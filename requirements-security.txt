@@ -1,0 +1,27 @@
+# Security Hardening Sprint - Requirements
+# Install these dependencies for authentication and validation
+
+# Authentication & Security
+passlib[bcrypt]==1.7.4  # Password hashing
+python-jose[cryptography]==3.3.0  # JWT tokens
+python-multipart==0.0.6  # OAuth2 form data
+
+# Input Validation & Sanitization
+bleach==6.1.0  # HTML sanitization
+email-validator==2.1.0  # Email validation
+
+# Rate Limiting (upgraded)
+slowapi==0.1.9  # Better rate limiting with Redis
+
+# CSRF Protection
+itsdangerous==2.1.2  # Token generation for CSRF
+
+# Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+httpx==0.25.2  # Async test client
+
+# Circuit Breaker & Retry
+tenacity==8.2.3  # Retry logic
+circuitbreaker==1.4.0  # Circuit breaker pattern

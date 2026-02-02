@@ -1,0 +1,253 @@
+# R-DIOS CI/CD Pipeline
+# Automated testing, security scanning, and deployment
+
+name: R-DIOS CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  PYTHON_VERSION: "3.11"
+  NODE_VERSION: "18"
+
+jobs:
+  # ==================== LINTING & CODE QUALITY ====================
+  lint:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install linting tools
+        run: |
+          pip install flake8 black isort mypy
+      
+      - name: Run flake8
+        run: flake8 api/ --max-line-length=120 --exclude=__pycache__
+        continue-on-error: true
+      
+      - name: Check formatting with black
+        run: black --check api/
+        continue-on-error: true
+      
+      - name: Check imports with isort
+        run: isort --check-only api/
+        continue-on-error: true
+
+  # ==================== UNIT TESTS ====================
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    needs: lint
+    
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: --health-cmd "redis-cli ping" --health-interval 10s --health-timeout 5s --health-retries 5
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          pip install -r api/requirements.txt
+          pip install pytest pytest-cov pytest-asyncio httpx
+      
+      - name: Run tests with coverage
+        env:
+          USE_SQLITE: "true"
+          REDIS_ENABLED: "true"
+          REDIS_HOST: "localhost"
+        run: |
+          pytest tests/ -v --cov=api --cov-report=xml --cov-report=html
+      
+      - name: Upload coverage report
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: false
+
+  # ==================== SECURITY SCANNING ====================
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: lint
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install security tools
+        run: |
+          pip install pip-audit safety bandit
+      
+      - name: Run pip-audit
+        run: pip-audit -r api/requirements.txt --strict
+        continue-on-error: true
+      
+      - name: Run safety check
+        run: safety check -r api/requirements.txt
+        continue-on-error: true
+      
+      - name: Run bandit (SAST)
+        run: bandit -r api/ -ll --format json --output bandit-report.json
+        continue-on-error: true
+      
+      - name: Upload security report
+        uses: actions/upload-artifact@v3
+        with:
+          name: security-reports
+          path: bandit-report.json
+
+  # ==================== BUILD DOCKER IMAGE ====================
+  build:
+    name: Build Docker
+    runs-on: ubuntu-latest
+    needs: [test, security]
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      
+      - name: Build and push API image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./api
+          file: ./api/Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/rdios-api:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/rdios-api:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ==================== DEPLOY TO STAGING ====================
+  deploy-staging:
+    name: Deploy Staging
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: staging
+      url: https://staging.rdios.com
+    
+    steps:
+      - name: Deploy to staging server
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          script: |
+            cd /opt/rdios
+            docker-compose pull api
+            docker-compose up -d api
+            docker-compose exec api python -c "from api.db.database import check_database_health; print(check_database_health())"
+      
+      - name: Health check
+        run: |
+          sleep 30
+          curl -f https://staging.rdios.com/health || exit 1
+        continue-on-error: true
+
+  # ==================== DEPLOY TO PRODUCTION ====================
+  deploy-production:
+    name: Deploy Production
+    runs-on: ubuntu-latest
+    needs: deploy-staging
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: production
+      url: https://api.rdios.com
+    
+    steps:
+      - name: Deploy to production
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          script: |
+            cd /opt/rdios
+            docker-compose pull api
+            docker-compose up -d --no-deps api
+            sleep 10
+            # Health check
+            curl -f http://localhost:8000/health || docker-compose logs api
+      
+      - name: Notify deployment
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          fields: repo,message,commit,author,action,eventName,workflow
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+        if: always()
+
+  # ==================== LOAD TESTING (Weekly) ====================
+  load-test:
+    name: Load Testing
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || contains(github.event.head_commit.message, '[load-test]')
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install Locust
+        run: pip install locust
+      
+      - name: Run load tests
+        run: |
+          locust -f tests/load/locustfile.py \
+            --host=https://staging.rdios.com \
+            --users=100 \
+            --spawn-rate=10 \
+            --run-time=5m \
+            --headless \
+            --html=load-test-report.html
+      
+      - name: Upload load test report
+        uses: actions/upload-artifact@v3
+        with:
+          name: load-test-report
+          path: load-test-report.html

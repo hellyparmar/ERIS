@@ -1,0 +1,228 @@
+/* Modern Design System - Glassmorphism & Gradients */
+
+:root {
+    /* Primary Gradients */
+    --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --gradient-secondary: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    --gradient-success: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    --gradient-warning: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+    --gradient-danger: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+
+    /* Light Mode Defaults */
+    --bg-primary: #f8fafc;
+    --text-primary: #0f172a;
+    --glass-bg: rgba(255, 255, 255, 0.9);
+    --glass-border: rgba(226, 232, 240, 0.8);
+    --glass-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+}
+
+.dark {
+    /* Cyberpunk Enterprise Theme */
+    --bg-primary: #050507;
+    --text-primary: #f1f5f9;
+
+    /* High-fidelity Glass */
+    --glass-bg: rgba(20, 20, 35, 0.6);
+    --glass-border: rgba(255, 255, 255, 0.12);
+    /* Brighter border */
+
+    --glass-shadow:
+        0 4px 30px rgba(0, 0, 0, 0.5),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+    /* Inner rim */
+
+    --hover-glow: 0 0 25px rgba(6, 182, 212, 0.25);
+    /* Cyan Glow */
+}
+
+/* UNIVERSAL DARK MODE HOVER OVERRIDES */
+.dark button:not(:disabled):hover,
+.dark input:hover,
+.dark select:hover,
+.dark .hover-trigger:hover {
+    box-shadow: var(--hover-glow) !important;
+    border-color: rgba(96, 165, 250, 0.5) !important;
+    transition: all 0.3s ease;
+}
+
+/* Ensure glass cards keep their specific style but use the variable */
+
+/* Glass Card */
+.glass-card {
+    background: var(--glass-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--glass-border);
+    border-radius: 1rem;
+    box-shadow: var(--glass-shadow);
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    /* Bouncy spring */
+    position: relative;
+    overflow: hidden;
+}
+
+.glass-card::before {
+    /* Subtle shine element */
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg,
+            transparent,
+            rgba(255, 255, 255, 0.03),
+            transparent);
+    transition: 0.5s;
+    pointer-events: none;
+}
+
+.glass-card:hover::before {
+    left: 100%;
+}
+
+.glass-card:hover {
+    transform: translateY(-5px) scale(1.005);
+}
+
+.dark .glass-card:hover {
+    box-shadow:
+        0 0 30px rgba(6, 182, 212, 0.2),
+        /* Cyan spill */
+        0 0 0 1px rgba(6, 182, 212, 0.4);
+    /* Sharp cyan border */
+    border-color: transparent;
+    background-color: rgba(20, 20, 35, 0.8) !important;
+}
+
+/* Neon Gradient Text */
+.gradient-text {
+    background: linear-gradient(135deg, #22d3ee 0%, #a855f7 100%);
+    /* Cyan to Purple */
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    filter: drop-shadow(0 0 2em rgba(34, 211, 238, 0.2));
+}
+
+/* Light mode: use solid dark color for maximum readability */
+:not(.dark) .gradient-text {
+    background: #111827;
+    /* gray-900 for WCAG AAA compliance */
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* NUCLEAR DARK MODE OVERRIDE 
+   Forces all light backgrounds to be dark/transparent in dark mode.
+   Solves persistent "white box" issues in inputs, cards, and filters.
+*/
+.dark .bg-white,
+.dark .bg-gray-50,
+.dark .bg-gray-100,
+.dark .bg-gray-200,
+.dark .bg-slate-50,
+.dark .bg-slate-100 {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+    color: #f8fafc !important;
+}
+
+/* Gradient Button */
+.gradient-button {
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 9999px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+/* Animations */
+.fade-in-up {
+    animation: fadeInUp 0.6s ease-out;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.shimmer {
+    background: linear-gradient(90deg,
+            rgba(255, 255, 255, 0.05) 0%,
+            rgba(255, 255, 255, 0.1) 50%,
+            rgba(255, 255, 255, 0.05) 100%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+    0% {
+        background-position: -200% 0;
+    }
+
+    100% {
+        background-position: 200% 0;
+    }
+}
+
+/* ========================================
+   LIGHT MODE ENHANCEMENTS
+   ======================================== */
+
+/* Light Mode Text Contrast Standards (WCAG AA Compliance) */
+:not(.dark) .text-gray-400 {
+    color: #6b7280 !important;
+    /* gray-500 for better contrast */
+}
+
+:not(.dark) .text-gray-500 {
+    color: #4b5563 !important;
+    /* gray-600 for better contrast */
+}
+
+/* Light Mode Interactive Elements Hover */
+:not(.dark) button:not(:disabled):hover,
+:not(.dark) input:hover,
+:not(.dark) select:hover {
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15) !important;
+    border-color: rgba(59, 130, 246, 0.3) !important;
+    transition: all 0.2s ease;
+}
+
+/* Light Mode Glass Card Hover */
+:not(.dark) .glass-card:hover {
+    box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.08);
+    border-color: rgba(59, 130, 246, 0.2);
+    transform: translateY(-2px);
+}
+
+/* Typography Hierarchy for Light Mode */
+:not(.dark) h1,
+:not(.dark) h2,
+:not(.dark) h3 {
+    color: #111827;
+    /* gray-900 for maximum contrast */
+    font-weight: 700;
+}
+
+:not(.dark) p {
+    color: #374151;
+    /* gray-700 for body text */
+}
+
+:not(.dark) label,
+:not(.dark) .text-sm {
+    color: #4b5563;
+    /* gray-600 for labels */
+}

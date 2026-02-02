@@ -1,0 +1,43 @@
+/* Skip Links Styles */
+.skip-links {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 10000;
+    width: 100%;
+}
+
+.skip-link {
+    position: absolute;
+    top: -100px;
+    left: 8px;
+    background: var(--primary, #4f46e5);
+    color: white;
+    padding: 12px 24px;
+    text-decoration: none;
+    border-radius: 0 0 8px 8px;
+    font-weight: 600;
+    font-size: 14px;
+    transition: top 0.2s ease;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.skip-link:focus {
+    top: 0;
+    outline: 3px solid #fff;
+    outline-offset: 2px;
+}
+
+.skip-link:hover {
+    background: var(--primary-dark, #4338ca);
+}
+
+/* Dark mode support */
+.dark .skip-link {
+    background: #818cf8;
+    color: #1e1b4b;
+}
+
+.dark .skip-link:hover {
+    background: #a5b4fc;
+}

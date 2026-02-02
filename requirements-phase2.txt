@@ -1,0 +1,10 @@
+# R-DIOS v5.0 - Phase 2: Transaction Engine Requirements
+
+# PDF Generation
+reportlab==4.0.4
+
+# WhatsApp Integration (Twilio)
+twilio==8.5.0
+
+# Environment variable management
+python-dotenv==1.0.0

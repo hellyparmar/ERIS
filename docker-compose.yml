@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  # ==============================
+  # BACKEND SERVICE
+  # ==============================
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: rdios_backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://user:password@db:5432/rdios
+      - SECRET_KEY=${SECRET_KEY}
+      - ALLOWED_HOSTS=localhost,127.0.0.1
+    depends_on:
+      - db
+      - redis
+    networks:
+      - rdios_net
+    restart: always
+
+  # ==============================
+  # FRONTEND SERVICE
+  # ==============================
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: rdios_frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - rdios_net
+    restart: always
+
+  # ==============================
+  # DATABASE (PostgreSQL)
+  # ==============================
+  db:
+    image: postgres:15-alpine
+    container_name: rdios_db
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=rdios
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - rdios_net
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U user -d rdios" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ==============================
+  # REDIS (Rate Limiting)
+  # ==============================
+  redis:
+    image: redis:alpine
+    container_name: rdios_redis
+    networks:
+      - rdios_net
+
+networks:
+  rdios_net:
+    driver: bridge
+
+volumes:
+  postgres_data:

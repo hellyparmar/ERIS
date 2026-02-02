@@ -1,0 +1,117 @@
+import React, { Suspense, lazy } from 'react';
+import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import Sidebar from './components/layout/Sidebar';
+import MobileNav from './components/layout/MobileNav';
+import { ToastProvider } from './components/ui/Toast';
+import ErrorBoundary from './components/ErrorBoundary';
+import SkipLinks from './components/a11y/SkipLinks';
+import { Announcer } from './components/a11y/A11yUtils';
+import './modern-design.css';
+import './index.css';
+
+// Lazy load pages
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Analytics = lazy(() => import('./pages/Analytics'));
+const Inventory = lazy(() => import('./pages/Inventory'));
+const Forecasts = lazy(() => import('./pages/Forecasts'));
+const Alerts = lazy(() => import('./pages/Alerts'));
+const Integrations = lazy(() => import('./pages/Integrations'));
+const Team = lazy(() => import('./pages/Team'));
+const Enterprise = lazy(() => import('./pages/Enterprise'));
+const AIAssistant = lazy(() => import('./pages/AIAssistant'));
+const TaxCompliance = lazy(() => import('./pages/TaxCompliance'));
+const Invoices = lazy(() => import('./pages/Invoices'));
+const Loyalty = lazy(() => import('./pages/Loyalty'));
+// New Enterprise Intelligence Modules
+const CustomerInsights = lazy(() => import('./pages/CustomerInsights'));
+const MultiStore = lazy(() => import('./pages/MultiStore'));
+const Compliance = lazy(() => import('./pages/Compliance'));
+// Production-Grade Feature Pages
+const Settings = lazy(() => import('./pages/Settings'));
+const DevOps = lazy(() => import('./pages/DevOps'));
+const POS = lazy(() => import('./pages/POS'));
+const Employees = lazy(() => import('./pages/Employees'));
+const Returns = lazy(() => import('./pages/Returns'));
+const Suppliers = lazy(() => import('./pages/Suppliers'));
+const Promotions = lazy(() => import('./pages/Promotions'));
+const Monitoring = lazy(() => import('./pages/Monitoring'));
+
+// Loading Fallback
+const LoadingSpinner = () => (
+  <div className="flex h-full items-center justify-center min-h-[50vh]">
+    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+  </div>
+);
+
+const MainLayout = () => {
+  const location = useLocation();
+  const mainRef = React.useRef(null);
+
+  React.useEffect(() => {
+    if (mainRef.current) {
+      mainRef.current.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+    }
+  }, [location.pathname]);
+
+  return (
+    <>
+      <SkipLinks />
+      <Announcer />
+      <div className="flex h-screen bg-background text-foreground overflow-hidden transition-colors duration-300">
+        <div id="navigation" className="hidden md:block">
+          <Sidebar />
+        </div>
+        <main
+          id="main-content"
+          ref={mainRef}
+          className="flex-1 overflow-y-auto p-4 md:p-8 mb-16 md:mb-0"
+          role="main"
+          aria-label="Main content"
+        >
+          <Suspense fallback={<LoadingSpinner />}>
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/analytics" element={<Analytics />} />
+              <Route path="/invoices" element={<Invoices />} />
+              <Route path="/loyalty" element={<Loyalty />} />
+              <Route path="/inventory" element={<Inventory />} />
+              <Route path="/forecasts" element={<Forecasts />} />
+              <Route path="/alerts" element={<Alerts />} />
+              <Route path="/integrations" element={<Integrations />} />
+              <Route path="/tax-compliance" element={<TaxCompliance />} />
+              <Route path="/team" element={<Team />} />
+              <Route path="/enterprise" element={<Enterprise />} />
+              <Route path="/ai-assistant" element={<AIAssistant />} />
+              <Route path="/customers" element={<CustomerInsights />} />
+              <Route path="/multi-store" element={<MultiStore />} />
+              <Route path="/compliance" element={<Compliance />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="/devops" element={<DevOps />} />
+              <Route path="/pos" element={<POS />} />
+              <Route path="/employees" element={<Employees />} />
+              <Route path="/returns" element={<Returns />} />
+              <Route path="/suppliers" element={<Suppliers />} />
+              <Route path="/promotions" element={<Promotions />} />
+              <Route path="/monitoring" element={<Monitoring />} />
+            </Routes>
+          </Suspense>
+        </main>
+        <MobileNav />
+      </div>
+    </>
+  );
+};
+
+function App() {
+  return (
+    <ErrorBoundary>
+      <ToastProvider>
+        <Router>
+          <MainLayout />
+        </Router>
+      </ToastProvider>
+    </ErrorBoundary>
+  );
+}
+
+export default App;
