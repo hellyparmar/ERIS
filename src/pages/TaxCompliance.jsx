@@ -32,6 +32,23 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, T
 const TaxCompliance = () => {
     const [activeTab, setActiveTab] = useState('gst'); // gst, tds, income_tax
 
+    // Determine if we are in dark mode (simple check)
+    const isDark = document.documentElement.classList.contains('dark');
+    const textColor = isDark ? '#e2e8f0' : '#475569';
+    const gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+
+    const chartOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { position: 'top', labels: { usePointStyle: true, color: textColor } },
+        },
+        scales: {
+            x: { grid: { color: gridColor }, ticks: { color: textColor } },
+            y: { grid: { color: gridColor }, ticks: { color: textColor } }
+        }
+    };
+
     // Mock Data
     const taxSummary = {
         total_liability: 124500,
@@ -73,17 +90,7 @@ const TaxCompliance = () => {
         ]
     };
 
-    const chartOptions = {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: { position: 'top', labels: { usePointStyle: true, color: '#e2e8f0' } },
-        },
-        scales: {
-            x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#e2e8f0' } },
-            y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#e2e8f0' } }
-        }
-    };
+
 
     return (
         <div className="min-h-screen fade-in-up space-y-8">
@@ -91,7 +98,7 @@ const TaxCompliance = () => {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
                     <h1 className="text-4xl font-bold gradient-text mb-2">Tax & Compliance</h1>
-                    <p className="text-gray-400">Automated tax liability tracking and filing</p>
+                    <p className="text-muted-foreground">Automated tax liability tracking and filing</p>
                 </div>
                 <GradientButton
                     className="flex items-center justify-center gap-2 whitespace-nowrap"
@@ -105,10 +112,10 @@ const TaxCompliance = () => {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <GlassCard className="p-6">
                     <div className="flex justify-between items-start mb-2">
-                        <span className="text-gray-400 text-sm">Total Tax Liability</span>
+                        <span className="text-muted-foreground text-sm">Total Tax Liability</span>
                         <DollarSign className="text-blue-500 w-5 h-5" />
                     </div>
-                    <h3 className="text-2xl font-bold text-slate-900 dark:text-white">₹{taxSummary.total_liability.toLocaleString()}</h3>
+                    <h3 className="text-2xl font-bold text-foreground">₹{taxSummary.total_liability.toLocaleString()}</h3>
                 </GlassCard>
                 <GlassCard className="p-6">
                     <div className="flex justify-between items-start mb-2">
@@ -126,10 +133,10 @@ const TaxCompliance = () => {
                 </GlassCard>
                 <GlassCard className="p-6">
                     <div className="flex justify-between items-start mb-2">
-                        <span className="text-gray-400 text-sm">Next Due Date</span>
+                        <span className="text-muted-foreground text-sm">Next Due Date</span>
                         <Calendar className="text-yellow-500 w-5 h-5" />
                     </div>
-                    <h3 className="text-2xl font-bold text-slate-900 dark:text-white">{taxSummary.next_due}</h3>
+                    <h3 className="text-2xl font-bold text-foreground">{taxSummary.next_due}</h3>
                 </GlassCard>
             </div>
 
@@ -144,8 +151,8 @@ const TaxCompliance = () => {
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
                         className={`px-4 py-2 font-medium transition-all relative ${activeTab === tab.id
-                            ? 'text-blue-600 dark:text-blue-400'
-                            : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                            ? 'text-primary'
+                            : 'text-muted-foreground hover:text-foreground'
                             }`}
                     >
                         {tab.label}
@@ -193,20 +200,20 @@ const TaxCompliance = () => {
                     <GlassCard className="p-6">
                         <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Detailed Calculation</h3>
                         <div className="space-y-4 text-sm">
-                            <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-800">
-                                <span className="text-gray-500 dark:text-slate-400">Gross Revenue</span>
-                                <span className="text-slate-900 dark:text-white font-medium">₹12,45,000</span>
+                            <div className="flex justify-between py-2 border-b border-border">
+                                <span className="text-muted-foreground">Gross Revenue</span>
+                                <span className="text-foreground font-medium">₹12,45,000</span>
                             </div>
-                            <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-800">
-                                <span className="text-gray-500 dark:text-slate-400">Taxable Amount</span>
-                                <span className="text-slate-900 dark:text-white font-medium">₹10,50,000</span>
+                            <div className="flex justify-between py-2 border-b border-border">
+                                <span className="text-muted-foreground">Taxable Amount</span>
+                                <span className="text-foreground font-medium">₹10,50,000</span>
                             </div>
-                            <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-800">
-                                <span className="text-gray-500 dark:text-slate-400">Applicable Rate</span>
-                                <span className="text-slate-900 dark:text-white font-medium">18%</span>
+                            <div className="flex justify-between py-2 border-b border-border">
+                                <span className="text-muted-foreground">Applicable Rate</span>
+                                <span className="text-foreground font-medium">18%</span>
                             </div>
                             <div className="flex justify-between py-2 pt-4">
-                                <span className="text-gray-900 dark:text-white font-bold">Total Tax</span>
+                                <span className="text-foreground font-bold">Total Tax</span>
                                 <span className="text-blue-500 font-bold">₹1,89,000</span>
                             </div>
                         </div>

@@ -1,6 +1,7 @@
 /**
  * Enterprise Retail Intelligence System v3.0
  * ALERTS PAGE - Real-time Notification System
+ * Refactored with Enterprise Design System
  */
 
 import { useState, useEffect } from 'react';
@@ -17,113 +18,86 @@ import {
     Filter,
     X
 } from 'lucide-react';
-import GlassCard from '../components/ui/GlassCard';
-import GradientButton from '../components/ui/GradientButton';
-import '../modern-design.css';
+import UnifiedCard from '../components/ui/UnifiedCard';
+import ActionButton from '../components/ui/ActionButton';
+import { useToast } from '../components/ui/Toast';
 
 const Alerts = () => {
+    const { addToast } = useToast();
     const [filterSeverity, setFilterSeverity] = useState('all');
-    const [filterCategory, setFilterCategory] = useState('all');
+    const [filterCategory] = useState('all');
+    const [alerts, setAlerts] = useState([]);
+    const [loading, setLoading] = useState(true);
 
-    // Alert data
-    const [alerts] = useState([
-        {
-            id: 1,
-            severity: 'critical',
-            category: 'stock',
-            title: 'Critical Stock Level',
-            description: 'Premium Headphones inventory critically low (5 units remaining)',
-            timestamp: '2 minutes ago',
-            read: false,
-            action: 'Create Purchase Order',
-            icon: Package,
-            color: 'red'
-        },
-        {
-            id: 2,
-            severity: 'warning',
-            category: 'stock',
-            title: 'Low Stock Alert',
-            description: 'Wireless Mouse approaching reorder point (18 units left)',
-            timestamp: '15 minutes ago',
-            read: false,
-            action: 'View Stock Details',
-            icon: Package,
-            color: 'yellow'
-        },
-        {
-            id: 3,
-            severity: 'info',
-            category: 'sales',
-            title: 'Sales Milestone Achieved',
-            description: 'Daily sales target of ₹50,000 reached! Current: ₹52,340',
-            timestamp: '1 hour ago',
-            read: true,
-            action: 'View Report',
-            icon: DollarSign,
-            color: 'green'
-        },
-        {
-            id: 4,
-            severity: 'critical',
-            category: 'forecast',
-            title: 'Demand Spike Predicted',
-            description: 'AI forecasts 35% demand increase for Designer T-Shirts in next 7 days',
-            timestamp: '2 hours ago',
-            read: false,
-            action: 'Adjust Inventory',
-            icon: TrendingDown,
-            color: 'purple'
-        },
-        {
-            id: 5,
-            severity: 'warning',
-            category: 'system',
-            title: 'Sync Pending',
-            description: 'Tally synchronization delayed - 23 transactions pending',
-            timestamp: '3 hours ago',
-            read: true,
-            action: 'Retry Sync',
-            icon: AlertCircle,
-            color: 'orange'
-        },
-        {
-            id: 6,
-            severity: 'info',
-            category: 'stock',
-            title: 'Restock Completed',
-            description: 'Organic Coffee Beans restocked successfully (75 units added)',
-            timestamp: '5 hours ago',
-            read: true,
-            action: 'View Details',
-            icon: CheckCircle,
-            color: 'blue'
-        },
-        {
-            id: 7,
-            severity: 'critical',
-            category: 'stock',
-            title: 'Out of Stock',
-            description: 'Yoga Mat Pro is completely out of stock - 3 pending orders',
-            timestamp: '6 hours ago',
-            read: false,
-            action: 'Urgent Reorder',
-            icon: Package,
-            color: 'red'
-        },
-        {
-            id: 8,
-            severity: 'info',
-            category: 'sales',
-            title: 'New Customer Record',
-            description: 'Total customers reached 850+ milestone today',
-            timestamp: '8 hours ago',
-            read: true,
-            action: 'View Analytics',
-            icon: CheckCircle,
-            color: 'green'
+    useEffect(() => {
+        fetchAlerts();
+    }, []);
+
+    const fetchAlerts = async () => {
+        try {
+            setLoading(true);
+            const response = await fetch('http://localhost:8000/api/v1/alerts/list');
+            const data = await response.json();
+            if (data.success) {
+                // Transform API data to component format
+                const transformed = data.data.map(alert => ({
+                    id: alert.id,
+                    severity: alert.severity,
+                    category: alert.category,
+                    title: alert.title,
+                    description: alert.message,
+                    timestamp: new Date(alert.created_at).toLocaleString(),
+                    read: alert.is_acknowledged,
+                    action: alert.severity === 'critical' ? 'Take Action' : 'View Details',
+                    icon: getIconForCategory(alert.category),
+                    color: getSeverityColor(alert.severity)
+                }));
+                setAlerts(transformed);
+            }
+        } catch (error) {
+            console.error('Failed to fetch alerts:', error);
+            addToast('Failed to load alerts', 'error');
+        } finally {
+            setLoading(false);
         }
-    ]);
+    };
+
+    const handleAcknowledge = async (alertId) => {
+        try {
+            const response = await fetch(`http://localhost:8000/api/v1/alerts/${alertId}/acknowledge`, {
+                method: 'PATCH'
+            });
+            const data = await response.json();
+            if (data.success) {
+                addToast('Alert acknowledged', 'success');
+                fetchAlerts(); // Refresh list
+            }
+        } catch (error) {
+            console.error('Failed to acknowledge alert:', error);
+            addToast('Failed to acknowledge alert', 'error');
+        }
+    };
+
+    const getIconForCategory = (category) => {
+        const icons = {
+            'stock': Package,
+            'sales': DollarSign,
+            'forecast': TrendingDown,
+            'system': AlertCircle
+        };
+        return icons[category] || Info;
+    };
+
+    const getSeverityColor = (severity) => {
+        const colors = {
+            'critical': 'red',
+            'warning': 'yellow',
+            'info': 'blue'
+        };
+        return colors[severity] || 'gray';
+    };
+
+    const categories = ['all', 'stock', 'sales', 'forecast', 'system'];
 
     const getSeverityIcon = (severity) => {
         switch (severity) {
@@ -138,16 +112,13 @@ const Alerts = () => {
         }
     };
 
-    const handleDismiss = (id) => {
-        // In a real app, this would make an API call
-        // const updatedAlerts = alerts.filter(a => a.id !== id);
+    const handleDismiss = () => {
         alert("Alert dismissed! (In full version this will remove the alert)");
     };
 
-    const handleAction = async (action, alertDetails) => {
+    const handleAction = async (action) => {
         if (action === 'Create Purchase Order') {
             try {
-                // Trigger PDF download from backend
                 const response = await fetch(`http://localhost:8000/api/v1/reports/purchase-order/download?item_id=PRD001&quantity=50`);
                 if (response.ok) {
                     const blob = await response.blob();
@@ -171,31 +142,18 @@ const Alerts = () => {
         }
     };
 
-    const getSeverityColor = (severity) => {
-        switch (severity) {
-            case 'critical':
-                return 'bg-red-500/20 border-red-500/30 text-red-400';
-            case 'warning':
-                return 'bg-yellow-500/20 border-yellow-500/30 text-yellow-400';
-            case 'info':
-                return 'bg-blue-500/20 border-blue-500/30 text-blue-400';
-            default:
-                return 'bg-gray-500/20 border-gray-500/30 text-gray-400';
-        }
-    };
-
     const getCategoryColor = (category) => {
         switch (category) {
             case 'stock':
-                return 'text-purple-400';
+                return 'text-purple-600 dark:text-purple-400';
             case 'sales':
-                return 'text-green-400';
+                return 'text-green-600 dark:text-green-400';
             case 'forecast':
-                return 'text-orange-400';
+                return 'text-orange-600 dark:text-orange-400';
             case 'system':
-                return 'text-blue-400';
+                return 'text-primary';
             default:
-                return 'text-gray-400';
+                return 'text-muted-foreground';
         }
     };
 
@@ -213,7 +171,7 @@ const Alerts = () => {
     const unreadCount = alerts.filter(a => !a.read).length;
 
     return (
-        <div className="min-h-screen space-y-8 animate-fade-in">
+        <div className="min-h-screen space-y-6">
             {/* Header */}
             <motion.div
                 initial={{ opacity: 0, y: -20 }}
@@ -227,142 +185,132 @@ const Alerts = () => {
 
             {/* Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <GlassCard variant="gradient" className="p-6 animate-slide-up stagger-1">
+                <UnifiedCard className="cursor-pointer hover:shadow-lg transition-shadow">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-gray-400 text-sm mb-1">Total Alerts</p>
-                            <p className="text-3xl font-bold text-gray-900 dark:text-white">{alerts.length}</p>
+                            <p className="text-muted-foreground text-sm mb-1">Total Alerts</p>
+                            <p className="text-3xl font-bold text-foreground">{alerts.length}</p>
                         </div>
-                        <div className="p-3 rounded-lg bg-blue-600/20 border border-blue-500/30">
-                            <AlertCircle size={24} className="text-blue-400" />
+                        <div className="p-3 rounded-lg bg-primary/10 shadow-[0_0_10px_rgba(59,130,246,0.2)]">
+                            <AlertCircle size={24} className="text-primary" />
                         </div>
                     </div>
-                    <div className="mt-3 flex items-center gap-2 text-xs text-gray-500">
-                        <span className="px-2 py-1 bg-white/10 rounded">{unreadCount} unread</span>
+                    <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                        <span className="px-2 py-1 bg-muted rounded">{unreadCount} unread</span>
                     </div>
-                </GlassCard>
+                </UnifiedCard>
 
-                <GlassCard
-                    variant="gradient"
+                <UnifiedCard
                     onClick={() => setFilterSeverity('critical')}
-                    className={`p-6 cursor-pointer transition-all hover:scale-105 hover:shadow-glow-danger animate-slide-up stagger-2 ${filterSeverity === 'critical' ? 'ring-2 ring-danger shadow-glow-danger' : ''
+                    className={`cursor-pointer transition-all hover:shadow-2xl ${filterSeverity === 'critical' ? 'shadow-[0_0_20px_rgba(239,68,68,0.4)]' : ''
                         }`}
                 >
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-gray-400 text-sm mb-1">Critical</p>
-                            <p className="text-3xl font-bold text-gray-900 dark:text-white">{criticalCount}</p>
+                            <p className="text-muted-foreground text-sm mb-1">Critical</p>
+                            <p className="text-3xl font-bold text-foreground">{criticalCount}</p>
                         </div>
-                        <div className="p-3 rounded-lg bg-red-600/20 border border-red-500/30">
-                            <AlertTriangle size={24} className="text-red-400" />
+                        <div className="p-3 rounded-lg bg-destructive/10 shadow-[0_0_10px_rgba(239,68,68,0.2)]">
+                            <AlertTriangle size={24} className="text-destructive" />
                         </div>
                     </div>
-                    <p className="mt-3 text-xs text-red-400 font-medium">Requires immediate action</p>
-                </GlassCard>
+                    <p className="mt-3 text-xs text-muted-foreground font-medium">Requires immediate action</p>
+                </UnifiedCard>
 
-                <GlassCard
-                    variant="gradient"
+                <UnifiedCard
                     onClick={() => setFilterSeverity('warning')}
-                    className={`p-6 cursor-pointer transition-all hover:scale-105 hover:shadow-glow-warning animate-slide-up stagger-3 ${filterSeverity === 'warning' ? 'ring-2 ring-warning shadow-glow-warning' : ''
+                    className={`cursor-pointer transition-all hover:shadow-2xl ${filterSeverity === 'warning' ? 'shadow-[0_0_20px_rgba(234,179,8,0.4)]' : ''
                         }`}
                 >
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-gray-400 text-sm mb-1">Warnings</p>
-                            <p className="text-3xl font-bold text-gray-900 dark:text-white">{warningCount}</p>
+                            <p className="text-muted-foreground text-sm mb-1">Warnings</p>
+                            <p className="text-3xl font-bold text-foreground">{warningCount}</p>
                         </div>
-                        <div className="p-3 rounded-lg bg-yellow-600/20 border border-yellow-500/30">
-                            <AlertCircle size={24} className="text-yellow-400" />
+                        <div className="p-3 rounded-lg bg-yellow-500/10 shadow-[0_0_10px_rgba(234,179,8,0.2)]">
+                            <AlertCircle size={24} className="text-yellow-600 dark:text-yellow-500" />
                         </div>
                     </div>
-                    <p className="mt-3 text-xs text-yellow-400 font-medium">Attention needed</p>
-                </GlassCard>
+                    <p className="mt-3 text-xs text-muted-foreground font-medium">Attention needed</p>
+                </UnifiedCard>
 
-                <GlassCard
-                    variant="gradient"
+                <UnifiedCard
                     onClick={() => setFilterSeverity('info')}
-                    className={`p-6 cursor-pointer transition-all hover:scale-105 hover:shadow-glow-primary animate-slide-up stagger-4 ${filterSeverity === 'info' ? 'ring-2 ring-primary shadow-glow-primary' : ''
+                    className={`cursor-pointer transition-all hover:shadow-lg ${filterSeverity === 'info' ? 'ring-2 ring-primary' : ''
                         }`}
                 >
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-gray-400 text-sm mb-1">Info</p>
-                            <p className="text-3xl font-bold text-gray-900 dark:text-white">{infoCount}</p>
+                            <p className="text-muted-foreground text-sm mb-1">Info</p>
+                            <p className="text-3xl font-bold text-foreground">{infoCount}</p>
                         </div>
-                        <div className="p-3 rounded-lg bg-blue-600/20 border border-blue-500/30">
-                            <Info size={24} className="text-blue-400" />
+                        <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
+                            <Info size={24} className="text-primary" />
                         </div>
                     </div>
-                    <p className="mt-3 text-xs text-blue-400 font-medium">Informational updates</p>
-                </GlassCard>
+                    <p className="mt-3 text-xs text-muted-foreground font-medium">Informational updates</p>
+                </UnifiedCard>
             </div>
 
             {/* Filters */}
-            <GlassCard variant="gradient" className="p-6 animate-slide-up stagger-5">
+            <UnifiedCard>
                 <div className="flex flex-wrap items-center gap-4">
                     <div className="flex items-center gap-2">
-                        <Filter size={20} className="text-gray-400" />
-                        <span className="text-gray-400">Filters:</span>
+                        <Filter size={20} className="text-muted-foreground" />
+                        <span className="text-foreground font-medium">Filters:</span>
                     </div>
 
-                    <div className="flex gap-2">
-                        <button
+                    <div className="flex gap-2 flex-wrap">
+                        <ActionButton
                             onClick={() => setFilterSeverity('all')}
-                            className={`px-4 py-2 rounded-lg transition ${filterSeverity === 'all'
-                                ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg shadow-blue-500/30'
-                                : 'bg-gray-100 dark:bg-slate-800/50 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-700 border border-transparent dark:border-white/10'
-                                }`}
+                            variant={filterSeverity === 'all' ? 'primary' : 'secondary'}
+                            size="sm"
                         >
                             All
-                        </button>
-                        <button
+                        </ActionButton>
+                        <ActionButton
                             onClick={() => setFilterSeverity('critical')}
-                            className={`px-4 py-2 rounded-lg transition ${filterSeverity === 'critical'
-                                ? 'bg-red-600 text-white'
-                                : 'bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/20'
-                                }`}
+                            variant={filterSeverity === 'critical' ? 'destructive' : 'secondary'}
+                            size="sm"
                         >
                             Critical ({criticalCount})
-                        </button>
-                        <button
+                        </ActionButton>
+                        <ActionButton
                             onClick={() => setFilterSeverity('warning')}
-                            className={`px-4 py-2 rounded-lg transition ${filterSeverity === 'warning'
-                                ? 'bg-yellow-600 text-white'
-                                : 'bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/20'
-                                }`}
+                            variant={filterSeverity === 'warning' ? 'primary' : 'secondary'}
+                            size="sm"
+                            className={filterSeverity === 'warning' ? 'bg-yellow-600 hover:bg-yellow-700 text-white' : ''}
                         >
                             Warnings ({warningCount})
-                        </button>
-                        <button
+                        </ActionButton>
+                        <ActionButton
                             onClick={() => setFilterSeverity('info')}
-                            className={`px-4 py-2 rounded-lg transition ${filterSeverity === 'info'
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/20'
-                                }`}
+                            variant={filterSeverity === 'info' ? 'primary' : 'secondary'}
+                            size="sm"
                         >
                             Info ({infoCount})
-                        </button>
+                        </ActionButton>
                     </div>
 
                     <div className="ml-auto flex gap-2">
-                        <button className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-gray-400 text-sm transition">
+                        <ActionButton variant="secondary" size="sm">
                             Mark All as Read
-                        </button>
-                        <button className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-gray-400 text-sm transition">
+                        </ActionButton>
+                        <ActionButton variant="secondary" size="sm">
                             Clear All
-                        </button>
+                        </ActionButton>
                     </div>
                 </div>
-            </GlassCard>
+            </UnifiedCard>
 
             {/* Alerts List */}
             <div className="space-y-4">
                 {filteredAlerts.length === 0 ? (
-                    <GlassCard variant="gradient" className="p-12 text-center">
-                        <CheckCircle className="mx-auto mb-4 text-green-400" size={48} />
-                        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">No Alerts</h3>
-                        <p className="text-gray-400">All caught up! No alerts for this filter.</p>
-                    </GlassCard>
+                    <UnifiedCard className="text-center py-12">
+                        <CheckCircle className="mx-auto mb-4 text-green-600 dark:text-green-500" size={48} />
+                        <h3 className="text-xl font-bold text-foreground mb-2">No Alerts</h3>
+                        <p className="text-muted-foreground">All caught up! No alerts for this filter.</p>
+                    </UnifiedCard>
                 ) : (
                     filteredAlerts.map((alert, idx) => {
                         const isPulse = alert.severity === 'critical' && !alert.read;
@@ -373,17 +321,15 @@ const Alerts = () => {
                                 animate={{ opacity: 1, x: 0 }}
                                 transition={{ delay: idx * 0.05 }}
                             >
-                                <GlassCard
-                                    variant="gradient"
-                                    className={`p-6 transition-all ${!alert.read ? 'border-l-4 border-primary' : ''
-                                        } ${isPulse ? 'animate-pulse-custom ring-2 ring-danger/50' : ''
+                                <UnifiedCard
+                                    className={`${!alert.read ? 'border-l-4 border-primary' : ''} ${isPulse ? 'ring-2 ring-destructive/50' : ''
                                         }`}
                                 >
                                     <div className="flex items-start gap-4">
                                         {/* Icon */}
-                                        <div className={`p-3 rounded-lg ${getSeverityColor(alert.severity)} relative`}>
+                                        <div className={`p-3 rounded-lg ${getSeverityColor(alert.severity)} relative flex-shrink-0`}>
                                             {isPulse && (
-                                                <span className="absolute inset-0 rounded-lg bg-danger/20 animate-ping" />
+                                                <span className="absolute inset-0 rounded-lg bg-destructive/20 animate-ping" />
                                             )}
                                             <div className="relative z-10">
                                                 {getSeverityIcon(alert.severity)}
@@ -391,27 +337,27 @@ const Alerts = () => {
                                         </div>
 
                                         {/* Content */}
-                                        <div className="flex-1">
+                                        <div className="flex-1 min-w-0">
                                             <div className="flex items-start justify-between mb-2">
-                                                <div>
-                                                    <div className="flex items-center gap-3 mb-1">
-                                                        <h3 className="text-lg font-bold bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-3 mb-1 flex-wrap">
+                                                        <h3 className="text-lg font-bold text-foreground">
                                                             {alert.title}
                                                         </h3>
                                                         {!alert.read && (
-                                                            <span className="px-2 py-1 bg-primary/20 border border-primary/30 text-primary text-xs rounded-full font-semibold animate-pulse-custom">
+                                                            <span className="px-2 py-1 bg-primary/10 border border-primary/20 text-primary text-xs rounded-full font-semibold">
                                                                 NEW
                                                             </span>
                                                         )}
                                                     </div>
                                                     <p className="text-muted-foreground text-sm">{alert.description}</p>
                                                 </div>
-                                                <button className="p-2 hover:bg-white/10 rounded-lg transition">
+                                                <button className="p-2 hover:bg-muted rounded-lg transition flex-shrink-0">
                                                     <X size={20} className="text-muted-foreground" />
                                                 </button>
                                             </div>
 
-                                            <div className="flex items-center justify-between mt-4">
+                                            <div className="flex items-center justify-between mt-4 gap-4 flex-wrap">
                                                 <div className="flex items-center gap-4 text-xs text-muted-foreground">
                                                     <span className="flex items-center gap-1">
                                                         <Clock size={14} />
@@ -423,23 +369,25 @@ const Alerts = () => {
                                                 </div>
 
                                                 <div className="flex gap-2">
-                                                    <button
+                                                    <ActionButton
+                                                        variant="primary"
+                                                        size="sm"
                                                         onClick={() => handleAction(alert.action, alert)}
-                                                        className="px-4 py-2 bg-gradient-to-r from-primary to-purple hover:shadow-lg hover:shadow-primary/30 rounded-lg text-white text-sm transition-all font-medium"
                                                     >
                                                         {alert.action}
-                                                    </button>
-                                                    <button
+                                                    </ActionButton>
+                                                    <ActionButton
+                                                        variant="destructive"
+                                                        size="sm"
                                                         onClick={() => handleDismiss(alert.id)}
-                                                        className="px-4 py-2 bg-muted/30 hover:bg-muted/50 rounded-lg text-foreground text-sm transition-all font-medium border border-border"
                                                     >
                                                         Dismiss
-                                                    </button>
+                                                    </ActionButton>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
-                                </GlassCard>
+                                </UnifiedCard>
                             </motion.div>
                         );
                     })
@@ -449,13 +397,13 @@ const Alerts = () => {
             {/* Pagination */}
             {filteredAlerts.length > 0 && (
                 <div className="flex items-center justify-center gap-2">
-                    <button className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-gray-400 text-sm transition">
+                    <ActionButton variant="secondary" size="sm">
                         Previous
-                    </button>
-                    <span className="px-4 py-2 text-gray-400 text-sm">Page 1 of 1</span>
-                    <button className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-gray-400 text-sm transition">
+                    </ActionButton>
+                    <span className="px-4 py-2 text-muted-foreground text-sm">Page 1 of 1</span>
+                    <ActionButton variant="secondary" size="sm">
                         Next
-                    </button>
+                    </ActionButton>
                 </div>
             )}
         </div>

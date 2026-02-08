@@ -582,34 +582,9 @@ async def explain_forecast(
 # REAL-TIME METRICS WITH ACTUAL CSV DATA
 # ============================================================
 
-# Cache for CSV data (load once, reuse)
-_csv_data_cache = {}
-
-def load_csv_data_cached():
-    """Load processed CSV data with caching"""
-    global _csv_data_cache
-    
-    if _csv_data_cache:
-        return _csv_data_cache
-    
-    try:
-        from pathlib import Path
-        import pandas as pd
-        
-        base_path = Path(__file__).parent.parent.parent / "data" / "processed"
-        
-        _csv_data_cache = {
-            "products": pd.read_csv(base_path / "products_enriched.csv"),
-            "sales": pd.read_csv(base_path / "sales_enriched.csv"),
-            "customers": pd.read_csv(base_path / "customers_enriched.csv"),
-            "inventory": pd.read_csv(base_path / "inventory_enriched.csv")
-        }
-        
-        logger.info(f"Loaded CSV data: {len(_csv_data_cache['products'])} products, {len(_csv_data_cache['sales'])} sales")
-        return _csv_data_cache
-    except Exception as e:
-        logger.error(f"Failed to load CSV data: {e}")
-        return None
+# ============================================================
+# REAL-TIME METRICS (LIVE DATABASE)
+# ============================================================
 
 def get_time_multiplier_for_hour(hour: int) -> float:
     """Calculate time-of-day multiplier for realistic metrics"""
@@ -623,94 +598,104 @@ def get_time_multiplier_for_hour(hour: int) -> float:
         return 0.4  # Night time
 
 @router.get("/realtime")
-async def get_realtime_dashboard_metrics():
+async def get_realtime_dashboard_metrics(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
     """
-    Get real-time dashboard metrics with actual CSV data
-    Returns time-aware metrics that change throughout the day
+    Get real-time dashboard metrics directly from the database
     """
-    csv_data = load_csv_data_cached()
-    
-    if not csv_data:
-        # Fallback to mock data
-        current_hour = datetime.now().hour
-        time_mult = get_time_multiplier_for_hour(current_hour)
-        return {
-            "timestamp": datetime.now().isoformat(),
-            "today_revenue": round(125000 * time_mult, 2),
-            "total_revenue": 28015526.10,
-            "active_orders": int(45 * time_mult),
-            "total_orders": 99441,
-            "avg_order_value": 2817.50,
-            "top_products": [],
-            "low_stock_alerts": [],
-            "time_multiplier": round(time_mult, 2)
-        }
-    
-    current_hour = datetime.now().hour
-    time_multiplier = get_time_multiplier_for_hour(current_hour)
-    
-    # Calculate actual metrics from CSV
-    total_revenue = csv_data["sales"]["payment_value_inr"].sum()
-    total_orders = len(csv_data["sales"])
-    avg_order_value = total_revenue / total_orders
-    
-    # Daily average (simulate today's progress)
-    daily_avg_revenue = total_revenue / 365
-    today_revenue = daily_avg_revenue * time_multiplier
-    
-    # Active orders (simulated based on time of day)
-    base_active_orders = int(total_orders / 365 / 24)
-    active_orders = int(base_active_orders * time_multiplier * 10)
-    
-    # Filter products for Restaurant Context
     try:
-        # Get count of all products in relevant categories
-        product_categories = csv_data["products"]["product_category_name"].value_counts()
+        from sqlalchemy import func, desc, and_
+        from api.db.models import Sale, SaleItem
+        from api.db.multitenant_models import Product, Inventory
+
+        now = datetime.now()
+        today_start = datetime.combine(now.date(), datetime.min.time())
+        current_hour = now.hour
+        time_multiplier = get_time_multiplier_for_hour(current_hour)
+
+        # 1. Revenue & Orders
+        # Total Revenue (Lifetime)
+        total_revenue = db.query(func.sum(Sale.total_amount)).scalar() or 0
+        total_orders = db.query(func.count(Sale.id)).scalar() or 0
         
-        # Filter only restaurant categories
-        restaurant_product_categories = product_categories[product_categories.index.isin(RESTAURANT_CATEGORIES)].head(5)
+        # Today's Revenue (Simulated "Real-time" based on total)
+        # Since synthetic data covers past dates, we simulate "today" as a fraction of daily average
+        # In a real system, this would be: .filter(Sale.transaction_date >= today_start)
+        daily_avg_revenue = (float(total_revenue) / 365) if total_revenue else 0.0
+        today_revenue = daily_avg_revenue * time_multiplier
+
+        # Active Orders (Simulated)
+        active_orders = int((total_orders / 365 / 24) * time_multiplier * 10)
         
-        # If no restaurant categories found (fallback), generic top 5
-        if restaurant_product_categories.empty:
-            restaurant_product_categories = product_categories.head(5)
-            
+        # Avg Order Value
+        avg_order_value = float(total_revenue) / total_orders if total_orders > 0 else 0.0
+
+        # 2. Top Products (By Units Sold)
+        top_products_query = db.query(
+            Product.name,
+            func.sum(SaleItem.quantity).label('units_sold'),
+            func.sum(SaleItem.total_price).label('revenue')
+        ).join(SaleItem, Product.id == SaleItem.product_id)\
+         .group_by(Product.id, Product.name)\
+         .order_by(desc('units_sold'))\
+         .limit(5)
+        
+        top_products_data = top_products_query.all()
+        
         top_products = []
-        for idx, (category, count) in enumerate(restaurant_product_categories.items(), 1):
-            english_name = CATEGORY_MAPPING.get(category, category.replace("_", " ").title())
+        for idx, row in enumerate(top_products_data, 1):
             top_products.append({
                 "rank": idx,
-                "name": english_name,
-                "units_sold": int(count),
-                "revenue": round(count * 2500, 2)
+                "name": row.name,
+                "units_sold": row.units_sold,
+                "revenue": float(row.revenue or 0)
             })
-    except Exception as e:
-        logger.error(f"Error getting top products: {e}")
-        top_products = []
-    
-    # Low stock alerts from inventory
-    try:
-        low_stock = csv_data["inventory"][csv_data["inventory"]["stock_quantity"] < 50].head(5)
-        alerts = []
-        for _, item in low_stock.iterrows():
-            alerts.append({
-                "product_id": item["product_id"],
-                "current_stock": int(item["stock_quantity"]),
-                "reorder_point": int(item.get("reorder_point", 20)),
-                "severity": "critical" if item["stock_quantity"] < 20 else "warning"
+
+        # 3. Low Stock Alerts
+        low_stock_query = db.query(Inventory, Product)\
+            .join(Product, Inventory.product_id == Product.id)\
+            .filter(Inventory.current_stock < Inventory.reorder_point)\
+            .limit(5)
+        
+        low_stock_data = low_stock_query.all()
+        
+        low_stock_alerts = []
+        for inventory, product in low_stock_data:
+            low_stock_alerts.append({
+                "product_id": product.id,
+                "product_name": product.name,
+                "current_stock": inventory.current_stock,
+                "reorder_point": inventory.reorder_point,
+                "severity": "critical" if inventory.current_stock < (inventory.reorder_point / 2) else "warning"
             })
+
+        return {
+            "timestamp": now.isoformat(),
+            "today_revenue": round(today_revenue, 2),
+            "total_revenue": round(float(total_revenue), 2),
+            "active_orders": active_orders,
+            "total_orders": total_orders,
+            "avg_order_value": round(float(avg_order_value), 2),
+            "top_products": top_products,
+            "low_stock_alerts": low_stock_alerts,
+            "time_multiplier": round(time_multiplier, 2),
+            "data_source": "Live Database"
+        }
+
     except Exception as e:
-        logger.error(f"Error getting low stock: {e}")
-        alerts = []
-    
-    return {
-        "timestamp": datetime.now().isoformat(),
-        "today_revenue": round(today_revenue, 2),
-        "total_revenue": round(total_revenue, 2),
-        "active_orders": active_orders,
-        "total_orders": total_orders,
-        "avg_order_value": round(avg_order_value, 2),
-        "top_products": top_products,
-        "low_stock_alerts": alerts,
-        "time_multiplier": round(time_multiplier, 2),
-        "data_source": "CSV (99K orders)"
-    }
+        logger.error(f"Database query failed: {e}")
+        # Fallback to zero values if DB fails (should not happen in production)
+        return {
+            "timestamp": datetime.now().isoformat(),
+            "today_revenue": 0,
+            "total_revenue": 0,
+            "active_orders": 0,
+            "total_orders": 0,
+            "avg_order_value": 0,
+            "top_products": [],
+            "low_stock_alerts": [],
+            "error": str(e)
+        }
+

@@ -34,7 +34,8 @@ from api.routers import (
     messages, community, health, monitoring, auth, circuit_health,
     sales_analytics, crud_v2,
     dashboard, tally_integration, odoo_sync,
-    reports # New router
+    reports, enterprise, # New router
+    weather  # Weather API router
 )
 
 # Import middleware
@@ -59,8 +60,19 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Configure CORS
-cors_origins = os.getenv('CORS_ORIGINS', 'http://localhost:5173').split(',')
+# Configure CORS - Allow frontend access
+# Configure CORS - Allow frontend access
+cors_origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:3000",
+    "http://localhost:8000",
+    "http://localhost:5175",
+    "http://127.0.0.1:5175",
+    "http://localhost:5176",
+    "http://127.0.0.1:5176"
+]
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
@@ -104,9 +116,13 @@ app.include_router(monitoring.router, tags=["Monitoring"])
 app.include_router(circuit_health.router, tags=["Circuit Breakers"])
 
 # Business endpoints (will add auth protection gradually)
+from api.routers import pos, alerts
 app.include_router(analytics.router, prefix="/api/v1", tags=["Analytics"])
 app.include_router(analytics_advanced.router, tags=["Advanced Analytics"])
+app.include_router(weather.router, tags=["Weather"])  # Weather API endpoints
 app.include_router(inventory.router, tags=["Inventory"])
+app.include_router(pos.router, tags=["POS"])
+app.include_router(alerts.router, tags=["Alerts"])
 app.include_router(invoices.router, tags=["Transaction Engine"])
 app.include_router(messages.router, tags=["Communication Hub"])
 app.include_router(community.router, tags=["Community Commerce"])
@@ -120,6 +136,7 @@ app.include_router(crud_v2.router, tags=["CRUD v2"])
 app.include_router(tally_integration.router, tags=["Tally Integration"])
 app.include_router(odoo_sync.router, tags=["Odoo Sync"])
 app.include_router(reports.router, tags=["Reports"])
+app.include_router(enterprise.router, tags=["Enterprise"])
 
 # Loyalty Program (Next-Gen Loyalty Module)
 from api.routers import loyalty
@@ -131,6 +148,7 @@ app.include_router(export.router, tags=["Export"])
 
 # Import and register new analytics routers
 from api.routers import inventory_analytics, customer_analytics
+logger.info("Registering Inventory and Customer Analytics routers")
 app.include_router(inventory_analytics.router, tags=["Inventory Analytics"])
 app.include_router(customer_analytics.router, tags=["Customer Analytics"])
 

@@ -11,7 +11,7 @@ from typing import Optional
 from datetime import timedelta
 
 from api.db.database import get_db
-from api.db.models import User
+from api.db.multitenant_models import User
 from api.auth.password import hash_password, verify_password
 from api.auth.jwt_handler import (
     create_access_token,
@@ -26,14 +26,12 @@ router = APIRouter(prefix="/auth", tags=["authentication"])
 # ==================== REQUEST/RESPONSE MODELS ====================
 
 class UserRegister(BaseModel):
-    username: str = Field(..., min_length=3, max_length=50)
     email: EmailStr
     password: str = Field(..., min_length=8, max_length=100)
     full_name: Optional[str] = Field(None, max_length=200)
 
 class UserResponse(BaseModel):
     id: int
-    username: str
     email: str
     full_name: Optional[str]
     role: str
@@ -60,19 +58,10 @@ async def register(
     """
     Register a new user
     
-    - **username**: Unique username (3-50 chars)
     - **email**: Valid email address
     - **password**: Strong password (min 8 chars)
     - **full_name**: Optional full name
     """
-    # Check if username exists
-    existing_user = db.query(User).filter(User.username == user_data.username).first()
-    if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username already registered"
-        )
-    
     # Check if email exists
     existing_email = db.query(User).filter(User.email == user_data.email).first()
     if existing_email:
@@ -90,11 +79,11 @@ async def register(
     
     # Create new user
     new_user = User(
-        username=user_data.username,
         email=user_data.email,
-        password=hash_password(user_data.password),
+        hashed_password=hash_password(user_data.password),
         full_name=user_data.full_name,
-        role="user"  # Default role
+        role="analyst",  # Default role
+        organization_id=None  # TODO: Set proper organization
     )
     
     db.add(new_user)
@@ -109,25 +98,25 @@ async def login(
     db: Session = Depends(get_db)
 ):
     """
-    Login with username and password
+    Login with email and password
     
     Returns JWT access token and refresh token
     """
-    # Find user by username
-    user = db.query(User).filter(User.username == form_data.username).first()
+    # Find user by email (username field in OAuth2 form is used for email)
+    user = db.query(User).filter(User.email == form_data.username).first()
     
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
+            detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
     
     # Verify password
-    if not verify_password(form_data.password, user.password):
+    if not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
+            detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
     
@@ -222,7 +211,7 @@ async def change_password(
     Requires authentication + correct old password
     """
     # Verify old password
-    if not verify_password(old_password, current_user.password):
+    if not verify_password(old_password, current_user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Incorrect old password"
@@ -236,7 +225,7 @@ async def change_password(
         )
     
     # Update password
-    current_user.password = hash_password(new_password)
+    current_user.hashed_password = hash_password(new_password)
     db.commit()
     
     return {"message": "Password  changed successfully"}

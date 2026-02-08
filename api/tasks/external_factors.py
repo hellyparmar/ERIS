@@ -132,12 +132,30 @@ def fetch_economic_indicators():
 def fetch_weather_data(location: str):
     """
     Fetch weather from OpenWeatherMap API
-    TODO: Implement actual API integration
+    Integrated with the weather service for consistent data handling
     """
-    api_key = os.getenv('OPENWEATHER_API_KEY')
+    from api.services.weather_service import get_weather_service
     
-    if not api_key:
-        logger.warning("OpenWeatherMap API key not configured. Using mock data.")
+    try:
+        service = get_weather_service()
+        weather = service.get_current_weather(location, 'IN')
+        
+        # Map service response to task format
+        return {
+            'temp_avg': weather.get('temperature', 28.5),
+            'temp_max': weather.get('temp_max', 32.0),
+            'temp_min': weather.get('temp_min', 25.0),
+            'feels_like': weather.get('feels_like', 30.0),
+            'humidity': weather.get('humidity', 65),
+            'pressure': weather.get('pressure', 1012),
+            'wind_speed': weather.get('wind_speed', 12.5),
+            'rainfall': weather.get('rainfall_1h', 0),
+            'condition': weather.get('condition', 'clear').lower(),
+            'description': weather.get('description', 'Clear sky')
+        }
+    except Exception as e:
+        logger.error(f"Error fetching weather for {location}: {e}")
+        # Return mock data for resilience
         return {
             'temp_avg': 28.5,
             'temp_max': 32.0,
@@ -150,27 +168,6 @@ def fetch_weather_data(location: str):
             'condition': 'clear',
             'description': 'Clear sky'
         }
-    
-    try:
-        url = f"http://api.openweathermap.org/data/2.5/weather?q={location},IN&appid={api_key}&units=metric"
-        response = requests.get(url, timeout=5)
-        data = response.json()
-        
-        return {
-            'temp_avg': data['main']['temp'],
-            'temp_max': data['main']['temp_max'],
-            'temp_min': data['main']['temp_min'],
-            'feels_like': data['main']['feels_like'],
-            'humidity': data['main']['humidity'],
-            'pressure': data['main']['pressure'],
-            'wind_speed': data['wind']['speed'],
-            'rainfall': data.get('rain', {}).get('1h', 0),
-            'condition': data['weather'][0]['main'].lower(),
-            'description': data['weather'][0]['description']
-        }
-    except Exception as e:
-        logger.error(f"Error fetching weather: {e}")
-        return fetch_weather_data.__defaults__[0]  # Return mock data
 
 def check_holiday(date):
     """

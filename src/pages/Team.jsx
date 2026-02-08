@@ -124,8 +124,8 @@ const Team = () => {
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
-                    <h1 className="text-4xl font-bold gradient-text mb-2">Team Management</h1>
-                    <p className="text-gray-400">Collaborate and manage access controls</p>
+                    <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent mb-2">Team Management</h1>
+                    <p className="text-muted-foreground">Collaborate and manage access controls</p>
                 </motion.div>
                 <GradientButton
                     className="flex items-center justify-center gap-2 whitespace-nowrap box-shadow-glow"
@@ -139,43 +139,43 @@ const Team = () => {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <GlassCard className="p-5 flex items-center justify-between">
                     <div>
-                        <p className="text-sm font-medium text-slate-500 dark:text-slate-300">Total Members</p>
-                        <h3 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{teamMembers.length}</h3>
+                        <p className="text-sm font-medium text-muted-foreground">Total Members</p>
+                        <h3 className="text-2xl font-bold text-foreground mt-1">{teamMembers.length}</h3>
                     </div>
-                    <div className="p-4 rounded-xl bg-blue-500 bg-opacity-80 dark:bg-opacity-90 shadow-lg flex items-center justify-center">
+                    <div className="p-4 rounded-xl bg-blue-500 bg-opacity-80 dark:bg-opacity-90 shadow-[0_0_15px_rgba(59,130,246,0.5)] flex items-center justify-center">
                         <Users className="w-6 h-6 text-white" strokeWidth={2.5} />
                     </div>
                 </GlassCard>
                 <GlassCard className="p-5 flex items-center justify-between">
                     <div>
-                        <p className="text-sm font-medium text-slate-500 dark:text-slate-300">Active Now</p>
-                        <h3 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">
+                        <p className="text-sm font-medium text-muted-foreground">Active Now</p>
+                        <h3 className="text-2xl font-bold text-foreground mt-1">
                             {teamMembers.filter(m => m.status === 'active').length}
                         </h3>
                     </div>
-                    <div className="p-4 rounded-xl bg-green-500 bg-opacity-80 dark:bg-opacity-90 shadow-lg flex items-center justify-center">
+                    <div className="p-4 rounded-xl bg-green-500 bg-opacity-80 dark:bg-opacity-90 shadow-[0_0_15px_rgba(34,197,94,0.5)] flex items-center justify-center">
                         <Activity className="w-6 h-6 text-white" strokeWidth={2.5} />
                     </div>
                 </GlassCard>
                 <GlassCard className="p-5 flex items-center justify-between">
                     <div>
-                        <p className="text-sm font-medium text-slate-500 dark:text-slate-300">Admins</p>
-                        <h3 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">
+                        <p className="text-sm font-medium text-muted-foreground">Admins</p>
+                        <h3 className="text-2xl font-bold text-foreground mt-1">
                             {teamMembers.filter(m => m.role === 'Admin').length}
                         </h3>
                     </div>
-                    <div className="p-4 rounded-xl bg-purple-500 bg-opacity-80 dark:bg-opacity-90 shadow-lg flex items-center justify-center">
+                    <div className="p-4 rounded-xl bg-purple-500 bg-opacity-80 dark:bg-opacity-90 shadow-[0_0_15px_rgba(168,85,247,0.5)] flex items-center justify-center">
                         <Shield className="w-6 h-6 text-white" strokeWidth={2.5} />
                     </div>
                 </GlassCard>
                 <GlassCard className="p-5 flex items-center justify-between">
                     <div>
-                        <p className="text-sm font-medium text-slate-500 dark:text-slate-300">Managers</p>
-                        <h3 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">
+                        <p className="text-sm font-medium text-muted-foreground">Managers</p>
+                        <h3 className="text-2xl font-bold text-foreground mt-1">
                             {teamMembers.filter(m => m.role === 'Manager').length}
                         </h3>
                     </div>
-                    <div className="p-4 rounded-xl bg-orange-500 bg-opacity-80 dark:bg-opacity-90 shadow-lg flex items-center justify-center">
+                    <div className="p-4 rounded-xl bg-orange-500 bg-opacity-80 dark:bg-opacity-90 shadow-[0_0_15px_rgba(249,115,22,0.5)] flex items-center justify-center">
                         <Users className="w-6 h-6 text-white" strokeWidth={2.5} />
                     </div>
                 </GlassCard>
@@ -189,7 +189,7 @@ const Team = () => {
                         onClick={() => setFilter(item.toLowerCase())}
                         className={`px-4 py-2 rounded-full text-sm font-medium transition-all whitespace-nowrap border ${filter === item.toLowerCase()
                             ? 'bg-white/10 border-white/20 text-white shadow-lg backdrop-blur-md'
-                            : 'bg-transparent border-transparent text-gray-400 hover:text-white hover:bg-white/5'
+                            : 'bg-transparent border-transparent text-muted-foreground hover:text-foreground hover:bg-white/5'
                             }`}
                     >
                         {item}
@@ -234,27 +234,27 @@ const Team = () => {
                                 {/* Content */}
                                 <div className="pt-12 p-6">
                                     <div className="mb-4">
-                                        <h3 className="text-xl font-bold text-white group-hover:text-blue-400 transition-colors">{member.name}</h3>
-                                        <p className="text-sm text-gray-400 dark:text-gray-300">{member.role} • {member.department}</p>
+                                        <h3 className="text-xl font-bold text-foreground group-hover:text-primary transition-colors">{member.name}</h3>
+                                        <p className="text-sm text-muted-foreground">{member.role} • {member.department}</p>
                                     </div>
 
                                     <div className="space-y-3">
-                                        <div className="flex items-center gap-3 text-sm text-gray-400 dark:text-gray-300 bg-white/5 p-2 rounded-lg">
+                                        <div className="flex items-center gap-3 text-sm text-muted-foreground bg-secondary/50 p-2 rounded-lg">
                                             <Mail size={14} className="text-blue-400" />
                                             <span className="truncate">{member.email}</span>
                                         </div>
-                                        <div className="flex items-center gap-3 text-sm text-gray-400 dark:text-gray-300 bg-white/5 p-2 rounded-lg">
+                                        <div className="flex items-center gap-3 text-sm text-muted-foreground bg-secondary/50 p-2 rounded-lg">
                                             <Phone size={14} className="text-green-400 shrink-0" />
                                             <span className="truncate">{member.phone}</span>
                                         </div>
                                     </div>
 
-                                    <div className="mt-6 flex items-center justify-between text-xs text-gray-500 border-t border-white/5 pt-4">
+                                    <div className="mt-6 flex items-center justify-between text-xs text-muted-foreground border-t border-border pt-4">
                                         <div className="flex items-center gap-1">
                                             <Activity size={12} />
-                                            Last active: <span className="text-gray-300">{member.lastActive}</span>
+                                            Last active: <span className="text-foreground">{member.lastActive}</span>
                                         </div>
-                                        <button className="text-blue-400 hover:text-blue-300 transition-colors">View Profile</button>
+                                        <button className="text-primary hover:text-primary/80 transition-colors">View Profile</button>
                                     </div>
                                 </div>
                             </GlassCard>

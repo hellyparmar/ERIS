@@ -18,6 +18,36 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 
+# Concise system prompt for business-focused responses
+SYSTEM_PROMPT = """You are an intelligent AI assistant for R-DIOS, a retail intelligence system.
+
+**Response Guidelines:**
+1. **Be Concise**: Provide direct, actionable answers without unnecessary technical details
+2. **Business Focus**: Frame insights in business terms, not technical jargon
+3. **No Code in Responses**: Never show SQL queries, code snippets, or technical implementation details to users
+4. **Clean Formatting**: Use plain text without markdown symbols (no **, •, or #)
+5. **Structure**: Use this format:
+   - Direct answer to the question
+   - Key Insights section with numbered points
+   - Suggestions section with numbered recommendations
+
+**Example:**
+User: "What were last month's sales trends?"
+Response: "Last month showed steady growth with total revenue of ₹2.4L, up 12% from the previous month.
+
+Key Insights:
+1. Peak sales occurred on weekends (Fri-Sun), accounting for 45% of revenue
+2. Electronics category drove the growth with 28% increase
+3. Average transaction value increased from ₹850 to ₹920
+
+Suggestions:
+1. Focus weekend promotions on high-margin electronics
+2. Consider extending weekend hours to capture more traffic"
+
+Keep responses under 150 words unless detailed analysis is specifically requested.
+Use simple, clean formatting without bold, italics, or special characters.
+"""
+
 # In-memory storage for conversations (replace with database in production)
 conversations = {}
 
@@ -79,39 +109,13 @@ You may present the results naturally in your response.
 """
         else:
             template_hint = ""
-        
-        # Get enhanced context from semantic layer
-        schema_context = semantic_layer.get_schema_context()
-        terms_context = semantic_layer.get_business_terms_context()
-        
-        # Enhanced System Prompt for Actions
-        action_instructions = """
-        IMPORTANT: If the user indicates they want to create, draft, or make a Purchase Order (PO), you MUST include a structured action in your response.
-        
-        Format your response like this:
-        [Your natural language response here]
-        <<ACTION>>{"type": "draft_po", "data": {"item": "Item Name", "quantity": 100, "vendor": "Vendor Name", "delivery_date": "YYYY-MM-DD"}}<<END_ACTION>>
-        
-        Extract as much information as possible from the user's request. Use intelligent defaults if missing.
-        """
-        
-        full_system_prompt = f"""{base_system_prompt}
+        # Build full system prompt with context
+        full_system_prompt = f"""{SYSTEM_PROMPT}
 
-{schema_context}
-
-{terms_context}
-
-## SQL Generation Rules:
-1. Only use tables: sales, products, customers, inventory
-2. Always specify columns explicitly (no SELECT *)
-3. Use DATE() for date comparisons
-4. For date columns, use 'transaction_date' not 'date'
-5. Join products table when you need product names
-6. Use COALESCE for nullable columns
-
-{template_hint}
-
-{action_instructions}
+Current Context:
+- User is viewing the R-DIOS retail intelligence dashboard
+- System has access to sales, inventory, customer, and analytics data
+- Respond in {request.message.language}
 """
         
         # Call AI Service
@@ -133,7 +137,7 @@ You may present the results naturally in your response.
             "parts": [response_text]
         })
 
-        # Create response message
+        # Create response message (NO provider label added to text)
         ai_message = Message(
             text=response_text,
             language=request.message.language,
@@ -141,11 +145,6 @@ You may present the results naturally in your response.
             timestamp=datetime.utcnow().isoformat()
         )
         
-        # We append provider name to message for UI visibility (optional hack or Schema update)
-        # Choosing to prepend to text for immediate feedback without schema change
-        provider_badge = f"[Provider: {result['provider']}]\n"
-        ai_message.text = provider_badge + ai_message.text
-
         return ChatResponse(
             message=ai_message,
             session_id=request.session_id,
@@ -183,21 +182,37 @@ async def get_status():
     """
     Check AI service status and provider availability
     """
-    from api.services.ai_service import ai_service
-    
-    provider_status = ai_service.get_provider_status()
-    
-    # Determine primary active provider for display
-    active_providers = [k for k, v in provider_status.items() if v]
-    primary = active_providers[0] if active_providers else "Offline"
-    
-    return {
-        "service": "R-DIOS AI Assistant",
-        "primary_provider": primary,
-        "providers": provider_status,
-        "active_sessions": len(conversations),
-        "status": "online" if active_providers else "offline"
-    }
+    try:
+        from api.services.ai_service import ai_service
+        
+        provider_status = ai_service.get_provider_status()
+        
+        # Determine primary active provider for display
+        active_providers = [k for k, v in provider_status.items() if v]
+        primary = active_providers[0] if active_providers else "Offline"
+        
+        return {
+            "service": "R-DIOS AI Assistant",
+            "primary_provider": primary,
+            "providers": provider_status,
+            "active_sessions": len(conversations),
+            "status": "online" if active_providers else "offline"
+        }
+    except Exception as e:
+        # If ai_service fails to import (missing dependencies), return offline status
+        return {
+            "service": "R-DIOS AI Assistant",
+            "primary_provider": "Offline",
+            "providers": {
+                "groq": False,
+                "gemini": False,
+                "openrouter": False,
+                "ollama": False
+            },
+            "active_sessions": 0,
+            "status": "offline",
+            "error": "AI service dependencies not available"
+        }
 
 @router.get("/semantic-layer")
 async def get_semantic_layer_info():

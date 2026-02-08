@@ -1,11 +1,12 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { MoreHorizontal, ChevronLeft, ChevronRight } from 'lucide-react';
 import GlassCard from '../ui/GlassCard';
 
 const TransactionsTable = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 5;
+    const paginationRef = useRef(null);
 
     const allTransactions = [
         { id: "202507870", date: "May 15, 2025", customer: "Customer@livo.vn", amount: "$1,20.00", status: "Completed" },
@@ -26,6 +27,13 @@ const TransactionsTable = () => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     const currentTransactions = allTransactions.slice(startIndex, startIndex + itemsPerPage);
 
+    // Scroll to pagination controls when page changes
+    useEffect(() => {
+        if (paginationRef.current) {
+            paginationRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }
+    }, [currentPage]);
+
     const getStatusColor = (status) => {
         switch (status) {
             case 'Completed': return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400';
@@ -36,16 +44,16 @@ const TransactionsTable = () => {
     };
 
     return (
-        <GlassCard className="h-full bg-card border-border flex flex-col">
-            <div className="p-6 border-b border-border flex justify-between items-center">
+        <GlassCard className="h-full bg-card/50 flex flex-col shadow-2xl">
+            <div className="p-6 flex justify-between items-center">
                 <h3 className="font-bold text-card-foreground">Recent Transactions & Status</h3>
                 <MoreHorizontal className="text-muted-foreground cursor-pointer hover:text-foreground transition-colors" size={20} />
             </div>
 
-            <div className="flex-1 overflow-auto p-0">
+            <div className="flex-1 p-0">
                 <table className="w-full text-left text-sm">
                     <thead>
-                        <tr className="bg-muted/50 text-muted-foreground font-bold text-xs uppercase tracking-wider">
+                        <tr className="bg-black/20 text-muted-foreground font-bold text-xs uppercase tracking-wider">
                             <th className="px-6 py-4">Date ↑</th>
                             <th className="px-6 py-4">Transaction ID</th>
                             <th className="px-6 py-4">Customer</th>
@@ -54,9 +62,9 @@ const TransactionsTable = () => {
                             <th className="px-6 py-4 text-center">Actions</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-border">
+                    <tbody className="divide-y divide-white/10">
                         {currentTransactions.map((tx) => (
-                            <tr key={tx.id} className="hover:bg-muted/50 transition-colors">
+                            <tr key={tx.id} className="hover:bg-white/5 transition-colors group">
                                 <td className="px-6 py-4 text-foreground font-medium">{tx.date}</td>
                                 <td className="px-6 py-4 text-muted-foreground font-mono text-xs">{tx.id}</td>
                                 <td className="px-6 py-4 text-foreground">{tx.customer}</td>
@@ -79,7 +87,7 @@ const TransactionsTable = () => {
                 </table>
             </div>
             {/* Pagination Controls */}
-            <div className="p-4 border-t border-border flex justify-end gap-2 text-sm">
+            <div ref={paginationRef} className="p-4 border-t border-border flex justify-end gap-2 text-sm">
                 <button
                     onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                     disabled={currentPage === 1}

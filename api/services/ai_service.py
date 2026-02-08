@@ -7,6 +7,10 @@ from typing import Dict, Any, Optional
 import google.generativeai as genai
 from groq import Groq
 from openai import OpenAI
+from dotenv import load_dotenv
+
+# Load environment variables BEFORE initializing service
+load_dotenv()
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -62,9 +66,9 @@ class AIService:
 
         # Routing Weights
         self.weights = {
-            "groq": 0.80,    # 80% Traffic
-            "gemini": 0.15,  # 15% Traffic
-            "openrouter": 0.05 # 5% Traffic
+            "openrouter": 1.0, # 100% Traffic (User Preference: Llama 3)
+            "groq": 0.0,
+            "gemini": 0.0
         }
 
     def _get_provider(self, context_length: str = "short") -> str:
@@ -79,20 +83,29 @@ class AIService:
         if not available:
             return "mock"  # Use MockProvider for demo when no API keys
             
-        # For long context, prefer Gemini
+        # User Preference: Prioritize OpenRouter (Llama 3)
+        if "openrouter" in available:
+            return "openrouter"
+            
+        # For long context, prefer Gemini (if OpenRouter not available)
         if context_length == "long" and "gemini" in available:
             return "gemini"
             
-        # Weighted selection
+        # Weighted selection - only from available providers
         try:
+            # Filter weights to only include available providers
+            available_weights = {k: v for k, v in self.weights.items() if k in available}
+            if not available_weights:
+                return available[0]
+            
             return random.choices(
-                population=list(self.weights.keys()), 
-                weights=list(self.weights.values()), 
+                population=list(available_weights.keys()), 
+                weights=list(available_weights.values()), 
                 k=1
             )[0]
-        except ValueError:
+        except (ValueError, IndexError):
             # Fallback if weights mismatch available providers
-            return available[0]
+            return available[0] if available else "mock"
 
     async def generate_response(
         self, 
@@ -106,21 +119,19 @@ class AIService:
         # specialized logic for long context queries could go here
         provider = self._get_provider(context_length="short" if len(message) < 5000 else "long")
         
+        # DEBUG: Return error directly to see why OpenRouter failed
         try:
             return await self._call_provider(provider, message, system_prompt, session_history)
         except Exception as e:
-            logger.error(f"Provider {provider} failed: {e}. Failing over...")
-            # Simple Failover Logic
-            for backup in ["groq", "gemini", "openrouter", "ollama"]:
-                if backup != provider:
-                    try:
-                        return await self._call_provider(backup, message, system_prompt, session_history)
-                    except:
-                        continue
+            logger.error(f"Provider {provider} failed: {e}")
+            import traceback
+            traceback.print_exc()
+            return {"text": f"DEBUG ERROR from {provider}: {str(e)}", "action": None, "provider": "error"}
             
-            # Fallback to Mock Provider for Demo
-            logger.warning("All providers failed. Switching to Mock Provider.")
-            return self._call_mock_provider(message, system_prompt, session_history)
+            # Original Failover Logic (Commented out for debugging)
+            # logger.error(f"Provider {provider} failed: {e}. Failing over...")
+            # for backup in ["groq", "gemini", "openrouter", "ollama"]:
+            #     ...
 
     async def _call_provider(self, provider: str, message: str, system_prompt: str, history: list) -> Dict[str, Any]:
         """
@@ -140,6 +151,62 @@ class AIService:
             return self._call_mock_provider(message, system_prompt, history)
         else:
             raise ValueError("Unknown provider")
+
+    def _extract_action(self, text: str) -> tuple[str, Optional[Dict]]:
+        """
+        Extracts structured JSON actions from identifying tags.
+        """
+        # ... (lines 156-160 in original)
+        import re
+        action_payload = None
+        clean_text = text
+        # ... (rest of _extract_action)
+        return clean_text, action_payload
+
+    def _call_openrouter(self, message: str, system_prompt: str, history: list) -> Dict[str, Any]:
+        if not self.openrouter_client: raise Exception("OpenRouter not configured")
+        
+        # Robust list of verified free models (Llama 3 family and strong backups)
+        models = [
+            "openrouter/free", # Auto-select best free model
+            "meta-llama/llama-3.3-70b-instruct:free",
+            "meta-llama/llama-3.2-3b-instruct:free",
+            "nousresearch/hermes-3-llama-3.1-405b:free",
+            "openai/gpt-oss-120b:free",
+            "qwen/qwen3-coder:free"
+        ]
+        
+        last_error = None
+        
+        for model in models:
+            try:
+                # print(f"Trying OpenRouter model: {model}")
+                completion = self.openrouter_client.chat.completions.create(
+                    model=model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": message}
+                    ],
+                    extra_headers={
+                        "HTTP-Referer": "http://localhost:5173", # Recommended by OpenRouter
+                        "X-Title": "R-DIOS AI Assistant"
+                    }
+                )
+                
+                raw_text = completion.choices[0].message.content
+                text, action_data = self._extract_action(raw_text)
+                
+                # Simplify provider name for UI
+                model_name = model.split('/')[1].split(':')[0] if '/' in model else model
+                return {"text": text, "action": action_data, "provider": f"OpenRouter ({model_name})"}
+                
+            except Exception as e:
+                # print(f"Model {model} failed: {e}")
+                last_error = e
+                continue
+        
+        # If all models fail
+        raise last_error or Exception("All OpenRouter models failed")
 
     def _extract_action(self, text: str) -> tuple[str, Optional[Dict]]:
         """
@@ -198,21 +265,7 @@ class AIService:
         
         return {"text": text, "action": action, "provider": "Gemini 1.5 Flash"}
 
-    def _call_openrouter(self, message: str, system_prompt: str, history: list) -> Dict[str, Any]:
-        if not self.openrouter_client: raise Exception("OpenRouter not configured")
-        
-        completion = self.openrouter_client.chat.completions.create(
-            model="meta-llama/llama-3-8b-instruct:free", # Using a free model alias
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": message}
-            ]
-        )
-        
-        raw_text = completion.choices[0].message.content
-        text, action = self._extract_action(raw_text)
-        
-        return {"text": text, "action": action, "provider": "OpenRouter"}
+
 
     def _call_ollama(self, message: str, system_prompt: str, history: list) -> Dict[str, Any]:
         # Simple REST call to local Ollama

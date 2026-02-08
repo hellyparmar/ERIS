@@ -9,6 +9,7 @@ import {
     AlertTriangle, TrendingUp, DollarSign, Clock, Filter
 } from 'lucide-react';
 import GlassCard from '../components/ui/GlassCard';
+import ActionButton from '../components/ui/ActionButton';
 import {
     generateTaxTransactions,
     calculateTaxSummary,
@@ -47,13 +48,44 @@ const Compliance = () => {
             {/* Compliance Status Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <GlassCard variant="gradient" className="p-6 animate-slide-up stagger-1">
-                    <div className="flex items-start justify-between">
+                    <div className="flex items-start justify-between gap-4">
+                        <div>
+                            <p className="text-sm text-muted-foreground mb-1">Total Revenue</p>
+                            <p className="text-3xl font-bold text-foreground">
+                                {formatCurrency(taxSummary.totalRevenue)}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                                +12.5% vs last month
+                            </p>
+                        </div>
+                        <div className="p-3 rounded-xl bg-gradient-to-br from-green-500/20 to-emerald-500/20">
+                            <TrendingUp className="text-success" size={24} />
+                        </div>
+                    </div>
+                </GlassCard>
+
+                <GlassCard variant="gradient" className="p-6 animate-slide-up stagger-2">
+                    <div className="flex items-start justify-between gap-4">
+                        <div>
+                            <p className="text-sm text-muted-foreground mb-1">Next Deadline</p>
+                            <p className="text-2xl font-bold text-foreground">
+                                {deadline.days} days
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                                {deadline.date}
+                            </p>
+                        </div>
+                        <div className="p-3 rounded-xl bg-gradient-to-br from-purple-500/20 to-pink-500/20">
+                            <Calendar className="text-purple-500" size={24} />
+                        </div>
+                    </div>
+                </GlassCard>
+
+                <GlassCard variant="gradient" className="p-6 animate-slide-up stagger-3">
+                    <div className="flex items-start justify-between gap-4">
                         <div>
                             <p className="text-sm text-muted-foreground mb-1">Compliance Status</p>
-                            <p className={`text-3xl font-bold ${complianceStatus.status === 'Compliant' ? 'text-success' :
-                                complianceStatus.status === 'Warning' ? 'text-warning' :
-                                    'text-danger'
-                                }`}>
+                            <p className="text-3xl font-bold text-foreground">
                                 {complianceStatus.status}
                             </p>
                             <p className="text-xs text-muted-foreground mt-1">
@@ -73,11 +105,11 @@ const Compliance = () => {
                     </div>
                 </GlassCard>
 
-                <GlassCard variant="gradient" className="p-6 animate-slide-up stagger-2">
-                    <div className="flex items-start justify-between">
+                <GlassCard variant="gradient" className="p-6 animate-slide-up stagger-4">
+                    <div className="flex items-start justify-between gap-4">
                         <div>
                             <p className="text-sm text-muted-foreground mb-1">Total GST Collected</p>
-                            <p className="text-3xl font-bold bg-gradient-to-r from-primary to-purple bg-clip-text text-transparent">
+                            <p className="text-3xl font-bold text-foreground">
                                 {formatCurrency(taxSummary.totalGST)}
                             </p>
                             <p className="text-xs text-muted-foreground mt-1">
@@ -86,40 +118,6 @@ const Compliance = () => {
                         </div>
                         <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500/20 to-cyan-500/20">
                             <DollarSign className="text-blue-500" size={24} />
-                        </div>
-                    </div>
-                </GlassCard>
-
-                <GlassCard variant="gradient" className="p-6 animate-slide-up stagger-3">
-                    <div className="flex items-start justify-between">
-                        <div>
-                            <p className="text-sm text-muted-foreground mb-1">Total Revenue</p>
-                            <p className="text-3xl font-bold text-foreground">
-                                {formatCurrency(taxSummary.totalRevenue)}
-                            </p>
-                            <p className="text-xs text-success mt-1">
-                                +12.5% vs last month
-                            </p>
-                        </div>
-                        <div className="p-3 rounded-xl bg-gradient-to-br from-green-500/20 to-emerald-500/20">
-                            <TrendingUp className="text-success" size={24} />
-                        </div>
-                    </div>
-                </GlassCard>
-
-                <GlassCard variant="gradient" className="p-6 animate-slide-up stagger-4">
-                    <div className="flex items-start justify-between">
-                        <div>
-                            <p className="text-sm text-muted-foreground mb-1">Next Deadline</p>
-                            <p className="text-2xl font-bold text-foreground">
-                                {deadline.days} days
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                                {deadline.date}
-                            </p>
-                        </div>
-                        <div className="p-3 rounded-xl bg-gradient-to-br from-purple-500/20 to-pink-500/20">
-                            <Calendar className="text-purple-500" size={24} />
                         </div>
                     </div>
                 </GlassCard>
@@ -142,7 +140,7 @@ const Compliance = () => {
                                 </div>
                                 <div className="text-right">
                                     <p className="text-sm text-muted-foreground">Revenue</p>
-                                    <p className="text-lg font-semibold bg-gradient-to-r from-primary to-purple bg-clip-text text-transparent">
+                                    <p className="text-lg font-semibold text-foreground">
                                         {formatCurrency(data.revenue)}
                                     </p>
                                 </div>
@@ -164,7 +162,7 @@ const Compliance = () => {
                                     <p className="text-xs text-muted-foreground">{data.count} transactions</p>
                                 </div>
                                 <div className="text-right">
-                                    <p className="text-lg font-bold text-primary">{formatCurrency(data.gst)}</p>
+                                    <p className="text-lg font-bold text-foreground">{formatCurrency(data.gst)}</p>
                                     <p className="text-xs text-muted-foreground">{formatCurrency(data.revenue)} revenue</p>
                                 </div>
                             </div>
@@ -179,10 +177,9 @@ const Compliance = () => {
                     <h2 className="text-xl font-bold bg-gradient-to-r from-primary to-purple bg-clip-text text-transparent">
                         Recent Tax Transactions
                     </h2>
-                    <button className="px-4 py-2 rounded-lg bg-primary/20 text-primary text-sm font-medium hover:bg-primary/30 transition-colors flex items-center gap-2">
-                        <Download size={16} />
+                    <ActionButton variant="secondary" icon={Download}>
                         Export Report
-                    </button>
+                    </ActionButton>
                 </div>
 
                 <div className="overflow-x-auto">
@@ -245,7 +242,7 @@ const Compliance = () => {
                                         </span>
                                     </td>
                                     <td className="py-3 px-4 text-right">
-                                        <p className="text-sm font-semibold text-primary">₹{txn.gstAmount.toFixed(2)}</p>
+                                        <p className="text-sm font-semibold text-foreground">₹{txn.gstAmount.toFixed(2)}</p>
                                     </td>
                                     <td className="py-3 px-4 text-right">
                                         <p className="text-sm font-bold text-foreground">₹{txn.finalPrice.toFixed(2)}</p>

@@ -1,0 +1,13 @@
+{
+  "timestamp": "2026-02-06T16:35:00.926341",
+  "validation": {
+    "menu_categories": [],
+    "sample_products": [],
+    "seasonal_patterns": {},
+    "payment_distribution": {},
+    "customer_segments": {}
+  },
+  "checks_passed": 0,
+  "total_checks": 5,
+  "pass_rate": 0.0
+}

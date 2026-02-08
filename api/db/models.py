@@ -11,12 +11,6 @@ import enum
 
 # ==================== ENUMERATIONS ====================
 
-class UserRole(enum.Enum):
-    """User role enumeration"""
-    ADMIN = "admin"
-    MANAGER = "manager"
-    ANALYST = "analyst"
-
 class AlertSeverity(enum.Enum):
     """Alert severity levels"""
     CRITICAL = "critical"
@@ -43,99 +37,10 @@ class ListingType(enum.Enum):
     BULK_BUY_REQUEST = "bulk_buy_request"
 
 # ==================== EXISTING TABLES (UPDATED) ====================
+# We re-export it here so other modules can import it from api.db.models
+# Product, Customer, Supplier models are imported from multitenant_models
 
-class User(Base):
-    """User accounts with RBAC"""
-    __tablename__ = "users"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    email = Column(String(255), unique=True, nullable=False, index=True)
-    hashed_password = Column(String(255), nullable=False)
-    full_name = Column(String(255))
-    role = Column(Enum(UserRole), default=UserRole.ANALYST)
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
-    # Relationships
-    acknowledged_alerts = relationship("Alert", foreign_keys="[Alert.acknowledged_by]", back_populates="acknowledged_by_user")
-    sync_logs = relationship("SyncLog", back_populates="user")
-
-class Product(Base):
-    """Product catalog with Indian context"""
-    __tablename__ = "products"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    sku = Column(String(100), unique=True, nullable=False, index=True)
-    name = Column(String(255), nullable=False)
-    category = Column(String(100), index=True)
-    
-    # Pricing (INR)
-    unit_price = Column(DECIMAL(12, 2), nullable=False)
-    cost_price = Column(DECIMAL(12, 2))
-    
-    # Indian Tax Context (NEW)
-    hsn_code = Column(String(10), index=True)
-    gst_rate = Column(DECIMAL(5, 2))  # 5%, 12%, 18%, 28%
-    
-    # Dead Stock Management (NEW)
-    is_dead_stock = Column(Boolean, default=False, index=True)
-    last_sale_date = Column(DateTime(timezone=True))
-    days_since_last_sale = Column(Integer)
-    
-    description = Column(Text)
-    source = Column(String(50), default="manual")
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
-    # Relationships
-    sales = relationship("Sale", back_populates="product")
-    inventory = relationship("Inventory", back_populates="product", uselist=False)
-    alerts = relationship("Alert", back_populates="related_product")
-    community_listings = relationship("CommunityListing", back_populates="product")
-
-class Customer(Base):
-    """Customer information with communication preferences"""
-    __tablename__ = "customers"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    customer_code = Column(String(100), unique=True, index=True)
-    name = Column(String(255), nullable=False)
-    email = Column(String(255))
-    phone = Column(String(50))
-    
-    # WhatsApp Integration (NEW)
-    whatsapp_number = Column(String(20))
-    preferred_channel = Column(Enum(MessageChannel), default=MessageChannel.WHATSAPP)
-    
-    address = Column(Text)
-    city = Column(String(100))
-    address = Column(Text)
-    city = Column(String(100))
-    country = Column(String(100))
-
-    # Tally Integration
-    tally_ledger_name = Column(String(255))  # Exact name of the Ledger in Tally
-    
-    # Loyalty Program (NEW)
-    loyalty_points = Column(Integer, default=0)
-    referral_code = Column(String(20), unique=True, index=True) # Unique code for inviting others
-    
-    # Credit Management (NEW)
-    credit_allowed = Column(Boolean, default=False, index=True)
-    
-    source = Column(String(50), default="manual")
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
-    # Relationships
-    sales = relationship("Sale", back_populates="customer")
-    invoices = relationship("Invoice", back_populates="customer")
-    credit_account = relationship("CustomerCredit", back_populates="customer", uselist=False)
-    messages = relationship("Message", foreign_keys="[Message.recipient_id]", 
-                          primaryjoin="and_(Customer.id==Message.recipient_id, Message.recipient_type=='customer')",
-                          viewonly=True)
-    referrals_made = relationship("Referral", back_populates="referrer")
+from api.db.multitenant_models import User, UserRole, Product, Customer, Supplier, Invoice, PaymentStatus, Inventory, PurchaseOrder, PurchaseOrderItem
 
 class Sale(Base):
     """Sales transactions with payment tracking"""
@@ -143,13 +48,10 @@ class Sale(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     transaction_id = Column(String(100), unique=True, index=True)
-    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
     customer_id = Column(Integer, ForeignKey("customers.id"))
     store_id = Column(Integer, index=True)
     
     transaction_date = Column(DateTime(timezone=True), nullable=False, index=True)
-    quantity = Column(Integer, nullable=False)
-    unit_price = Column(DECIMAL(12, 2), nullable=False)
     discount = Column(DECIMAL(12, 2), default=0.0)
     tax = Column(DECIMAL(12, 2), default=0.0)
     total_amount = Column(DECIMAL(12, 2), nullable=False)
@@ -165,36 +67,27 @@ class Sale(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     # Relationships
-    product = relationship("Product", back_populates="sales")
     customer = relationship("Customer", back_populates="sales")
     invoice = relationship("Invoice", back_populates="sales")
+    items = relationship("SaleItem", back_populates="sale", cascade="all, delete-orphan")
 
-class Inventory(Base):
-    """Inventory levels with enriched tracking"""
-    __tablename__ = "inventory"
+class SaleItem(Base):
+    """Line items for sales transactions"""
+    __tablename__ = "sale_items"
     
     id = Column(Integer, primary_key=True, index=True)
-    product_id = Column(Integer, ForeignKey("products.id"), unique=True, nullable=False)
+    sale_id = Column(Integer, ForeignKey("sales.id"), nullable=False)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
     
-    # Stock Management
-    current_stock = Column(Integer, default=0)
-    reserved_stock = Column(Integer, default=0)
-    available_stock = Column(Integer, default=0)
-    
-    # Reorder Management (UPDATED)
-    reorder_point = Column(Integer, default=10)
-    reorder_quantity = Column(Integer, default=50)
-    max_stock_level = Column(Integer)  # NEW
-    
-    warehouse_location = Column(String(100))
-    
-    # Timestamps (UPDATED)
-    last_stocked_date = Column(DateTime(timezone=True))
-    last_restocked = Column(DateTime(timezone=True))  # NEW
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    quantity = Column(Integer, nullable=False)
+    unit_price = Column(DECIMAL(12, 2), nullable=False)
+    total_price = Column(DECIMAL(12, 2), nullable=False)
     
     # Relationships
-    product = relationship("Product", back_populates="inventory")
+    sale = relationship("Sale", back_populates="items")
+    product = relationship("Product", back_populates="sale_items")
+
+# Inventory moved to multitenant_models.py
 
 class Alert(Base):
     """System alerts and notifications"""
@@ -214,7 +107,7 @@ class Alert(Base):
     
     # Relationships
     related_product = relationship("Product", back_populates="alerts")
-    acknowledged_by_user = relationship("User", back_populates="acknowledged_alerts")
+    acknowledged_by_user = relationship("User") # back_populates removed for schema simplicity during load
 
 class SyncLog(Base):
     """ERP sync history"""
@@ -232,51 +125,11 @@ class SyncLog(Base):
     initiated_by = Column(Integer, ForeignKey("users.id"))
     
     # Relationships
-    user = relationship("User", back_populates="sync_logs")
+    triggered_by = relationship("User") # back_populates removed for load simplicity
 
 # ==================== NEW TABLES (Phase 1) ====================
 
-class Invoice(Base):
-    """Invoices with GST automation"""
-    __tablename__ = "invoices"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    invoice_number = Column(String(50), unique=True, nullable=False, index=True)
-    customer_id = Column(Integer, ForeignKey("customers.id"), nullable=False)
-    
-    # GST/Tax Automation
-    hsn_code = Column(String(10))
-    tax_rate = Column(DECIMAL(5, 2))
-    taxable_amount = Column(DECIMAL(12, 2))
-    tax_amount = Column(DECIMAL(12, 2))
-    total_amount = Column(DECIMAL(12, 2), nullable=False)
-    
-    # Khata/Credit Management
-    payment_status = Column(Enum(PaymentStatus), default=PaymentStatus.PENDING, index=True)
-    amount_paid = Column(DECIMAL(12, 2), default=0.0)
-    amount_due = Column(DECIMAL(12, 2))
-
-    # Tally Prime Integration
-    tally_sync_status = Column(String(20), default="pending", index=True)  # pending, synced, failed
-    tally_voucher_number = Column(String(50))  # VchNo in Tally
-    tally_error_log = Column(Text)  # Last error message if failed
-    
-    # Digital Receipts
-    receipt_sent_via = Column(String(20))  # whatsapp, email, sms
-    receipt_url = Column(Text)
-    
-    invoice_date = Column(DateTime(timezone=True), server_default=func.now(), index=True)
-    due_date = Column(DateTime(timezone=True))
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    
-    # Relationships
-    customer = relationship("Customer", back_populates="invoices")
-    sales = relationship("Sale", back_populates="invoice")
-    payments = relationship("InvoicePayment", back_populates="invoice")
-    messages = relationship("Message", 
-                          primaryjoin="and_(Invoice.id==Message.related_entity_id, Message.related_entity_type=='invoice')",
-                          foreign_keys="[Message.related_entity_id]",
-                          viewonly=True)
+# Invoice moved to multitenant_models.py
 
 class InvoicePayment(Base):
     """Partial payment tracking for Khata system"""
@@ -420,4 +273,4 @@ class Referral(Base):
     converted_at = Column(DateTime(timezone=True))
     
     # Relationships
-    referrer = relationship("Customer", back_populates="referrals_made")
+    referrer = relationship("Customer", foreign_keys=[referrer_id]) # back_populates removed for load simplicity

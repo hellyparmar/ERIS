@@ -99,7 +99,7 @@ export const getSegmentColor = (segment) => {
     const colors = {
         'Champions': {
             bg: 'from-yellow-400 to-orange-500',
-            text: 'text-yellow-600 dark:text-yellow-400',
+            text: 'text-yellow-800 dark:text-yellow-300',
             border: 'border-yellow-500/30',
             glow: 'shadow-glow-warning'
         },

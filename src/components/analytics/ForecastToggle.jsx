@@ -1,6 +1,6 @@
 import React from 'react';
-import { motion } from 'framer-motion';
 import { TrendingUp, TrendingDown } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 /**
  * ForecastToggle Component
@@ -16,7 +16,7 @@ const ForecastToggle = ({ enabled, onToggle, className = "" }) => {
                 flex items-center gap-2 px-4 py-2 rounded-lg border-2 transition-all
                 ${enabled
                     ? 'bg-primary/10 border-primary text-primary'
-                    : 'bg-muted border-border text-muted-foreground hover:bg-muted/80'
+                    : 'bg-transparent border-border/50 text-muted-foreground hover:bg-white/5'
                 }
                 ${className}
             `}
@@ -33,7 +33,7 @@ const ForecastToggle = ({ enabled, onToggle, className = "" }) => {
                     <TrendingDown className="w-4 h-4" />
                 )}
             </motion.div>
-            <span className="text-sm font-medium">
+            <span className="text-sm font-normal">
                 {enabled ? 'Forecast ON' : 'Show Forecast'}
             </span>
             {enabled && (

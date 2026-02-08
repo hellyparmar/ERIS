@@ -1,7 +1,9 @@
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import Sidebar from './components/layout/Sidebar';
+import Header from './components/layout/Header';
 import MobileNav from './components/layout/MobileNav';
+import FloatingAIAssistant from './components/layout/FloatingAIAssistant';
 import { ToastProvider } from './components/ui/Toast';
 import ErrorBoundary from './components/ErrorBoundary';
 import SkipLinks from './components/a11y/SkipLinks';
@@ -49,7 +51,10 @@ const MainLayout = () => {
 
   React.useEffect(() => {
     if (mainRef.current) {
-      mainRef.current.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+      // Ensure scroll happens after render
+      setTimeout(() => {
+        mainRef.current.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+      }, 0);
     }
   }, [location.pathname]);
 
@@ -57,46 +62,50 @@ const MainLayout = () => {
     <>
       <SkipLinks />
       <Announcer />
-      <div className="flex h-screen bg-background text-foreground overflow-hidden transition-colors duration-300">
+      <div className="flex h-screen bg-background text-foreground overflow-hidden transition-colors duration-300" style={{ height: '100vh' }}>
         <div id="navigation" className="hidden md:block">
           <Sidebar />
         </div>
-        <main
-          id="main-content"
-          ref={mainRef}
-          className="flex-1 overflow-y-auto p-4 md:p-8 mb-16 md:mb-0"
-          role="main"
-          aria-label="Main content"
-        >
-          <Suspense fallback={<LoadingSpinner />}>
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/analytics" element={<Analytics />} />
-              <Route path="/invoices" element={<Invoices />} />
-              <Route path="/loyalty" element={<Loyalty />} />
-              <Route path="/inventory" element={<Inventory />} />
-              <Route path="/forecasts" element={<Forecasts />} />
-              <Route path="/alerts" element={<Alerts />} />
-              <Route path="/integrations" element={<Integrations />} />
-              <Route path="/tax-compliance" element={<TaxCompliance />} />
-              <Route path="/team" element={<Team />} />
-              <Route path="/enterprise" element={<Enterprise />} />
-              <Route path="/ai-assistant" element={<AIAssistant />} />
-              <Route path="/customers" element={<CustomerInsights />} />
-              <Route path="/multi-store" element={<MultiStore />} />
-              <Route path="/compliance" element={<Compliance />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="/devops" element={<DevOps />} />
-              <Route path="/pos" element={<POS />} />
-              <Route path="/employees" element={<Employees />} />
-              <Route path="/returns" element={<Returns />} />
-              <Route path="/suppliers" element={<Suppliers />} />
-              <Route path="/promotions" element={<Promotions />} />
-              <Route path="/monitoring" element={<Monitoring />} />
-            </Routes>
-          </Suspense>
-        </main>
+        <div className="flex-1 flex flex-col overflow-hidden h-full">
+          <Header />
+          <main
+            id="main-content"
+            ref={mainRef}
+            className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 mb-16 md:mb-0 w-full min-h-0"
+            role="main"
+            aria-label="Main content"
+          >
+            <Suspense fallback={<LoadingSpinner />}>
+              <Routes>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/analytics" element={<Analytics />} />
+                <Route path="/invoices" element={<Invoices />} />
+                <Route path="/loyalty" element={<Loyalty />} />
+                <Route path="/inventory" element={<Inventory />} />
+                <Route path="/forecasts" element={<Forecasts />} />
+                <Route path="/alerts" element={<Alerts />} />
+                <Route path="/integrations" element={<Integrations />} />
+                <Route path="/tax-compliance" element={<TaxCompliance />} />
+                <Route path="/team" element={<Team />} />
+                <Route path="/enterprise" element={<Enterprise />} />
+                <Route path="/ai-assistant" element={<AIAssistant />} />
+                <Route path="/customers" element={<CustomerInsights />} />
+                <Route path="/multi-store" element={<MultiStore />} />
+                <Route path="/compliance" element={<Compliance />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="/devops" element={<DevOps />} />
+                <Route path="/pos" element={<POS />} />
+                <Route path="/employees" element={<Employees />} />
+                <Route path="/returns" element={<Returns />} />
+                <Route path="/suppliers" element={<Suppliers />} />
+                <Route path="/promotions" element={<Promotions />} />
+                <Route path="/monitoring" element={<Monitoring />} />
+              </Routes>
+            </Suspense>
+          </main>
+        </div>
         <MobileNav />
+        <FloatingAIAssistant />
       </div>
     </>
   );

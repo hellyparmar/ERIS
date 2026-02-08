@@ -1,0 +1,23 @@
+{
+  "timestamp": "2026-02-06T16:35:48.242378",
+  "tests": {
+    "connection": true,
+    "tables_exist": true,
+    "data_populated": true,
+    "indexes_created": true,
+    "foreign_keys_valid": true
+  },
+  "table_counts": {
+    "organizations": 1,
+    "stores": 1,
+    "users": 0,
+    "products": 26400,
+    "customers": 99000,
+    "sales": 100000,
+    "sale_items": 194864,
+    "inventory": 26400,
+    "suppliers": 0,
+    "invoices": 0
+  },
+  "all_passed": true
+}

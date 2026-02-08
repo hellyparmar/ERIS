@@ -1,6 +1,5 @@
 
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
 import {
     FileText,
     RefreshCw,
@@ -12,8 +11,10 @@ import {
 } from 'lucide-react';
 import GlassCard from '../components/ui/GlassCard';
 import GradientButton from '../components/ui/GradientButton';
+import { useToast } from '../components/ui/Toast';
 
 const Invoices = () => {
+    const { addToast } = useToast();
     // Mock Data simulating DB
     const [invoices, setInvoices] = useState([
         { id: "INV-001", customer: "ABC Corp", amount: "₹15,000", date: "2026-01-21", status: "paid", tally_status: "synced" },
@@ -95,8 +96,8 @@ const Invoices = () => {
         <div className="space-y-8 fade-in-up min-h-screen">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h1 className="text-4xl font-bold gradient-text mb-2">Invoices</h1>
-                    <p className="text-gray-400">Manage sales and Tally integration</p>
+                    <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent mb-2">Invoices</h1>
+                    <p className="text-muted-foreground">Manage sales and Tally integration</p>
                 </div>
                 <div className="flex gap-3">
                     <div className="flex flex-1 md:flex-none gap-3">
@@ -124,7 +125,7 @@ const Invoices = () => {
             <GlassCard className="overflow-hidden">
                 <table className="w-full text-left text-sm">
                     <thead>
-                        <tr className="bg-slate-50 dark:bg-slate-950/50 text-slate-500 dark:text-slate-300 font-medium text-xs uppercase tracking-wider">
+                        <tr className="bg-slate-50 dark:bg-slate-950/50 text-muted-foreground font-semibold text-xs uppercase tracking-wider">
                             <th className="px-6 py-4">Invoice ID</th>
                             <th className="px-6 py-4">Customer</th>
                             <th className="px-6 py-4">Date</th>
@@ -137,10 +138,10 @@ const Invoices = () => {
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                         {invoices.map((inv) => (
                             <tr key={inv.id} className="hover:bg-muted/50 transition-colors">
-                                <td className="px-6 py-4 font-mono text-slate-600 dark:text-slate-300 font-medium">{inv.id}</td>
-                                <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">{inv.customer}</td>
-                                <td className="px-6 py-4 text-slate-500 dark:text-slate-400">{inv.date}</td>
-                                <td className="px-6 py-4 font-bold text-slate-900 dark:text-white">{inv.amount}</td>
+                                <td className="px-6 py-4 font-mono text-muted-foreground font-medium text-xs">{inv.id}</td>
+                                <td className="px-6 py-4 font-medium text-foreground">{inv.customer}</td>
+                                <td className="px-6 py-4 text-foreground font-medium">{inv.date}</td>
+                                <td className="px-6 py-4 font-bold text-foreground">{inv.amount}</td>
                                 <td className="px-6 py-4">
                                     <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${getStatusColor(inv.status)}`}>
                                         {inv.status}

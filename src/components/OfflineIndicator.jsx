@@ -60,9 +60,12 @@ export function OfflineIndicator() {
 
                     <div className="status-row">
                         <span>Connection:</span>
-                        <span className={isOnline ? 'text-success' : 'text-danger'}>
-                            {isOnline ? '🟢 Online' : '🔴 Offline'}
-                        </span>
+                        <div className="flex items-center gap-2">
+                            <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500 text-green-500' : 'bg-red-500 text-red-500'}`} />
+                            <span className={isOnline ? 'text-green-500' : 'text-red-500'}>
+                                {isOnline ? 'Online' : 'Offline'}
+                            </span>
+                        </div>
                     </div>
 
                     {syncStatus && syncStatus.last_sync_time && (

@@ -1,0 +1,12 @@
+{
+  "timestamp": "2026-02-06T16:34:55.828180",
+  "tests": {
+    "connection": true,
+    "tables_exist": false,
+    "data_populated": false,
+    "indexes_created": false,
+    "foreign_keys_valid": null
+  },
+  "table_counts": {},
+  "all_passed": false
+}

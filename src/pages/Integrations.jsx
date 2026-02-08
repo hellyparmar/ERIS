@@ -1,18 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Save, RefreshCw, CheckCircle, AlertCircle, Database, Server, User, Key, Globe, ShoppingCart, CreditCard, ExternalLink } from 'lucide-react';
-import GlassCard from '../components/ui/GlassCard';
-import GradientButton from '../components/ui/GradientButton';
-import '../modern-design.css';
+import UnifiedCard from '../components/ui/UnifiedCard';
+import ActionButton from '../components/ui/ActionButton';
 
 // Mock Organization ID for demo
 const ORG_ID = '00000000-0000-0000-0000-000000000001';
 
 const INTEGRATION_TABS = [
-    { id: 'odoo', name: 'Odoo ERP', icon: Database, bgClass: 'bg-purple-500', textClass: 'text-white' },
-    { id: 'zoho', name: 'Zoho Books', icon: CreditCard, bgClass: 'bg-yellow-500', textClass: 'text-white' },
-    { id: 'shopify', name: 'Shopify', icon: ShoppingCart, bgClass: 'bg-green-500', textClass: 'text-white' },
-    { id: 'woocommerce', name: 'WooCommerce', icon: Globe, bgClass: 'bg-blue-500', textClass: 'text-white' }
+    { id: 'odoo', name: 'Odoo ERP', icon: Database, bgClass: 'bg-purple-500', shadowColor: 'rgba(168, 85, 247, 0.5)' },
+    { id: 'zoho', name: 'Zoho Books', icon: CreditCard, bgClass: 'bg-yellow-500', shadowColor: 'rgba(234, 179, 8, 0.5)' },
+    { id: 'shopify', name: 'Shopify', icon: ShoppingCart, bgClass: 'bg-green-500', shadowColor: 'rgba(34, 197, 94, 0.5)' },
+    { id: 'woocommerce', name: 'WooCommerce', icon: Globe, bgClass: 'bg-blue-500', shadowColor: 'rgba(59, 130, 246, 0.5)' }
 ];
 
 const Integrations = () => {
@@ -83,161 +82,170 @@ const Integrations = () => {
 
     const renderFormFields = () => {
         const config = configs[activeTab];
-        const inputClass = "w-full bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-lg p-3 text-gray-900 dark:text-white focus:border-purple-500 focus:outline-none placeholder-gray-500 dark:placeholder-gray-400";
+        const inputClass = "w-full bg-background border border-input rounded-lg p-3 text-foreground focus:ring-2 focus:ring-ring focus:outline-none placeholder-muted-foreground transition";
 
         switch (activeTab) {
             case 'odoo':
                 return (
                     <>
                         <div className="space-y-4">
-                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Connection Details</h3>
+                            <h3 className="text-lg font-semibold text-foreground">Connection Details</h3>
                             <div className="space-y-2">
-                                <label className="text-sm text-gray-500 dark:text-slate-300 flex items-center gap-2"><Server size={14} /> Server URL</label>
+                                <label className="text-sm text-muted-foreground flex items-center gap-2"><Server size={14} /> Server URL</label>
                                 <input type="text" value={config.url} onChange={(e) => handleConfigChange('url', e.target.value)}
                                     placeholder="https://your-odoo-instance.com" className={inputClass} />
                             </div>
                             <div className="space-y-2">
-                                <label className="text-sm text-gray-500 dark:text-slate-300 flex items-center gap-2"><Database size={14} /> Database Name</label>
+                                <label className="text-sm text-muted-foreground flex items-center gap-2"><Database size={14} /> Database Name</label>
                                 <input type="text" value={config.db_name} onChange={(e) => handleConfigChange('db_name', e.target.value)}
-                                    placeholder="e.g. odoo16_production" className={inputClass} />
+                                    placeholder="your_database" className={inputClass} />
                             </div>
                             <div className="space-y-2">
-                                <label className="text-sm text-gray-500 dark:text-slate-300 flex items-center gap-2"><User size={14} /> Email / Username</label>
+                                <label className="text-sm text-muted-foreground flex items-center gap-2"><User size={14} /> Username</label>
                                 <input type="text" value={config.username} onChange={(e) => handleConfigChange('username', e.target.value)}
                                     placeholder="admin@example.com" className={inputClass} />
                             </div>
                             <div className="space-y-2">
-                                <label className="text-sm text-gray-500 dark:text-slate-300 flex items-center gap-2"><Key size={14} /> API Key / Password</label>
+                                <label className="text-sm text-muted-foreground flex items-center gap-2"><Key size={14} /> API Key</label>
                                 <input type="password" value={config.api_key} onChange={(e) => handleConfigChange('api_key', e.target.value)}
-                                    placeholder="••••••••" className={inputClass} />
+                                    placeholder="••••••••••••••••" className={inputClass} />
                             </div>
                         </div>
                     </>
                 );
             case 'zoho':
                 return (
-                    <>
-                        <div className="space-y-4">
-                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">OAuth Credentials</h3>
-                            <div className="space-y-2">
-                                <label className="text-sm text-gray-500 dark:text-gray-400 block">Organization ID</label>
-                                <input type="text" value={config.org_id} onChange={(e) => handleConfigChange('org_id', e.target.value)}
-                                    placeholder="e.g. 783291..." className={inputClass} />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-sm text-gray-500 dark:text-gray-400 block">Client ID</label>
-                                <input type="text" value={config.client_id} onChange={(e) => handleConfigChange('client_id', e.target.value)}
-                                    placeholder="Zoho Client ID" className={inputClass} />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-sm text-gray-500 dark:text-gray-400 block">Client Secret</label>
-                                <input type="password" value={config.client_secret} onChange={(e) => handleConfigChange('client_secret', e.target.value)}
-                                    placeholder="••••••••" className={inputClass} />
-                            </div>
+                    <div className="space-y-4">
+                        <h3 className="text-lg font-semibold text-foreground">Connection Details</h3>
+                        <div className="space-y-2">
+                            <label className="text-sm text-muted-foreground">Organization ID</label>
+                            <input type="text" value={config.org_id} onChange={(e) => handleConfigChange('org_id', e.target.value)}
+                                placeholder="123456789" className={inputClass} />
                         </div>
-                    </>
+                        <div className="space-y-2">
+                            <label className="text-sm text-muted-foreground">Client ID</label>
+                            <input type="text" value={config.client_id} onChange={(e) => handleConfigChange('client_id', e.target.value)}
+                                placeholder="1000.XXXXXXXXXXXXXXX" className={inputClass} />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sm text-muted-foreground">Client Secret</label>
+                            <input type="password" value={config.client_secret} onChange={(e) => handleConfigChange('client_secret', e.target.value)}
+                                placeholder="••••••••••••••••" className={inputClass} />
+                        </div>
+                    </div>
                 );
             case 'shopify':
                 return (
-                    <>
-                        <div className="space-y-4">
-                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Store Access</h3>
-                            <div className="space-y-2">
-                                <label className="text-sm text-gray-500 dark:text-gray-400 block">Shop URL</label>
-                                <input type="text" value={config.shop_url} onChange={(e) => handleConfigChange('shop_url', e.target.value)}
-                                    placeholder="my-shop.myshopify.com" className={inputClass} />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-sm text-gray-500 dark:text-gray-400 block">Admin API Access Token</label>
-                                <input type="password" value={config.access_token} onChange={(e) => handleConfigChange('access_token', e.target.value)}
-                                    placeholder="shpat_..." className={inputClass} />
-                            </div>
+                    <div className="space-y-4">
+                        <h3 className="text-lg font-semibold text-foreground">Connection Details</h3>
+                        <div className="space-y-2">
+                            <label className="text-sm text-muted-foreground">Shop URL</label>
+                            <input type="text" value={config.shop_url} onChange={(e) => handleConfigChange('shop_url', e.target.value)}
+                                placeholder="your-store.myshopify.com" className={inputClass} />
                         </div>
-                    </>
+                        <div className="space-y-2">
+                            <label className="text-sm text-muted-foreground">Access Token</label>
+                            <input type="password" value={config.access_token} onChange={(e) => handleConfigChange('access_token', e.target.value)}
+                                placeholder="shpat_••••••••••••••••" className={inputClass} />
+                        </div>
+                    </div>
                 );
             case 'woocommerce':
                 return (
-                    <>
-                        <div className="space-y-4">
-                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">API Keys</h3>
-                            <div className="space-y-2">
-                                <label className="text-sm text-gray-500 dark:text-gray-400 block">Store URL</label>
-                                <input type="text" value={config.store_url} onChange={(e) => handleConfigChange('store_url', e.target.value)}
-                                    placeholder="https://..." className={inputClass} />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-sm text-gray-500 dark:text-gray-400 block">Consumer Key</label>
-                                <input type="text" value={config.consumer_key} onChange={(e) => handleConfigChange('consumer_key', e.target.value)}
-                                    placeholder="ck_..." className={inputClass} />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-sm text-gray-500 dark:text-gray-400 block">Consumer Secret</label>
-                                <input type="password" value={config.consumer_secret} onChange={(e) => handleConfigChange('consumer_secret', e.target.value)}
-                                    placeholder="cs_..." className={inputClass} />
-                            </div>
+                    <div className="space-y-4">
+                        <h3 className="text-lg font-semibold text-foreground">Connection Details</h3>
+                        <div className="space-y-2">
+                            <label className="text-sm text-muted-foreground">Store URL</label>
+                            <input type="text" value={config.store_url} onChange={(e) => handleConfigChange('store_url', e.target.value)}
+                                placeholder="https://your-store.com" className={inputClass} />
                         </div>
-                    </>
+                        <div className="space-y-2">
+                            <label className="text-sm text-muted-foreground">Consumer Key</label>
+                            <input type="text" value={config.consumer_key} onChange={(e) => handleConfigChange('consumer_key', e.target.value)}
+                                placeholder="ck_••••••••••••••••" className={inputClass} />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sm text-muted-foreground">Consumer Secret</label>
+                            <input type="password" value={config.consumer_secret} onChange={(e) => handleConfigChange('consumer_secret', e.target.value)}
+                                placeholder="cs_••••••••••••••••" className={inputClass} />
+                        </div>
+                    </div>
                 );
             default: return null;
         }
     };
 
     const renderSyncToggles = () => {
+        const config = configs[activeTab];
+        const toggles = {
+            odoo: [
+                { key: 'sync_products', label: 'Sync Products' },
+                { key: 'sync_customers', label: 'Sync Customers' }
+            ],
+            zoho: [{ key: 'sync_invoices', label: 'Sync Invoices' }],
+            shopify: [{ key: 'sync_inventory', label: 'Sync Inventory' }],
+            woocommerce: [{ key: 'sync_orders', label: 'Sync Orders' }]
+        };
+
         return (
-            <div className="pt-4 flex gap-6">
-                <label className="flex items-center gap-2 cursor-pointer text-gray-300">
-                    <input type="checkbox" checked={true} readOnly className="accent-blue-500 w-4 h-4" />
-                    Sync Products
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer text-gray-300">
-                    <input type="checkbox" checked={true} readOnly className="accent-blue-500 w-4 h-4" />
-                    Sync Orders
-                </label>
+            <div className="mt-6 space-y-3">
+                <h3 className="text-sm font-semibold text-foreground">Sync Options</h3>
+                {toggles[activeTab]?.map(toggle => (
+                    <label key={toggle.key} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg cursor-pointer hover:bg-muted/50 transition">
+                        <span className="text-sm text-foreground">{toggle.label}</span>
+                        <input
+                            type="checkbox"
+                            checked={config[toggle.key]}
+                            onChange={(e) => handleConfigChange(toggle.key, e.target.checked)}
+                            className="w-4 h-4 rounded border-border bg-background checked:bg-primary focus:ring-2 focus:ring-ring"
+                        />
+                    </label>
+                ))}
             </div>
         );
     };
 
     const renderGuide = () => {
-        switch (activeTab) {
-            case 'odoo':
-                return (
-                    <ul className="space-y-3 text-sm text-gray-400">
-                        <li className="flex gap-2"><span className="bg-white/10 w-5 h-5 rounded-full flex items-center justify-center text-xs">1</span>Log in to Odoo Database.</li>
-                        <li className="flex gap-2"><span className="bg-white/10 w-5 h-5 rounded-full flex items-center justify-center text-xs">2</span>Go to Profile → Account Security.</li>
-                        <li className="flex gap-2"><span className="bg-white/10 w-5 h-5 rounded-full flex items-center justify-center text-xs">3</span>Generate new API Key.</li>
-                        <li className="flex gap-2"><span className="bg-white/10 w-5 h-5 rounded-full flex items-center justify-center text-xs">4</span>Enter details appropriately.</li>
-                    </ul>
-                );
-            case 'zoho':
-                return (
-                    <ul className="space-y-3 text-sm text-gray-400">
-                        <li className="flex gap-2"><span className="bg-white/10 w-5 h-5 rounded-full flex items-center justify-center text-xs">1</span>Go to Zoho Developer Console.</li>
-                        <li className="flex gap-2"><span className="bg-white/10 w-5 h-5 rounded-full flex items-center justify-center text-xs">2</span>Register a new specific Client.</li>
-                        <li className="flex gap-2"><span className="bg-white/10 w-5 h-5 rounded-full flex items-center justify-center text-xs">3</span>Copy Client ID and Secret.</li>
-                    </ul>
-                );
-            case 'shopify':
-                return (
-                    <ul className="space-y-3 text-sm text-gray-400">
-                        <li className="flex gap-2"><span className="bg-white/10 w-5 h-5 rounded-full flex items-center justify-center text-xs">1</span>Go to Shopify Admin → Apps.</li>
-                        <li className="flex gap-2"><span className="bg-white/10 w-5 h-5 rounded-full flex items-center justify-center text-xs">2</span>Create a Custom App.</li>
-                        <li className="flex gap-2"><span className="bg-white/10 w-5 h-5 rounded-full flex items-center justify-center text-xs">3</span>Reveal Admin API Access Token.</li>
-                    </ul>
-                );
-            case 'woocommerce':
-                return (
-                    <ul className="space-y-3 text-sm text-gray-400">
-                        <li className="flex gap-2"><span className="bg-white/10 w-5 h-5 rounded-full flex items-center justify-center text-xs">1</span>Go to WooCommerce → Settings → Advanced.</li>
-                        <li className="flex gap-2"><span className="bg-white/10 w-5 h-5 rounded-full flex items-center justify-center text-xs">2</span>REST API → Add Key.</li>
-                        <li className="flex gap-2"><span className="bg-white/10 w-5 h-5 rounded-full flex items-center justify-center text-xs">3</span>Generate Consumer Key/Secret.</li>
-                    </ul>
-                );
-            default: return null;
-        }
+        const guides = {
+            odoo: [
+                'Log in to Odoo Database.',
+                'Go to Profile → Account Security.',
+                'Generate new API Key.',
+                'Enter details appropriately.'
+            ],
+            zoho: [
+                'Go to Zoho Developer Console.',
+                'Register a new specific Client.',
+                'Copy Client ID and Secret.'
+            ],
+            shopify: [
+                'Go to Shopify Admin → Apps.',
+                'Create a Custom App.',
+                'Reveal Admin API Access Token.'
+            ],
+            woocommerce: [
+                'Go to WooCommerce → Settings → Advanced.',
+                'REST API → Add Key.',
+                'Generate Consumer Key/Secret.'
+            ]
+        };
+
+        return (
+            <ul className="space-y-3 text-sm text-muted-foreground">
+                {guides[activeTab]?.map((step, idx) => (
+                    <li key={idx} className="flex gap-2">
+                        <span className="bg-muted w-5 h-5 rounded-full flex items-center justify-center text-xs text-foreground flex-shrink-0">
+                            {idx + 1}
+                        </span>
+                        <span>{step}</span>
+                    </li>
+                ))}
+            </ul>
+        );
     };
 
     return (
-        <div className="min-h-screen p-6 space-y-6 animate-fade-in">
+        <div className="min-h-screen space-y-6">
             {/* Header */}
             <motion.div
                 initial={{ opacity: 0, y: -20 }}
@@ -249,8 +257,8 @@ const Integrations = () => {
                 <p className="text-muted-foreground">Manage third-party connections and APIs</p>
             </motion.div>
 
-            {/* Top Tabs */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            {/* Integration Tabs - Strict Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {INTEGRATION_TABS.map((tab, idx) => {
                     const isActive = activeTab === tab.id;
                     const isConnected = connections[tab.id];
@@ -264,67 +272,58 @@ const Integrations = () => {
                             transition={{ delay: idx * 0.1 }}
                             whileHover={{ scale: 1.02 }}
                             whileTap={{ scale: 0.98 }}
-                            className={`p-4 rounded-xl border transition-all relative overflow-hidden text-left ${isActive
-                                    ? 'bg-gradient-to-br from-primary/10 to-purple/10 border-primary/50 shadow-glow-primary'
-                                    : 'bg-card border-border hover:border-primary/30 hover:shadow-lg'
+                            className={`p-5 rounded-xl border transition-all relative text-left group ${isActive
+                                ? 'bg-primary/5 border-primary shadow-lg shadow-primary/10'
+                                : 'bg-card border-border hover:border-primary/30 hover:shadow-md'
                                 }`}
                         >
-                            <div className="flex items-center justify-between mb-2">
-                                <div className={`p-4 rounded-xl ${tab.bgClass} bg-opacity-80 dark:bg-opacity-90 mb-3 flex items-center justify-center shadow-lg`}>
-                                    <Icon size={28} className="text-white" strokeWidth={2} />
+                            <div className="flex items-center gap-4">
+                                <div
+                                    className={`p-3 rounded-xl ${tab.bgClass} shadow-lg group-hover:scale-110 transition-transform duration-300`}
+                                    style={{ boxShadow: `0 0 20px ${tab.shadowColor}` }}
+                                >
+                                    <Icon size={24} className="text-white drop-shadow-md" />
                                 </div>
-                                {isConnected && (
-                                    <div className="relative">
-                                        <CheckCircle size={16} className="text-success relative z-10" />
-                                        <span className="absolute inset-0 rounded-full bg-success/20 animate-ping" />
+                                <div className="flex-1">
+                                    <div className="flex items-center justify-between">
+                                        <h3 className="font-bold text-foreground text-lg">{tab.name}</h3>
+                                        {isConnected && (
+                                            <CheckCircle size={18} className="text-green-500" />
+                                        )}
                                     </div>
-                                )}
+                                    <div className="mt-1">
+                                        {isConnected ? (
+                                            <span className="inline-flex items-center text-xs font-medium text-green-600 dark:text-green-400 bg-green-500/10 px-2 py-1 rounded-full">
+                                                ● Connected
+                                            </span>
+                                        ) : (
+                                            <span className="inline-flex items-center text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded-full border border-border">
+                                                Not Configured
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
-                            <h3 className="font-semibold text-foreground">{tab.name}</h3>
-                            <p className="text-xs text-muted-foreground">
-                                {isConnected ? (
-                                    <span className="text-success font-medium">● Connected</span>
-                                ) : (
-                                    'Not Configured'
-                                )}
-                            </p>
-
-                            {isActive && (
-                                <motion.div
-                                    layoutId="activeTabIndicator"
-                                    className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-primary to-purple"
-                                />
-                            )}
                         </motion.button>
                     )
                 })}
             </div>
 
             {/* Main Content Area */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Left: Configuration Form */}
                 <div className="lg:col-span-2">
-                    <GlassCard variant="gradient" className="p-6 h-full animate-slide-up stagger-1">
-                        <div className="mb-6">
-                            <div className="flex items-center justify-between mb-2">
-                                <div className="flex items-center gap-3">
-                                    {(() => {
-                                        const TabIcon = INTEGRATION_TABS.find(t => t.id === activeTab)?.icon;
-                                        return TabIcon ? <TabIcon className="text-gray-400" size={24} /> : null;
-                                    })()}
-                                    <h2 className="text-xl font-bold text-white">
-                                        Configure {INTEGRATION_TABS.find(t => t.id === activeTab)?.name}
-                                    </h2>
-                                </div>
-                                {connections[activeTab] && (
-                                    <span className="px-3 py-1 rounded-full bg-green-500/20 text-green-400 text-xs font-medium border border-green-500/20">
-                                        • Active
-                                    </span>
-                                )}
-                            </div>
-                            <p className="text-sm text-gray-400">Fill up the information of third-party database to enable real-time sync.</p>
-                        </div>
-
+                    <UnifiedCard
+                        title={`Configure ${INTEGRATION_TABS.find(t => t.id === activeTab)?.name}`}
+                        subtitle="Fill up the information of third-party database to enable real-time sync"
+                        actions={
+                            connections[activeTab] && (
+                                <span className="px-3 py-1 rounded-full bg-green-500/10 text-green-600 dark:text-green-500 text-xs font-medium border border-green-500/20">
+                                    • Active
+                                </span>
+                            )
+                        }
+                    >
                         {renderFormFields()}
                         {renderSyncToggles()}
 
@@ -335,7 +334,10 @@ const Integrations = () => {
                                     initial={{ opacity: 0, height: 0 }}
                                     animate={{ opacity: 1, height: 'auto' }}
                                     exit={{ opacity: 0, height: 0 }}
-                                    className={`mt-4 p-3 rounded-lg flex items-center gap-2 text-sm ${status.type === 'success' ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'}`}
+                                    className={`mt-4 p-3 rounded-lg flex items-center gap-2 text-sm ${status.type === 'success'
+                                        ? 'bg-green-500/10 text-green-600 dark:text-green-500 border border-green-500/20'
+                                        : 'bg-destructive/10 text-destructive border border-destructive/20'
+                                        }`}
                                 >
                                     {status.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
                                     {status.message}
@@ -343,50 +345,50 @@ const Integrations = () => {
                             )}
                         </AnimatePresence>
 
-                        <div className="flex gap-4 mt-8 pt-6 border-t border-white/10">
-                            <GradientButton
+                        <div className="flex gap-4 mt-6 pt-6 border-t border-border">
+                            <button
                                 onClick={handleTestConnection}
                                 disabled={testing}
-                                className="flex-1 flex items-center justify-center gap-2"
+                                className="btn-enterprise btn-enterprise-primary flex-1 flex items-center justify-center gap-2"
                             >
-                                {testing ? <RefreshCw className="animate-spin w-4 h-4" /> : <RefreshCw className="w-4 h-4" />}
+                                <RefreshCw size={16} className={testing ? 'animate-spin' : ''} />
                                 {connections[activeTab] ? 'Test & Reconnect' : 'Connect App'}
-                            </GradientButton>
+                            </button>
 
                             <button
                                 onClick={handleSave}
                                 disabled={loading}
-                                className="px-6 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-white transition border border-white/10 flex items-center gap-2"
+                                className="btn-enterprise btn-enterprise-success flex items-center justify-center gap-2"
                             >
-                                <Save size={16} /> Save
+                                <Save size={16} />
+                                Save
                             </button>
                         </div>
-                    </GlassCard>
+                    </UnifiedCard>
                 </div>
 
                 {/* Right: Info & Status */}
                 <div className="space-y-6">
-                    <GlassCard variant="gradient" className="p-6 animate-slide-up stagger-2">
-                        <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Auto-Sync Status</h3>
+                    <UnifiedCard title="Auto-Sync Status">
                         <div className="space-y-4">
-                            <div className="flex justify-between items-center p-4 bg-white/5 rounded-lg border border-white/5">
+                            <div className="flex justify-between items-center p-4 bg-muted/30 rounded-lg">
                                 <div>
-                                    <p className="text-slate-600 dark:text-gray-400 text-sm">Scheduler</p>
-                                    <p className="text-green-600 dark:text-green-400 font-medium flex items-center gap-2">
+                                    <p className="text-muted-foreground text-sm font-semibold">Scheduler</p>
+                                    <p className="text-muted-foreground font-medium flex items-center gap-2">
                                         <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
                                         Running
                                     </p>
                                 </div>
-                                <RefreshCw size={20} className="text-gray-500 animate-spin-slow" />
+                                <RefreshCw size={20} className="text-muted-foreground animate-spin-slow" />
                             </div>
 
-                            <div className="p-4 bg-white/5 rounded-lg border border-white/5">
+                            <div className="p-4 bg-muted/30 rounded-lg">
                                 <div className="flex justify-between items-center mb-2">
-                                    <p className="text-slate-600 dark:text-gray-400 text-sm">Sync Interval</p>
+                                    <p className="text-muted-foreground text-sm">Sync Interval</p>
                                     <select
                                         value={syncInterval}
                                         onChange={(e) => setSyncInterval(e.target.value)}
-                                        className="bg-black/30 text-xs text-white border border-white/10 rounded px-2 py-1 focus:outline-none"
+                                        className="bg-background text-xs text-foreground border border-input rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-ring"
                                     >
                                         <option value="30m">30 Mins</option>
                                         <option value="1h">1 Hour</option>
@@ -396,20 +398,19 @@ const Integrations = () => {
                                 </div>
                             </div>
                         </div>
-                    </GlassCard>
+                    </UnifiedCard>
 
-                    <GlassCard variant="gradient" className="p-6 animate-slide-up stagger-3">
-                        <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">How to Connect</h3>
+                    <UnifiedCard title="How to Connect">
                         {renderGuide()}
-                        <div className="mt-6 pt-4 border-t border-white/10">
+                        <div className="mt-6 pt-4 border-t border-border">
                             <button
-                                onClick={() => addToast("Opening Documentation in new tab...", "success")}
-                                className="text-xs text-blue-400 flex items-center gap-1 hover:underline bg-transparent border-none p-0"
+                                onClick={() => alert("Opening Documentation in new tab...")}
+                                className="text-xs text-primary flex items-center gap-1 hover:underline"
                             >
                                 <ExternalLink size={12} /> View Documentation
                             </button>
                         </div>
-                    </GlassCard>
+                    </UnifiedCard>
                 </div>
             </div>
         </div>

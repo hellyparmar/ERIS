@@ -1,0 +1,1 @@
+{"message":{"text":"[Provider: error]\nDEBUG ERROR from openrouter: Error code: 404 - {'error': {'message': 'No endpoints found for qwen/qwen-2.5-coder-32b-instruct:free.', 'code': 404}, 'user_id': 'user_39KGvU0QUVkO8YBVeX2clJwyhyp'}","language":"en","script":"native","timestamp":"2026-02-07T04:49:35.025134"},"session_id":"debug_final_5","action":null}

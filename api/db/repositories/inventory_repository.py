@@ -207,5 +207,84 @@ class InventoryRepository:
             'categories': categories
         }
 
+
+    @staticmethod
+    def create_product(db: Session, product_data: Dict, inventory_data: Dict) -> Dict:
+        """Create new product and initialize inventory"""
+        try:
+            # 1. Create Product
+            new_product = Product(
+                sku=product_data['sku'],
+                name=product_data['name'],
+                category=product_data.get('category'),
+                unit_price=product_data['unit_price'],
+                cost_price=product_data.get('cost_price'),
+                hsn_code=product_data.get('hsn_code'),
+                gst_rate=product_data.get('gst_rate'),
+                description=product_data.get('description')
+            )
+            db.add(new_product)
+            db.flush()  # To get product ID
+
+            # 2. Create Inventory Record
+            new_inventory = Inventory(
+                product_id=new_product.id,
+                current_stock=inventory_data.get('current_stock', 0),
+                reorder_point=inventory_data.get('reorder_point', 10),
+                reorder_quantity=inventory_data.get('reorder_quantity', 50),
+                warehouse_location=inventory_data.get('warehouse_location'),
+                last_stocked_date=datetime.now() if inventory_data.get('current_stock', 0) > 0 else None
+            )
+            db.add(new_inventory)
+            db.commit()
+            
+            return {
+                "id": new_inventory.id,
+                "product_id": new_product.id,
+                "name": new_product.name,
+                "sku": new_product.sku
+            }
+        except Exception as e:
+            db.rollback()
+            raise e
+
+    @staticmethod
+    def update_product(db: Session, product_id: int, updates: Dict) -> Optional[Dict]:
+        """Update product and inventory details"""
+        product = db.query(Product).filter(Product.id == product_id).first()
+        inventory = db.query(Inventory).filter(Inventory.product_id == product_id).first()
+        
+        if not product or not inventory:
+            return None
+            
+        # Update Product Fields
+        if 'name' in updates: product.name = updates['name']
+        if 'category' in updates: product.category = updates['category']
+        if 'unit_price' in updates: product.unit_price = updates['unit_price']
+        if 'cost_price' in updates: product.cost_price = updates['cost_price']
+        
+        # Update Inventory Fields
+        if 'current_stock' in updates: 
+            inventory.current_stock = updates['current_stock']
+            inventory.updated_at = datetime.now()
+        if 'reorder_point' in updates: inventory.reorder_point = updates['reorder_point']
+        if 'warehouse_location' in updates: inventory.warehouse_location = updates['warehouse_location']
+        
+        db.commit()
+        return {"id": product.id, "name": product.name, "message": "Updated successfully"}
+
+    @staticmethod
+    def delete_product(db: Session, product_id: int) -> bool:
+        """Delete product and related inventory"""
+        try:
+            # Delete inventory first (FK constraint usually handles this but being explicit)
+            db.query(Inventory).filter(Inventory.product_id == product_id).delete()
+            db.query(Product).filter(Product.id == product_id).delete()
+            db.commit()
+            return True
+        except Exception:
+            db.rollback()
+            return False
+
 # Singleton instance
 inventory_repository = InventoryRepository()

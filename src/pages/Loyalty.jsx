@@ -15,8 +15,8 @@ import {
     UserPlus,
     TrendingUp
 } from 'lucide-react';
-import GlassCard from '../components/ui/GlassCard';
-import GradientButton from '../components/ui/GradientButton';
+import UnifiedCard from '../components/ui/UnifiedCard';
+import ActionButton from '../components/ui/ActionButton';
 import { useToast } from '../components/ui/Toast';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -126,7 +126,7 @@ const Loyalty = () => {
             });
 
             if (response.ok) {
-                const result = await response.json();
+                await response.json();
                 addToast(`WhatsApp payment reminder sent to ${customer.customer_name}`, "success");
             } else {
                 const error = await response.json();
@@ -196,13 +196,13 @@ const Loyalty = () => {
                 className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
             >
                 <div>
-                    <h1 className="text-4xl font-bold gradient-text mb-2">Loyalty & Credit</h1>
-                    <p className="text-gray-400">Manage referrals and digital udhaar</p>
+                    <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-purple bg-clip-text text-transparent mb-2">Loyalty & Credit</h1>
+                    <p className="text-muted-foreground">Manage referrals and digital udhaar</p>
                 </div>
                 <div className="flex items-center gap-3">
                     <button
                         onClick={handleRefresh}
-                        className="p-2 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-colors duration-200"
+                        className="p-2 hover:bg-white/10 rounded-lg text-muted-foreground hover:text-white transition-colors duration-200"
                         title="Refresh data"
                     >
                         <RefreshCw size={18} />
@@ -214,7 +214,7 @@ const Loyalty = () => {
                                 onClick={() => setActiveTab(tab)}
                                 className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${activeTab === tab
                                     ? 'bg-blue-600 !text-white shadow-lg'
-                                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                                    : 'text-muted-foreground hover:text-white hover:bg-white/5'
                                     }`}
                             >
                                 {tab.charAt(0).toUpperCase() + tab.slice(1)}
@@ -226,12 +226,12 @@ const Loyalty = () => {
 
             {/* Quick Stats */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <GlassCard className="p-6">
+                <UnifiedCard className="p-6">
                     <div className="flex justify-between items-start">
                         <div>
-                            <p className="text-sm font-medium text-slate-500 dark:text-slate-300 mb-1">Total Referrals</p>
+                            <p className="text-sm font-medium text-muted-foreground mb-1">Total Referrals</p>
                             <h3 className="text-2xl font-bold text-slate-900 dark:text-white">{stats.referrals.total}</h3>
-                            <p className="text-xs text-green-500 dark:text-green-400 mt-1 font-medium">
+                            <p className="text-xs text-muted-foreground mt-1 font-medium">
                                 {stats.referrals.converted} converted
                             </p>
                         </div>
@@ -239,13 +239,13 @@ const Loyalty = () => {
                             <Users className="w-6 h-6 text-white" strokeWidth={2.5} />
                         </div>
                     </div>
-                </GlassCard>
+                </UnifiedCard>
 
-                <GlassCard className="p-6 bg-purple-500/5 border-purple-500/20">
+                <UnifiedCard className="p-6">
                     <div className="flex justify-between items-start">
                         <div>
                             <div className="flex items-center gap-2 mb-1">
-                                <p className="text-sm font-medium text-slate-500 dark:text-slate-300">Rewards Due</p>
+                                <p className="text-sm font-medium text-muted-foreground">Rewards Due</p>
                                 <div className="group relative">
                                     <HelpCircle size={12} className="text-gray-500 cursor-help" />
                                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-black/90 text-xs text-white rounded text-center opacity-0 group-hover:opacity-100 transition pointer-events-none z-10">
@@ -261,13 +261,13 @@ const Loyalty = () => {
                             <Gift className="w-6 h-6 text-white" strokeWidth={2.5} />
                         </div>
                     </div>
-                </GlassCard>
+                </UnifiedCard>
 
-                <GlassCard className="p-6 bg-yellow-500/5 border-yellow-500/20">
+                <UnifiedCard className="p-6">
                     <div className="flex justify-between items-start">
                         <div>
                             <div className="flex items-center gap-2 mb-1">
-                                <p className="text-gray-400 text-xs uppercase tracking-wider">Active Credit</p>
+                                <p className="text-muted-foreground text-xs uppercase tracking-wider">Active Credit</p>
                                 <div className="group relative">
                                     <HelpCircle size={12} className="text-gray-500 cursor-help" />
                                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-black/90 text-xs text-white rounded text-center opacity-0 group-hover:opacity-100 transition pointer-events-none z-10">
@@ -275,8 +275,8 @@ const Loyalty = () => {
                                     </div>
                                 </div>
                             </div>
-                            <h3 className="text-2xl font-bold text-gray-900 dark:text-white">{stats.credit.formatted}</h3>
-                            <p className="text-xs text-yellow-500 dark:text-yellow-400 mt-1 font-medium">
+                            <h3 className="text-2xl font-bold text-foreground">{stats.credit.formatted}</h3>
+                            <p className="text-xs text-muted-foreground mt-1 font-medium">
                                 {stats.credit.at_risk_count} at risk
                             </p>
                         </div>
@@ -284,43 +284,43 @@ const Loyalty = () => {
                             <CreditCard size={20} />
                         </div>
                     </div>
-                </GlassCard>
+                </UnifiedCard>
 
-                <GlassCard className="p-6 relative overflow-hidden group">
+                <UnifiedCard className="p-6 relative overflow-hidden group">
                     <div className="relative z-10">
                         <p className="text-muted-foreground text-xs font-medium mb-2 uppercase tracking-wider">Referral Code</p>
-                        <div className="flex items-center gap-2 bg-muted/50 p-3 rounded-lg border border-border group-hover:border-primary/50 transition">
-                            <code className="text-xl font-mono text-primary font-bold tracking-widest">{referralCode}</code>
-                            <button onClick={copyToClipboard} className="ml-auto text-muted-foreground hover:text-foreground">
+                        <div className="flex items-center justify-between gap-2 bg-secondary p-3 rounded-lg border border-border group-hover:border-primary/50 transition w-full">
+                            <code className="text-xl font-mono text-primary font-bold tracking-widest truncate">{referralCode}</code>
+                            <button onClick={copyToClipboard} className="text-muted-foreground hover:text-foreground shrink-0">
                                 {copySuccess ? <CheckCircle size={16} className="text-green-500" /> : <Copy size={16} />}
                             </button>
                         </div>
-                        <div className="mt-2 text-xs text-muted-foreground flex items-center gap-1">
+                        <div className="mt-2 text-xs text-gray-500 dark:text-muted-foreground flex items-center gap-1">
                             <Share2 size={12} /> Share link active
                         </div>
                     </div>
-                </GlassCard>
+                </UnifiedCard>
             </div>
 
             {/* TAB CONTENT: UDHAAR (Active Credit) */}
             {activeTab === 'udhaar' && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <div className="lg:col-span-2">
-                        <GlassCard className="overflow-hidden">
+                        <UnifiedCard className="overflow-hidden">
                             <div className="p-6 border-b border-white/10 flex justify-between items-center">
                                 <h3 className="font-bold text-white">Digital Udhaar (Credit Accounts)</h3>
-                                <GradientButton size="sm" className="text-xs" onClick={() => addToast("Add Credit User Modal Opened", "info")}>
+                                <ActionButton size="sm" className="text-xs" onClick={() => addToast("Add Credit User Modal Opened", "info")}>
                                     <UserPlus size={14} className="mr-1" /> Add Credit User
-                                </GradientButton>
+                                </ActionButton>
                             </div>
                             {creditCustomers.length === 0 ? (
-                                <div className="p-8 text-center text-gray-400">
+                                <div className="p-8 text-center text-muted-foreground">
                                     <CreditCard size={48} className="mx-auto mb-4 opacity-50" />
                                     <p>No customers with active credit found</p>
                                 </div>
                             ) : (
                                 <table className="w-full text-left text-sm">
-                                    <thead className="bg-white/5 text-gray-400 text-xs uppercase">
+                                    <thead className="bg-white/5 text-muted-foreground text-xs uppercase">
                                         <tr>
                                             <th className="px-6 py-4">Customer</th>
                                             <th className="px-6 py-4">Utilization</th>
@@ -348,7 +348,7 @@ const Loyalty = () => {
                                                                 style={{ width: `${Math.min(cust.utilization, 100)}%` }}
                                                             ></div>
                                                         </div>
-                                                        <span className="text-xs text-gray-400">{cust.utilization}%</span>
+                                                        <span className="text-xs text-muted-foreground">{cust.utilization}%</span>
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4 font-bold text-white">
@@ -381,36 +381,36 @@ const Loyalty = () => {
                                     </tbody>
                                 </table>
                             )}
-                        </GlassCard>
+                        </UnifiedCard>
                     </div>
 
                     <div className="lg:col-span-1 space-y-6">
-                        <GlassCard className="p-6 bg-gradient-to-br from-red-900/20 to-orange-900/10 border-red-500/30">
+                        <UnifiedCard className="p-6 bg-gradient-to-br from-red-900/20 to-orange-900/10 border-red-500/30">
                             <div className="flex items-start gap-4">
                                 <div className="p-3 bg-red-500/20 rounded-lg text-red-400">
                                     <AlertCircle size={24} />
                                 </div>
                                 <div>
                                     <h3 className="font-bold text-white mb-1">Overdue Risks</h3>
-                                    <p className="text-sm text-gray-400 mb-4">
+                                    <p className="text-sm text-muted-foreground mb-4">
                                         {stats.credit.at_risk_count} customers exceed safe credit utilization limits.
                                         Immediate action recommended.
                                     </p>
-                                    <GradientButton
+                                    <ActionButton
                                         size="sm"
                                         variant="secondary"
                                         className="w-full"
                                         onClick={handleBulkReminders}
                                     >
                                         Auto-Send Reminders
-                                    </GradientButton>
+                                    </ActionButton>
                                 </div>
                             </div>
-                        </GlassCard>
+                        </UnifiedCard>
 
-                        <GlassCard className="p-6">
+                        <UnifiedCard className="p-6">
                             <h3 className="font-bold text-white mb-4">Credit Policy</h3>
-                            <ul className="space-y-3 text-sm text-gray-400">
+                            <ul className="space-y-3 text-sm text-muted-foreground">
                                 <li className="flex items-center gap-2">
                                     <CheckCircle size={14} className="text-green-500" /> Max Limit: ₹50,000 / customer
                                 </li>
@@ -421,7 +421,7 @@ const Loyalty = () => {
                                     <Clock size={14} className="text-yellow-500" /> Auto-lock at 90 days overdue
                                 </li>
                             </ul>
-                        </GlassCard>
+                        </UnifiedCard>
                     </div>
                 </div>
             )}
@@ -429,19 +429,19 @@ const Loyalty = () => {
             {/* TAB CONTENT: OVERVIEW (Referrals) */}
             {activeTab === 'overview' && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <GlassCard className="p-6">
+                    <UnifiedCard className="p-6">
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-lg font-bold text-white">Top Referrers</h3>
                             <TrendingUp size={18} className="text-green-400" />
                         </div>
                         {topReferrers.length === 0 ? (
-                            <div className="text-center py-8 text-gray-400">
+                            <div className="text-center py-8 text-muted-foreground">
                                 <Users size={48} className="mx-auto mb-4 opacity-50" />
-                                <p>No referrers yet. Start the program!</p>
+                                <p className="text-muted-foreground">No referrers yet. Start the program!</p>
                             </div>
                         ) : (
                             <div className="space-y-4">
-                                {topReferrers.map((referrer, i) => (
+                                {topReferrers.map((referrer) => (
                                     <div key={referrer.customer_id} className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
                                         <div className="flex items-center gap-3">
                                             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold">
@@ -460,23 +460,23 @@ const Loyalty = () => {
                                 ))}
                             </div>
                         )}
-                    </GlassCard>
+                    </UnifiedCard>
 
-                    <GlassCard className="p-6 flex flex-col justify-center items-center text-center">
+                    <UnifiedCard className="p-6 flex flex-col justify-center items-center text-center">
                         <div className="w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center text-blue-400 mb-4">
                             <Share2 size={32} />
                         </div>
                         <h3 className="text-xl font-bold text-white mb-2">Invite New Customers</h3>
-                        <p className="text-gray-400 mb-6 max-w-xs">
+                        <p className="text-muted-foreground mb-6 max-w-xs">
                             Send invites via SMS or WhatsApp. Both you and the new customer earn ₹100 store credit.
                         </p>
-                        <GradientButton
-                            className="w-full max-w-sm flex flex-row items-center justify-center gap-2 whitespace-nowrap"
+                        <ActionButton
+                            className="w-full max-w-sm flex flex-row items-center justify-center gap-2 whitespace-nowrap bg-blue-600 hover:bg-blue-700 text-white"
                             onClick={handleSendInvites}
                         >
                             Send Invites <Send size={16} />
-                        </GradientButton>
-                    </GlassCard>
+                        </ActionButton>
+                    </UnifiedCard>
                 </div>
             )}
         </div>

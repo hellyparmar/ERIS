@@ -3,11 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Send, Loader, Sparkles, Trash2 } from 'lucide-react';
 import GlassCard from '../components/ui/GlassCard';
 import ChatMessage from '../components/ai/ChatMessage';
-import LanguageSelector from '../components/ai/LanguageSelector';
 // QuickActions removed
 import VoiceInput from '../components/ai/VoiceInput';
 import { detectLanguage, formatMessageForAI, getSystemPrompt } from '../lib/languageDetection';
-import { useLanguage } from '../hooks/useLanguage';
 import { useToast } from '../components/ui/Toast';
 import { sanitizeInput } from '../utils/sanitize';
 
@@ -16,7 +14,6 @@ import { sanitizeInput } from '../utils/sanitize';
  * Multilingual chat interface with auto-detection and script support
  */
 const AIAssistant = () => {
-    const { t } = useLanguage();
     const { addToast } = useToast();
     // Load chat history from localStorage on mount
     const [messages, setMessages] = useState(() => {
@@ -30,8 +27,8 @@ const AIAssistant = () => {
     });
     const [inputText, setInputText] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const [selectedLanguage, setSelectedLanguage] = useState('en');
-    const [scriptMode, setScriptMode] = useState('native');
+    const [selectedLanguage] = useState('en');
+    const [scriptMode] = useState('native');
     const [sessionId] = useState(() => `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
     const messagesEndRef = useRef(null);
     const inputRef = useRef(null);
@@ -120,7 +117,10 @@ const AIAssistant = () => {
 
             const aiMessage = {
                 id: Date.now() + 1,
-                ...data.message,
+                text: data.message.text,
+                language: data.message.language,
+                script: data.message.script,
+                timestamp: new Date().toISOString(), // Use current time for accurate display
                 action: data.action, // Include agentic action if present
                 isUser: false
             };
@@ -176,10 +176,10 @@ const AIAssistant = () => {
                 className="flex items-center justify-between shrink-0 mb-6"
             >
                 <div>
-                    <h1 className="text-4xl font-bold gradient-text mb-2 flex items-center gap-3">
+                    <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent mb-2 flex items-center gap-3">
                         AI Assistant
                     </h1>
-                    <p className="text-gray-600 dark:text-gray-400">
+                    <p className="text-muted-foreground">
                         Intelligent multilingual assistant for retail insights
                     </p>
                     <div className={`mt-2 inline-flex items-center gap-2 px-2 py-1 rounded-md border ${aiStatus.online
@@ -228,7 +228,7 @@ const AIAssistant = () => {
                                     </div>
                                 </motion.div>
                             ) : (
-                                messages.map(message => (
+                                (messages || []).map(message => (
                                     <ChatMessage
                                         key={message.id}
                                         message={message}
@@ -250,28 +250,66 @@ const AIAssistant = () => {
                         <div ref={messagesEndRef} />
                     </div>
 
-                    <div className="border-t border-gray-200 dark:border-gray-700 p-4 space-y-3 shrink-0 bg-white/50 dark:bg-black/20 backdrop-blur-sm">
-                        <div className="flex items-center justify-between gap-4">
-                            <LanguageSelector
-                                currentLanguage={selectedLanguage}
-                                scriptMode={scriptMode}
-                                onScriptToggle={() => setScriptMode(prev => prev === 'native' ? 'roman' : 'native')}
-                                onLanguageChange={setSelectedLanguage}
-                            />
+                    <div className="border-t border-border p-4 space-y-3 shrink-0">
+                        <div className="flex gap-2">
                             <VoiceInput
                                 onTranscript={(transcript) => {
                                     setInputText(transcript);
-                                    // Auto-send after voice input
+                                    // Auto-send after voice input completes
                                     setTimeout(() => {
                                         if (transcript.trim()) {
-                                            handleSendMessage();
+                                            // Trigger send by simulating the message send
+                                            const userMessage = sanitizeInput(transcript.trim());
+                                            const detectedLang = detectLanguage(userMessage);
+                                            const formattedMessage = formatMessageForAI(userMessage, detectedLang);
+
+                                            const newUserMessage = {
+                                                id: Date.now(),
+                                                ...formattedMessage,
+                                                isUser: true
+                                            };
+
+                                            setMessages(prev => [...prev, newUserMessage]);
+                                            setInputText('');
+                                            setIsLoading(true);
+
+                                            // Call AI service
+                                            (async () => {
+                                                try {
+                                                    const response = await fetch('http://localhost:8000/api/v1/ai/chat', {
+                                                        method: 'POST',
+                                                        headers: { 'Content-Type': 'application/json' },
+                                                        body: JSON.stringify({
+                                                            message: formattedMessage,
+                                                            session_id: sessionId,
+                                                            system_prompt: getSystemPrompt(detectedLang)
+                                                        })
+                                                    });
+
+                                                    if (response.ok) {
+                                                        const data = await response.json();
+                                                        const aiMessage = {
+                                                            id: Date.now() + 1,
+                                                            text: data.message.text,
+                                                            language: data.message.language,
+                                                            script: data.message.script,
+                                                            timestamp: new Date().toISOString(),
+                                                            action: data.action,
+                                                            isUser: false
+                                                        };
+                                                        setMessages(prev => [...prev, aiMessage]);
+                                                    }
+                                                } catch (error) {
+                                                    console.error('Voice input AI error:', error);
+                                                } finally {
+                                                    setIsLoading(false);
+                                                }
+                                            })();
                                         }
                                     }, 500);
                                 }}
                                 language={selectedLanguage === 'en' ? 'en-US' : `${selectedLanguage}-IN`}
                             />
-                        </div>
-                        <div className="flex gap-2">
                             <div className="flex-1 relative">
                                 <Sparkles className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500" size={20} />
                                 <textarea
@@ -280,7 +318,7 @@ const AIAssistant = () => {
                                     onChange={(e) => setInputText(e.target.value)}
                                     onKeyPress={handleKeyPress}
                                     placeholder="Ask me anything..."
-                                    className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition resize-none h-[52px]"
+                                    className="w-full pl-10 pr-4 py-3 bg-transparent border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:border-primary transition resize-none h-[52px]"
                                     rows="1"
                                 />
                             </div>

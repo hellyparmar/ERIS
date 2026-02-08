@@ -75,6 +75,9 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     host: true,
+    watch: {
+      ignored: ['**/.venv/**', '**/node_modules/**', '**/.git/**'],
+    },
   },
 
   // Preview configuration

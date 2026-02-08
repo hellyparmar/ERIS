@@ -36,7 +36,6 @@ const GlassCard = ({
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
         background: 'var(--glass-bg)',
-        border: '1px solid var(--glass-border)',
         boxShadow: 'var(--glass-shadow)',
     };
 

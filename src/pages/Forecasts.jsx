@@ -20,6 +20,7 @@ import {
 import { Line } from 'react-chartjs-2';
 import GlassCard from '../components/ui/GlassCard';
 import GradientButton from '../components/ui/GradientButton';
+import ActionButton from '../components/ui/ActionButton';
 import { useTheme } from '../hooks/useTheme';
 import '../modern-design.css';
 
@@ -27,7 +28,6 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, T
 
 const Forecasts = () => {
     const { isDark } = useTheme();
-    const [selectedProduct, setSelectedProduct] = useState('all');
     const [timeHorizon, setTimeHorizon] = useState(30);
     const [growthRate, setGrowthRate] = useState(0); // For What-If Analysis
     const [loading, setLoading] = useState(false);
@@ -47,7 +47,7 @@ const Forecasts = () => {
             const data = await response.json();
             setApiData(data);
         } catch (error) {
-            console.warn("Backend unavailable, using mock data for demonstration");
+            console.warn("Backend unavailable, using mock data", error);
             // Mock Fallback Data
             const today = new Date();
             const mockForecast = Array.from({ length: timeHorizon }, (_, i) => {
@@ -164,7 +164,7 @@ const Forecasts = () => {
                 ticks: {
                     color: isDark ? '#94a3b8' : '#64748b',
                     maxTicksLimit: 8,
-                    callback: function (val, index) {
+                    callback: function (val) {
                         // Format date to "MMM D" e.g. "May 8"
                         const date = new Date(this.getLabelForValue(val));
                         return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -175,7 +175,12 @@ const Forecasts = () => {
                 grid: { color: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)' },
                 ticks: {
                     color: isDark ? '#94a3b8' : '#64748b',
-                    callback: (value) => '₹' + (value / 1000).toFixed(0) + 'K'
+                    callback: (value) => {
+                        if (value >= 1000) {
+                            return '₹' + (value / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+                        }
+                        return '₹' + value;
+                    }
                 }
             }
         }
@@ -265,7 +270,7 @@ const Forecasts = () => {
                 <GlassCard variant="gradient" className="p-6 animate-slide-up stagger-1">
                     <div className="text-center">
                         <Brain className="mx-auto mb-3 text-purple-400" size={32} />
-                        <p className="text-gray-400 text-sm mb-2">Model Accuracy</p>
+                        <p className="text-muted-foreground text-sm mb-2">Model Accuracy</p>
                         <div className="relative w-24 h-24 mx-auto">
                             <svg className="transform -rotate-90 w-24 h-24">
                                 <circle cx="48" cy="48" r="40" stroke="rgba(255,255,255,0.1)" strokeWidth="8" fill="none" />
@@ -285,8 +290,8 @@ const Forecasts = () => {
                                     </linearGradient>
                                 </defs>
                             </svg>
-                            <div className="absolute inset-0 flex items-center justify-center">
-                                <span className="text-2xl font-bold text-gray-900 dark:text-white">{modelMetrics.accuracy}%</span>
+                            <div className="absolute inset-0 flex items-center justify-center z-10">
+                                <span className="text-2xl font-bold text-foreground">{modelMetrics.accuracy}%</span>
                             </div>
                         </div>
                     </div>
@@ -557,9 +562,9 @@ const Forecasts = () => {
                         <h2 className="text-xl font-bold bg-gradient-to-r from-primary to-purple bg-clip-text text-transparent">
                             AI-Powered Recommendations
                         </h2>
-                        <GradientButton variant="primary" size="sm">
+                        <button className="btn-enterprise btn-enterprise-destructive text-sm">
                             Retrain Model
-                        </GradientButton>
+                        </button>
                     </div>
 
                     <div className="space-y-4">
@@ -581,11 +586,17 @@ const Forecasts = () => {
                                     <p className="text-gray-900 dark:text-white font-medium mb-1">{rec.action}</p>
                                     <p className="text-sm text-gray-400">Potential savings: {rec.savings}</p>
                                 </div>
-                                <div className="flex gap-2">
-                                    <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg !text-white text-sm transition font-bold tracking-wide">
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={() => { }}
+                                        className="btn-enterprise btn-enterprise-success text-sm"
+                                    >
                                         Accept
                                     </button>
-                                    <button className="px-4 py-2 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-700 rounded-lg text-gray-900 dark:text-white text-sm transition">
+                                    <button
+                                        onClick={() => { }}
+                                        className="btn-enterprise btn-enterprise-destructive text-sm"
+                                    >
                                         Dismiss
                                     </button>
                                 </div>

@@ -93,8 +93,8 @@ const Settings = () => {
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
                             className={`flex items-center gap-2 px-6 py-3 rounded-lg transition-all whitespace-nowrap ${activeTab === tab.id
-                                    ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg'
-                                    : 'bg-white/10 text-gray-400 hover:bg-white/20'
+                                ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg'
+                                : 'bg-secondary/50 text-muted-foreground hover:bg-secondary'
                                 }`}
                         >
                             <Icon className="w-4 h-4" />
@@ -112,7 +112,7 @@ const Settings = () => {
                         <div className="space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-muted-foreground mb-2">Provider</label>
-                                <select className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-foreground focus:border-primary focus:outline-none">
+                                <select className="input-standard">
                                     <option>Auth0</option>
                                     <option>Firebase</option>
                                     <option>Custom OAuth2</option>
@@ -124,7 +124,7 @@ const Settings = () => {
                                 <input
                                     type="text"
                                     placeholder="your-client-id"
-                                    className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-foreground focus:border-primary focus:outline-none"
+                                    className="input-standard"
                                 />
                             </div>
                             <div>
@@ -133,7 +133,7 @@ const Settings = () => {
                                     <input
                                         type={showSecret.oauth ? 'text' : 'password'}
                                         placeholder="••••••••••••••••••••"
-                                        className="w-full px-4 py-2 pr-12 rounded-lg bg-white/5 border border-white/10 text-foreground focus:border-primary focus:outline-none"
+                                        className="input-standard pr-12"
                                     />
                                     <button
                                         onClick={() => setShowSecret(prev => ({ ...prev, oauth: !prev.oauth }))}
@@ -148,7 +148,7 @@ const Settings = () => {
                                 <input
                                     type="text"
                                     placeholder="https://yourdomain.com/callback"
-                                    className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-foreground focus:border-primary focus:outline-none"
+                                    className="input-standard"
                                 />
                             </div>
                         </div>
@@ -159,7 +159,7 @@ const Settings = () => {
                         <div className="space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-muted-foreground mb-2">Token Expiry</label>
-                                <select className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-foreground focus:border-primary focus:outline-none">
+                                <select className="input-standard">
                                     <option>15 minutes</option>
                                     <option>30 minutes</option>
                                     <option>1 hour</option>
@@ -168,7 +168,7 @@ const Settings = () => {
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-muted-foreground mb-2">Refresh Token Expiry</label>
-                                <select className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-foreground focus:border-primary focus:outline-none">
+                                <select className="input-standard">
                                     <option>7 days</option>
                                     <option>30 days</option>
                                     <option>90 days</option>
@@ -421,7 +421,7 @@ const Settings = () => {
                             <input
                                 type="text"
                                 placeholder="Search logs..."
-                                className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-foreground focus:border-primary focus:outline-none"
+                                className="input-standard"
                             />
                             <GradientButton onClick={() => { }}>
                                 <Download className="w-4 h-4 mr-2" />

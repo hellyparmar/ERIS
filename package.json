@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "BROWSER=google-chrome vite --open",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
@@ -20,12 +20,14 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "framer-motion": "^12.27.5",
+    "lodash": "^4.17.23",
     "lucide-react": "^0.562.0",
     "react": "^19.2.0",
     "react-chartjs-2": "^5.3.1",
     "react-countup": "^6.5.3",
     "react-dom": "^19.2.0",
     "react-error-boundary": "^6.1.0",
+    "react-grid-layout": "^2.2.2",
     "react-icons": "^5.5.0",
     "react-lazy-load-image-component": "^1.6.3",
     "react-router-dom": "^7.12.0",

@@ -19,16 +19,19 @@ import {
 } from 'lucide-react';
 import GlassCard from '../components/ui/GlassCard';
 import GradientButton from '../components/ui/GradientButton';
+import { useToast } from '../components/ui/Toast';
 
 const POS = () => {
+    const { addToast } = useToast();
     const [cart, setCart] = useState([
         { id: 1, name: 'Wireless Headphones', price: 1250, quantity: 2, sku: 'WH-001' },
         { id: 2, name: 'Smart Watch', price: 4500, quantity: 1, sku: 'SW-002' }
     ]);
     const [searchQuery, setSearchQuery] = useState('');
     const [paymentMethod, setPaymentMethod] = useState('cash');
-    const [isOnline, setIsOnline] = useState(true);
+    const [isOnline] = useState(true);
     const [showReceipt, setShowReceipt] = useState(false);
+    const [invoiceId] = useState(() => `INV-${Math.floor(Date.now() / 1000).toString().slice(-4)}`);
 
     // Mock products for search
     const products = [
@@ -71,9 +74,49 @@ const POS = () => {
         setSearchQuery('');
     };
 
-    const completeSale = () => {
-        setShowReceipt(true);
-        // In real app, would process payment and save transaction
+    const completeSale = async () => {
+        if (cart.length === 0) {
+            addToast('Cart is empty', 'error');
+            return;
+        }
+
+        try {
+            // Transform cart to API format
+            const checkoutData = {
+                items: cart.map(item => ({
+                    product_id: item.id,
+                    quantity: item.quantity,
+                    unit_price: item.price
+                })),
+                payment_method: paymentMethod,
+                discount: 0.0
+            };
+
+            const response = await fetch('http://localhost:8000/api/v1/pos/checkout', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(checkoutData)
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                addToast(`Sale completed! Total: ₹${data.data.total_amount}`, 'success');
+                setShowReceipt(true);
+                // Clear cart after successful checkout
+                setTimeout(() => {
+                    setCart([]);
+                    setShowReceipt(false);
+                }, 3000);
+            } else {
+                addToast(data.error || 'Checkout failed', 'error');
+            }
+        } catch (error) {
+            console.error('Checkout error:', error);
+            addToast('Failed to process checkout', 'error');
+        }
     };
 
     const clearCart = () => {
@@ -93,7 +136,7 @@ const POS = () => {
             {/* Header */}
             <div className="flex justify-between items-center">
                 <div>
-                    <h1 className="text-4xl font-bold gradient-text mb-2">Point of Sale</h1>
+                    <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-purple bg-clip-text text-transparent mb-2">Point of Sale</h1>
                     <p className="text-muted-foreground">Quick sales entry and receipt generation</p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -119,7 +162,7 @@ const POS = () => {
                                     placeholder="Search product by name or scan barcode..."
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-full pl-12 pr-4 py-3 rounded-lg bg-white/5 border border-white/10 text-foreground focus:border-primary focus:outline-none"
+                                    className="w-full pl-12 pr-4 py-3 rounded-lg bg-secondary/50 border border-border text-foreground focus:border-primary focus:outline-none"
                                 />
                             </div>
                             <button className="px-6 py-3 rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:shadow-lg transition-all flex items-center gap-2">
@@ -246,8 +289,8 @@ const POS = () => {
                                             key={method.id}
                                             onClick={() => setPaymentMethod(method.id)}
                                             className={`p-3 rounded-lg border-2 transition-all flex flex-col items-center gap-2 ${paymentMethod === method.id
-                                                    ? 'border-primary bg-primary/10'
-                                                    : 'border-white/10 bg-white/5 hover:bg-white/10'
+                                                ? 'border-primary bg-primary/10'
+                                                : 'border-border bg-secondary/20 hover:bg-secondary/40'
                                                 }`}
                                         >
                                             <Icon className={`w-5 h-5 ${paymentMethod === method.id ? 'text-primary' : 'text-muted-foreground'}`} />
@@ -301,7 +344,7 @@ const POS = () => {
                                 </div>
                                 <div className="border-t border-b border-black py-2 my-2">
                                     <p className="text-xs">Date: {new Date().toLocaleString()}</p>
-                                    <p className="text-xs">Invoice: #INV-{Math.floor(Math.random() * 10000)}</p>
+                                    <p className="text-xs">Invoice: #{invoiceId}</p>
                                 </div>
                                 {cart.map((item) => (
                                     <div key={item.id} className="flex justify-between text-xs mb-1">

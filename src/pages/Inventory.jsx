@@ -1,33 +1,82 @@
 /**
  * Enterprise Retail Intelligence System v3.0
  * INVENTORY PAGE - Real-time Product Management
+ * Refactored with Enterprise Design System
  */
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Filter, Grid, List, Plus, Download, Upload } from 'lucide-react';
-import GlassCard from '../components/ui/GlassCard';
-import GradientButton from '../components/ui/GradientButton';
-import '../modern-design.css';
+import { Search, Plus, Download, Upload, Edit2, Trash2 } from 'lucide-react';
+import UnifiedCard from '../components/ui/UnifiedCard';
+import UnifiedTable from '../components/ui/UnifiedTable';
+import ActionButton from '../components/ui/ActionButton';
+import { useToast } from '../components/ui/Toast';
 
 const Inventory = () => {
+    const { addToast } = useToast();
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('all');
     const [stockFilter, setStockFilter] = useState('all');
-    const [viewMode, setViewMode] = useState('table');
-    const [sortBy, setSortBy] = useState('name');
+    const [products, setProducts] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [refreshTrigger, setRefreshTrigger] = useState(0);
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 7;
 
-    // Mock product data (Petpooja F&B Context)
-    const [products] = useState([
-        { id: 1, sku: 'ING001', name: 'Fresh Paneer (Malai)', category: 'Raw Materials', stock: 15, minStock: 20, price: 320, status: 'low_stock', location: 'Fridge A' },
-        { id: 2, sku: 'ING002', name: 'Basmati Rice (Premium)', category: 'Raw Materials', stock: 120, minStock: 50, price: 85, status: 'in_stock', location: 'Store Room B' },
-        { id: 3, sku: 'BEV001', name: 'Coca Cola 300ml', category: 'Beverages', stock: 240, minStock: 100, price: 40, status: 'in_stock', location: 'Fridge C' },
-        { id: 4, sku: 'PKG001', name: 'Burger Box (Large)', category: 'Packaging', stock: 0, minStock: 200, price: 12, status: 'out_of_stock', location: 'Shelf D-1' },
-        { id: 5, sku: 'FRZ001', name: 'McCain French Fries', category: 'Frozen Food', stock: 45, minStock: 30, price: 210, status: 'in_stock', location: 'Freezer 1' },
-        { id: 6, sku: 'CON001', name: 'Tomato Ketchup Sachet', category: 'Condiments', stock: 850, minStock: 1000, price: 1.5, status: 'low_stock', location: 'Shelf A-3' },
-        { id: 7, sku: 'SUP001', name: 'Paper Napkins', category: 'Supplies', stock: 5000, minStock: 2000, price: 0.8, status: 'in_stock', location: 'Store Room A' },
-        { id: 8, sku: 'ING003', name: 'Amul Butter (500g)', category: 'Raw Materials', stock: 12, minStock: 15, price: 275, status: 'low_stock', location: 'Fridge B' },
-    ]);
+    // Fetch inventory from API
+    useEffect(() => {
+        fetchInventory();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [refreshTrigger]);
+
+    const fetchInventory = async () => {
+        try {
+            setLoading(true);
+            const response = await fetch('http://localhost:8000/api/v1/inventory/list');
+            const data = await response.json();
+            if (data.success && data.data.items) {
+                // Transform API data to match component expectations
+                const transformed = data.data.items.map(item => ({
+                    id: item.id,
+                    sku: item.sku,
+                    name: item.name,
+                    category: item.category,
+                    stock: item.current_stock,
+                    minStock: item.reorder_point,
+                    price: parseFloat(item.unit_price),
+                    status: item.stock_status,
+                    location: item.warehouse_location || 'Main Warehouse'
+                }));
+                setProducts(transformed);
+            }
+        } catch (error) {
+            console.error('Failed to fetch inventory:', error);
+            addToast('Failed to load inventory', 'error');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleDelete = async (productId) => {
+        if (!window.confirm('Are you sure you want to delete this product?')) return;
+
+        try {
+            const response = await fetch(`http://localhost:8000/api/v1/inventory/delete/${productId}`, {
+                method: 'DELETE'
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                addToast('Product deleted successfully', 'success');
+                setRefreshTrigger(prev => prev + 1);
+            } else {
+                addToast(data.error || 'Failed to delete product', 'error');
+            }
+        } catch (error) {
+            console.error('Delete failed:', error);
+            addToast('Failed to delete product', 'error');
+        }
+    };
 
     const categories = ['all', 'Raw Materials', 'Beverages', 'Frozen Food', 'Packaging', 'Condiments', 'Supplies'];
 
@@ -44,59 +93,167 @@ const Inventory = () => {
         return matchesSearch && matchesCategory && matchesStock;
     });
 
-    const getStockStatus = (product) => {
+    // Pagination logic
+    const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+    const paginatedProducts = filteredProducts.slice(
+        (currentPage - 1) * itemsPerPage,
+        currentPage * itemsPerPage
+    );
+
+    // Reset to page 1 when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, selectedCategory, stockFilter]);
+
+    const getStockBadge = (product) => {
         if (product.status === 'out_of_stock') {
-            return { text: 'Out of Stock', color: 'bg-red-600/20 border border-red-500/40 text-red-400', badgeBg: 'bg-red-600' };
+            return <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-destructive/10 text-destructive border border-destructive/20">
+                <span className="w-2 h-2 rounded-full bg-destructive" />
+                Out of Stock
+            </span>;
         } else if (product.status === 'low_stock') {
-            return { text: 'Low Stock', color: 'bg-yellow-600/20 border border-yellow-500/40 text-yellow-400', badgeBg: 'bg-yellow-600' };
+            return <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-yellow-500/10 text-yellow-600 dark:text-yellow-500 border border-yellow-500/20">
+                <span className="w-2 h-2 rounded-full bg-yellow-500" />
+                Low Stock
+            </span>;
         }
-        return { text: 'In Stock', color: 'bg-green-600/20 border border-green-500/40 text-green-400', badgeBg: 'bg-green-600' };
+        return <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-green-500/10 text-green-600 dark:text-green-500 border border-green-500/20">
+            <span className="w-2 h-2 rounded-full bg-green-500" />
+            In Stock
+        </span>;
     };
 
+    // Table columns configuration
+    const columns = [
+        {
+            header: 'SKU',
+            accessor: 'sku',
+            render: (value) => (
+                <span className="font-mono text-sm text-muted-foreground bg-muted px-2 py-1 rounded">
+                    {value}
+                </span>
+            )
+        },
+        {
+            header: 'Product',
+            accessor: 'name',
+            render: (value) => <span className="font-semibold text-foreground">{value}</span>
+        },
+        {
+            header: 'Category',
+            accessor: 'category'
+        },
+        {
+            header: 'Stock',
+            accessor: 'stock',
+            render: (value, row) => {
+                const stockPercentage = (row.stock / row.minStock) * 100;
+                return (
+                    <div className="flex flex-col items-end gap-1 min-w-0">
+                        <span className={`text-lg font-bold ${row.stock === 0 ? 'text-destructive' :
+                            row.stock < row.minStock ? 'text-yellow-600 dark:text-yellow-500' :
+                                'text-green-600 dark:text-green-500'
+                            }`}>
+                            {row.stock}
+                        </span>
+                        <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
+                            <div
+                                className={`h-full transition-all ${stockPercentage >= 100 ? 'bg-green-500' :
+                                    stockPercentage > 50 ? 'bg-yellow-500' :
+                                        'bg-destructive'
+                                    }`}
+                                style={{ width: `${Math.min(stockPercentage, 100)}%` }}
+                            />
+                        </div>
+                        <span className="text-xs text-muted-foreground">Min: {row.minStock}</span>
+                    </div>
+                );
+            }
+        },
+        {
+            header: 'Status',
+            accessor: 'status',
+            render: (value, row) => getStockBadge(row)
+        },
+        {
+            header: 'Price',
+            accessor: 'price',
+            render: (value) => (
+                <span className="font-bold text-foreground">
+                    ₹{value.toLocaleString()}
+                </span>
+            )
+        },
+        {
+            header: 'Location',
+            accessor: 'location'
+        },
+        {
+            header: 'Actions',
+            accessor: 'id',
+            render: (value, row) => (
+                <div className="flex justify-center gap-2">
+                    <button
+                        className="px-3 py-1 text-xs border border-border rounded hover:bg-secondary transition-colors text-foreground"
+                        onClick={() => console.log('Edit', row)}
+                    >
+                        Edit
+                    </button>
+                    <button
+                        className="px-3 py-1 text-xs border border-transparent text-red-500 hover:border-red-500 hover:bg-red-500/10 rounded transition-all"
+                        onClick={() => handleDelete(row.id)}
+                    >
+                        Delete
+                    </button>
+                </div>
+            )
+        }
+    ];
+
     return (
-        <div className="min-h-screen space-y-8 animate-fade-in">
+        <div className="min-h-screen space-y-6">
             {/* Header */}
             <motion.div
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
             >
-                <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-purple bg-clip-text text-transparent mb-2">
+                <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent mb-2">
                     Inventory Management
                 </h1>
                 <p className="text-muted-foreground">Real-time stock tracking and optimization</p>
             </motion.div>
 
             {/* Search & Filters */}
-            <GlassCard variant="gradient" className="animate-slide-up stagger-1">
-                <div className="p-6 space-y-4">
+            <UnifiedCard>
+                <div className="space-y-4">
                     {/* Search Bar */}
-                    <div className="flex gap-4 items-stretch">
-                        <div className="flex-1 relative">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500" size={20} />
+                    <div className="flex gap-4 items-stretch flex-wrap">
+                        <div className="flex-1 min-w-[300px] relative">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" size={20} />
                             <input
                                 type="text"
                                 placeholder="Search by product name or SKU..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-white/10 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition h-full"
+                                className="w-full pl-10 pr-4 py-3 bg-background border border-input rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition"
                             />
                         </div>
-                        <GradientButton variant="primary" className="flex items-center justify-center gap-2 h-full whitespace-nowrap px-6">
-                            <Plus size={20} /> Add Product
-                        </GradientButton>
+                        <ActionButton variant="primary" icon={Plus} className="whitespace-nowrap bg-blue-600 hover:bg-blue-700 text-white">
+                            Add Product
+                        </ActionButton>
                     </div>
 
                     {/* Filters */}
                     <div className="flex flex-wrap gap-4">
                         <div className="flex-1 min-w-[200px]">
-                            <label className="text-gray-400 text-sm mb-2 block">Category</label>
+                            <label className="text-muted-foreground text-sm mb-2 block">Category</label>
                             <select
                                 value={selectedCategory}
                                 onChange={(e) => setSelectedCategory(e.target.value)}
-                                className="w-full px-4 py-2 bg-gray-50 dark:bg-white/10 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:border-blue-500 transition"
+                                className="w-full px-4 py-2 bg-background border border-input rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition"
                             >
                                 {categories.map(cat => (
-                                    <option key={cat} value={cat} className="bg-gray-800">
+                                    <option key={cat} value={cat} className="bg-background">
                                         {cat === 'all' ? 'All Categories' : cat}
                                     </option>
                                 ))}
@@ -104,192 +261,84 @@ const Inventory = () => {
                         </div>
 
                         <div className="flex-1 min-w-[200px]">
-                            <label className="text-gray-400 text-sm mb-2 block">Stock Level</label>
+                            <label className="text-muted-foreground text-sm mb-2 block">Stock Level</label>
                             <select
                                 value={stockFilter}
                                 onChange={(e) => setStockFilter(e.target.value)}
-                                className="w-full px-4 py-2 bg-gray-50 dark:bg-white/10 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:border-blue-500 transition"
+                                className="w-full px-4 py-2 bg-background border border-input rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition"
                             >
-                                <option value="all" className="bg-gray-800">All Stock Levels</option>
-                                <option value="in" className="bg-gray-800">In Stock</option>
-                                <option value="low" className="bg-gray-800">Low Stock</option>
-                                <option value="out" className="bg-gray-800">Out of Stock</option>
+                                <option value="all" className="bg-background">All Stock Levels</option>
+                                <option value="in" className="bg-background">In Stock</option>
+                                <option value="low" className="bg-background">Low Stock</option>
+                                <option value="out" className="bg-background">Out of Stock</option>
                             </select>
-                        </div>
-
-                        <div className="flex gap-2 items-end">
-                            <button
-                                onClick={() => setViewMode('table')}
-                                className={`p-2 rounded-lg transition ${viewMode === 'table' ? 'bg-blue-600' : 'bg-white/10 hover:bg-white/20'}`}
-                            >
-                                <List size={20} />
-                            </button>
-                            <button
-                                onClick={() => setViewMode('grid')}
-                                className={`p-2 rounded-lg transition ${viewMode === 'grid' ? 'bg-blue-600' : 'bg-white/10 hover:bg-white/20'}`}
-                            >
-                                <Grid size={20} />
-                            </button>
                         </div>
                     </div>
 
                     {/* Bulk Actions */}
-                    <div className="flex gap-2">
-                        <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition text-white text-sm flex items-center gap-2">
-                            <Download size={16} /> Export CSV
-                        </button>
-                        <button className="px-4 py-2 bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 rounded-lg transition text-gray-700 dark:text-white text-sm flex items-center gap-2">
-                            <Upload size={16} /> Import CSV
-                        </button>
+                    <div className="flex gap-2 flex-wrap">
+                        <ActionButton variant="secondary" icon={Download}>
+                            Export CSV
+                        </ActionButton>
+                        <ActionButton variant="secondary" icon={Upload}>
+                            Import CSV
+                        </ActionButton>
                     </div>
                 </div>
-            </GlassCard>
+            </UnifiedCard>
 
             {/* Results Count */}
-            <div className="text-gray-400">
-                Showing {filteredProducts.length} of {products.length} products
+            <div className="text-muted-foreground text-sm">
+                Showing {paginatedProducts.length} of {filteredProducts.length} products (Page {currentPage} of {Math.max(1, totalPages)})
             </div>
 
-            {/* Product List/Grid */}
-            {viewMode === 'table' ? (
-                <GlassCard variant="gradient" className="animate-slide-up stagger-2">
-                    <div className="p-6">
-                        <h2 className="text-xl font-bold bg-gradient-to-r from-primary to-purple bg-clip-text text-transparent mb-6">
-                            Product Inventory
-                        </h2>
-                        <div className="overflow-x-auto">
-                            <table className="w-full">
-                                <thead>
-                                    <tr className="border-b border-border">
-                                        <th className="text-left py-3 px-4 text-muted-foreground font-semibold text-sm uppercase tracking-wider">SKU</th>
-                                        <th className="text-left py-3 px-4 text-muted-foreground font-semibold text-sm uppercase tracking-wider">Product</th>
-                                        <th className="text-left py-3 px-4 text-muted-foreground font-semibold text-sm uppercase tracking-wider">Category</th>
-                                        <th className="text-right py-3 px-4 text-muted-foreground font-semibold text-sm uppercase tracking-wider">Stock</th>
-                                        <th className="text-left py-3 px-4 text-muted-foreground font-semibold text-sm uppercase tracking-wider">Status</th>
-                                        <th className="text-right py-3 px-4 text-muted-foreground font-semibold text-sm uppercase tracking-wider">Price</th>
-                                        <th className="text-left py-3 px-4 text-muted-foreground font-semibold text-sm uppercase tracking-wider">Location</th>
-                                        <th className="text-center py-3 px-4 text-muted-foreground font-semibold text-sm uppercase tracking-wider">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {filteredProducts.map((product, idx) => {
-                                        const status = getStockStatus(product);
-                                        const stockPercentage = (product.stock / product.minStock) * 100;
-                                        return (
-                                            <motion.tr
-                                                key={product.id}
-                                                className="border-b border-border/50 hover:bg-gradient-to-r hover:from-primary/5 hover:to-purple/5 transition-all"
-                                                initial={{ opacity: 0, x: -20 }}
-                                                animate={{ opacity: 1, x: 0 }}
-                                                transition={{ delay: idx * 0.05 }}
-                                            >
-                                                <td className="py-4 px-4">
-                                                    <span className="font-mono text-sm text-muted-foreground bg-muted/30 px-2 py-1 rounded">
-                                                        {product.sku}
-                                                    </span>
-                                                </td>
-                                                <td className="py-4 px-4 text-foreground font-semibold">{product.name}</td>
-                                                <td className="py-4 px-4 text-muted-foreground">{product.category}</td>
-                                                <td className="py-4 px-4 text-right">
-                                                    <div className="flex flex-col items-end gap-1">
-                                                        <span className={`text-lg font-bold ${product.stock === 0 ? 'text-danger' :
-                                                                product.stock < product.minStock ? 'text-warning' :
-                                                                    'bg-gradient-to-r from-success to-primary bg-clip-text text-transparent'
-                                                            }`}>
-                                                            {product.stock}
-                                                        </span>
-                                                        <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
-                                                            <div
-                                                                className={`h-full transition-all ${stockPercentage >= 100 ? 'bg-gradient-to-r from-success to-primary' :
-                                                                        stockPercentage > 50 ? 'bg-warning' :
-                                                                            'bg-danger'
-                                                                    }`}
-                                                                style={{ width: `${Math.min(stockPercentage, 100)}%` }}
-                                                            />
-                                                        </div>
-                                                        <span className="text-xs text-muted-foreground">Min: {product.minStock}</span>
-                                                    </div>
-                                                </td>
-                                                <td className="py-4 px-4">
-                                                    <span className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold ${status.color}`}>
-                                                        <span className={`w-2 h-2 rounded-full ${status.badgeBg} animate-pulse-custom`} />
-                                                        {status.text}
-                                                    </span>
-                                                </td>
-                                                <td className="py-4 px-4 text-right">
-                                                    <span className="font-bold bg-gradient-to-r from-primary to-purple bg-clip-text text-transparent">
-                                                        ₹{product.price.toLocaleString()}
-                                                    </span>
-                                                </td>
-                                                <td className="py-4 px-4 text-muted-foreground text-sm">{product.location}</td>
-                                                <td className="py-4 px-4">
-                                                    <div className="flex justify-center gap-2">
-                                                        <button className="px-3 py-1.5 bg-gradient-to-r from-primary to-purple hover:shadow-lg hover:shadow-primary/30 rounded-lg text-white text-sm transition-all font-medium">
-                                                            Edit
-                                                        </button>
-                                                        <button className="px-3 py-1.5 bg-danger/10 hover:bg-danger/20 text-danger rounded-lg text-sm transition-all font-medium border border-danger/30">
-                                                            Delete
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </motion.tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </GlassCard>
-            ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                    {filteredProducts.map((product) => {
-                        const status = getStockStatus(product);
-                        return (
-                            <motion.div
-                                key={product.id}
-                                initial={{ opacity: 0, scale: 0.9 }}
-                                animate={{ opacity: 1, scale: 1 }}
+            {/* Product Table with Fixed 7 Rows */}
+            <UnifiedCard title="Product Inventory">
+                <div className="w-full">
+                    <UnifiedTable
+                        columns={columns}
+                        data={paginatedProducts}
+                        emptyMessage="No products found. Try adjusting your filters."
+                    />
+
+                    {/* Pagination Controls */}
+                    {totalPages > 1 && (
+                        <div className="flex items-center justify-center gap-2 mt-6 pb-4">
+                            <button
+                                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                disabled={currentPage === 1}
+                                className="p-2 rounded hover:bg-secondary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                aria-label="Previous page"
                             >
-                                <GlassCard variant="gradient" className="h-full flex flex-col hover:shadow-glow-primary transition-all">
-                                    <div className="p-6 flex-1 flex flex-col">
-                                        <div className="flex justify-between items-start mb-4">
-                                            <span className="text-gray-500 dark:text-gray-400 text-sm font-mono">{product.sku}</span>
-                                            <span className={`px-2 py-1 rounded text-xs ${status.color}`}>
-                                                {status.text}
-                                            </span>
-                                        </div>
-                                        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2 line-clamp-1" title={product.name}>{product.name}</h3>
-                                        <p className="text-gray-400 text-sm mb-4">{product.category}</p>
-                                        <div className="flex justify-between items-center mb-4 mt-auto">
-                                            <div>
-                                                <p className="text-xs text-gray-500">Stock</p>
-                                                <div className="flex flex-col">
-                                                    <span className={`text-xl font-bold ${product.stock < product.minStock ? 'text-red-500 dark:text-red-400' : 'text-gray-900 dark:text-white'}`}>
-                                                        {product.stock}
-                                                    </span>
-                                                    <span className="text-[10px] text-gray-500">/ {product.minStock}</span>
-                                                </div>
-                                            </div>
-                                            <div className="text-right">
-                                                <p className="text-xs text-gray-500">Price</p>
-                                                <p className="text-xl font-bold text-gray-900 dark:text-white">₹{product.price}</p>
-                                            </div>
-                                        </div>
-                                        <div className="flex gap-2 pt-4 border-t border-white/5">
-                                            <button className="flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-700 rounded !text-white text-sm transition font-bold tracking-wide">
-                                                Edit
-                                            </button>
-                                            <button className="px-3 py-2 bg-red-600 hover:bg-red-700 rounded !text-white text-sm transition font-bold tracking-wide">
-                                                Delete
-                                            </button>
-                                        </div>
-                                    </div>
-                                </GlassCard>
-                            </motion.div>
-                        );
-                    })}
+                                ← Prev
+                            </button>
+
+                            {[...Array(totalPages)].map((_, i) => (
+                                <button
+                                    key={i + 1}
+                                    onClick={() => setCurrentPage(i + 1)}
+                                    className={`px-3 py-1.5 rounded text-sm font-medium transition-all ${
+                                        currentPage === i + 1
+                                            ? 'bg-primary text-primary-foreground shadow-md'
+                                            : 'hover:bg-secondary text-foreground'
+                                    }`}
+                                >
+                                    {i + 1}
+                                </button>
+                            ))}
+
+                            <button
+                                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                disabled={currentPage === totalPages}
+                                className="p-2 rounded hover:bg-secondary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                aria-label="Next page"
+                            >
+                                Next →
+                            </button>
+                        </div>
+                    )}
                 </div>
-            )}
+            </UnifiedCard>
         </div>
     );
 };
