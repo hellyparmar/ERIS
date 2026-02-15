@@ -21,7 +21,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import uuid
 import sqlalchemy
-from api.db.database import Base
+from . import Base
 
 
 import enum

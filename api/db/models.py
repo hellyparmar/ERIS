@@ -6,7 +6,7 @@ Complete database schema with Transaction Engine, Communication Hub, and Communi
 from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, ForeignKey, Text, Enum, Numeric, DECIMAL, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from .database import Base
+from . import Base
 import enum
 
 # ==================== ENUMERATIONS ====================
@@ -81,7 +81,7 @@ class SaleItem(Base):
     
     quantity = Column(Integer, nullable=False)
     unit_price = Column(DECIMAL(12, 2), nullable=False)
-    total_price = Column(DECIMAL(12, 2), nullable=False)
+    line_total = Column(DECIMAL(12, 2), nullable=False)
     
     # Relationships
     sale = relationship("Sale", back_populates="items")
