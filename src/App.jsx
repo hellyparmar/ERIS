@@ -15,6 +15,7 @@ import './index.css';
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Analytics = lazy(() => import('./pages/Analytics'));
 const Inventory = lazy(() => import('./pages/Inventory'));
+const Customers = lazy(() => import('./pages/Customers'));  // Phase 3
 const Forecasts = lazy(() => import('./pages/Forecasts'));
 const Alerts = lazy(() => import('./pages/Alerts'));
 const Integrations = lazy(() => import('./pages/Integrations'));
@@ -50,12 +51,27 @@ const MainLayout = () => {
   const mainRef = React.useRef(null);
 
   React.useEffect(() => {
-    if (mainRef.current) {
-      // Ensure scroll happens after render
-      setTimeout(() => {
-        mainRef.current.scrollTo({ top: 0, left: 0, behavior: 'auto' });
-      }, 0);
+    // Disable browser's scroll restoration
+    if ('scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual';
     }
+
+    // Scroll to top using multiple methods to ensure it works
+    const scrollToTop = () => {
+      if (mainRef.current) {
+        mainRef.current.scrollTop = 0;
+      }
+      const mainContent = document.getElementById('main-content');
+      if (mainContent) {
+        mainContent.scrollTop = 0;
+      }
+    };
+
+    // Execute immediately and after a delay to override any restoration
+    scrollToTop();
+    setTimeout(scrollToTop, 10);
+    setTimeout(scrollToTop, 50);
+    setTimeout(scrollToTop, 100);
   }, [location.pathname]);
 
   return (
@@ -78,10 +94,11 @@ const MainLayout = () => {
             <Suspense fallback={<LoadingSpinner />}>
               <Routes>
                 <Route path="/" element={<Dashboard />} />
-                <Route path="/analytics" element={<Analytics />} />
+                <Route path="/analytics" element={<ErrorBoundary><Analytics /></ErrorBoundary>} />
                 <Route path="/invoices" element={<Invoices />} />
                 <Route path="/loyalty" element={<Loyalty />} />
                 <Route path="/inventory" element={<Inventory />} />
+                <Route path="/customers" element={<Customers />} />  {/* Phase 3 */}
                 <Route path="/forecasts" element={<Forecasts />} />
                 <Route path="/alerts" element={<Alerts />} />
                 <Route path="/integrations" element={<Integrations />} />

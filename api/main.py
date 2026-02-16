@@ -35,7 +35,8 @@ from api.routers import (
     sales_analytics, crud_v2,
     dashboard, tally_integration, odoo_sync,
     reports, enterprise, # New router
-    weather  # Weather API router
+    weather,  # Weather API router
+    products, sales, pos_auth, inventory_control, customers, loyalty # Added by user
 )
 
 # Import middleware
@@ -141,12 +142,20 @@ async def websocket(websocket):
 
 # Business endpoints (will add auth protection gradually)
 from api.routers import pos, alerts
+app.include_router(products.router, tags=["Products"])
+app.include_router(sales.router, tags=["Sales"])
+app.include_router(inventory.router, tags=["Inventory"])
+app.include_router(alerts.router, tags=["Alerts"])
+app.include_router(forecasting.router, tags=["ML Forecasting"])
+app.include_router(reports.router, tags=["Reports"])
+app.include_router(pos_auth.router, tags=["POS Authentication"])
+app.include_router(inventory_control.router, tags=["Inventory Control"])
+app.include_router(customers.router, tags=["Customers"])  # Phase 3
+app.include_router(loyalty.router, tags=["Loyalty Program"])    # Phase 3
 app.include_router(analytics.router, prefix="/api/v1", tags=["Analytics"])
 app.include_router(analytics_advanced.router, tags=["Advanced Analytics"])
 app.include_router(weather.router, tags=["Weather"])  # Weather API endpoints
-app.include_router(inventory.router, tags=["Inventory"])
 app.include_router(pos.router, tags=["POS"])
-app.include_router(alerts.router, tags=["Alerts"])
 app.include_router(invoices.router, tags=["Transaction Engine"])
 app.include_router(messages.router, tags=["Communication Hub"])
 app.include_router(community.router, tags=["Community Commerce"])
