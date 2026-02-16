@@ -10,6 +10,7 @@ from typing import Optional
 from api.db import get_db
 from api.services.barcode_scanner import lookup_barcode, update_product_barcode
 from api.services.stock_alerts import get_active_alerts, acknowledge_alert, check_stock_levels
+from api.services.reorder_automation import get_reorder_suggestions
 
 router = APIRouter(prefix="/inventory", tags=["Inventory Control"])
 
@@ -99,4 +100,25 @@ async def check_stock_endpoint(db: Session = Depends(get_db)):
         'success': True,
         'message': f'Generated {len(alerts)} new alerts',
         'alerts': alerts
+    }
+
+@router.get("/reorder-suggestions")
+async def get_reorder_suggestions_endpoint(
+    min_confidence: int = Query(50, ge=0, le=100, description="Minimum confidence score"),
+    limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db)
+):
+    """
+    Get AI-driven reorder suggestions
+    Based on sales velocity and stock levels
+    Sorted by urgency
+    """
+    suggestions = get_reorder_suggestions(db, min_confidence, limit)
+    
+    return {
+        'success': True,
+        'data': {
+            'suggestions': suggestions,
+            'total': len(suggestions)
+        }
     }
