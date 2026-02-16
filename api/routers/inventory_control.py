@@ -11,6 +11,7 @@ from api.db import get_db
 from api.services.barcode_scanner import lookup_barcode, update_product_barcode
 from api.services.stock_alerts import get_active_alerts, acknowledge_alert, check_stock_levels
 from api.services.reorder_automation import get_reorder_suggestions
+from api.services.stock_adjustment import record_adjustment, get_adjustment_history
 
 router = APIRouter(prefix="/inventory", tags=["Inventory Control"])
 
@@ -19,6 +20,14 @@ class BarcodeUpdateRequest(BaseModel):
     barcode: str
 
 class AcknowledgeAlertRequest(BaseModel):
+    user_id: int
+
+class StockAdjustmentRequest(BaseModel):
+    product_id: int
+    adjustment_type: str  # 'add', 'remove', 'set'
+    quantity: int
+    reason: str
+    notes: Optional[str] = None
     user_id: int
 
 @router.get("/scan/{barcode}")
@@ -121,4 +130,52 @@ async def get_reorder_suggestions_endpoint(
             'suggestions': suggestions,
             'total': len(suggestions)
         }
+    }
+
+@router.post("/adjust")
+async def adjust_stock(request: StockAdjustmentRequest, db: Session = Depends(get_db)):
+    """
+    Record stock adjustment with audit trail
+    Types: add, remove, set
+    Reasons: damage, theft, expiry, recount, supplier_return, customer_return, transfer_in, transfer_out, other
+    """
+    result = record_adjustment(
+        product_id=request.product_id,
+        adjustment_type=request.adjustment_type,
+        quantity=request.quantity,
+        reason=request.reason,
+        notes=request.notes,
+        user_id=request.user_id,
+        db=db
+    )
+    
+    if not result['success']:
+        raise HTTPException(status_code=400, detail=result['error'])
+    
+    return {
+        'success': True,
+        'data': {
+            'adjustment_id': result['adjustment_id'],
+            'new_stock_level': result['new_stock_level']
+        }
+    }
+
+@router.get("/adjustments")
+async def get_adjustments(
+    product_id: Optional[int] = Query(None, description="Filter by product ID"),
+    user_id: Optional[int] = Query(None, description="Filter by user ID"),
+    adjustment_type: Optional[str] = Query(None, description="Filter by type: add, remove, set"),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db)
+):
+    """
+    Get stock adjustment history
+    Returns audit log with before/after values, user, timestamp
+    """
+    result = get_adjustment_history(product_id, user_id, adjustment_type, limit, offset)
+    
+    return {
+        'success': True,
+        'data': result
     }
