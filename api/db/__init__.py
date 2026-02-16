@@ -23,20 +23,29 @@ else:
 # Database URL from environment variable
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql://postgres:postgres@localhost:5433/enterprise_retail"
+    "postgresql://postgres:EnterpriseRetail%402026@localhost:5433/enterprise_retail"
 )
 
 logger.info(f"Using DATABASE_URL: {DATABASE_URL[:40]}...")
 
-# Create engine with connection pooling
-engine = create_engine(
-    DATABASE_URL,
-    pool_pre_ping=True,  # Verify connections before using
-    pool_size=10,
-    max_overflow=20,
-    pool_recycle=3600,
-    echo=False  # Set to True for SQL debugging
-)
+# Create engine with connection pooling optimized for cloud (Supabase)
+engine_args = {
+    "pool_pre_ping": True,
+    "pool_size": 10,
+    "max_overflow": 20,
+    "pool_recycle": 3600,
+    "pool_timeout": 30,
+    "echo": False
+}
+
+# Add connection timeout for cloud databases (Supabase)
+if "supabase" in DATABASE_URL or "neon.tech" in DATABASE_URL:
+    engine_args["connect_args"] = {
+        "connect_timeout": 30,
+        "options": "-c statement_timeout=60000"
+    }
+
+engine = create_engine(DATABASE_URL, **engine_args)
 
 # Session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -53,5 +62,9 @@ def get_db():
     db = SessionLocal()
     try:
         yield db
+    except Exception as e:
+        db.rollback()
+        logger.error(f"DB session error: {e}")
+        raise
     finally:
         db.close()
