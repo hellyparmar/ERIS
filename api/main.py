@@ -84,6 +84,20 @@ app.add_middleware(
 # Rate Limiting
 app.add_middleware(APIRateLimitMiddleware, requests_per_minute=100)
 
+# Security Headers Middleware
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+    return response
+
+
 # Global exception handler
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
@@ -110,10 +124,20 @@ async def health_check():
 # Authentication (public endpoints - no auth required)
 app.include_router(auth.router, tags=["Authentication"])
 
+# JWT Authentication Router (DISABLED - using unified auth.py)
+# from api.routers import auth_login
+# app.include_router(auth_login.router, tags=["JWT Authentication"])
+
 # Health & Monitoring (public for load balancers)
 app.include_router(health.router, tags=["System Health"])
 app.include_router(monitoring.router, tags=["Monitoring"])
 app.include_router(circuit_health.router, tags=["Circuit Breakers"])
+
+# WebSocket for Real-time Updates
+from api.websocket_manager import websocket_endpoint
+@app.websocket("/api/ws")
+async def websocket(websocket):
+    await websocket_endpoint(websocket)
 
 # Business endpoints (will add auth protection gradually)
 from api.routers import pos, alerts
@@ -155,6 +179,18 @@ app.include_router(customer_analytics.router, tags=["Customer Analytics"])
 # ML Pipeline Endpoints
 from api.routers import forecasting
 app.include_router(forecasting.router, tags=["ML Forecasting"])
+
+# Invoicing & Billing (Phase 2B)
+from api.routers import invoicing_v2
+app.include_router(invoicing_v2.router, tags=["Invoicing & Billing"])
+
+# POS Integration (Phase 2B - POS Integration)
+from api.routers import pos_integration
+app.include_router(pos_integration.router, tags=["POS Integration"])
+
+# Bill Management (Phase 2B - Bill Management)
+from api.routers import bill_management
+app.include_router(bill_management.router, tags=["Bill Management"])
 
 # Causal Inference Endpoints
 from api.routers import causal
