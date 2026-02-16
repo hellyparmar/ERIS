@@ -7,10 +7,6 @@ const Customers = () => {
     const [activeTab, setActiveTab] = useState('list');
     const [stats, setStats] = useState(null);
 
-    useEffect(() => {
-        fetchStats();
-    }, []);
-
     const fetchStats = async () => {
         try {
             const response = await fetch(`${import.meta.env.VITE_API_URL}/customers/stats`);
@@ -23,6 +19,10 @@ const Customers = () => {
             console.error('Error fetching customer stats:', error);
         }
     };
+
+    useEffect(() => {
+        fetchStats();
+    }, []);
 
     const tabs = [
         { id: 'list', label: 'Customer List', icon: Users },
@@ -104,8 +104,8 @@ const Customers = () => {
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
                                 className={`flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === tab.id
-                                        ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
+                                    ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
                                     }`}
                             >
                                 <Icon className="w-5 h-5" />
