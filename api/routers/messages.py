@@ -9,7 +9,7 @@ from typing import Optional, List
 from datetime import datetime
 from pydantic import BaseModel, Field
 
-from api.db.database import get_db
+from api.db import get_db
 from api.db.models import MessageChannel, User
 from api.services.message_service import MessageService
 from api.auth.dependencies import get_current_active_user, get_current_admin_user

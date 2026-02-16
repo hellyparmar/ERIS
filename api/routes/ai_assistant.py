@@ -5,10 +5,13 @@ Handles chat interactions with Google Gemini API
 
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict
 import os
+import logging
 from datetime import datetime
 import google.generativeai as genai
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/ai", tags=["AI Assistant"])
 
@@ -66,18 +69,31 @@ class ActionData(BaseModel):
     type: str # e.g., 'draft_po'
     data: dict
 
+class QueryResult(BaseModel):
+    """Database query results if template was matched."""
+    success: bool
+    data: List[Dict] = []
+    row_count: int = 0
+    execution_time_ms: float = 0.0
+    error: Optional[str] = None
+    template_matched: Optional[str] = None
+
 class ChatResponse(BaseModel):
     message: Message
     session_id: str
     action: Optional[ActionData] = None
+    query_result: Optional[QueryResult] = None  # New: database results if available
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     """
     Send a message to the AI assistant using Multi-Provider Routing
+    Now includes database results when template matches.
     """
     try:
         from api.services.ai_service import ai_service
+        from api.services.semantic_layer import semantic_layer
+        from api.services.query_executor import query_executor
         
         # Initialize conversation history if not exists
         if request.session_id not in conversations:
@@ -92,23 +108,51 @@ async def chat(request: ChatRequest):
         # Get system prompt if provided
         base_system_prompt = request.system_prompt or "You are a helpful AI assistant for an Enterprise Retail Intelligence System."
         
-        # Import and use semantic layer for enhanced context
-        from api.services.semantic_layer import semantic_layer
+        # Try to match and execute a query (template or dynamic)
+        template_hint = ""
+        query_result_data = None
+        template_match = None
         
-        # Check for pre-approved template match first
+        # First try semantic layer templates
         template_match = semantic_layer.match_template(request.message.text)
+        
+        # If no template match, try dynamic query generation
+        if not template_match:
+            from api.services.dynamic_query_generator import dynamic_query_generator
+            dynamic_result = dynamic_query_generator.generate_query(request.message.text)
+            if dynamic_result:
+                query_type, generated_sql = dynamic_result
+                template_match = (f"dynamic_{query_type}", generated_sql)
+        
+        # Execute query if we have one
         if template_match:
             template_name, template_sql = template_match
-            # If we have a template match, provide it directly
+            logger.info(f"Using query: {template_name}")
+            
+            # Provide template hint to AI service
             template_hint = f"""
-IMPORTANT: For this query, use this pre-approved SQL template:
+IMPORTANT: Query has been executed against the database. Use this data in your response:
 ```sql
-{template_sql}
+{template_sql[:200]}...
 ```
-You may present the results naturally in your response.
 """
-        else:
-            template_hint = ""
+            # Execute query to capture results
+            try:
+                query_result = query_executor.execute_template_query(template_sql, semantic_layer)
+                if query_result.get("success"):
+                    query_result_data = QueryResult(
+                        success=True,
+                        data=query_result.get("data", []),
+                        row_count=query_result.get("row_count", 0),
+                        execution_time_ms=query_result.get("execution_time_ms", 0),
+                        template_matched=template_name
+                    )
+                    logger.info(f"Query executed: {query_result.get('row_count')} rows")
+                else:
+                    logger.warning(f"Query execution failed: {query_result.get('error')}")
+            except Exception as e:
+                logger.error(f"Query execution error: {str(e)}")
+        
         # Build full system prompt with context
         full_system_prompt = f"""{SYSTEM_PROMPT}
 
@@ -116,13 +160,15 @@ Current Context:
 - User is viewing the R-DIOS retail intelligence dashboard
 - System has access to sales, inventory, customer, and analytics data
 - Respond in {request.message.language}
+{template_hint}
 """
         
-        # Call AI Service
+        # Call AI Service (will also execute templates internally)
         result = await ai_service.generate_response(
             message=request.message.text,
             system_prompt=full_system_prompt,
-            session_history=conversations[request.session_id][:-1]
+            session_history=conversations[request.session_id][:-1],
+            execute_templates=True
         )
         
         response_text = result["text"]
@@ -148,7 +194,8 @@ Current Context:
         return ChatResponse(
             message=ai_message,
             session_id=request.session_id,
-            action=action_payload
+            action=action_payload,
+            query_result=query_result_data  # Include database results if available
         )
 
     except Exception as e:

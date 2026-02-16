@@ -63,7 +63,6 @@ class SyncService {
             console.error('[Sync] Preload failed:', error);
             throw error;
         }
-    }
 
     /**
      * Sync all pending data to server
@@ -109,7 +108,6 @@ class SyncService {
         } finally {
             this.isSyncing = false;
         }
-    }
 
     /**
      * Sync specific type of data
@@ -135,7 +133,6 @@ class SyncService {
             console.error(`[Sync] Failed to sync ${type}:`, error);
             throw error;
         }
-    }
 
     /**
      * Sync pending invoices
@@ -161,7 +158,6 @@ class SyncService {
                 console.error('[Sync] Invoice sync failed:', error);
                 results.failed++;
             }
-        }
 
         return results;
     }
@@ -189,7 +185,6 @@ class SyncService {
                 console.error('[Sync] Payment sync failed:', error);
                 results.failed++;
             }
-        }
 
         return results;
     }
@@ -213,7 +208,6 @@ class SyncService {
                 console.error('[Sync] Inventory sync failed:', error);
                 results.failed++;
             }
-        }
 
         return results;
     }
@@ -229,7 +223,6 @@ class SyncService {
             console.error('[Sync] Failed to get current org:', error);
             return null;
         }
-    }
 
     /**
      * Get current store from cache
@@ -242,7 +235,6 @@ class SyncService {
             console.error('[Sync] Failed to get current store:', error);
             return null;
         }
-    }
 
     /**
      * Get sync status
@@ -277,7 +269,6 @@ class SyncService {
             console.error('[Sync] Failed to clear data:', error);
             throw error;
         }
-    }
 
     /**
      * Get storage usage
@@ -301,11 +292,9 @@ class SyncService {
                 console.error('[Sync] Failed to get storage info:', error);
                 return null;
             }
-        }
 
         return null;
     }
-}
 
 // Export singleton instance
 export const syncService = new SyncService();

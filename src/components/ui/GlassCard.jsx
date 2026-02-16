@@ -1,5 +1,4 @@
 import React from 'react';
-import { motion } from 'framer-motion';
 import '../../modern-design.css';
 
 /**
@@ -50,7 +49,7 @@ const GlassCard = ({
     } : {};
 
     return (
-        <motion.div
+        <div
             className={`glass-card ${getVariantClasses()} ${className}`}
             style={cardStyle}
             {...animationProps}
@@ -59,7 +58,7 @@ const GlassCard = ({
             {...props}
         >
             {children}
-        </motion.div>
+        </div>
     );
 };
 

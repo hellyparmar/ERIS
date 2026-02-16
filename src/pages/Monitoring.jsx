@@ -68,7 +68,7 @@ const Monitoring = () => {
     const totalSavings = costOptimization.reduce((sum, item) => sum + item.savings, 0);
 
     return (
-        <div className="min-h-screen space-y-8 animate-fade-in">
+        <div className="min-h-screen space-y-8 p-6 animate-fade-in">
             {/* Header */}
             <div className="flex justify-between items-center">
                 <div>

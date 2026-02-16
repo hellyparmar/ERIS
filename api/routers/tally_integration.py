@@ -10,7 +10,7 @@ from uuid import UUID
 from pydantic import BaseModel
 
 from api.services.tally_sync_service import TallySyncService
-from api.db.database import get_db
+from api.db import get_db
 from api.auth.dependencies import get_current_user
 from api.middleware.tenant_context import require_organization
 

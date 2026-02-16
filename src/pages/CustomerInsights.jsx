@@ -4,7 +4,6 @@
  */
 
 import { useState, useEffect, useMemo } from 'react';
-import { motion } from 'framer-motion';
 import {
     Users, TrendingUp, DollarSign, Target, Search,
     ChevronDown, ChevronUp, AlertTriangle, Crown, Heart,
@@ -245,9 +244,7 @@ const CustomerInsights = () => {
     return (
         <div className="min-h-screen space-y-8 animate-fade-in p-6">
             {/* Header */}
-            <motion.div
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
+            <div
             >
                 <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-purple bg-clip-text text-transparent mb-2">
                     Customer Insights
@@ -255,7 +252,7 @@ const CustomerInsights = () => {
                 <p className="text-muted-foreground">
                     Deep Learning Churn Predictions & Segmentation
                 </p>
-            </motion.div>
+            </div>
 
             {/* Overview Metrics */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -324,11 +321,8 @@ const CustomerInsights = () => {
                         const isSelected = selectedSegment === segmentName;
 
                         return (
-                            <motion.div
+                            <div
                                 key={segmentName}
-                                initial={{ opacity: 0, scale: 0.9 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                transition={{ delay: idx * 0.05 }}
                                 className="h-full"
                             >
                                 <GlassCard
@@ -355,7 +349,7 @@ const CustomerInsights = () => {
                                         {apiSummary.segment_actions?.[segmentName] || "No action defined"}
                                     </p>
                                 </GlassCard>
-                            </motion.div>
+                            </div>
                         );
                     })}
                 </div>
@@ -521,9 +515,6 @@ const CustomerInsights = () => {
                                 return (
                                     <motion.tr
                                         key={customer.id}
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        transition={{ delay: idx * 0.02 }}
                                         className="border-b border-border/50 hover:bg-gradient-to-r hover:from-primary/5 hover:to-purple/5 transition-all"
                                     >
                                         <td className="py-4 px-4">

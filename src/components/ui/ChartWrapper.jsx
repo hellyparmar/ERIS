@@ -18,7 +18,6 @@ const ChartWrapper = ({ children, chartId }) => {
                     if (chartInstance) {
                         chartInstance.destroy();
                     }
-                }
             }
         };
     }, []);

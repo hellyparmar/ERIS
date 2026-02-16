@@ -10,7 +10,7 @@ from typing import Optional, List
 from datetime import datetime, timedelta
 from pydantic import BaseModel
 
-from api.db.database import get_db
+from api.db import get_db
 from api.db.models import User, Sale, Product, Invoice, Customer
 from api.services.export_service import ExportService
 from api.auth.dependencies import get_current_active_user

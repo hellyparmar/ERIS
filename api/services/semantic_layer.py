@@ -297,7 +297,7 @@ VALIDATION_RULES = [
     {
         "name": "check_table_exists",
         "pattern": r"FROM\s+(\w+)",
-        "allowed_tables": ["sales", "products", "customers", "inventory", "invoices", "alerts"],
+        "allowed_tables": ["sales", "products", "customers", "inventory", "invoices", "alerts", "sale_items", "users"],
         "message": "Unknown table referenced",
         "severity": "error"
     }

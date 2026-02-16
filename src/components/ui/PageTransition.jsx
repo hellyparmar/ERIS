@@ -1,5 +1,4 @@
 import React from 'react';
-import { motion } from 'framer-motion';
 import { pageVariants } from '../utils/animations';
 
 /**
@@ -8,15 +7,15 @@ import { pageVariants } from '../utils/animations';
  */
 const PageTransition = ({ children }) => {
     return (
-        <motion.div
+        <div
             initial="initial"
             animate="enter"
             exit="exit"
-            variants={pageVariants}
+            
             className="w-full h-full"
         >
             {children}
-        </motion.div>
+        </div>
     );
 };
 

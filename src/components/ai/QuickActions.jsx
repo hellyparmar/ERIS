@@ -1,5 +1,4 @@
 import React from 'react';
-import { motion } from 'framer-motion';
 import {
     TrendingUp, Package, AlertTriangle, BarChart3,
     Users, DollarSign, ShoppingCart, Calendar,
@@ -94,10 +93,9 @@ const QuickActions = ({ onActionClick, currentLanguage }) => {
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[600px] overflow-y-auto pr-2">
             {currentActions.map((action, index) => (
-                <motion.button
+                <button
                     key={index}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
+                    }
                     onClick={() => onActionClick(action.query)}
                     className="flex items-center gap-3 p-3 bg-white/5 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-lg hover:shadow-md dark:hover:shadow-blue-500/20 dark:hover:border-blue-500/50 transition-all text-left group"
                 >
@@ -107,7 +105,7 @@ const QuickActions = ({ onActionClick, currentLanguage }) => {
                     <span className="text-sm font-medium text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                         {action.text}
                     </span>
-                </motion.button>
+                </button>
             ))}
         </div>
     );

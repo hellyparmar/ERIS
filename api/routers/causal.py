@@ -12,7 +12,7 @@ import logging
 import json
 import sys
 
-from api.db.database import get_db
+from api.db import get_db
 from api.auth.dependencies import get_current_user
 
 logging.basicConfig(level=logging.INFO)

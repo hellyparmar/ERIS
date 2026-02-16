@@ -1,5 +1,4 @@
 import React from 'react';
-import { motion } from 'framer-motion';
 import '../../modern-design.css';
 
 /**
@@ -38,16 +37,13 @@ const GradientButton = ({
     };
 
     return (
-        <motion.button
+        <button
             className={`gradient-button relative overflow-hidden shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40 border border-white/20 backdrop-blur-sm ${sizes[size]} ${className}`}
             style={{
                 background: gradients[variant],
             }}
             onClick={onClick}
             disabled={disabled}
-            whileHover={{ scale: 1.05, y: -2 }}
-            whileTap={{ scale: 0.95 }}
-            transition={{ duration: 0.2 }}
             aria-disabled={disabled}
             type="button"
             {...props}
@@ -57,7 +53,7 @@ const GradientButton = ({
                 {icon && <span className="icon" aria-hidden="true">{icon}</span>}
                 <span>{children}</span>
             </div>
-        </motion.button>
+        </button>
     );
 };
 

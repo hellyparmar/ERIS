@@ -1,6 +1,5 @@
 
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
 import {
     FileText,
     TrendingUp,
@@ -93,7 +92,7 @@ const TaxCompliance = () => {
 
 
     return (
-        <div className="min-h-screen fade-in-up space-y-8">
+        <div className="min-h-screen fade-in-up space-y-8 p-6">
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
@@ -157,7 +156,7 @@ const TaxCompliance = () => {
                     >
                         {tab.label}
                         {activeTab === tab.id && (
-                            <motion.div
+                            <div
                                 layoutId="activeTaxTab"
                                 className="absolute bottom-[-9px] left-0 right-0 h-0.5 bg-blue-500"
                             />

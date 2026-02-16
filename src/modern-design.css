@@ -233,38 +233,40 @@
 
 /* Success Action - Professional Green */
 .btn-enterprise-success {
-    background-color: #10b981;
-    color: white;
+    background-color: #d1fae5;
+    color: #065f46;
+    border: 1px solid #a7f3d0;
     box-shadow:
-        0 4px 6px -1px rgba(16, 185, 129, 0.3),
-        0 2px 4px -1px rgba(16, 185, 129, 0.2),
-        inset 0 1px 0 rgba(255, 255, 255, 0.15);
+        0 1px 3px 0 rgba(0, 0, 0, 0.1),
+        0 1px 2px 0 rgba(0, 0, 0, 0.06);
 }
 
 .btn-enterprise-success:hover:not(:disabled) {
-    background-color: #059669;
+    background-color: #a7f3d0;
+    color: #064e3b;
+    border-color: #6ee7b7;
     box-shadow:
-        0 10px 15px -3px rgba(16, 185, 129, 0.4),
-        0 4px 6px -2px rgba(16, 185, 129, 0.3),
-        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        0 4px 6px -1px rgba(0, 0, 0, 0.1),
+        0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
 /* Destructive Action - Ruby Red */
 .btn-enterprise-destructive {
-    background-color: #ef4444;
-    color: white;
+    background-color: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fecaca;
     box-shadow:
-        0 4px 6px -1px rgba(239, 68, 68, 0.3),
-        0 2px 4px -1px rgba(239, 68, 68, 0.2),
-        inset 0 1px 0 rgba(255, 255, 255, 0.15);
+        0 1px 3px 0 rgba(0, 0, 0, 0.1),
+        0 1px 2px 0 rgba(0, 0, 0, 0.06);
 }
 
 .btn-enterprise-destructive:hover:not(:disabled) {
-    background-color: #dc2626;
+    background-color: #fecaca;
+    color: #7f1d1d;
+    border-color: #fca5a5;
     box-shadow:
-        0 10px 15px -3px rgba(239, 68, 68, 0.4),
-        0 4px 6px -2px rgba(239, 68, 68, 0.3),
-        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        0 4px 6px -1px rgba(0, 0, 0, 0.1),
+        0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
 /* Dark Mode Adjustments - Even more luminous for better visibility */
@@ -277,19 +279,27 @@
 }
 
 .dark .btn-enterprise-success {
-    background-color: #34d399;
+    background-color: #064e3b;
+    color: #d1fae5;
+    border-color: #065f46;
 }
 
 .dark .btn-enterprise-success:hover:not(:disabled) {
-    background-color: #10b981;
+    background-color: #065f46;
+    color: #ecfdf5;
+    border-color: #047857;
 }
 
 .dark .btn-enterprise-destructive {
-    background-color: #f87171;
+    background-color: #7f1d1d;
+    color: #fee2e2;
+    border-color: #991b1b;
 }
 
 .dark .btn-enterprise-destructive:hover:not(:disabled) {
-    background-color: #ef4444;
+    background-color: #991b1b;
+    color: #fef2f2;
+    border-color: #b91c1c;
 }
 
 /* Animations */

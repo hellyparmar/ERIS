@@ -10,7 +10,7 @@ from datetime import datetime, date
 from decimal import Decimal
 from pydantic import BaseModel, Field
 
-from api.db.database import get_db
+from api.db import get_db
 from api.db.models import PaymentStatus, User
 from api.services.invoice_service import InvoiceService
 from api.services.invoice_pdf_generator import InvoicePDFGenerator

@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { Save, RefreshCw, CheckCircle, AlertCircle, Database, Server, User, Key, Globe, ShoppingCart, CreditCard, ExternalLink } from 'lucide-react';
 import UnifiedCard from '../components/ui/UnifiedCard';
 import ActionButton from '../components/ui/ActionButton';
@@ -245,33 +244,26 @@ const Integrations = () => {
     };
 
     return (
-        <div className="min-h-screen space-y-6">
+        <div className="min-h-screen space-y-8 p-6">
             {/* Header */}
-            <motion.div
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
+            <div
             >
                 <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-purple bg-clip-text text-transparent mb-2">
                     Integrations
                 </h1>
                 <p className="text-muted-foreground">Manage third-party connections and APIs</p>
-            </motion.div>
+            </div>
 
             {/* Integration Tabs - Strict Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
                 {INTEGRATION_TABS.map((tab, idx) => {
                     const isActive = activeTab === tab.id;
                     const isConnected = connections[tab.id];
                     const Icon = tab.icon;
                     return (
-                        <motion.button
+                        <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: idx * 0.1 }}
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
                             className={`p-5 rounded-xl border transition-all relative text-left group ${isActive
                                 ? 'bg-primary/5 border-primary shadow-lg shadow-primary/10'
                                 : 'bg-card border-border hover:border-primary/30 hover:shadow-md'
@@ -304,7 +296,7 @@ const Integrations = () => {
                                     </div>
                                 </div>
                             </div>
-                        </motion.button>
+                        </button>
                     )
                 })}
             </div>
@@ -328,12 +320,9 @@ const Integrations = () => {
                         {renderSyncToggles()}
 
                         {/* Status Message */}
-                        <AnimatePresence>
+                        
                             {status.message && (
-                                <motion.div
-                                    initial={{ opacity: 0, height: 0 }}
-                                    animate={{ opacity: 1, height: 'auto' }}
-                                    exit={{ opacity: 0, height: 0 }}
+                                <div
                                     className={`mt-4 p-3 rounded-lg flex items-center gap-2 text-sm ${status.type === 'success'
                                         ? 'bg-green-500/10 text-green-600 dark:text-green-500 border border-green-500/20'
                                         : 'bg-destructive/10 text-destructive border border-destructive/20'
@@ -341,9 +330,9 @@ const Integrations = () => {
                                 >
                                     {status.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
                                     {status.message}
-                                </motion.div>
+                                </div>
                             )}
-                        </AnimatePresence>
+                        
 
                         <div className="flex gap-4 mt-6 pt-6 border-t border-border">
                             <button

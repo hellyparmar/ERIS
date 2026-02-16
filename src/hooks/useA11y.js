@@ -173,7 +173,6 @@ export const useArrowNavigation = (containerRef, options = {}) => {
                     e.preventDefault();
                     nextIndex = currentIndex - 1;
                 }
-            }
 
             // Handle looping
             if (loop) {

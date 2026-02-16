@@ -2,9 +2,15 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { visualizer } from 'rollup-plugin-visualizer'
 import { imagetools } from 'vite-imagetools'
+import path from 'path'
 
 // https://vite.dev/config/
 export default defineConfig({
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
   plugins: [
     react(),
     // Image optimization
@@ -40,7 +46,7 @@ export default defineConfig({
           // Vendor chunks
           'react-vendor': ['react', 'react-dom', 'react-router-dom'],
           'chart-vendor': ['recharts'],
-          'ui-vendor': ['lucide-react', 'framer-motion'],
+          'ui-vendor': ['lucide-react'],
           'query-vendor': ['@tanstack/react-query', 'axios'],
         },
       },
@@ -66,7 +72,6 @@ export default defineConfig({
       'axios',
       'recharts',
       'lucide-react',
-      'framer-motion',
     ],
   },
 

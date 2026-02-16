@@ -133,7 +133,6 @@ class OfflineDB {
             this.db = null;
             this.dbPromise = null;
         }
-    }
 
     /**
      * Get a single item by key
@@ -316,7 +315,6 @@ class OfflineDB {
             transaction.onerror = () => reject(transaction.error);
         });
     }
-}
 
 // Export singleton instance
 export const offlineDB = new OfflineDB();

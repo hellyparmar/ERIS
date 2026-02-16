@@ -10,7 +10,7 @@ from datetime import datetime, date, timedelta
 from typing import Optional, List, Dict, Any
 import logging
 
-from api.db.database import get_db
+from api.db import get_db
 from api.auth.dependencies import get_current_active_user
 
 logger = logging.getLogger(__name__)

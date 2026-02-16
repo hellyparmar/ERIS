@@ -8,7 +8,7 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from typing import Optional
 
-from api.db.database import get_db
+from api.db import get_db
 from api.db.models import User
 from api.auth.jwt_handler import decode_access_token
 

@@ -1,23 +1,81 @@
 {
-  "timestamp": "2026-02-06T16:35:48.242378",
-  "tests": {
+  "connection": {
     "connection": true,
-    "tables_exist": true,
+    "tables_exist": false,
     "data_populated": true,
     "indexes_created": true,
-    "foreign_keys_valid": true
+    "foreign_keys_valid": true,
+    "details": {
+      "missing_tables": [
+        "users",
+        "invoices",
+        "inventory",
+        "alerts"
+      ],
+      "total_tables": 4,
+      "required_tables_found": 4,
+      "all_tables": [
+        "products",
+        "customers",
+        "sales",
+        "sale_items"
+      ],
+      "table_counts": {
+        "products": 26400,
+        "customers": 99000,
+        "sales": 100000,
+        "sale_items": 199337,
+        "invoices": 0
+      },
+      "indexes": [
+        "idx_products_category",
+        "idx_products_sku",
+        "idx_customers_segment",
+        "idx_sales_transaction_date",
+        "idx_sales_customer",
+        "idx_sales_store",
+        "idx_sale_items_sale",
+        "idx_sale_items_product"
+      ]
+    }
   },
-  "table_counts": {
-    "organizations": 1,
-    "stores": 1,
-    "users": 0,
-    "products": 26400,
-    "customers": 99000,
-    "sales": 100000,
-    "sale_items": 194864,
-    "inventory": 26400,
-    "suppliers": 0,
-    "invoices": 0
+  "data_quality": {
+    "completeness": 100.0,
+    "accuracy": 100.0,
+    "consistency": 100.0,
+    "timeliness": 100,
+    "referential_integrity": 0.0,
+    "business_logic": {
+      "sales_count": 100000,
+      "products_count": 26400,
+      "customers_count": 99000,
+      "invoices_count": 0
+    },
+    "issues": []
   },
-  "all_passed": true
+  "petpooja_context": {
+    "indian_menu_items": true,
+    "seasonal_patterns": false,
+    "payment_distribution": {
+      "credit": 51.0,
+      "cash": 30.0,
+      "upi": 15.0,
+      "card": 4.0
+    },
+    "churn_customers": 36614,
+    "details": {
+      "categories": [
+        "Beverages",
+        "Chinese & Oriental",
+        "Desserts",
+        "Indian Breads",
+        "North Indian Main Course",
+        "Rice & Biryani",
+        "South Indian",
+        "Starters & Appetizers"
+      ],
+      "diwali_spike": 0.2996138034134795
+    },
+    "issues": []
+  }
 }

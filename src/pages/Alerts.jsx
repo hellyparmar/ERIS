@@ -4,8 +4,8 @@
  * Refactored with Enterprise Design System
  */
 
-import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import React, { useState, useEffect } from 'react';
+import { API_BASE } from '../lib/api';
 import {
     AlertTriangle,
     AlertCircle,
@@ -28,19 +28,25 @@ const Alerts = () => {
     const [filterCategory] = useState('all');
     const [alerts, setAlerts] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [totalAlerts, setTotalAlerts] = useState(0);
+    const perPage = 50;
 
     useEffect(() => {
         fetchAlerts();
-    }, []);
+    }, [currentPage, filterSeverity]);
 
     const fetchAlerts = async () => {
         try {
             setLoading(true);
-            const response = await fetch('http://localhost:8000/api/v1/alerts/list');
+            // Fetch with backend pagination: page and per_page parameters
+            const severityParam = filterSeverity !== 'all' ? `&severity=${filterSeverity}` : '';
+            const response = await fetch(`${API_BASE}/api/v1/alerts/list?page=${currentPage}&per_page=${perPage}${severityParam}`);
             const data = await response.json();
-            if (data.success) {
+            if (data.success && data.data) {
                 // Transform API data to component format
-                const transformed = data.data.map(alert => ({
+                const transformed = data.data.items.map(alert => ({
                     id: alert.id,
                     severity: alert.severity,
                     category: alert.category,
@@ -53,6 +59,8 @@ const Alerts = () => {
                     color: getSeverityColor(alert.severity)
                 }));
                 setAlerts(transformed);
+                setTotalPages(data.data.pagination.total_pages);
+                setTotalAlerts(data.data.pagination.total);
             }
         } catch (error) {
             console.error('Failed to fetch alerts:', error);
@@ -64,7 +72,7 @@ const Alerts = () => {
 
     const handleAcknowledge = async (alertId) => {
         try {
-            const response = await fetch(`http://localhost:8000/api/v1/alerts/${alertId}/acknowledge`, {
+            const response = await fetch(`${API_BASE}/api/v1/alerts/${alertId}/acknowledge`, {
                 method: 'PATCH'
             });
             const data = await response.json();
@@ -119,7 +127,7 @@ const Alerts = () => {
     const handleAction = async (action) => {
         if (action === 'Create Purchase Order') {
             try {
-                const response = await fetch(`http://localhost:8000/api/v1/reports/purchase-order/download?item_id=PRD001&quantity=50`);
+                const response = await fetch(`${API_BASE}/api/v1/reports/purchase-order/download?item_id=PRD001&quantity=50`);
                 if (response.ok) {
                     const blob = await response.blob();
                     const url = window.URL.createObjectURL(blob);
@@ -157,12 +165,8 @@ const Alerts = () => {
         }
     };
 
-    // Filter alerts
-    const filteredAlerts = alerts.filter(alert => {
-        const matchesSeverity = filterSeverity === 'all' || alert.severity === filterSeverity;
-        const matchesCategory = filterCategory === 'all' || alert.category === filterCategory;
-        return matchesSeverity && matchesCategory;
-    });
+    // No client-side filtering needed - backend handles it
+    const filteredAlerts = alerts;
 
     // Count alerts by severity
     const criticalCount = alerts.filter(a => a.severity === 'critical').length;
@@ -171,17 +175,14 @@ const Alerts = () => {
     const unreadCount = alerts.filter(a => !a.read).length;
 
     return (
-        <div className="min-h-screen space-y-6">
+        <div className="min-h-screen space-y-8 p-6">
             {/* Header */}
-            <motion.div
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-            >
+            <div>
                 <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-purple bg-clip-text text-transparent mb-2">
                     Alerts & Notifications
                 </h1>
                 <p className="text-muted-foreground">Real-time system alerts and actionable insights</p>
-            </motion.div>
+            </div>
 
             {/* Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -312,14 +313,11 @@ const Alerts = () => {
                         <p className="text-muted-foreground">All caught up! No alerts for this filter.</p>
                     </UnifiedCard>
                 ) : (
-                    filteredAlerts.map((alert, idx) => {
+                    filteredAlerts.map((alert) => {
                         const isPulse = alert.severity === 'critical' && !alert.read;
                         return (
-                            <motion.div
+                            <div
                                 key={alert.id}
-                                initial={{ opacity: 0, x: -20 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                transition={{ delay: idx * 0.05 }}
                             >
                                 <UnifiedCard
                                     className={`${!alert.read ? 'border-l-4 border-primary' : ''} ${isPulse ? 'ring-2 ring-destructive/50' : ''
@@ -388,25 +386,39 @@ const Alerts = () => {
                                         </div>
                                     </div>
                                 </UnifiedCard>
-                            </motion.div>
+                            </div>
                         );
                     })
                 )}
             </div>
 
             {/* Pagination */}
-            {filteredAlerts.length > 0 && (
-                <div className="flex items-center justify-center gap-2">
-                    <ActionButton variant="secondary" size="sm">
-                        Previous
-                    </ActionButton>
-                    <span className="px-4 py-2 text-muted-foreground text-sm">Page 1 of 1</span>
-                    <ActionButton variant="secondary" size="sm">
-                        Next
-                    </ActionButton>
-                </div>
-            )}
-        </div>
+            {
+                totalPages > 1 && (
+                    <div className="flex items-center justify-center gap-2">
+                        <ActionButton
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                            disabled={currentPage === 1}
+                        >
+                            Previous
+                        </ActionButton>
+                        <span className="px-4 py-2 text-muted-foreground text-sm">
+                            Page {currentPage} of {totalPages} ({totalAlerts} total alerts)
+                        </span>
+                        <ActionButton
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                            disabled={currentPage === totalPages}
+                        >
+                            Next
+                        </ActionButton>
+                    </div>
+                )
+            }
+        </div >
     );
 };
 

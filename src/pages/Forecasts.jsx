@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { API_BASE } from '../lib/api';
 import { TrendingUp, TrendingDown, Target, Brain, Zap, AlertCircle, CheckCircle, ArrowUp, ArrowDown, Info, Package, Truck } from 'lucide-react';
 import {
     Chart as ChartJS,
@@ -41,7 +41,7 @@ const Forecasts = () => {
         setLoading(true);
         try {
             // Use existing /api/forecasting/forecast endpoint
-            const response = await fetch(`http://localhost:8000/api/forecasting/forecast/1/1?days=${timeHorizon}&growth_rate=${growthRate / 100}`, {
+            const response = await fetch(`${API_BASE}/api/forecasting/forecast/1/1?days=${timeHorizon}&growth_rate=${growthRate / 100}`, {
                 method: 'GET'
             });
             const data = await response.json();
@@ -169,7 +169,6 @@ const Forecasts = () => {
                         const date = new Date(this.getLabelForValue(val));
                         return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
                     }
-                }
             },
             y: {
                 grid: { color: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)' },
@@ -181,10 +180,10 @@ const Forecasts = () => {
                         }
                         return '₹' + value;
                     }
+            }
                 }
             }
-        }
-    };
+    }};
 
     // Key insights
     const insights = [
@@ -192,21 +191,21 @@ const Forecasts = () => {
             icon: <TrendingUp className="text-blue-400" size={24} />,
             title: 'Upward Trend Detected',
             description: 'Sales projected to increase by 12.4% over next 30 days',
-            confidence: 87,
+            keyDrivers: ['Feb Promotion Period (+8%)', 'Pre-Holiday Inventory Rush', 'Competitor Stock-out'],
             type: 'positive'
         },
         {
             icon: <AlertCircle className="text-yellow-400" size={24} />,
             title: 'Seasonal Pattern',
             description: 'Peak expected on Day 15 - prepare 15% extra stock',
-            confidence: 92,
+            keyDrivers: ['Valentine\'s Day (Feb 14)', 'Historical Purchase Cycle', 'Regional Event Traffic'],
             type: 'warning'
         },
         {
             icon: <Zap className="text-purple-400" size={24} />,
             title: 'High Demand Products',
             description: 'Fresh Paneer: +25% demand, Coca Cola 300ml: +18%',
-            confidence: 78,
+            keyDrivers: ['Price Reduction (-8%)', 'High Inventory Levels (+40%)', 'Promotional Cross-sells'],
             type: 'info'
         }
     ];
@@ -253,17 +252,14 @@ const Forecasts = () => {
     };
 
     return (
-        <div className="min-h-screen space-y-8 animate-fade-in">
+        <div className="min-h-screen space-y-8 p-6 animate-fade-in">
             {/* Header */}
-            <motion.div
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-            >
+            <div>
                 <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-purple bg-clip-text text-transparent mb-2">
                     AI-Powered Forecasts
                 </h1>
                 <p className="text-muted-foreground">Machine learning demand predictions with confidence intervals</p>
-            </motion.div>
+            </div>
 
             {/* Model Performance Metrics */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -470,29 +466,29 @@ const Forecasts = () => {
                             </div>
 
                             {/* Shipping Risk */}
-                            <div className={`rounded-xl p-5 border ${apiData.impact.shipping_risk.includes("High") ? 'bg-red-900/20 dark:bg-red-900/20 border-red-200 dark:border-red-800' :
-                                apiData.impact.shipping_risk.includes("Medium") ? 'bg-yellow-900/20 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800' :
-                                    'bg-green-900/20 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+                            <div className={`rounded-xl p-5 border ${apiData.impact.shipping_risk.includes("High") ? 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900/30' :
+                                apiData.impact.shipping_risk.includes("Medium") ? 'bg-yellow-50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-900/30' :
+                                    'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900/30'
                                 }`}>
                                 <div className="flex justify-between items-start mb-2">
-                                    <span className={`text-sm font-medium ${apiData.impact.shipping_risk.includes("High") ? 'text-red-600 dark:text-red-400' :
-                                        apiData.impact.shipping_risk.includes("Medium") ? 'text-yellow-600 dark:text-yellow-400' :
-                                            'text-green-600 dark:text-green-400'
+                                    <span className={`text-sm font-medium ${apiData.impact.shipping_risk.includes("High") ? 'text-red-700 dark:text-red-400' :
+                                        apiData.impact.shipping_risk.includes("Medium") ? 'text-yellow-700 dark:text-yellow-400' :
+                                            'text-green-700 dark:text-green-400'
                                         }`}>Logistics Risk</span>
-                                    <Truck className={`w-5 h-5 ${apiData.impact.shipping_risk.includes("High") ? 'text-red-500' :
-                                        apiData.impact.shipping_risk.includes("Medium") ? 'text-yellow-500' :
-                                            'text-green-500'
+                                    <Truck className={`w-5 h-5 ${apiData.impact.shipping_risk.includes("High") ? 'text-red-600 dark:text-red-500' :
+                                        apiData.impact.shipping_risk.includes("Medium") ? 'text-yellow-600 dark:text-yellow-500' :
+                                            'text-green-600 dark:text-green-500'
                                         }`} />
                                 </div>
-                                <div className={`text-xl font-bold mb-1 ${apiData.impact.shipping_risk.includes("High") ? 'text-red-700 dark:text-red-300' :
-                                    apiData.impact.shipping_risk.includes("Medium") ? 'text-yellow-700 dark:text-yellow-300' :
-                                        'text-green-700 dark:text-green-300'
+                                <div className={`text-xl font-bold mb-1 ${apiData.impact.shipping_risk.includes("High") ? 'text-red-800 dark:text-red-300' :
+                                    apiData.impact.shipping_risk.includes("Medium") ? 'text-yellow-800 dark:text-yellow-300' :
+                                        'text-green-800 dark:text-green-300'
                                     }`}>
                                     {apiData.impact.shipping_risk}
                                 </div>
-                                <div className={`text-xs font-medium ${apiData.impact.shipping_risk.includes("High") ? 'text-red-600 dark:text-red-400' :
-                                    apiData.impact.shipping_risk.includes("Medium") ? 'text-yellow-600 dark:text-yellow-400' :
-                                        'text-green-600 dark:text-green-400'
+                                <div className={`text-xs font-medium ${apiData.impact.shipping_risk.includes("High") ? 'text-red-700 dark:text-red-400' :
+                                    apiData.impact.shipping_risk.includes("Medium") ? 'text-yellow-700 dark:text-yellow-400' :
+                                        'text-green-700 dark:text-green-400'
                                     }`}>
                                     Based on daily volume spikes
                                 </div>
@@ -509,12 +505,7 @@ const Forecasts = () => {
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     {insights.map((insight, idx) => (
-                        <motion.div
-                            key={idx}
-                            initial={{ opacity: 0, scale: 0.9 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            transition={{ delay: idx * 0.1 }}
-                        >
+                        <div key={idx}>
                             <GlassCard variant="gradient" className="p-6 h-full hover:shadow-glow-primary transition-all">
                                 <div className="flex items-start gap-4 h-full">
                                     <div className="p-3 rounded-lg bg-gray-100 dark:bg-white/5 dark:bg-black/20 flex-shrink-0">
@@ -523,34 +514,20 @@ const Forecasts = () => {
                                     <div className="flex-1 flex flex-col h-full">
                                         <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">{insight.title}</h3>
                                         <p className="text-gray-400 text-sm mb-3 flex-1">{insight.description}</p>
-                                        <div className="flex flex-col gap-1 mt-auto">
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">AI Confidence</span>
-                                                <span className="text-sm font-bold text-blue-500">{insight.confidence}%</span>
+                                        <div className="mt-auto pt-3 border-t border-gray-200 dark:border-gray-700">
+                                            <p className="text-xs font-semibold text-gray-900 dark:text-white uppercase tracking-wider mb-2">Key Drivers (Why?)</p>
+                                            <div className="flex flex-wrap gap-2">
+                                                {insight.keyDrivers.map((driver) => (
+                                                    <span key={driver} className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800/50 text-slate-800 dark:text-slate-200 text-xs rounded-md border border-slate-300 dark:border-slate-700 font-semibold">
+                                                        {driver}
+                                                    </span>
+                                                ))}
                                             </div>
-                                            <div className="w-full bg-white/10 rounded-full h-1.5">
-                                                <div
-                                                    className="h-1.5 rounded-full bg-gradient-to-r from-blue-500 to-purple-500"
-                                                    style={{ width: `${insight.confidence}%` }}
-                                                ></div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Causal Analysis (New) */}
-                                    <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800">
-                                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Key Drivers (Why?)</p>
-                                        <div className="flex flex-wrap gap-2">
-                                            {['Seasonal Trend (+12%)', 'Weekend Traffic', 'Diwali Prep'].map((tag) => (
-                                                <span key={tag} className="px-2 py-1 bg-blue-900/20 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-xs rounded border border-blue-200 dark:border-blue-800">
-                                                    {tag}
-                                                </span>
-                                            ))}
                                         </div>
                                     </div>
                                 </div>
                             </GlassCard>
-                        </motion.div>
+                        </div>
                     ))}
                 </div>
             </div>
@@ -569,12 +546,9 @@ const Forecasts = () => {
 
                     <div className="space-y-4">
                         {recommendations.map((rec, idx) => (
-                            <motion.div
+                            <div
                                 key={idx}
                                 className="flex items-center justify-between p-4 bg-gray-50 dark:bg-white/5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition"
-                                initial={{ opacity: 0, x: -20 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                transition={{ delay: idx * 0.1 }}
                             >
                                 <div className="flex-1">
                                     <div className="flex items-center gap-3 mb-2">
@@ -600,7 +574,7 @@ const Forecasts = () => {
                                         Dismiss
                                     </button>
                                 </div>
-                            </motion.div>
+                            </div>
                         ))}
                     </div>
                 </div>

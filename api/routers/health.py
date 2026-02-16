@@ -10,7 +10,7 @@ from datetime import datetime
 import psutil
 import os
 
-from api.db.database import get_db
+from api.db import get_db
 
 router = APIRouter(prefix="/health", tags=["health"])
 

@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Download, FileText, FileSpreadsheet, File, ChevronDown } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Download, FileSpreadsheet, FileText, X } from 'lucide-react';
+import { exportToCSV, exportToExcel, exportToPDF } from '@/lib/api';
 
 /**
  * ExportButton Component
@@ -32,7 +32,7 @@ const ExportButton = ({
 
         try {
             const token = localStorage.getItem('token');
-            const response = await fetch(`http://localhost:8000${endpoint}`, {
+            const response = await fetch(`${API_BASE}${endpoint}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -88,39 +88,36 @@ const ExportButton = ({
                 <ChevronDown size={16} className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} />
             </button>
 
-            <AnimatePresence>
-                {isOpen && (
-                    <motion.div
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden z-50"
-                    >
-                        {formats.map((format) => {
-                            const Icon = format.icon;
-                            return (
-                                <button
-                                    key={format.value}
-                                    onClick={() => handleExport(format.value)}
-                                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-left"
-                                >
-                                    <Icon size={18} className={format.color} />
-                                    <div>
-                                        <p className="text-sm font-medium text-gray-900 dark:text-white">
-                                            Export as {format.label}
-                                        </p>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                                            {format.value === 'pdf' && 'Professional report'}
-                                            {format.value === 'excel' && 'Spreadsheet format'}
-                                            {format.value === 'csv' && 'Raw data'}
-                                        </p>
-                                    </div>
-                                </button>
-                            );
-                        })}
-                    </motion.div>
-                )}
-            </AnimatePresence>
+
+            {isOpen && (
+                <div
+                    className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden z-50"
+                >
+                    {formats.map((format) => {
+                        const Icon = format.icon;
+                        return (
+                            <button
+                                key={format.value}
+                                onClick={() => handleExport(format.value)}
+                                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-left"
+                            >
+                                <Icon size={18} className={format.color} />
+                                <div>
+                                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                        Export as {format.label}
+                                    </p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                                        {format.value === 'pdf' && 'Professional report'}
+                                        {format.value === 'excel' && 'Spreadsheet format'}
+                                        {format.value === 'csv' && 'Raw data'}
+                                    </p>
+                                </div>
+                            </button>
+                        );
+                    })}
+                </div>
+            )}
+
 
             {/* Backdrop to close dropdown */}
             {isOpen && (

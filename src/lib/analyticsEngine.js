@@ -312,7 +312,6 @@ class AnalyticsEngine {
         };
         this.initialize(options);
     }
-}
 
 // Export singleton instance
 const analytics = new AnalyticsEngine();

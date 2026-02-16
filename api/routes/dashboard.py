@@ -13,7 +13,7 @@ import logging
 from typing import Dict, List, Any
 
 # Database Imports
-from api.db.database import get_db
+from api.db import get_db
 from api.db.models import Sale, SaleItem
 from api.db.multitenant_models import Product, Inventory, Customer
 

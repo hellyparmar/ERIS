@@ -1,5 +1,4 @@
 import React from 'react';
-import { motion } from 'framer-motion';
 
 /**
  * UnifiedCard Component - Enterprise Design System
@@ -20,17 +19,9 @@ const UnifiedCard = ({
     animated = false,
     ...props
 }) => {
-    const CardWrapper = animated ? motion.div : 'div';
-    const animationProps = animated ? {
-        initial: { opacity: 0, y: 20 },
-        animate: { opacity: 1, y: 0 },
-        transition: { duration: 0.3 }
-    } : {};
-
     return (
-        <CardWrapper
+        <div
             className={`bg-card/50 border-none shadow-2xl rounded-lg p-6 ${className}`}
-            {...animationProps}
             {...props}
         >
             {(title || actions) && (
@@ -57,7 +48,7 @@ const UnifiedCard = ({
             <div className="text-foreground">
                 {children}
             </div>
-        </CardWrapper>
+        </div>
     );
 };
 

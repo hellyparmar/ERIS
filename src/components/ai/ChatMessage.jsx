@@ -1,21 +1,18 @@
 import React from 'react';
-import { motion } from 'framer-motion';
 import { User, Bot } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import PurchaseOrderDraftCard from './PurchaseOrderDraftCard';
+import DatabaseResults from './DatabaseResults';
 
 /**
  * ChatMessage Component
  * Displays individual chat messages with user/AI differentiation
  */
 const ChatMessage = ({ message, isUser }) => {
-    const { text, timestamp, language, script, action } = message;
+    const { text, timestamp, language, script, action, queryResult } = message;
 
     return (
-        <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
+        <div
             className={`flex gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'} mb-4`}
         >
             {/* Avatar */}
@@ -34,7 +31,7 @@ const ChatMessage = ({ message, isUser }) => {
             <div className={`flex-1 max-w-[70%] ${isUser ? 'items-end' : 'items-start'} flex flex-col`}>
                 <div className={`rounded-2xl px-4 py-3 ${isUser
                     ? 'bg-gradient-to-br from-blue-500 to-purple-600 text-white'
-                    : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
+                    : 'bg-muted text-foreground'
                     }`}>
                     <p className="text-sm md:text-base whitespace-pre-wrap break-words">
                         {text}
@@ -52,8 +49,15 @@ const ChatMessage = ({ message, isUser }) => {
                     </div>
                 )}
 
+                {/* Database Results Table */}
+                {queryResult && !isUser && (
+                    <div className="mt-2 w-full max-w-full">
+                        <DatabaseResults queryResult={queryResult} />
+                    </div>
+                )}
+
                 {/* Metadata */}
-                <div className={`flex items-center gap-2 mt-1 text-xs text-gray-500 dark:text-gray-400 ${isUser ? 'flex-row-reverse' : 'flex-row'
+                <div className={`flex items-center gap-2 mt-1 text-xs text-muted-foreground ${isUser ? 'flex-row-reverse' : 'flex-row'
                     }`}>
                     <span>
                         {timestamp ? formatDistanceToNow(new Date(timestamp), { addSuffix: true }) : 'Just now'}
@@ -65,7 +69,7 @@ const ChatMessage = ({ message, isUser }) => {
                     )}
                 </div>
             </div>
-        </motion.div>
+        </div>
     );
 };
 

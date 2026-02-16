@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { API_BASE } from '../lib/api';
 import { Send, Loader, Sparkles, Trash2 } from 'lucide-react';
 import GlassCard from '../components/ui/GlassCard';
 import ChatMessage from '../components/ai/ChatMessage';
@@ -38,7 +38,7 @@ const AIAssistant = () => {
     useEffect(() => {
         const checkStatus = async () => {
             try {
-                const res = await fetch('http://localhost:8000/api/v1/ai/status');
+                const res = await fetch(`${API_BASE}/api/v1/ai/status`);
                 if (res.ok) {
                     const data = await res.json();
                     setAiStatus({
@@ -97,7 +97,7 @@ const AIAssistant = () => {
 
         try {
             // Call actual Gemini API (Route handles multi-provider)
-            const response = await fetch('http://localhost:8000/api/v1/ai/chat', {
+            const response = await fetch(`${API_BASE}/api/v1/ai/chat`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -149,7 +149,7 @@ const AIAssistant = () => {
     const handleClearChat = async () => {
         if (window.confirm('Are you sure you want to clear the chat history?')) {
             try {
-                await fetch(`http://localhost:8000/api/v1/ai/history/${sessionId}`, {
+                await fetch(`${API_BASE}/api/v1/ai/history/${sessionId}`, {
                     method: 'DELETE'
                 });
                 setMessages([]);
@@ -158,7 +158,6 @@ const AIAssistant = () => {
                 addToast("Chat history cleared (Local)", "info");
                 setMessages([]);
             }
-        }
     };
 
     const handleKeyPress = (e) => {
@@ -169,11 +168,8 @@ const AIAssistant = () => {
     };
 
     return (
-        <div className="h-full flex flex-col overflow-hidden fade-in-up">
-            <motion.div
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex items-center justify-between shrink-0 mb-6"
+        <div className="h-full flex flex-col overflow-hidden fade-in-up p-6">
+            <div
             >
                 <div>
                     <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent mb-2 flex items-center gap-3">
@@ -195,26 +191,22 @@ const AIAssistant = () => {
                     </div>
                 </div>
                 {messages.length > 0 && (
-                    <motion.button
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
+                    <button
                         onClick={handleClearChat}
                         className="flex items-center gap-2 px-4 py-2 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
                     >
                         <Trash2 className="w-4 h-4" />
                         Clear Chat
-                    </motion.button>
+                    </button>
                 )}
-            </motion.div>
+            </div>
 
             <div className="flex-1 min-h-0 flex flex-col">
                 <GlassCard className="flex-1 flex flex-col p-0 overflow-hidden h-full">
                     <div className="flex-1 overflow-y-auto p-6 space-y-4 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600">
-                        <AnimatePresence>
+                        
                             {messages.length === 0 ? (
-                                <motion.div
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
+                                <div
                                     className="h-full flex items-center justify-center text-center"
                                 >
                                     <div>
@@ -226,7 +218,7 @@ const AIAssistant = () => {
                                             Ask me anything about your sales, inventory, forecasts, or business insights!
                                         </p>
                                     </div>
-                                </motion.div>
+                                </div>
                             ) : (
                                 (messages || []).map(message => (
                                     <ChatMessage
@@ -236,16 +228,14 @@ const AIAssistant = () => {
                                     />
                                 ))
                             )}
-                        </AnimatePresence>
+                        
                         {isLoading && (
-                            <motion.div
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
+                            <div
                                 className="flex items-center gap-2 text-gray-500 dark:text-gray-400"
                             >
                                 <Loader className="w-4 h-4 animate-spin" />
                                 <span className="text-sm">AI is thinking...</span>
-                            </motion.div>
+                            </div>
                         )}
                         <div ref={messagesEndRef} />
                     </div>
@@ -276,7 +266,7 @@ const AIAssistant = () => {
                                             // Call AI service
                                             (async () => {
                                                 try {
-                                                    const response = await fetch('http://localhost:8000/api/v1/ai/chat', {
+                                                    const response = await fetch(`${API_BASE}/api/v1/ai/chat`, {
                                                         method: 'POST',
                                                         headers: { 'Content-Type': 'application/json' },
                                                         body: JSON.stringify({
@@ -323,9 +313,7 @@ const AIAssistant = () => {
                                 />
                             </div>
 
-                            <motion.button
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
+                            <button
                                 onClick={handleSendMessage}
                                 disabled={!inputText.trim() || isLoading}
                                 className="px-6 py-3 bg-gradient-to-br from-blue-500 to-purple-600 text-white rounded-lg hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shrink-0"
@@ -335,7 +323,7 @@ const AIAssistant = () => {
                                 ) : (
                                     <Send className="w-5 h-5" />
                                 )}
-                            </motion.button>
+                            </button>
                         </div>
                     </div>
                 </GlassCard>
@@ -344,4 +332,5 @@ const AIAssistant = () => {
     );
 };
 
+};
 export default AIAssistant;

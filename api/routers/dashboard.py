@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 import logging
 import sys
 
-from api.db.database import get_db
+from api.db import get_db
 from api.auth.dependencies import get_current_user
 
 logging.basicConfig(level=logging.INFO)
@@ -636,7 +636,7 @@ async def get_realtime_dashboard_metrics(
         top_products_query = db.query(
             Product.name,
             func.sum(SaleItem.quantity).label('units_sold'),
-            func.sum(SaleItem.total_price).label('revenue')
+            func.sum(SaleItem.line_total).label('revenue')
         ).join(SaleItem, Product.id == SaleItem.product_id)\
          .group_by(Product.id, Product.name)\
          .order_by(desc('units_sold'))\
@@ -652,24 +652,9 @@ async def get_realtime_dashboard_metrics(
                 "units_sold": row.units_sold,
                 "revenue": float(row.revenue or 0)
             })
-
-        # 3. Low Stock Alerts
-        low_stock_query = db.query(Inventory, Product)\
-            .join(Product, Inventory.product_id == Product.id)\
-            .filter(Inventory.current_stock < Inventory.reorder_point)\
-            .limit(5)
-        
-        low_stock_data = low_stock_query.all()
-        
+        # 3. Low Stock Alerts (inventory table not available in this dataset)
         low_stock_alerts = []
-        for inventory, product in low_stock_data:
-            low_stock_alerts.append({
-                "product_id": product.id,
-                "product_name": product.name,
-                "current_stock": inventory.current_stock,
-                "reorder_point": inventory.reorder_point,
-                "severity": "critical" if inventory.current_stock < (inventory.reorder_point / 2) else "warning"
-            })
+        # Placeholder for future inventory management integration
 
         return {
             "timestamp": now.isoformat(),

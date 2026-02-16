@@ -1,5 +1,4 @@
 import React from 'react';
-import { motion } from 'framer-motion';
 
 /**
  * ActionButton Component - Enterprise Design System
@@ -41,9 +40,7 @@ const ActionButton = ({
     const baseClass = "rounded-lg font-medium transition-all duration-200 flex items-center justify-center gap-2 whitespace-nowrap flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed";
 
     return (
-        <motion.button
-            whileHover={!disabled ? { scale: 1.02 } : {}}
-            whileTap={!disabled ? { scale: 0.98 } : {}}
+        <button
             onClick={onClick}
             disabled={disabled}
             className={`${baseClass} ${variants[variant] || variants.primary} ${sizes[size]} ${className}`}
@@ -51,7 +48,7 @@ const ActionButton = ({
         >
             {Icon && <Icon size={size === 'sm' ? 14 : size === 'lg' ? 20 : 18} />}
             {children}
-        </motion.button>
+        </button>
     );
 };
 

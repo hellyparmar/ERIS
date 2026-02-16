@@ -64,8 +64,8 @@ export const FocusTrap = ({ children, active = true }) => {
                     e.preventDefault();
                     firstElement?.focus();
                 }
-            }
         };
+            }
 
         // Focus first element
         firstElement?.focus();

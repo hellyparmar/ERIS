@@ -10,7 +10,7 @@ from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 from datetime import timedelta
 
-from api.db.database import get_db
+from api.db import get_db
 from api.db.multitenant_models import User
 from api.auth.password import hash_password, verify_password
 from api.auth.jwt_handler import (
@@ -20,6 +20,22 @@ from api.auth.jwt_handler import (
     ACCESS_TOKEN_EXPIRE_MINUTES
 )
 from api.auth.dependencies import get_current_active_user
+import hashlib
+
+# Legacy SHA256 password verification (for existing users in database)
+def verify_sha256_password(plain_password: str, sha256_hash: str) -> bool:
+    """Verify SHA256 hashed password"""
+    return hashlib.sha256(plain_password.encode()).hexdigest() == sha256_hash
+
+# Combined password verifier - supports both bcrypt and SHA256
+def verify_password_combined(plain_password: str, stored_hash: str) -> bool:
+    """Verify password - tries bcrypt first, then SHA256 as fallback"""
+    # Try bcrypt first (for new passwords)
+    try:
+        return verify_password(plain_password, stored_hash)
+    except:
+        # Fall back to SHA256 (for legacy passwords in database)
+        return verify_sha256_password(plain_password, stored_hash)
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 
@@ -102,27 +118,54 @@ async def login(
     
     Returns JWT access token and refresh token
     """
-    # Find user by email (username field in OAuth2 form is used for email)
-    user = db.query(User).filter(User.email == form_data.username).first()
+    # Find user by email using raw SQL (username field in OAuth2 form is used for email)
+    from sqlalchemy import text
     
-    if not user:
+    user_email = form_data.username
+    
+    # Debug: Log the input
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"Login attempt for: {user_email}")
+    
+    result = db.execute(text(
+        "SELECT id, email, hashed_password FROM users WHERE email = :email LIMIT 1"
+    ), {"email": user_email})
+    
+    user_row = result.fetchone()
+    
+    if not user_row:
+        logger.warning(f"User not found: {user_email}")
+        # Try as username instead
+        result = db.execute(text(
+            "SELECT id, email, hashed_password FROM users WHERE username = :username LIMIT 1"
+        ), {"username": user_email})
+        user_row = result.fetchone()
+        
+        if not user_row:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect email or password",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+    
+    user_id, user_email_db, hashed_password = user_row
+    logger.info(f"Found user: {user_id}, {user_email_db}")
+    
+    # Verify password (supports both bcrypt and SHA256 legacy passwords)
+    if not verify_password_combined(form_data.password, hashed_password):
+        logger.warning(f"Password verification failed for: {user_email}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    # Verify password
-    if not verify_password(form_data.password, user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    logger.info(f"Login successful for: {user_email}")
     
-    # Create tokens
-    access_token = create_access_token(data={"sub": str(user.id)})
-    refresh_token = create_refresh_token(data={"sub": str(user.id)})
+    # Create tokens using user ID
+    access_token = create_access_token(data={"sub": str(user_id)})
+    refresh_token = create_refresh_token(data={"sub": str(user_id)})
     
     return {
         "access_token": access_token,

@@ -1,5 +1,4 @@
 import React from 'react';
-import { motion } from 'framer-motion';
 import { cardHover } from '../../utils/animations';
 
 /**
@@ -14,9 +13,9 @@ const AnimatedCard = ({
     ...props
 }) => {
     return (
-        <motion.div
+        <div
             className={`glass-card ${className}`}
-            variants={cardHover}
+            
             initial="rest"
             whileHover="hover"
             whileTap="tap"
@@ -33,7 +32,7 @@ const AnimatedCard = ({
             {...props}
         >
             {children}
-        </motion.div>
+        </div>
     );
 };
 

@@ -114,7 +114,6 @@ export const useFocusTrap = (isActive) => {
                     e.preventDefault();
                     firstElement.focus();
                 }
-            }
         };
 
         // Focus first element
@@ -507,7 +506,6 @@ export const accessibilityStyles = `
       transition-duration: 0.01ms !important;
       scroll-behavior: auto !important;
     }
-  }
 
   /* High Contrast Mode */
   @media (prefers-contrast: high) {
@@ -518,7 +516,6 @@ export const accessibilityStyles = `
     .form-input {
       border: 2px solid #000000;
     }
-  }
 
   /* Screen Reader Only */
   .sr-only {

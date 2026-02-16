@@ -72,10 +72,36 @@ All pages should use consistent loading overlays:
 
 ## Pages Updated (✓ Standardized)
 
+### Format Applied: `p-6` padding + `space-y-8` spacing
+
 - ✓ Dashboard
-- ✓ Analytics (partially)
-- PageWrapper component created for future use
+- ✓ Analytics
+- ✓ Alerts
+- ✓ Compliance
+- ✓ Employees
+- ✓ Enterprise
+- ✓ Forecasts
+- ✓ Integrations
+- ✓ Inventory
+- ✓ Invoices
+- ✓ Loyalty
+- ✓ Monitoring
+- ✓ MultiStore
+- ✓ POS
+- ✓ Promotions
+- ✓ Returns
+- ✓ Settings
+- ✓ Suppliers
+- ✓ TaxCompliance
+- ✓ Team
+- ✓ DevOps
+- ✓ AIAssistant (with `p-6` applied to unique `h-full flex` layout)
+- ✓ CustomerInsights (reference implementation)
 
-## Next Steps
+## Standardization Complete
 
-All remaining pages should be updated to use the new `PageWrapper` and `PageHeader` components to ensure consistency across the entire application.
+All 23 pages have been updated with consistent formatting:
+- **Padding**: `p-6` (24px on all sides)
+- **Section spacing**: `space-y-8` (32px between major sections)
+
+This ensures visual consistency and proper margins across the entire application, with all pages now following the Customer Insights page design standards.

@@ -4,7 +4,6 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { Mic, MicOff } from 'lucide-react';
 
 const VoiceInput = ({ onTranscript, language = 'en-US' }) => {
@@ -40,8 +39,8 @@ const VoiceInput = ({ onTranscript, language = 'en-US' }) => {
                 } else {
                     interimText += transcriptPiece;
                 }
-            }
 
+            }
             setInterimTranscript(interimText);
 
             if (finalText) {
@@ -69,7 +68,7 @@ const VoiceInput = ({ onTranscript, language = 'en-US' }) => {
             if (recognitionRef.current) {
                 recognitionRef.current.stop();
             }
-        };
+        }
     }, [language, transcript, onTranscript]);
 
     const toggleListening = () => {
@@ -85,40 +84,22 @@ const VoiceInput = ({ onTranscript, language = 'en-US' }) => {
             setIsListening(true);
         }
     };
-
-    if (!isSupported) {
-        return (
-            <div className="text-xs text-muted-foreground">
-                Voice input not supported in this browser
-            </div>
-        );
-    }
-
     return (
-        <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+
+        <button
             onClick={toggleListening}
-            className={`p-3 rounded-lg transition-all flex items-center gap-2 ${isListening
+            disabled={!isSupported}
+            className={`p-2.5 rounded-lg transition-all flex items-center justify-center shrink-0 ${
+                !isSupported
+                    ? 'bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed opacity-50'
+                    : isListening
                     ? 'bg-red-500 hover:bg-red-600 text-white shadow-lg shadow-red-500/50 animate-pulse'
                     : 'bg-blue-500 hover:bg-blue-600 text-white'
-                }`}
-            title={isListening ? 'Stop recording' : 'Start voice input'}
+            }`}
+            title={!isSupported ? 'Voice input not supported in this browser' : isListening ? 'Stop recording' : 'Start voice input'}
         >
-            {isListening ? <MicOff size={20} /> : <Mic size={20} />}
-            <AnimatePresence>
-                {isListening && (
-                    <motion.span
-                        initial={{ opacity: 0, width: 0 }}
-                        animate={{ opacity: 1, width: 'auto' }}
-                        exit={{ opacity: 0, width: 0 }}
-                        className="text-sm font-medium whitespace-nowrap overflow-hidden"
-                    >
-                        {interimTranscript || 'Listening...'}
-                    </motion.span>
-                )}
-            </AnimatePresence>
-        </motion.button>
+            {isListening ? <MicOff size={18} /> : <Mic size={18} />}
+        </button>
     );
 };
 

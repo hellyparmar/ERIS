@@ -1,0 +1,688 @@
+{
+  "timestamp": "2026-02-09T19:24:55.440666",
+  "api_version": "3.0.0",
+  "endpoints_tested": [
+    {
+      "endpoint": "/",
+      "method": "GET",
+      "status_code": 200,
+      "response_time": 0.005710124969482422,
+      "success": true,
+      "response_sample": {
+        "message": "R-DIOS API v3.0",
+        "docs": "/docs",
+        "redoc": "/redoc",
+        "health": "/health"
+      }
+    },
+    {
+      "endpoint": "/health",
+      "method": "GET",
+      "status_code": 200,
+      "response_time": 0.0015621185302734375,
+      "success": true,
+      "response_sample": {
+        "status": "healthy",
+        "version": "3.0.0",
+        "environment": "development"
+      }
+    },
+    {
+      "endpoint": "/docs",
+      "method": "GET",
+      "status_code": 200,
+      "response_time": 0.0015637874603271484,
+      "success": true,
+      "response_sample": "\n    <!DOCTYPE html>\n    <html>\n    <head>\n    <link type=\"text/css\" rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css\">\n    <link rel=\"shortcut icon\" href=\"https://"
+    },
+    {
+      "endpoint": "/redoc",
+      "method": "GET",
+      "status_code": 200,
+      "response_time": 0.0012056827545166016,
+      "success": true,
+      "response_sample": "\n    <!DOCTYPE html>\n    <html>\n    <head>\n    <title>R-DIOS API - ReDoc</title>\n    <!-- needed for adaptive design -->\n    <meta charset=\"utf-8\"/>\n    <meta name=\"viewport\" content=\"width=device-wid"
+    },
+    {
+      "endpoint": "/api/v1/dashboard",
+      "method": "GET",
+      "status_code": 404,
+      "response_time": 0.001569986343383789,
+      "success": false
+    },
+    {
+      "endpoint": "/api/v1/dashboard/realtime",
+      "method": "GET",
+      "status_code": 200,
+      "response_time": 0.24561214447021484,
+      "success": true,
+      "response_sample": {
+        "timestamp": "2026-02-09T19:24:55.454503",
+        "today_revenue": 326189.4,
+        "total_revenue": 124019927.62,
+        "active_orders": 109,
+        "total_orders": 100000,
+        "avg_order_value": 1240.2,
+        "top_products": [
+          {
+            "rank": 1,
+            "name": "Masala Dosa & Idli",
+            "units_sold": 40,
+            "revenue": 8484.8
+          },
+          {
+            "rank": 2,
+            "name": "Crispy Vada & Snacks",
+            "units_sold": 40,
+            "revenue": 14150.26
+          },
+          {
+            "rank": 3,
+            "name": "Tandoori Vada & Snacks",
+            "units_sold": 40,
+            "revenue": 9827.2
+          },
+          {
+            "rank": 4,
+            "name": "Tandoori Ice Cream",
+            "units_sold": 40,
+            "revenue": 8991.6
+          },
+          {
+            "rank": 5,
+            "name": "Amritsari Dal Korma",
+            "units_sold": 39,
+            "revenue": 10287.03
+          }
+        ],
+        "low_stock_alerts": [
+          {
+            "product_id": 18,
+            "product_name": "Hyderabadi Dal Tikka Masala",
+            "current_stock": 19,
+            "reorder_point": 20,
+            "severity": "warning"
+          },
+          {
+            "product_id": 24,
+            "product_name": "Special Dal Roganjosh",
+            "current_stock": 15,
+            "reorder_point": 20,
+            "severity": "warning"
+          },
+          {
+            "product_id": 41,
+            "product_name": "Tandoori Chicken Lababdar",
+            "current_stock": 14,
+            "reorder_point": 20,
+            "severity": "warning"
+          },
+          {
+            "product_id": 48,
+            "product_name": "Hyderabadi Paneer Tikka Masala",
+            "current_stock": 16,
+            "reorder_point": 20,
+            "severity": "warning"
+          },
+          {
+            "product_id": 80,
+            "product_name": "Classic Paneer Saag",
+            "current_stock": 11,
+            "reorder_point": 20,
+            "severity": "warning"
+          }
+        ],
+        "time_multiplier": 0.96,
+        "data_source": "Live Database"
+      }
+    },
+    {
+      "endpoint": "/api/dashboard/summary",
+      "method": "GET",
+      "status_code": 404,
+      "response_time": 0.001794576644897461,
+      "success": false
+    },
+    {
+      "endpoint": "/api/dashboard/kpis",
+      "method": "GET",
+      "status_code": 404,
+      "response_time": 0.001329660415649414,
+      "success": false
+    },
+    {
+      "endpoint": "/api/v1/analytics/sales",
+      "method": "GET",
+      "status_code": 404,
+      "response_time": 0.0013248920440673828,
+      "success": false
+    },
+    {
+      "endpoint": "/api/v1/analytics/revenue",
+      "method": "GET",
+      "status_code": 404,
+      "response_time": 0.0015134811401367188,
+      "success": false
+    },
+    {
+      "endpoint": "/api/v1/analytics/inventory",
+      "method": "GET",
+      "status_code": 404,
+      "response_time": 0.0013654232025146484,
+      "success": false
+    },
+    {
+      "endpoint": "/api/v1/analytics/customers",
+      "method": "GET",
+      "status_code": 404,
+      "response_time": 0.001367807388305664,
+      "success": false
+    },
+    {
+      "endpoint": "/api/sales-analytics/daily-summary",
+      "method": "GET",
+      "status_code": 404,
+      "response_time": 0.002447843551635742,
+      "success": false
+    },
+    {
+      "endpoint": "/api/sales-analytics/category-performance",
+      "method": "GET",
+      "status_code": 404,
+      "response_time": 0.002733945846557617,
+      "success": false
+    },
+    {
+      "endpoint": "/api/v1/predictions/revenue",
+      "method": "GET",
+      "status_code": 404,
+      "response_time": 0.002210378646850586,
+      "success": false
+    },
+    {
+      "endpoint": "/api/v1/predictions/demand",
+      "method": "GET",
+      "status_code": 404,
+      "response_time": 0.002130270004272461,
+      "success": false
+    },
+    {
+      "endpoint": "/api/forecasting/forecast/1/1?days=7",
+      "method": "GET",
+      "status_code": 200,
+      "response_time": 0.09800887107849121,
+      "success": true,
+      "response_sample": {
+        "forecast": [
+          {
+            "date": "2026-02-10",
+            "value": 1384.54,
+            "lower_bound": 1310.04,
+            "upper_bound": 1452.66
+          },
+          {
+            "date": "2026-02-11",
+            "value": 1371.19,
+            "lower_bound": 1307.01,
+            "upper_bound": 1441.03
+          },
+          {
+            "date": "2026-02-12",
+            "value": 1383.88,
+            "lower_bound": 1311.04,
+            "upper_bound": 1449.43
+          },
+          {
+            "date": "2026-02-13",
+            "value": 1379.55,
+            "lower_bound": 1307.16,
+            "upper_bound": 1454.11
+          },
+          {
+            "date": "2026-02-14",
+            "value": 1386.14,
+            "lower_bound": 1320.73,
+            "upper_bound": 1455.25
+          },
+          {
+            "date": "2026-02-15",
+            "value": 1391.71,
+            "lower_bound": 1318.99,
+            "upper_bound": 1463.93
+          },
+          {
+            "date": "2026-02-16",
+            "value": 1384.04,
+            "lower_bound": 1315.01,
+            "upper_bound": 1454.91
+          }
+        ],
+        "metrics": {
+          "rmse": 54.23,
+          "status": "Success",
+          "model": "Facebook Prophet"
+        },
+        "impact": {
+          "projected_revenue": 12101328.32,
+          "projected_margin": 3872425.06,
+          "warehouse_utilization": 7744.85,
+          "shipping_risk": "Low (Optimal)"
+        }
+      }
+    },
+    {
+      "endpoint": "/api/forecasting/forecast/store/1?days=30",
+      "method": "GET",
+      "status_code": 422,
+      "response_time": 0.0017960071563720703,
+      "success": false
+    },
+    {
+      "endpoint": "/api/inventory/low-stock",
+      "method": "GET",
+      "status_code": 404,
+      "response_time": 0.0014786720275878906,
+      "success": false
+    },
+    {
+      "endpoint": "/api/inventory/stock-levels",
+      "method": "GET",
+      "status_code": 404,
+      "response_time": 0.0013151168823242188,
+      "success": false
+    },
+    {
+      "endpoint": "/api/inventory/turnover",
+      "method": "GET",
+      "status_code": 404,
+      "response_time": 0.0014791488647460938,
+      "success": false
+    },
+    {
+      "endpoint": "/api/petpooja/menu",
+      "method": "GET",
+      "status_code": 200,
+      "response_time": 0.0012636184692382812,
+      "success": true,
+      "response_sample": {
+        "restaurant": "Petpooja Restaurant",
+        "menu": {
+          "Starters": [
+            {
+              "name": "Paneer Tikka",
+              "price": 180,
+              "prep_time": 15
+            },
+            {
+              "name": "Veg Spring Rolls",
+              "price": 120,
+              "prep_time": 12
+            },
+            {
+              "name": "Chicken Wings",
+              "price": 220,
+              "prep_time": 18
+            },
+            {
+              "name": "Crispy Corn",
+              "price": 140,
+              "prep_time": 10
+            },
+            {
+              "name": "Mushroom Pepper Dry",
+              "price": 160,
+              "prep_time": 12
+            }
+          ],
+          "Mains": [
+            {
+              "name": "Butter Chicken",
+              "price": 280,
+              "prep_time": 20
+            },
+            {
+              "name": "Dal Makhani",
+              "price": 180,
+              "prep_time": 15
+            },
+            {
+              "name": "Chicken Biryani",
+              "price": 320,
+              "prep_time": 25
+            },
+            {
+              "name": "Paneer Butter Masala",
+              "price": 240,
+              "prep_time": 18
+            },
+            {
+              "name": "Kadai Chicken",
+              "price": 300,
+              "prep_time": 22
+            },
+            {
+              "name": "Veg Biryani",
+              "price": 220,
+              "prep_time": 20
+            }
+          ],
+          "Breads": [
+            {
+              "name": "Butter Naan",
+              "price": 40,
+              "prep_time": 8
+            },
+            {
+              "name": "Garlic Naan",
+              "price": 50,
+              "prep_time": 8
+            },
+            {
+              "name": "Tandoori Roti",
+              "price": 30,
+              "prep_time": 6
+            },
+            {
+              "name": "Laccha Paratha",
+              "price": 60,
+              "prep_time": 10
+            }
+          ],
+          "Desserts": [
+            {
+              "name": "Gulab Jamun",
+              "price": 80,
+              "prep_time": 5
+            },
+            {
+              "name": "Ice Cream",
+              "price": 100,
+              "prep_time": 3
+            },
+            {
+              "name": "Brownie with Ice Cream",
+              "price": 150,
+              "prep_time": 8
+            }
+          ],
+          "Beverages": [
+            {
+              "name": "Sweet Lassi",
+              "price": 60,
+              "prep_time": 5
+            },
+            {
+              "name": "Soft Drink",
+              "price": 40,
+              "prep_time": 2
+            },
+            {
+              "name": "Fresh Lime Soda",
+              "price": 50,
+              "prep_time": 5
+            },
+            {
+              "name": "Masala Chai",
+              "price": 30,
+              "prep_time": 5
+            }
+          ]
+        },
+        "categories": [
+          "Starters",
+          "Mains",
+          "Breads",
+          "Desserts",
+          "Beverages"
+        ]
+      }
+    },
+    {
+      "endpoint": "/api/petpooja/categories",
+      "method": "GET",
+      "status_code": 404,
+      "response_time": 0.0016901493072509766,
+      "success": false
+    },
+    {
+      "endpoint": "/api/petpooja/analytics/daily-summary",
+      "method": "GET",
+      "status_code": 200,
+      "response_time": 0.004294157028198242,
+      "success": true,
+      "response_sample": {
+        "date": "2026-02-09",
+        "total_orders": 120,
+        "total_revenue": 77658.0,
+        "total_gst_collected": 3698.0,
+        "average_order_value": 647.15,
+        "order_type_breakdown": {
+          "Dine-in": {
+            "count": 33,
+            "revenue": 24769.5
+          },
+          "Takeaway": {
+            "count": 47,
+            "revenue": 26848.5
+          },
+          "Delivery": {
+            "count": 40,
+            "revenue": 26040.0
+          }
+        },
+        "payment_method_breakdown": {
+          "Cash": {
+            "count": 29,
+            "amount": 15718.5
+          },
+          "Card": {
+            "count": 26,
+            "amount": 13891.5
+          },
+          "UPI": {
+            "count": 32,
+            "amount": 25305.0
+          },
+          "Credit": {
+            "count": 33,
+            "amount": 22743.0
+          }
+        },
+        "peak_hours": {
+          "lunch": "12:00 PM - 2:00 PM",
+          "dinner": "7:00 PM - 10:00 PM"
+        }
+      }
+    },
+    {
+      "endpoint": "/api/petpooja/analytics/category-sales",
+      "method": "GET",
+      "status_code": 404,
+      "response_time": 0.0024373531341552734,
+      "success": false
+    },
+    {
+      "endpoint": "/api/petpooja/customers",
+      "method": "GET",
+      "status_code": 404,
+      "response_time": 0.0025255680084228516,
+      "success": false
+    },
+    {
+      "endpoint": "/api/reports/sales",
+      "method": "GET",
+      "status_code": 404,
+      "response_time": 0.002091646194458008,
+      "success": false
+    },
+    {
+      "endpoint": "/api/reports/inventory",
+      "method": "GET",
+      "status_code": 404,
+      "response_time": 0.0015668869018554688,
+      "success": false
+    },
+    {
+      "endpoint": "/api/export/sales",
+      "method": "GET",
+      "status_code": 405,
+      "response_time": 0.002012968063354492,
+      "success": false
+    },
+    {
+      "endpoint": "/api/weather/current",
+      "method": "GET",
+      "status_code": 404,
+      "response_time": 0.003490924835205078,
+      "success": false
+    },
+    {
+      "endpoint": "/api/weather/forecast",
+      "method": "GET",
+      "status_code": 404,
+      "response_time": 0.0019779205322265625,
+      "success": false
+    },
+    {
+      "endpoint": "/api/health/status",
+      "method": "GET",
+      "status_code": 404,
+      "response_time": 0.0021963119506835938,
+      "success": false
+    },
+    {
+      "endpoint": "/api/monitoring/metrics",
+      "method": "GET",
+      "status_code": 404,
+      "response_time": 0.0021638870239257812,
+      "success": false
+    },
+    {
+      "endpoint": "/api/circuit-breaker/status",
+      "method": "GET",
+      "status_code": 404,
+      "response_time": 0.002629518508911133,
+      "success": false
+    },
+    {
+      "endpoint": "/api/auth/status",
+      "method": "GET",
+      "status_code": 404,
+      "response_time": 0.001922607421875,
+      "success": false
+    },
+    {
+      "endpoint": "/api/auth/login",
+      "method": "POST",
+      "status_code": 404,
+      "response_time": 0.0028858184814453125,
+      "success": false
+    },
+    {
+      "endpoint": "/api/v1/data/products",
+      "method": "GET",
+      "status_code": 404,
+      "response_time": 0.0024847984313964844,
+      "success": false
+    },
+    {
+      "endpoint": "/api/v1/data/customers",
+      "method": "GET",
+      "status_code": 404,
+      "response_time": 0.0020127296447753906,
+      "success": false
+    },
+    {
+      "endpoint": "/api/v1/data/sales",
+      "method": "GET",
+      "status_code": 404,
+      "response_time": 0.002213716506958008,
+      "success": false
+    },
+    {
+      "endpoint": "/api/v1/models",
+      "method": "GET",
+      "status_code": 404,
+      "response_time": 0.0019266605377197266,
+      "success": false
+    },
+    {
+      "endpoint": "/api/v1/models/status",
+      "method": "GET",
+      "status_code": 404,
+      "response_time": 0.002034902572631836,
+      "success": false
+    },
+    {
+      "endpoint": "/api/causal/analysis",
+      "method": "GET",
+      "status_code": 404,
+      "response_time": 0.0020699501037597656,
+      "success": false
+    },
+    {
+      "endpoint": "/api/loyalty/members",
+      "method": "GET",
+      "status_code": 404,
+      "response_time": 0.0021750926971435547,
+      "success": false
+    },
+    {
+      "endpoint": "/api/alerts/active",
+      "method": "GET",
+      "status_code": 404,
+      "response_time": 0.002269744873046875,
+      "success": false
+    }
+  ],
+  "endpoints_working": [
+    "/",
+    "/health",
+    "/docs",
+    "/redoc",
+    "/api/v1/dashboard/realtime",
+    "/api/forecasting/forecast/1/1?days=7",
+    "/api/petpooja/menu",
+    "/api/petpooja/analytics/daily-summary"
+  ],
+  "endpoints_failed": [
+    "/api/v1/dashboard",
+    "/api/dashboard/summary",
+    "/api/dashboard/kpis",
+    "/api/v1/analytics/sales",
+    "/api/v1/analytics/revenue",
+    "/api/v1/analytics/inventory",
+    "/api/v1/analytics/customers",
+    "/api/sales-analytics/daily-summary",
+    "/api/sales-analytics/category-performance",
+    "/api/v1/predictions/revenue",
+    "/api/v1/predictions/demand",
+    "/api/forecasting/forecast/store/1?days=30",
+    "/api/inventory/low-stock",
+    "/api/inventory/stock-levels",
+    "/api/inventory/turnover",
+    "/api/petpooja/categories",
+    "/api/petpooja/analytics/category-sales",
+    "/api/petpooja/customers",
+    "/api/reports/sales",
+    "/api/reports/inventory",
+    "/api/export/sales",
+    "/api/weather/current",
+    "/api/weather/forecast",
+    "/api/health/status",
+    "/api/monitoring/metrics",
+    "/api/circuit-breaker/status",
+    "/api/auth/status",
+    "/api/auth/login",
+    "/api/v1/data/products",
+    "/api/v1/data/customers",
+    "/api/v1/data/sales",
+    "/api/v1/models",
+    "/api/v1/models/status",
+    "/api/causal/analysis",
+    "/api/loyalty/members",
+    "/api/alerts/active"
+  ],
+  "business_logic": {},
+  "performance": {}
+}

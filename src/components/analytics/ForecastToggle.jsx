@@ -1,6 +1,5 @@
 import React from 'react';
 import { TrendingUp, TrendingDown } from 'lucide-react';
-import { motion } from 'framer-motion';
 
 /**
  * ForecastToggle Component
@@ -8,10 +7,8 @@ import { motion } from 'framer-motion';
  */
 const ForecastToggle = ({ enabled, onToggle, className = "" }) => {
     return (
-        <motion.button
+        <button
             onClick={onToggle}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
             className={`
                 flex items-center gap-2 px-4 py-2 rounded-lg border-2 transition-all
                 ${enabled
@@ -23,27 +20,23 @@ const ForecastToggle = ({ enabled, onToggle, className = "" }) => {
             aria-label={`${enabled ? 'Hide' : 'Show'} forecast`}
             title={`${enabled ? 'Hide' : 'Show'} ML-predicted forecast`}
         >
-            <motion.div
-                animate={{ rotate: enabled ? 0 : 180 }}
-                transition={{ duration: 0.3 }}
+            <div
             >
                 {enabled ? (
                     <TrendingUp className="w-4 h-4" />
                 ) : (
                     <TrendingDown className="w-4 h-4" />
                 )}
-            </motion.div>
+            </div>
             <span className="text-sm font-normal">
                 {enabled ? 'Forecast ON' : 'Show Forecast'}
             </span>
             {enabled && (
-                <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
+                <div
                     className="w-2 h-2 rounded-full bg-primary animate-pulse"
                 />
             )}
-        </motion.button>
+        </button>
     );
 };
 

@@ -49,12 +49,12 @@ const InventoryAlerts = ({ alerts = [], maxDisplay = 5 }) => {
     if (!alerts || alerts.length === 0) {
         return (
             <Card>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                <h3 className="text-lg font-semibold text-foreground mb-4">
                     {t('dashboard').inventoryAlerts}
                 </h3>
                 <div className="text-center py-8">
-                    <Package className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                    <p className="text-gray-500 dark:text-gray-400">
+                    <Package className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+                    <p className="text-muted-foreground">
                         No active alerts. All inventory levels are healthy!
                     </p>
                 </div>
@@ -65,7 +65,7 @@ const InventoryAlerts = ({ alerts = [], maxDisplay = 5 }) => {
     return (
         <Card>
             <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                <h3 className="text-lg font-semibold text-foreground">
                     {t('dashboard').inventoryAlerts}
                 </h3>
                 <span className="text-sm text-gray-500 dark:text-gray-400">

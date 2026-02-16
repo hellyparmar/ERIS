@@ -10,7 +10,6 @@
 
 import { useEffect, useState } from 'react';
 import { useLanguage } from '../hooks/useLanguage';
-import { motion, AnimatePresence } from 'framer-motion';
 import { Users, Mail, Phone, Shield, Activity, Calendar, MoreVertical, Plus } from 'lucide-react';
 import GlassCard from '../components/ui/GlassCard';
 import GradientButton from '../components/ui/GradientButton';
@@ -120,13 +119,13 @@ const Team = () => {
         : teamMembers.filter(m => m.role.toLowerCase() === filter || m.status === filter);
 
     return (
-        <div className="space-y-8 fade-in-up min-h-screen">
+        <div className="space-y-8 fade-in-up min-h-screen p-6">
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
+                <div>
                     <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent mb-2">Team Management</h1>
                     <p className="text-muted-foreground">Collaborate and manage access controls</p>
-                </motion.div>
+                </div>
                 <GradientButton
                     className="flex items-center justify-center gap-2 whitespace-nowrap box-shadow-glow"
                     onClick={() => addToast("Invite User Modal Opened", "info")}
@@ -199,14 +198,10 @@ const Team = () => {
 
             {/* Team Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <AnimatePresence>
+                
                     {filteredMembers.map((member) => (
-                        <motion.div
+                        <div
                             key={member.id}
-                            initial={{ opacity: 0, scale: 0.9 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.9 }}
-                            layout
                         >
                             <GlassCard className="h-full group relative overflow-hidden hover:border-blue-500/30 transition-colors duration-300">
                                 {/* Banner Gradient */}
@@ -258,9 +253,9 @@ const Team = () => {
                                     </div>
                                 </div>
                             </GlassCard>
-                        </motion.div>
+                        </div>
                     ))}
-                </AnimatePresence>
+                
             </div>
         </div>
     );

@@ -217,7 +217,6 @@ export const generateAlerts = (inventoryData, demandData) => {
         timestamp: new Date().toISOString()
       });
     }
-  }
   
   return alerts.sort((a, b) => {
     const severityOrder = { critical: 0, warning: 1, info: 2 };

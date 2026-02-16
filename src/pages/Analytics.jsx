@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import { API_BASE } from '../lib/api';
 import {
     Chart as ChartJS,
     CategoryScale,
@@ -23,8 +24,9 @@ import GlassCard from '../components/ui/GlassCard';
 import GradientButton from '../components/ui/GradientButton';
 import ExportButton from '../components/ui/ExportButton';
 import ForecastToggle from '../components/analytics/ForecastToggle';
+import ErrorBoundary from '../components/ErrorBoundary';
 import { useTheme } from '../hooks/useTheme';
-import Skeleton from '../components/ui/Skeleton';
+import LoadingNotice from '../components/ui/LoadingNotice';
 import '../modern-design.css';
 
 // Register ChartJS components
@@ -43,7 +45,7 @@ ChartJS.register(
 
 
 
-const Analytics = () => {
+const AnalyticsContent = () => {
     const { isDark } = useTheme();
     const [timePeriod, setTimePeriod] = useState('30D');
     const [salesTrendData, setSalesTrendData] = useState({ labels: [], datasets: [] });
@@ -51,18 +53,15 @@ const Analytics = () => {
     const [showForecast, setShowForecast] = useState(false);
     const [topProducts, setTopProducts] = useState([]);
     const [categoryData, setCategoryData] = useState({ labels: [], datasets: [] });
-    const [restaurantData, setRestaurantData] = useState(null);
-    const [revenueComparisonData, setRevenueComparisonData] = useState({ labels: [], datasets: [] });
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
 
     // Fetch real-time data from API
     useEffect(() => {
         const fetchRealtimeData = async () => {
             setLoading(true);
-            setError(null);
+
             try {
-                const response = await fetch('http://localhost:8000/api/v1/dashboard/realtime');
+                const response = await fetch(`${API_BASE}/api/v1/dashboard/realtime`);
                 // Check if response is ok
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
@@ -70,7 +69,7 @@ const Analytics = () => {
                 const data = await response.json();
 
                 // Transform top_products from API to match table format
-                const products = (data.top_products || []).map((product, idx) => ({
+                const products = (data.top_products || []).map((product) => ({
                     rank: product.rank,
                     name: product.name,
                     category: product.name, // Category name is the product name in our CSV
@@ -90,11 +89,11 @@ const Analytics = () => {
                     'Beverages & Drinks',
                     'Sides & Accompaniments'
                 ];
-                
-                const categoryLabels = (products && products.length > 0) 
+
+                const categoryLabels = (products && products.length > 0)
                     ? products.slice(0, 5).map((_, idx) => meaningfulCategoryNames[idx])
                     : meaningfulCategoryNames;
-                
+
                 const totalRev = data.total_revenue || 1;
                 const categoryValues = (products && products.length > 0)
                     ? products.slice(0, 5).map(p => ((p.revenue / totalRev) * 100).toFixed(1))
@@ -153,7 +152,7 @@ const Analytics = () => {
     useEffect(() => {
         const fetchRestaurantData = async () => {
             try {
-                const response = await fetch('http://localhost:8000/api/petpooja/analytics/daily-summary');
+                const response = await fetch(`${API_BASE}/api/petpooja/analytics/daily-summary`);
                 const data = await response.json();
                 setRestaurantData(data);
                 // ...
@@ -296,8 +295,7 @@ const Analytics = () => {
                 grid: { color: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)' },
                 ticks: { color: isDark ? '#94a3b8' : '#334155' } // slate-400 : slate-700
             }
-        }
-    };
+    }};
 
     const doughnutOptions = {
         responsive: true,
@@ -316,38 +314,17 @@ const Analytics = () => {
                 titleColor: isDark ? '#f1f5f9' : '#1e293b',
                 bodyColor: isDark ? '#cbd5e1' : '#475569',
             }
-        }
-    };
+    }};
 
     // Compute displayed products based on showAllProducts state
     const displayedProducts = showAllProducts ? topProducts : topProducts.slice(0, 5);
 
     if (loading) {
-        return (
-            <div className="min-h-screen space-y-8 animate-fade-in p-6">
-                <div className="flex justify-between items-center mb-8">
-                    <div className="space-y-2">
-                        <Skeleton className="h-10 w-64" />
-                        <Skeleton className="h-4 w-96" />
-                    </div>
-                    <div className="flex gap-3">
-                        <Skeleton className="h-10 w-32" />
-                        <Skeleton className="h-10 w-32" />
-                    </div>
-                </div>
-
-                <Skeleton className="h-[400px] w-full rounded-2xl" />
-
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <Skeleton className="h-[300px] w-full rounded-2xl" />
-                    <Skeleton className="h-[300px] w-full rounded-2xl" />
-                </div>
-            </div>
-        );
+        return <LoadingNotice message="Loading analytics data..." />;
     }
 
     return (
-        <div className="min-h-screen space-y-8 animate-fade-in">
+        <div className="min-h-screen space-y-8 p-6 animate-fade-in">
             {/* Top Section: Header & Controls */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
@@ -419,163 +396,38 @@ const Analytics = () => {
                 </GlassCard>
 
                 {/* Category Stats */}
-                <GlassCard variant="gradient" className="animate-slide-up stagger-3">
-                    <div className="p-6">
-                        <h2 className="text-xl font-bold bg-gradient-to-r from-primary to-purple bg-clip-text text-transparent mb-4">
-                            Category Performance
-                        </h2>
-                        <div className="space-y-4">
-                            {categoryData.labels.map((category, idx) => (
-                                <div key={category} className="flex items-center justify-between p-3 rounded-lg bg-gradient-to-r from-primary/5 to-purple/5 hover:from-primary/10 hover:to-purple/10 transition-all">
-                                    <div className="flex items-center gap-3">
-                                        <div
-                                            className="w-4 h-4 rounded-full shadow-lg"
-                                            style={{ backgroundColor: categoryData.datasets[0].backgroundColor[idx] }}
-                                        />
-                                        <span className="text-foreground font-medium">{category}</span>
+                {categoryData?.datasets?.[0]?.data?.some(val => val > 0) && (
+                    <GlassCard variant="gradient" className="animate-slide-up stagger-3">
+                        <div className="p-6">
+                            <h2 className="text-xl font-bold bg-gradient-to-r from-primary to-purple bg-clip-text text-transparent mb-4">
+                                Category Performance
+                            </h2>
+                            <div className="space-y-4">
+                                {categoryData.labels.map((category, idx) => (
+                                    <div key={category} className="flex items-center justify-between p-3 rounded-lg bg-gradient-to-r from-primary/5 to-purple/5 hover:from-primary/10 hover:to-purple/10 transition-all">
+                                        <div className="flex items-center gap-3">
+                                            <div
+                                                className="w-4 h-4 rounded-full shadow-lg"
+                                                style={{ backgroundColor: categoryData.datasets[0].backgroundColor[idx] }}
+                                            />
+                                            <span className="text-foreground font-medium">{category}</span>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-lg font-bold text-foreground">
+                                                {categoryData.datasets[0].data[idx]}%
+                                            </p>
+                                            <p className="text-xs text-muted-foreground">of total sales</p>
+                                        </div>
                                     </div>
-                                    <div className="text-right">
-                                        <p className="text-lg font-bold text-foreground">
-                                            {categoryData.datasets[0].data[idx]}%
-                                        </p>
-                                        <p className="text-xs text-muted-foreground">of total sales</p>
-                                    </div>
-                                </div>
-                            ))}
+                                ))}
+                            </div>
                         </div>
-                    </div>
-                </GlassCard>
+                    </GlassCard>
+                )}
             </div>
 
             {/* Restaurant Analytics Section */}
-            {restaurantData && (
-                <>
-                    <div className="mt-8">
-                        <h2 className="text-2xl font-bold text-foreground mb-4">Store Operations Analytics</h2>
-                    </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        {/* Revenue Comparison */}
-                        <GlassCard>
-                            <div className="p-6">
-                                <h2 className="text-xl font-bold text-foreground mb-4">Revenue Comparison</h2>
-                                <div style={{ height: '300px' }}>
-                                    <Bar data={revenueComparisonData} options={{
-                                        ...chartOptions,
-                                        plugins: {
-                                            ...chartOptions.plugins,
-                                            legend: { display: false }
-                                        },
-                                        scales: {
-                                            ...chartOptions.scales,
-                                            y: {
-                                                ...chartOptions.scales.y,
-                                                title: {
-                                                    display: true,
-                                                    text: 'Revenue (₹ Lakhs)',
-                                                    color: isDark ? '#94a3b8' : '#64748b'
-                                                }
-                                            }
-                                        }
-                                    }} />
-                                </div>
-                                <div className="mt-4 grid grid-cols-2 gap-4">
-                                    <div className="text-center">
-                                        <p className="text-sm text-muted-foreground">Retail</p>
-                                        <p className="text-2xl font-bold text-foreground">₹{(revenueComparisonData.datasets[0]?.data[0] || 0).toFixed(2)}L</p>
-                                    </div>
-                                    <div className="text-center">
-                                        <p className="text-sm text-muted-foreground">Restaurant</p>
-                                        <p className="text-2xl font-bold text-foreground">₹{(revenueComparisonData.datasets[0]?.data[1] || 0).toFixed(2)}L</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </GlassCard>
-
-                        {/* Order Type Breakdown */}
-                        <GlassCard>
-                            <div className="p-6">
-                                <h2 className="text-xl font-bold text-foreground mb-4">Order Type Distribution</h2>
-                                <div style={{ height: '300px' }}>
-                                    <Doughnut data={{
-                                        labels: Object.keys(restaurantData.order_type_breakdown || {}),
-                                        datasets: [{
-                                            data: Object.values(restaurantData.order_type_breakdown || {}).map(v => v.count),
-                                            backgroundColor: [
-                                                'rgba(59, 130, 246, 0.8)', // Blue for Dine-in
-                                                'rgba(34, 197, 94, 0.8)', // Green for Takeaway
-                                                'rgba(168, 85, 247, 0.8)', // Purple for Delivery
-                                            ],
-                                            borderWidth: 0,
-                                        }]
-                                    }} options={doughnutOptions} />
-                                </div>
-                            </div>
-                        </GlassCard>
-
-                        {/* Payment Method Breakdown */}
-                        <GlassCard>
-                            <div className="p-6">
-                                <h2 className="text-xl font-bold text-foreground mb-4">Payment Methods</h2>
-                                <div className="space-y-3">
-                                    {Object.entries(restaurantData.payment_method_breakdown || {}).map(([method, data]) => (
-                                        <div key={method} className="flex items-center justify-between">
-                                            <div className="flex items-center gap-3">
-                                                <div className={`w-3 h-3 rounded-full ${method === 'Cash' ? 'bg-green-500' :
-                                                    method === 'Card' ? 'bg-blue-500' :
-                                                        method === 'UPI' ? 'bg-purple-500' :
-                                                            'bg-amber-500'
-                                                    }`} />
-                                                <span className="text-gray-300">{method}</span>
-                                            </div>
-                                            <div className="text-right">
-                                                <p className="text-foreground font-semibold">{data.count}</p>
-                                                <p className="text-xs text-muted-foreground">₹{data.amount.toLocaleString()}</p>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </GlassCard>
-
-                        {/* Restaurant Summary Stats */}
-                        <GlassCard>
-                            <div className="p-6">
-                                <h2 className="text-xl font-bold text-foreground mb-4">Restaurant Summary</h2>
-                                <div className="space-y-4">
-                                    <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Total Orders</span>
-                                        <span className="font-bold text-gray-900 dark:text-white">{restaurantData.total_orders}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Total Revenue</span>
-                                        <span className="font-bold text-foreground">₹{restaurantData.total_revenue.toLocaleString()}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-muted-foreground">GST Collected</span>
-                                        <span className="font-bold text-gray-900 dark:text-white">₹{restaurantData.total_gst_collected.toLocaleString()}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Avg Order Value</span>
-                                        <span className="font-bold text-gray-900 dark:text-white">₹{restaurantData.average_order_value.toFixed(2)}</span>
-                                    </div>
-                                    <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
-                                        <p className="text-sm text-muted-foreground mb-2">Peak Hours</p>
-                                        <div className="flex gap-2">
-                                            <span className="px-3 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-full text-sm">
-                                                {restaurantData.peak_hours.lunch}
-                                            </span>
-                                            <span className="px-3 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-full text-sm">
-                                                {restaurantData.peak_hours.dinner}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </GlassCard>
-                    </div>
-                </>
-            )}
 
             {/* Top Products Table */}
             <GlassCard variant="gradient" className="animate-slide-up stagger-4">
@@ -643,5 +495,11 @@ const Analytics = () => {
         </div>
     );
 };
+
+const Analytics = () => (
+    <ErrorBoundary>
+        <AnalyticsContent />
+    </ErrorBoundary>
+);
 
 export default Analytics;

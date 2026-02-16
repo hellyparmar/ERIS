@@ -64,7 +64,6 @@ function triggerBackgroundSync() {
             console.error('[Sync] Background sync failed:', err);
         });
     }
-}
 
 /**
  * Show browser notification
@@ -77,7 +76,6 @@ function showNotification(title, body) {
             badge: '/badge-72x72.png'
         });
     }
-}
 
 /**
  * Request notification permission
@@ -88,4 +86,3 @@ export function requestNotificationPermission() {
             console.log('[Notification] Permission:', permission);
         });
     }
-}

@@ -27,7 +27,7 @@ const Promotions = () => {
     const avgConversion = promotions.reduce((sum, p) => sum + p.conversion, 0) / promotions.length;
 
     return (
-        <div className="min-h-screen space-y-8 animate-fade-in">
+        <div className="min-h-screen space-y-8 p-6 animate-fade-in">
             {/* Header */}
             <div className="flex justify-between items-center">
                 <div>

@@ -1,0 +1,79 @@
+{
+  "timestamp": "2026-02-10T12:39:04.019628",
+  "authentication": {
+    "service": "active",
+    "login": "failed"
+  },
+  "analytics": {
+    "/api/analytics/metrics": {
+      "without_auth": 404,
+      "with_auth": "N/A",
+      "protected": false
+    },
+    "/api/analytics/alerts": {
+      "without_auth": 404,
+      "with_auth": "N/A",
+      "protected": false
+    },
+    "/api/analytics/chart-data": {
+      "without_auth": 404,
+      "with_auth": "N/A",
+      "protected": false
+    },
+    "/api/v1/analytics/sales": {
+      "without_auth": 404,
+      "with_auth": "N/A",
+      "protected": false
+    },
+    "/api/v1/analytics/customers": {
+      "without_auth": 404,
+      "with_auth": "N/A",
+      "protected": false
+    },
+    "/api/reports/sales": {
+      "without_auth": 404,
+      "with_auth": "N/A",
+      "protected": false
+    },
+    "/api/reports/inventory": {
+      "without_auth": 404,
+      "with_auth": "N/A",
+      "protected": false
+    }
+  },
+  "endpoints": {},
+  "security": {
+    "X-Content-Type-Options": "missing",
+    "X-Frame-Options": "missing",
+    "X-XSS-Protection": "missing",
+    "Content-Security-Policy": "missing",
+    "Strict-Transport-Security": "missing"
+  },
+  "performance": {
+    "health": 1.482089360555013,
+    "dashboard": 300.9595076243083,
+    "inventory": 17.342805862426758,
+    "forecast": 90.90010325113933
+  },
+  "issues": {
+    "Login endpoint returning 401": {
+      "priority": "CRITICAL",
+      "issue": "Login endpoint returning 401",
+      "cause": "User table exists but queries not matching database schema",
+      "fix": "Update auth.py query to use correct field name (email vs username)"
+    },
+    "Analytics endpoints not found (404)": {
+      "priority": "HIGH",
+      "issue": "Analytics endpoints not found (404)",
+      "cause": "Routes not properly configured or router not included",
+      "fix": "Verify analytics router is included in main.py"
+    },
+    "Missing security headers: 5": {
+      "priority": "HIGH",
+      "issue": "Missing security headers: 5",
+      "cause": "Security middleware not configured",
+      "fix": "Add CORSMiddleware and security headers to main.py"
+    }
+  },
+  "fixes_needed": []
+}

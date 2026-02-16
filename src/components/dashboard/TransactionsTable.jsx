@@ -1,27 +1,15 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { MoreHorizontal, ChevronLeft, ChevronRight } from 'lucide-react';
-import GlassCard from '../ui/GlassCard';
+import UnifiedCard from '../ui/UnifiedCard';
 
-const TransactionsTable = () => {
+const TransactionsTable = ({ transactions = [] }) => {
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 5;
     const paginationRef = useRef(null);
 
-    const allTransactions = [
-        { id: "202507870", date: "May 15, 2025", customer: "Customer@livo.vn", amount: "$1,20.00", status: "Completed" },
-        { id: "202507388", date: "May 15, 2025", customer: "Customer@lrevis.ph", amount: "$36.00", status: "Completed" },
-        { id: "202507391", date: "May 15, 2025", customer: "Customer@thevis.ph", amount: "$80.00", status: "Pending" },
-        { id: "202507368", date: "May 15, 2025", customer: "Customer@arewai.com", amount: "$26.00", status: "Failed" },
-        { id: "202507921", date: "May 14, 2025", customer: "Customer@johndoe.com", amount: "$165.00", status: "Completed" },
-        { id: "202507922", date: "May 14, 2025", customer: "Customer@test.com", amount: "$45.00", status: "Completed" },
-        { id: "202507923", date: "May 13, 2025", customer: "Customer@demo.com", amount: "$210.00", status: "Completed" },
-        { id: "202507924", date: "May 13, 2025", customer: "Customer@sample.com", amount: "$85.00", status: "Pending" },
-        { id: "202507925", date: "May 12, 2025", customer: "Customer@user.com", amount: "$120.00", status: "Failed" },
-        { id: "202507926", date: "May 12, 2025", customer: "Customer@client.com", amount: "$300.00", status: "Completed" },
-        { id: "202507927", date: "May 11, 2025", customer: "Customer@corp.com", amount: "$550.00", status: "Completed" },
-        { id: "202507928", date: "May 11, 2025", customer: "Customer@ltd.com", amount: "$90.00", status: "Pending" },
-    ];
+    // Use provided transactions or fallback to empty array
+    const allTransactions = transactions && transactions.length > 0 ? transactions : [];
 
     const totalPages = Math.ceil(allTransactions.length / itemsPerPage);
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -44,7 +32,7 @@ const TransactionsTable = () => {
     };
 
     return (
-        <GlassCard className="h-full bg-card/50 flex flex-col shadow-2xl">
+        <UnifiedCard className="h-full bg-card/50 flex flex-col shadow-2xl">
             <div className="p-6 flex justify-between items-center">
                 <h3 className="font-bold text-card-foreground">Recent Transactions & Status</h3>
                 <MoreHorizontal className="text-muted-foreground cursor-pointer hover:text-foreground transition-colors" size={20} />
@@ -115,7 +103,7 @@ const TransactionsTable = () => {
                     <ChevronRight size={16} />
                 </button>
             </div>
-        </GlassCard>
+        </UnifiedCard>
     );
 };
 

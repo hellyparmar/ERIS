@@ -1,5 +1,4 @@
 import React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { Trash2, Download, Edit, Check, X } from 'lucide-react';
 
 /**
@@ -15,12 +14,11 @@ const BulkActionToolbar = ({
     className = ""
 }) => {
     return (
-        <AnimatePresence>
+        
             {selectedCount > 0 && (
-                <motion.div
-                    initial={{ opacity: 0, y: -20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
+                <div
+                    }
+                    }
                     className={`fixed top-20 left-1/2 transform -translate-x-1/2 z-50 ${className}`}
                 >
                     <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg shadow-2xl px-6 py-4 flex items-center gap-6">
@@ -37,42 +35,39 @@ const BulkActionToolbar = ({
 
                         <div className="flex items-center gap-2">
                             {onExport && (
-                                <motion.button
-                                    whileHover={{ scale: 1.05 }}
-                                    whileTap={{ scale: 0.95 }}
+                                <button
+                                    }
                                     onClick={onExport}
                                     className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
                                     title="Export selected"
                                 >
                                     <Download size={16} />
                                     <span className="text-sm font-medium">Export</span>
-                                </motion.button>
+                                </button>
                             )}
 
                             {onUpdate && (
-                                <motion.button
-                                    whileHover={{ scale: 1.05 }}
-                                    whileTap={{ scale: 0.95 }}
+                                <button
+                                    }
                                     onClick={onUpdate}
                                     className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
                                     title="Update selected"
                                 >
                                     <Edit size={16} />
                                     <span className="text-sm font-medium">Update</span>
-                                </motion.button>
+                                </button>
                             )}
 
                             {onDelete && (
-                                <motion.button
-                                    whileHover={{ scale: 1.05 }}
-                                    whileTap={{ scale: 0.95 }}
+                                <button
+                                    }
                                     onClick={onDelete}
                                     className="flex items-center gap-2 px-4 py-2 bg-red-500/80 hover:bg-red-600 rounded-lg transition-colors"
                                     title="Delete selected"
                                 >
                                     <Trash2 size={16} />
                                     <span className="text-sm font-medium">Delete</span>
-                                </motion.button>
+                                </button>
                             )}
 
                             <button
@@ -84,9 +79,9 @@ const BulkActionToolbar = ({
                             </button>
                         </div>
                     </div>
-                </motion.div>
+                </div>
             )}
-        </AnimatePresence>
+        
     );
 };
 

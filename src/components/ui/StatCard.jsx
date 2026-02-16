@@ -1,5 +1,4 @@
 import React from 'react';
-import { motion } from 'framer-motion';
 import CountUp from 'react-countup';
 import GlassCard from './GlassCard';
 import '../../modern-design.css';

@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { MapPin, Users, Activity } from 'lucide-react';
 import GlassCard from '../ui/GlassCard';
 
@@ -77,14 +76,12 @@ const LiveRetailMap = () => {
                 </svg>
 
                 {/* Pulses */}
-                <AnimatePresence>
+                
                     {pulses.map(pulse => (
-                        <motion.div
+                        <div
                             key={pulse.id}
-                            initial={{ opacity: 0.8, scale: 0.2 }}
-                            animate={{ opacity: 0, scale: 4 }}
-                            exit={{ opacity: 0 }}
-                            transition={{ duration: 1.5, ease: "easeOut" }}
+                            }
+                            }
                             className={`absolute w-8 h-8 rounded-full ${pulse.color} blur-sm`}
                             style={{
                                 left: pulse.x,
@@ -94,11 +91,10 @@ const LiveRetailMap = () => {
                         />
                     ))}
                     {pulses.map(pulse => (
-                        <motion.div
+                        <div
                             key={`dot-${pulse.id}`}
-                            initial={{ opacity: 1, scale: 1 }}
-                            animate={{ opacity: 0 }}
-                            transition={{ duration: 0.5, delay: 0.2 }}
+                            }
+                            }
                             className={`absolute w-2 h-2 rounded-full bg-white shadow-lg`}
                             style={{
                                 left: pulse.x,
@@ -107,7 +103,7 @@ const LiveRetailMap = () => {
                             }}
                         />
                     ))}
-                </AnimatePresence>
+                
             </div>
 
             {/* Legend */}

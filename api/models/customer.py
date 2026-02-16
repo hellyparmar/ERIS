@@ -12,6 +12,7 @@ from api.db.models import Base
 class Customer(Base):
     """Customer model with loyalty and credit management"""
     __tablename__ = 'customers'
+    __table_args__ = {'extend_existing': True}
     
     # Primary Key
     id = Column(Integer, primary_key=True, index=True)

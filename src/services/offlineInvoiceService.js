@@ -110,7 +110,6 @@ export async function createInvoiceOffline(invoiceData) {
         console.error('[OfflineInvoice] Failed to create invoice:', error);
         throw error;
     }
-}
 
 /**
  * Get all pending invoices
@@ -123,7 +122,6 @@ export async function getPendingInvoices() {
         console.error('[OfflineInvoice] Failed to get pending invoices:', error);
         return [];
     }
-}
 
 /**
  * Get invoice by local ID
@@ -135,7 +133,6 @@ export async function getInvoiceByLocalId(local_id) {
         console.error('[OfflineInvoice] Failed to get invoice:', error);
         return null;
     }
-}
 
 /**
  * Update invoice offline
@@ -170,7 +167,6 @@ export async function updateInvoiceOffline(local_id, updates) {
         console.error('[OfflineInvoice] Failed to update invoice:', error);
         throw error;
     }
-}
 
 /**
  * Delete invoice offline
@@ -183,7 +179,6 @@ export async function deleteInvoiceOffline(local_id) {
         console.error('[OfflineInvoice] Failed to delete invoice:', error);
         throw error;
     }
-}
 
 /**
  * Get invoice statistics
@@ -206,4 +201,3 @@ export async function getInvoiceStats() {
         console.error('[OfflineInvoice] Failed to get stats:', error);
         return null;
     }
-}

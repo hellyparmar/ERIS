@@ -9,7 +9,7 @@ from typing import Optional, List
 from decimal import Decimal
 from pydantic import BaseModel, Field
 
-from api.db.database import get_db
+from api.db import get_db
 from api.db.models import User
 from api.services.community_service import CommunityCommerceService
 from api.auth.dependencies import get_current_active_user

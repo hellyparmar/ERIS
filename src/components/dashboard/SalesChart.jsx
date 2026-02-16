@@ -42,15 +42,15 @@ const SalesChart = ({ data, title = "Sales Trend & Forecast", height = 300 }) =>
         const data = payload[0].payload;
 
         return (
-            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 shadow-lg">
-                <p className="text-sm font-medium text-gray-900 dark:text-white mb-2">
+            <div className="bg-card border border-border rounded-lg p-3 shadow-lg">
+                <p className="text-sm font-medium text-foreground mb-2">
                     {data.date}
                 </p>
                 {data.actual && (
                     <div className="flex items-center gap-2 mb-1">
                         <div className="w-3 h-3 rounded-full" style={{ backgroundColor: CHART_COLORS.primary }} />
-                        <span className="text-xs text-gray-600 dark:text-gray-400">Actual:</span>
-                        <span className="text-xs font-medium text-gray-900 dark:text-white">
+                        <span className="text-xs text-muted-foreground">Actual:</span>
+                        <span className="text-xs font-medium text-foreground">
                             {formatCompactNumber(data.actual)}
                         </span>
                     </div>
@@ -59,12 +59,12 @@ const SalesChart = ({ data, title = "Sales Trend & Forecast", height = 300 }) =>
                     <>
                         <div className="flex items-center gap-2 mb-1">
                             <div className="w-3 h-3 rounded-full" style={{ backgroundColor: CHART_COLORS.secondary }} />
-                            <span className="text-xs text-gray-600 dark:text-gray-400">Predicted:</span>
-                            <span className="text-xs font-medium text-gray-900 dark:text-white">
+                            <span className="text-xs text-muted-foreground">Predicted:</span>
+                            <span className="text-xs font-medium text-foreground">
                                 {formatCompactNumber(data.predicted)}
                             </span>
                         </div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        <div className="text-xs text-muted-foreground mt-1">
                             Range: {formatCompactNumber(data.lowerBound)} - {formatCompactNumber(data.upperBound)}
                         </div>
                     </>
@@ -75,7 +75,7 @@ const SalesChart = ({ data, title = "Sales Trend & Forecast", height = 300 }) =>
 
     return (
         <Card>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            <h3 className="text-lg font-semibold text-foreground mb-4">
                 {title}
             </h3>
 

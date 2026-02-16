@@ -17,6 +17,10 @@ const apiClient = axios.create({
     }
 });
 
+// Export base URL for direct fetch usage
+export const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
+
 // Request interceptor (for auth tokens in future)
 apiClient.interceptors.request.use(
     (config) => {
@@ -102,6 +106,59 @@ export const api = {
 
         getStatus: (jobId) => apiClient.get(`/api/v1/models/status/${jobId}`)
     }
+};
+
+// Export utility functions for data export
+export const exportToCSV = async (data, filename = 'export.csv') => {
+    const csvContent = convertToCSV(data);
+    downloadFile(csvContent, filename, 'text/csv');
+};
+
+export const exportToExcel = async (data, filename = 'export.xlsx') => {
+    // For now, export as CSV (Excel can open CSV files)
+    // TODO: Implement proper XLSX generation using a library like xlsx
+    const csvContent = convertToCSV(data);
+    downloadFile(csvContent, filename.replace('.xlsx', '.csv'), 'text/csv');
+};
+
+export const exportToPDF = async (data, filename = 'export.pdf') => {
+    // TODO: Implement PDF generation
+    console.warn('PDF export not yet implemented. Exporting as CSV instead.');
+    const csvContent = convertToCSV(data);
+    downloadFile(csvContent, filename.replace('.pdf', '.csv'), 'text/csv');
+};
+
+// Helper function to convert array of objects to CSV
+const convertToCSV = (data) => {
+    if (!data || data.length === 0) return '';
+
+    const headers = Object.keys(data[0]);
+    const csvRows = [headers.join(',')];
+
+    for (const row of data) {
+        const values = headers.map(header => {
+            const value = row[header];
+            // Escape quotes and wrap in quotes if contains comma
+            const escaped = String(value).replace(/"/g, '""');
+            return escaped.includes(',') ? `"${escaped}"` : escaped;
+        });
+        csvRows.push(values.join(','));
+    }
+
+    return csvRows.join('\n');
+};
+
+// Helper function to trigger file download
+const downloadFile = (content, filename, mimeType) => {
+    const blob = new Blob([content], { type: mimeType });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
 };
 
 export default api;

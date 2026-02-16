@@ -11,7 +11,7 @@ from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
 import logging
 
-from api.db.database import get_db
+from api.db import get_db
 from api.auth.dependencies import get_current_user
 
 logger = logging.getLogger(__name__)

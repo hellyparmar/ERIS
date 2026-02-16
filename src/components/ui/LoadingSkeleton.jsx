@@ -118,7 +118,6 @@ if (typeof document !== 'undefined') {
       100% {
         background-position: 200% 0;
       }
-    }
   `;
     document.head.appendChild(style);
 }

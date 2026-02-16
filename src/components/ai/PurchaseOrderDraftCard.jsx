@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
 import { ShoppingCart, Calendar, Building, Check, X, Edit2 } from 'lucide-react';
 
 const PurchaseOrderDraftCard = ({ actionData, onConfirm, onCancel }) => {
@@ -21,38 +20,32 @@ const PurchaseOrderDraftCard = ({ actionData, onConfirm, onCancel }) => {
 
     if (status === 'confirmed') {
         return (
-            <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
+            <div
                 className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-4 flex items-center justify-center gap-3 text-green-700 dark:text-green-400"
             >
                 <div className="w-8 h-8 bg-green-100 dark:bg-green-800 rounded-full flex items-center justify-center">
                     <Check className="w-5 h-5" />
                 </div>
                 <span className="font-medium">Purchase Order Created Successfully</span>
-            </motion.div>
+            </div>
         );
     }
 
     if (status === 'cancelled') {
         return (
-            <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
+            <div
                 className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 flex items-center justify-center gap-3 text-red-700 dark:text-red-400"
             >
                 <div className="w-8 h-8 bg-red-100 dark:bg-red-800 rounded-full flex items-center justify-center">
                     <X className="w-5 h-5" />
                 </div>
                 <span className="font-medium">Draft Cancelled</span>
-            </motion.div>
+            </div>
         );
     }
 
     return (
-        <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
+        <div
             className="w-full max-w-md bg-white/80 dark:bg-gray-800/80 backdrop-blur-md border border-purple-200 dark:border-purple-500/30 rounded-xl overflow-hidden shadow-lg my-2"
         >
             <div className="bg-gradient-to-r from-purple-500 to-indigo-600 px-4 py-3 flex items-center justify-between">
@@ -127,7 +120,7 @@ const PurchaseOrderDraftCard = ({ actionData, onConfirm, onCancel }) => {
                     </button>
                 </div>
             </div>
-        </motion.div>
+        </div>
     );
 };
 

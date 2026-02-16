@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
+import { API_BASE } from '@/lib/api';
 import {
     BarChart2,
     Users,
@@ -17,10 +18,10 @@ import {
     Legend,
     Filler
 } from 'chart.js';
-import GlassCard from '../components/ui/GlassCard';
-import { DashboardSkeleton } from '../components/ui/LoadingSkeleton';
+import UnifiedCard from '../components/ui/UnifiedCard';
+import LoadingNotice from '../components/ui/LoadingNotice';
 import TransactionsTable from '../components/dashboard/TransactionsTable';
-import { useToast } from '../components/ui/Toast';
+
 
 // Register Chart.js components
 ChartJS.register(
@@ -35,20 +36,17 @@ ChartJS.register(
 );
 
 const Dashboard = () => {
-    const { addToast } = useToast();
     const [timeRange, setTimeRange] = useState('30D');
     const [realtimeData, setRealtimeData] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [lastUpdate, setLastUpdate] = useState(null);
 
     // Initial fetch on component mount
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const res = await fetch('http://localhost:8000/api/v1/dashboard/realtime');
+                const res = await fetch(`${API_BASE}/api/v1/dashboard/realtime`);
                 const data = await res.json();
                 setRealtimeData(data);
-                setLastUpdate(new Date());
                 setLoading(false);
             } catch (error) {
                 console.error('Failed to fetch realtime data:', error);
@@ -57,6 +55,31 @@ const Dashboard = () => {
         };
 
         fetchData();
+    }, []);
+
+    // Scroll to top when Dashboard component mounts (or location changes)
+    useEffect(() => {
+        // Disable browser's automatic scroll restoration
+        if ('scrollRestoration' in window.history) {
+            window.history.scrollRestoration = 'manual';
+        }
+
+        // Scroll to top using multiple methods to ensure it works
+        const scrollToTop = () => {
+            const mainContent = document.getElementById('main-content');
+            if (mainContent) {
+                mainContent.scrollTop = 0;
+            }
+            // Also try window scroll as fallback
+            window.scrollTo(0, 0);
+        };
+
+        // Execute immediately and after delays to override any restoration
+        scrollToTop();
+        setTimeout(scrollToTop, 10);
+        setTimeout(scrollToTop, 50);
+        setTimeout(scrollToTop, 100);
+        setTimeout(scrollToTop, 200);
     }, []);
 
     // Format currency
@@ -174,20 +197,19 @@ const Dashboard = () => {
             x: {
                 grid: { display: false }, ticks: { font: { size: 10 }, color: '#94a3b8' }
             }
-        }
-    };
+    }};
 
     const renderMetricCard = (key, metric) => {
         const Icon = metric.icon;
         return (
             <div key={key} className="h-full">
-                <GlassCard variant="gradient" className="h-full p-6 relative overflow-hidden group hover:ring-2 hover:ring-primary/50 transition-all cursor-move">
+                <UnifiedCard className="h-full relative overflow-hidden group hover:ring-2 hover:ring-primary/50 transition-all cursor-move">
                     <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-purple/5 opacity-50"></div>
                     <div className="relative z-10 flex flex-col justify-between h-full">
                         <div className="flex justify-between items-start">
                             <div className="flex-1">
                                 <p className="text-sm font-medium text-muted-foreground mb-1">{metric.label}</p>
-                                <h3 className="text-2xl font-bold bg-gradient-to-r from-primary to-purple bg-clip-text text-transparent">
+                                <h3 className="text-2xl font-bold text-foreground">
                                     {metric.value}
                                 </h3>
                             </div>
@@ -208,13 +230,13 @@ const Dashboard = () => {
                             )}
                         </div>
                     </div>
-                </GlassCard>
+                </UnifiedCard>
             </div>
         );
     };
 
     return (
-        <div className="min-h-screen fade-in-up space-y-6">
+        <div className="min-h-screen fade-in-up space-y-8 p-6">
             {/* Page Loading Overlay */}
             {loading && (
                 <div className="fixed inset-0 bg-background/50 backdrop-blur-sm flex items-center justify-center z-50">
@@ -241,10 +263,10 @@ const Dashboard = () => {
 
             {/* Metrics Grid - Fixed Layout */}
             {loading ? (
-                <DashboardSkeleton />
+                <LoadingNotice message="Loading dashboard data..." />
             ) : (
                 <>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-8">
                         {renderMetricCard('revenue', metricsData.revenue)}
                         {renderMetricCard('orders', metricsData.orders)}
                         {renderMetricCard('aov', metricsData.aov)}
@@ -253,7 +275,7 @@ const Dashboard = () => {
 
                     <div className="space-y-6">
                         {/* Sales Chart */}
-                        <GlassCard className="p-6 flex flex-col">
+                        <UnifiedCard className="flex flex-col">
                             <div className="flex justify-between items-center mb-4">
                                 <h3 className="font-bold text-foreground text-lg">Sales Performance</h3>
                                 <div className="flex gap-2 p-1 bg-muted rounded-lg">
@@ -274,14 +296,14 @@ const Dashboard = () => {
                             <div className="w-full h-80">
                                 <Line data={getChartData(timeRange)} options={chartOptions} />
                             </div>
-                        </GlassCard>
+                        </UnifiedCard>
 
                         {/* Transactions Table */}
-                        <GlassCard className="overflow-hidden flex flex-col">
+                        <UnifiedCard className="overflow-hidden flex flex-col">
                             <div className="flex-1">
-                                <TransactionsTable />
+                                <TransactionsTable transactions={realtimeData?.recent_transactions || []} />
                             </div>
-                        </GlassCard>
+                        </UnifiedCard>
                     </div>
                 </>
             )}

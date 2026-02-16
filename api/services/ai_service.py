@@ -111,11 +111,42 @@ class AIService:
         self, 
         message: str, 
         system_prompt: str, 
-        session_history: list = []
+        session_history: list = [],
+        execute_templates: bool = True
     ) -> Dict[str, Any]:
         """
         Main entry point to get AI response.
+        Now includes database results if template matches.
         """
+        # Try to match and execute template query
+        database_context = ""
+        if execute_templates:
+            try:
+                from api.services.semantic_layer import semantic_layer
+                from api.services.query_executor import query_executor
+                
+                template_match = semantic_layer.match_template(message)
+                if template_match:
+                    template_name, template_sql = template_match
+                    logger.info(f"Template matched: {template_name}")
+                    
+                    # Execute query
+                    result = query_executor.execute_template_query(template_sql, semantic_layer)
+                    
+                    if result.get("success"):
+                        # Format results for LLM context
+                        database_context = query_executor.format_results_for_llm(result)
+                        logger.info(f"Database results: {result.get('row_count')} rows")
+                    else:
+                        logger.warning(f"Query execution failed: {result.get('error')}")
+                        
+            except Exception as e:
+                logger.warning(f"Template execution disabled or failed: {str(e)}")
+        
+        # Inject database context into system prompt
+        if database_context:
+            system_prompt += f"\n\nREAL DATABASE RESULTS:\n{database_context}"
+        
         # specialized logic for long context queries could go here
         provider = self._get_provider(context_length="short" if len(message) < 5000 else "long")
         

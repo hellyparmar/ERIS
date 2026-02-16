@@ -4,13 +4,12 @@
  */
 
 import { useState, useMemo, useEffect } from 'react';
-import { motion } from 'framer-motion';
 import {
     Store, MapPin, TrendingUp, TrendingDown, DollarSign, Target, AlertTriangle, Star,
     ChevronDown, ChevronUp, Search
 } from 'lucide-react';
 import UnifiedCard from '../components/ui/UnifiedCard';
-import { DashboardSkeleton, TableSkeleton } from '../components/ui/LoadingSkeleton';
+import LoadingNotice from '../components/ui/LoadingNotice';
 import mockStores, { getTopPerformingStores, calculateRegionalPerformance } from '../data/storeData';
 import {
     getNetworkMetrics,
@@ -168,11 +167,9 @@ const MultiStore = () => {
     };
 
     return (
-        <div className="min-h-screen space-y-8 animate-fade-in">
+        <div className="min-h-screen space-y-8 p-6 animate-fade-in">
             {/* Header */}
-            <motion.div
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
+            <div
             >
                 <h1 className="text-4xl font-bold text-foreground mb-2">
                     Multi-Store Dashboard
@@ -180,9 +177,9 @@ const MultiStore = () => {
                 <p className="text-muted-foreground">
                     Monitor and compare performance across {networkMetrics.totalStores} retail locations
                 </p>
-            </motion.div>
+            </div>
 
-            {isLoading ? <DashboardSkeleton /> : (
+            {isLoading ? <LoadingNotice message="Loading store data..." /> : (
                 <>
                     {/* Network Overview Metrics */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -261,11 +258,8 @@ const MultiStore = () => {
                         </h2>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                             {regionalPerformance.map((region, idx) => (
-                                <motion.div
+                                <div
                                     key={region.region}
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: idx * 0.05 }}
                                     onClick={() => setSelectedRegion(selectedRegion === region.region ? 'all' : region.region)}
                                     className={`p-4 rounded-xl border cursor-pointer transition-all hover:scale-105 ${selectedRegion === region.region
                                         ? 'bg-gradient-to-br from-primary/10 to-purple/10 border-primary/50 shadow-glow-primary'
@@ -285,7 +279,7 @@ const MultiStore = () => {
                                             {region.avgGrowth >= 0 ? '+' : ''}{region.avgGrowth}%
                                         </span>
                                     </div>
-                                </motion.div>
+                                </div>
                             ))}
                         </div>
                     </UnifiedCard>
@@ -573,9 +567,6 @@ const MultiStore = () => {
                                     {filteredStores.map((store, idx) => (
                                         <motion.tr
                                             key={store.id}
-                                            initial={{ opacity: 0 }}
-                                            animate={{ opacity: 1 }}
-                                            transition={{ delay: idx * 0.02 }}
                                             className="border-b border-border/50 hover:bg-gradient-to-r hover:from-primary/5 hover:to-purple/5 transition-all"
                                         >
                                             <td className="py-3 px-4">
@@ -631,8 +622,7 @@ const MultiStore = () => {
                                 No stores found matching your criteria
                             </div>
                         )}
-                    </div>
-                </UnifiedCard>
+                    </UnifiedCard>
                 </>
             )}
         </div>

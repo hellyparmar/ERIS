@@ -1,5 +1,4 @@
 import React from 'react';
-import { motion } from 'framer-motion';
 import { Globe, Type } from 'lucide-react';
 import { getLanguageName } from '../../lib/languageDetection';
 
@@ -40,9 +39,8 @@ const LanguageSelector = ({ currentLanguage, scriptMode, onScriptToggle, onLangu
             {currentLanguage !== 'en' && (
                 <>
                     <div className="w-px h-6 bg-gray-300 dark:bg-gray-600" />
-                    <motion.button
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
+                    <button
+                        }
                         onClick={onScriptToggle}
                         className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${scriptMode === 'roman'
                             ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
@@ -51,7 +49,7 @@ const LanguageSelector = ({ currentLanguage, scriptMode, onScriptToggle, onLangu
                     >
                         <Type className="w-3.5 h-3.5" />
                         {scriptMode === 'roman' ? 'Roman' : 'Native'}
-                    </motion.button>
+                    </button>
                 </>
             )}
         </div>

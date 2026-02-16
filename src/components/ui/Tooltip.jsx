@@ -1,5 +1,4 @@
 import React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 
 /**
  * Tooltip Component
@@ -31,16 +30,14 @@ const Tooltip = ({ children, content, position = 'top' }) => {
                 {children}
             </div>
 
-            <AnimatePresence>
+            
                 {show && (
-                    <motion.div
+                    <div
                         id={tooltipId}
                         role="tooltip"
                         className={`absolute ${positions[position]} z-50 px-3 py-2 text-sm text-white bg-gray-900 dark:bg-gray-700 rounded-lg shadow-lg whitespace-nowrap pointer-events-none`}
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.8 }}
-                        transition={{ duration: 0.15 }}
+                        }
+                        }
                     >
                         {content}
                         <div
@@ -51,9 +48,9 @@ const Tooltip = ({ children, content, position = 'top' }) => {
                                 }`}
                             aria-hidden="true"
                         />
-                    </motion.div>
+                    </div>
                 )}
-            </AnimatePresence>
+            
         </div>
     );
 };

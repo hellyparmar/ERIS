@@ -6,9 +6,9 @@
 import { useState, useMemo } from 'react';
 import {
     Scale, FileText, Shield, CheckCircle, Calendar, Download,
-    AlertTriangle, TrendingUp, DollarSign, Clock, Filter
+    AlertTriangle, TrendingUp, DollarSign, Clock, Filter, ChevronLeft, ChevronRight
 } from 'lucide-react';
-import GlassCard from '../components/ui/GlassCard';
+import UnifiedCard from '../components/ui/UnifiedCard';
 import ActionButton from '../components/ui/ActionButton';
 import {
     generateTaxTransactions,
@@ -20,10 +20,17 @@ import {
 
 const Compliance = () => {
     const [transactions] = useState(() => generateTaxTransactions(100));
+    const [currentPage, setCurrentPage] = useState(1);
+    const rowsPerPage = 7;
 
     // Calculate summaries
     const taxSummary = useMemo(() => calculateTaxSummary(transactions), [transactions]);
     const complianceStatus = useMemo(() => getComplianceStatus(transactions), [transactions]);
+
+    // Pagination
+    const totalPages = Math.ceil(transactions.length / rowsPerPage);
+    const startIdx = (currentPage - 1) * rowsPerPage;
+    const paginatedTransactions = transactions.slice(startIdx, startIdx + rowsPerPage);
 
     // Format deadline
     const formatDeadline = (date) => {
@@ -34,7 +41,7 @@ const Compliance = () => {
     const deadline = formatDeadline(complianceStatus.nextDeadline);
 
     return (
-        <div className="min-h-screen space-y-8 animate-fade-in">
+        <div className="min-h-screen space-y-8 p-6 animate-fade-in">
             {/* Header */}
             <div>
                 <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-purple bg-clip-text text-transparent mb-2">
@@ -47,7 +54,7 @@ const Compliance = () => {
 
             {/* Compliance Status Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <GlassCard variant="gradient" className="p-6 animate-slide-up stagger-1">
+                <UnifiedCard className="animate-slide-up stagger-1">
                     <div className="flex items-start justify-between gap-4">
                         <div>
                             <p className="text-sm text-muted-foreground mb-1">Total Revenue</p>
@@ -62,9 +69,9 @@ const Compliance = () => {
                             <TrendingUp className="text-success" size={24} />
                         </div>
                     </div>
-                </GlassCard>
+                </UnifiedCard>
 
-                <GlassCard variant="gradient" className="p-6 animate-slide-up stagger-2">
+                <UnifiedCard className="animate-slide-up stagger-2">
                     <div className="flex items-start justify-between gap-4">
                         <div>
                             <p className="text-sm text-muted-foreground mb-1">Next Deadline</p>
@@ -79,9 +86,9 @@ const Compliance = () => {
                             <Calendar className="text-purple-500" size={24} />
                         </div>
                     </div>
-                </GlassCard>
+                </UnifiedCard>
 
-                <GlassCard variant="gradient" className="p-6 animate-slide-up stagger-3">
+                <UnifiedCard className="animate-slide-up stagger-3">
                     <div className="flex items-start justify-between gap-4">
                         <div>
                             <p className="text-sm text-muted-foreground mb-1">Compliance Status</p>
@@ -103,9 +110,9 @@ const Compliance = () => {
                             )}
                         </div>
                     </div>
-                </GlassCard>
+                </UnifiedCard>
 
-                <GlassCard variant="gradient" className="p-6 animate-slide-up stagger-4">
+                <UnifiedCard className="animate-slide-up stagger-4">
                     <div className="flex items-start justify-between gap-4">
                         <div>
                             <p className="text-sm text-muted-foreground mb-1">Total GST Collected</p>
@@ -120,16 +127,13 @@ const Compliance = () => {
                             <DollarSign className="text-blue-500" size={24} />
                         </div>
                     </div>
-                </GlassCard>
+                </UnifiedCard>
             </div>
 
             {/* GST Breakdown */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* GST by Rate */}
-                <GlassCard variant="gradient" className="p-6 animate-slide-up stagger-1">
-                    <h2 className="text-xl font-bold bg-gradient-to-r from-primary to-purple bg-clip-text text-transparent mb-4">
-                        GST Collection by Rate
-                    </h2>
+                <UnifiedCard className="animate-slide-up stagger-1" title="GST Collection by Rate">
                     <div className="space-y-3">
                         {Object.entries(taxSummary.byRate).map(([rate, data]) => (
                             <div key={rate} className="flex items-center justify-between p-4 rounded-lg bg-gradient-to-r from-primary/5 to-purple/5 border border-border">
@@ -147,13 +151,10 @@ const Compliance = () => {
                             </div>
                         ))}
                     </div>
-                </GlassCard>
+                </UnifiedCard>
 
                 {/* GST by Category */}
-                <GlassCard variant="gradient" className="p-6 animate-slide-up stagger-2">
-                    <h2 className="text-xl font-bold bg-gradient-to-r from-primary to-purple bg-clip-text text-transparent mb-4">
-                        GST by Category
-                    </h2>
+                <UnifiedCard className="animate-slide-up stagger-2" title="GST by Category">
                     <div className="space-y-3">
                         {Object.entries(taxSummary.byCategory).slice(0, 6).map(([category, data]) => (
                             <div key={category} className="flex items-center justify-between p-4 rounded-lg bg-gradient-to-r from-primary/5 to-purple/5 border border-border">
@@ -168,13 +169,13 @@ const Compliance = () => {
                             </div>
                         ))}
                     </div>
-                </GlassCard>
+                </UnifiedCard>
             </div>
 
             {/* Recent Transactions */}
-            <GlassCard variant="gradient" className="p-6">
+            <UnifiedCard>
                 <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-xl font-bold bg-gradient-to-r from-primary to-purple bg-clip-text text-transparent">
+                    <h2 className="text-xl font-bold text-foreground">
                         Recent Tax Transactions
                     </h2>
                     <ActionButton variant="secondary" icon={Download}>
@@ -213,7 +214,7 @@ const Compliance = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {transactions.slice(0, 15).map((txn, idx) => (
+                            {paginatedTransactions.map((txn) => (
                                 <tr
                                     key={txn.id}
                                     className="border-b border-border/50 hover:bg-gradient-to-r hover:from-primary/5 hover:to-purple/5 transition-all"
@@ -258,7 +259,73 @@ const Compliance = () => {
                         </tbody>
                     </table>
                 </div>
-            </GlassCard>
+
+                {/* Pagination Controls */}
+                <div className="flex items-center justify-center gap-2 mt-6 pt-6 border-t border-border">
+                    <button
+                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                        disabled={currentPage === 1}
+                        className="p-2 rounded-lg bg-secondary hover:bg-secondary/80 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-foreground"
+                        title="Previous page"
+                    >
+                        <ChevronLeft size={20} />
+                    </button>
+
+                    <div className="flex items-center gap-1">
+                        {/* Show first page if not in range */}
+                        {currentPage > 3 && (
+                            <>
+                                <button
+                                    onClick={() => setCurrentPage(1)}
+                                    className="px-3 py-2 rounded-lg font-medium transition-all bg-secondary hover:bg-secondary/80 text-foreground"
+                                >
+                                    1
+                                </button>
+                                {currentPage > 4 && <span className="text-muted-foreground">...</span>}
+                            </>
+                        )}
+
+                        {/* Show 3 page numbers around current page */}
+                        {Array.from({ length: Math.min(3, totalPages) }, (_, i) => {
+                            const startPage = Math.max(1, Math.min(currentPage - 1, totalPages - 2));
+                            return startPage + i;
+                        }).map((page) => (
+                            <button
+                                key={page}
+                                onClick={() => setCurrentPage(page)}
+                                className={`px-3 py-2 rounded-lg font-medium transition-all ${currentPage === page
+                                    ? 'bg-blue-600 text-white shadow-md'
+                                    : 'bg-secondary hover:bg-secondary/80 text-foreground'
+                                    }`}
+                            >
+                                {page}
+                            </button>
+                        ))}
+
+                        {/* Show last page if not in range */}
+                        {currentPage < totalPages - 2 && (
+                            <>
+                                {currentPage < totalPages - 3 && <span className="text-muted-foreground">...</span>}
+                                <button
+                                    onClick={() => setCurrentPage(totalPages)}
+                                    className="px-3 py-2 rounded-lg font-medium transition-all bg-secondary hover:bg-secondary/80 text-foreground"
+                                >
+                                    {totalPages}
+                                </button>
+                            </>
+                        )}
+                    </div>
+
+                    <button
+                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                        disabled={currentPage === totalPages}
+                        className="p-2 rounded-lg bg-secondary hover:bg-secondary/80 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-foreground"
+                        title="Next page"
+                    >
+                        <ChevronRight size={20} />
+                    </button>
+                </div>
+            </UnifiedCard>
         </div>
     );
 };

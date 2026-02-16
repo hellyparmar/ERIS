@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import datetime, timedelta
 
-from api.db.database import get_db
+from api.db import get_db
 from api.db.models import Invoice, Message, CommunityListing, Sale
 from api.middleware.rate_limiter import rate_limiter
 from api.services.cache_service import cache

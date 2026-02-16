@@ -12,7 +12,7 @@ import logging
 import json
 from pathlib import Path
 
-from api.db.database import get_db
+from api.db import get_db
 from api.auth.dependencies import get_current_user
 
 logging.basicConfig(level=logging.INFO)
@@ -378,3 +378,238 @@ async def get_holiday_impact_forecast(
         ),
         'summary': f"Found {len(holiday_impacts)} holiday-affected days with combined revenue lift opportunity"
     }
+
+
+# ============================================================
+# PHASE 2A: NEW FORECASTING ENDPOINTS
+# ============================================================
+
+@router.get("/demand-forecast")
+async def get_demand_forecast(
+    product_id: Optional[int] = Query(None),
+    category: Optional[str] = Query(None),
+    days_ahead: int = Query(30, ge=7, le=365),
+    method: str = Query("exponential_smoothing", regex="^(exponential_smoothing|arima|linear_regression)$"),
+    db: Session = Depends(get_db)
+):
+    """Generate demand forecast for products using multiple methods"""
+    from sqlalchemy import text
+    import numpy as np
+    
+    try:
+        # Get historical sales data (last 90 days)
+        sales_query = """
+            SELECT 
+                DATE(s.created_at) as sale_date,
+                COUNT(*) as orders,
+                SUM(s.total_amount) as revenue
+            FROM sales s
+            WHERE s.created_at >= datetime('now', '-90 days')
+        """
+        
+        params = {}
+        if product_id:
+            sales_query += " AND s.id IN (SELECT sale_id FROM sale_items WHERE product_id = :product_id)"
+            params['product_id'] = product_id
+        if category:
+            sales_query += " AND s.id IN (SELECT si.sale_id FROM sale_items si JOIN products p ON si.product_id = p.id WHERE p.category = :category)"
+            params['category'] = category
+        
+        sales_query += " GROUP BY DATE(s.created_at) ORDER BY sale_date"
+        
+        sales_data = db.execute(text(sales_query), params).fetchall()
+        
+        if not sales_data or len(sales_data) < 14:
+            return {
+                "success": False,
+                "error": "Insufficient historical data (minimum 14 days required)",
+                "data": []
+            }
+        
+        # Extract values
+        dates = [row[0] for row in sales_data]
+        values = np.array([row[1] for row in sales_data], dtype=float)
+        
+        # Generate forecast
+        forecast_values = []
+        ci_lower = []
+        ci_upper = []
+        
+        if method == "exponential_smoothing":
+            alpha = 0.3
+            last_val = values[-1]
+            variance = np.var(values)
+            for i in range(days_ahead):
+                pred = alpha * last_val + (1 - alpha) * (last_val if i == 0 else forecast_values[-1])
+                forecast_values.append(pred)
+                std_err = np.sqrt(variance)
+                ci_lower.append(max(0, pred - 1.96 * std_err))
+                ci_upper.append(pred + 1.96 * std_err)
+        elif method == "arima":
+            trend = (values[-1] - values[-7]) / 7 if len(values) > 7 else 0
+            for i in range(days_ahead):
+                pred = values[-1] + trend * (i + 1)
+                forecast_values.append(max(0, pred))
+                ci_lower.append(max(0, pred - 50))
+                ci_upper.append(pred + 50)
+        else:  # linear_regression
+            x = np.arange(len(values))
+            coeffs = np.polyfit(x, values, 1)
+            residuals = values - np.polyval(coeffs, x)
+            std_err = np.std(residuals)
+            for i in range(days_ahead):
+                pred = np.polyval(coeffs, len(values) + i)
+                forecast_values.append(max(0, pred))
+                ci_lower.append(max(0, pred - 1.96 * std_err))
+                ci_upper.append(pred + 1.96 * std_err)
+        
+        # Generate future dates
+        last_date = dates[-1]
+        future_dates = [(last_date + timedelta(days=i)).isoformat() for i in range(1, days_ahead + 1)]
+        
+        return {
+            "success": True,
+            "data": {
+                "forecast": [
+                    {
+                        "date": d,
+                        "forecast": round(f, 2),
+                        "lower_bound": round(l, 2),
+                        "upper_bound": round(u, 2),
+                        "confidence": 0.95
+                    }
+                    for d, f, l, u in zip(future_dates, forecast_values, ci_lower, ci_upper)
+                ],
+                "method": method,
+                "historical_points": len(sales_data)
+            }
+        }
+    except Exception as e:
+        logger.error(f"Forecast error: {e}")
+        return {"success": False, "error": str(e), "data": []}
+
+
+@router.get("/stock-optimization")
+async def get_stock_optimization(
+    category: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """Calculate optimal stock levels using ABC analysis"""
+    from sqlalchemy import text
+    import numpy as np
+    
+    try:
+        query = """
+            SELECT 
+                i.id, i.name, i.product_id, i.current_stock,
+                p.cost_price,
+                COUNT(si.id) as sales_count,
+                SUM(si.quantity) as total_units_sold
+            FROM inventory i
+            JOIN products p ON i.product_id = p.id
+            LEFT JOIN sale_items si ON p.id = si.product_id
+            WHERE 1=1
+        """
+        
+        params = {}
+        if category:
+            query += " AND p.category = :category"
+            params['category'] = category
+        
+        query += " GROUP BY i.id ORDER BY total_units_sold DESC"
+        
+        data = db.execute(text(query), params).fetchall()
+        
+        if not data:
+            return {"success": False, "error": "No inventory data", "data": []}
+        
+        # ABC Analysis
+        total_value = sum((row[4] or 1) * (row[6] or 0) for row in data)
+        cumulative = 0
+        results = []
+        
+        for row in data:
+            inv_value = (row[4] or 1) * (row[6] or 0)
+            cumulative += inv_value
+            pct = (cumulative / total_value * 100) if total_value > 0 else 0
+            abc_class = "A" if pct <= 80 else ("B" if pct <= 95 else "C")
+            
+            daily_demand = (row[6] or 0) / 90 if row[6] else 0
+            reorder_point = max(int(daily_demand * 3), 1)
+            eoq = int(np.sqrt(2 * (daily_demand * 365) * 100 / ((row[4] or 1) * 0.25)))
+            
+            results.append({
+                "product_id": row[2],
+                "name": row[1],
+                "abc_class": abc_class,
+                "current_stock": row[3],
+                "recommended_reorder": reorder_point,
+                "recommended_max": reorder_point + eoq,
+                "eoq": eoq
+            })
+        
+        return {
+            "success": True,
+            "data": {
+                "optimizations": results,
+                "total": len(data),
+                "needs_optimization": len([x for x in results if x['current_stock'] < x['recommended_reorder']])
+            }
+        }
+    except Exception as e:
+        logger.error(f"Optimization error: {e}")
+        return {"success": False, "error": str(e), "data": []}
+
+
+@router.get("/sales-trend")
+async def get_sales_trend(
+    days: int = Query(90, ge=7, le=365),
+    category: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """Analyze sales trends with moving averages"""
+    from sqlalchemy import text
+    import numpy as np
+    
+    try:
+        query = """
+            SELECT 
+                DATE(s.created_at) as date,
+                COUNT(*) as orders,
+                SUM(s.total_amount) as revenue
+            FROM sales s
+            WHERE s.created_at >= datetime('now', '-' || :days || ' days')
+        """
+        
+        params = {'days': days}
+        if category:
+            query += " AND s.id IN (SELECT si.sale_id FROM sale_items si JOIN products p ON si.product_id = p.id WHERE p.category = :category)"
+            params['category'] = category
+        
+        query += " GROUP BY DATE(s.created_at) ORDER BY date"
+        
+        data = db.execute(text(query), params).fetchall()
+        
+        trends = [
+            {"date": str(row[0]), "orders": row[1], "revenue": round(float(row[2] or 0), 2)}
+            for row in data
+        ]
+        
+        # Calculate 7-day MA
+        orders = [x['orders'] for x in trends]
+        for i in range(len(trends)):
+            if i >= 6:
+                ma = np.mean(orders[i-6:i+1])
+                trends[i]['orders_ma7'] = round(ma, 2)
+        
+        return {
+            "success": True,
+            "data": {
+                "trends": trends,
+                "total_revenue": sum(x['revenue'] for x in trends),
+                "avg_daily": round(sum(x['revenue'] for x in trends) / len(trends), 2) if trends else 0
+            }
+        }
+    except Exception as e:
+        logger.error(f"Trend error: {e}")
+        return {"success": False, "error": str(e), "data": []}
