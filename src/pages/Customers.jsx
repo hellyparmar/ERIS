@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Users, Award, CreditCard, TrendingUp } from 'lucide-react';
 import CustomerList from '../components/customers/CustomerList';
+import LoyaltyDashboard from '../components/customers/LoyaltyDashboard';
+import CreditManagement from '../components/customers/CreditManagement';
 import UnifiedCard from '../components/ui/UnifiedCard';
 
 const Customers = () => {
@@ -119,32 +121,8 @@ const Customers = () => {
             {/* Tab Content */}
             <div className="mt-6">
                 {activeTab === 'list' && <CustomerList />}
-                {activeTab === 'loyalty' && (
-                    <UnifiedCard>
-                        <div className="text-center py-12">
-                            <Award className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                                Loyalty Program Dashboard
-                            </h3>
-                            <p className="text-gray-600 dark:text-gray-400">
-                                Loyalty program management coming soon
-                            </p>
-                        </div>
-                    </UnifiedCard>
-                )}
-                {activeTab === 'credit' && (
-                    <UnifiedCard>
-                        <div className="text-center py-12">
-                            <CreditCard className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                                Credit Management
-                            </h3>
-                            <p className="text-gray-600 dark:text-gray-400">
-                                Credit management dashboard coming soon
-                            </p>
-                        </div>
-                    </UnifiedCard>
-                )}
+                {activeTab === 'loyalty' && <LoyaltyDashboard />}
+                {activeTab === 'credit' && <CreditManagement />}
                 {activeTab === 'analytics' && (
                     <UnifiedCard>
                         <div className="text-center py-12">
