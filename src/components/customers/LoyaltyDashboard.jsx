@@ -36,7 +36,7 @@ const LoyaltyDashboard = () => {
         return colors[tier] || 'from-gray-400 to-gray-600';
     };
 
-    const getTierIcon = (tier) => {
+    const getTierIcon = () => {
         return <Award className="w-8 h-8" />;
     };
 
