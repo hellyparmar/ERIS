@@ -2,19 +2,23 @@
 Inventory Control Router
 Barcode scanning, stock alerts, reorder suggestions, stock adjustments
 """
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional
 
 from api.db import get_db
 from api.services.barcode_scanner import lookup_barcode, update_product_barcode
+from api.services.stock_alerts import get_active_alerts, acknowledge_alert, check_stock_levels
 
 router = APIRouter(prefix="/inventory", tags=["Inventory Control"])
 
 class BarcodeUpdateRequest(BaseModel):
     product_id: int
     barcode: str
+
+class AcknowledgeAlertRequest(BaseModel):
+    user_id: int
 
 @router.get("/scan/{barcode}")
 async def scan_barcode(barcode: str, db: Session = Depends(get_db)):
@@ -47,3 +51,52 @@ async def update_barcode(request: BarcodeUpdateRequest, db: Session = Depends(ge
         raise HTTPException(status_code=400, detail=result['error'])
     
     return {'success': True, 'message': 'Barcode updated successfully'}
+
+@router.get("/alerts")
+async def get_alerts(
+    severity: Optional[str] = Query(None, description="Filter by severity: critical, warning, info"),
+    category: Optional[str] = Query(None, description="Filter by product category"),
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db)
+):
+    """
+    Get active low stock alerts
+    Returns alerts with severity counts and pagination
+    """
+    result = get_active_alerts(db, severity, category, limit, offset)
+    
+    return {
+        'success': True,
+        'data': result
+    }
+
+@router.post("/alerts/{alert_id}/acknowledge")
+async def acknowledge_alert_endpoint(
+    alert_id: int,
+    request: AcknowledgeAlertRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Mark alert as acknowledged
+    """
+    result = acknowledge_alert(alert_id, request.user_id, db)
+    
+    if not result['success']:
+        raise HTTPException(status_code=404, detail=result['error'])
+    
+    return {'success': True, 'message': 'Alert acknowledged'}
+
+@router.post("/alerts/check")
+async def check_stock_endpoint(db: Session = Depends(get_db)):
+    """
+    Manually trigger stock level check
+    Generates alerts for low stock items
+    """
+    alerts = check_stock_levels(db)
+    
+    return {
+        'success': True,
+        'message': f'Generated {len(alerts)} new alerts',
+        'alerts': alerts
+    }
