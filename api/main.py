@@ -127,9 +127,9 @@ async def health_check():
 # Authentication (public endpoints - no auth required)
 app.include_router(auth.router, tags=["Authentication"])
 
-# JWT Authentication Router (DISABLED - using unified auth.py)
-# from api.routers import auth_login
-# app.include_router(auth_login.router, tags=["JWT Authentication"])
+# JWT Authentication Router (Two-flow: Manager password + Cashier PIN)
+from api.routers import auth_login
+app.include_router(auth_login.router, tags=["JWT Authentication"])
 
 # Health & Monitoring (public for load balancers)
 app.include_router(health.router, tags=["System Health"])
