@@ -37,7 +37,7 @@ from api.routers import (
     reports, enterprise, # New router
     weather,  # Weather API router
     forecasting, pos, alerts,  # ML & Business routers
-    pos_auth, inventory_control, customers, loyalty # Phase 1-3 routers
+    pos_auth, pos_sales, inventory_control, customers, loyalty # Phase 1-3 routers
 )
 
 
@@ -149,6 +149,7 @@ app.include_router(alerts.router, tags=["Alerts"])
 app.include_router(forecasting.router, tags=["ML Forecasting"])
 app.include_router(reports.router, tags=["Reports"])
 app.include_router(pos_auth.router, tags=["POS Authentication"])
+app.include_router(pos_sales.router, tags=["POS Sales"])
 app.include_router(inventory_control.router, tags=["Inventory Control"])
 app.include_router(customers.router, tags=["Customers"])  # Phase 3
 app.include_router(loyalty.router, tags=["Loyalty Program"])    # Phase 3
