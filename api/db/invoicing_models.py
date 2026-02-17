@@ -33,6 +33,7 @@ class PaymentMethod(str, enum.Enum):
 class Invoice(Base):
     """Main invoice table"""
     __tablename__ = "invoices"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
     invoice_number = Column(String, unique=True, index=True)
@@ -88,6 +89,7 @@ class Invoice(Base):
 class InvoiceLineItem(Base):
     """Invoice line items"""
     __tablename__ = "invoice_line_items"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
     invoice_id = Column(Integer, ForeignKey("invoices.id"), index=True)
@@ -118,6 +120,7 @@ class InvoiceLineItem(Base):
 class Payment(Base):
     """Payment tracking"""
     __tablename__ = "payments"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
     invoice_id = Column(Integer, ForeignKey("invoices.id"), index=True)
@@ -150,6 +153,7 @@ class Payment(Base):
 class InvoiceTax(Base):
     """Detailed tax breakdown"""
     __tablename__ = "invoice_taxes"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
     invoice_id = Column(Integer, ForeignKey("invoices.id"), index=True)
@@ -173,6 +177,7 @@ class InvoiceTax(Base):
 class GSTRate(Base):
     """GST rate master"""
     __tablename__ = "gst_rates"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
     product_category = Column(String, unique=True, index=True)

@@ -10,9 +10,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from api.db.models import (
-    Sale, SaleItem, Invoice, InvoiceLineItem, Product, 
-    Customer, Inventory, InvoiceTax, GSTRate
+    Sale, SaleItem, Product, Customer, Inventory
 )
+from api.db.invoicing_models import Invoice, InvoiceLineItem, InvoiceTax, GSTRate
+
 
 
 class POSInvoiceService:
