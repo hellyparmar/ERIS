@@ -21,6 +21,8 @@ import GlassCard from '../components/ui/GlassCard';
 import GradientButton from '../components/ui/GradientButton';
 import { useToast } from '../components/ui/Toast';
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
 const POS = () => {
     const { addToast } = useToast();
     const [cart, setCart] = useState([
@@ -92,7 +94,7 @@ const POS = () => {
                 discount: 0.0
             };
 
-            const response = await fetch('http://localhost:8000/api/v1/pos/checkout', {
+            const response = await fetch(`${API_BASE}/api/v1/pos/checkout`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
