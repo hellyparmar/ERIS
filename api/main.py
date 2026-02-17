@@ -36,6 +36,7 @@ from api.routers import (
     dashboard, tally_integration, odoo_sync,
     reports, enterprise, # New router
     weather,  # Weather API router
+    forecasting, pos, alerts,  # ML & Business routers
     pos_auth, inventory_control, customers, loyalty # Phase 1-3 routers
 )
 
@@ -143,8 +144,6 @@ async def websocket(websocket):
 
 # Business endpoints (will add auth protection gradually)
 from api.routers import pos, alerts
-app.include_router(products.router, tags=["Products"])
-app.include_router(sales.router, tags=["Sales"])
 app.include_router(inventory.router, tags=["Inventory"])
 app.include_router(alerts.router, tags=["Alerts"])
 app.include_router(forecasting.router, tags=["ML Forecasting"])
