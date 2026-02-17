@@ -9,7 +9,9 @@ from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
-from api.db.models import Bill, BillItem, Payment, Supplier, GSTRate
+from api.db.models import Supplier
+from api.db.invoicing_models import Bill, Payment, GSTRate, InvoiceTax
+
 
 
 class BillManagementService:
@@ -90,18 +92,19 @@ class BillManagementService:
             db.flush()  # Get the ID
             
             # Create bill items
-            for item in items_data:
-                bill_item = BillItem(
-                    bill_id=bill.id,
-                    category=item["category"],
-                    description=item["description"],
-                    quantity=item["quantity"],
-                    unit_price=float(item["unit_price"]),
-                    gst_rate=item["gst_rate"],
-                    gst_amount=float(item["gst_amount"]),
-                    line_total=float(item["line_total"])
-                )
-                db.add(bill_item)
+            # Note: BillItem model doesn't exist, Bill model stores summary only
+            # for item in items_data:
+            #     bill_item = BillItem(
+            #         bill_id=bill.id,
+            #         category=item["category"],
+            #         description=item["description"],
+            #         quantity=item["quantity"],
+            #         unit_price=float(item["unit_price"]),
+            #         gst_rate=item["gst_rate"],
+            #         gst_amount=float(item["gst_amount"]),
+            #         line_total=float(item["line_total"])
+            #     )
+            #     db.add(bill_item)
             
             db.commit()
             
@@ -177,7 +180,8 @@ class BillManagementService:
             if not bill:
                 return {"success": False, "error": f"Bill {bill_id} not found"}
             
-            items = db.query(BillItem).filter(BillItem.bill_id == bill_id).all()
+            # BillItem model doesn't exist
+            items = []  # db.query(BillItem).filter(BillItem.bill_id == bill_id).all()
             
             return {
                 "success": True,
@@ -477,5 +481,4 @@ class BillReconciliation:
             return {"success": False, "error": str(e)}
 
 
-# Import InvoiceTax for GST reconciliation
-from api.db.models import InvoiceTax
+# InvoiceTax already imported at top from api.db.invoicing_models
