@@ -12,6 +12,7 @@ from datetime import datetime
 from api.db import get_db
 from api.routers.pos_auth import verify_pos_token
 from api.services.pos_service import complete_sale
+from api.services.thermal_printer import EscPosReceiptPrinter, MockReceiptPrinter
 
 router = APIRouter(prefix="/api/v1/pos", tags=["POS Sales"])
 
@@ -290,3 +291,114 @@ async def get_day_summary(
             for row in items_sold
         ]
     }
+
+
+@router.post("/print-receipt/{sale_id}")
+async def print_receipt(
+    sale_id: int,
+    use_mock: bool = False,
+    paper_width: int = 58,
+    printer_host: str = "192.168.1.100",
+    cashier_token = Depends(verify_pos_token),
+    db: Session = Depends(get_db)
+):
+    """
+    Print receipt on thermal printer (ESC/POS)
+    """
+    from sqlalchemy import text
+    
+    try:
+        sale = db.execute(text("""
+            SELECT s.id, s.transaction_id, s.transaction_date,
+                   s.customer_id, s.discount, s.tax, s.total_amount, s.payment_method,
+                   c.name as customer_name
+            FROM sales s
+            LEFT JOIN customers c ON s.customer_id = c.id
+            WHERE s.id = :id
+        """)).params(id=sale_id).fetchone()
+        
+        if not sale:
+            raise HTTPException(status_code=404, detail=f"Sale {sale_id} not found")
+        
+        items = db.execute(text("""
+            SELECT si.product_id, p.name, si.quantity, si.unit_price, si.line_total
+            FROM sale_items si
+            JOIN products p ON si.product_id = p.id
+            WHERE si.sale_id = :sale_id
+        """)).params(sale_id=sale_id).fetchall()
+        
+        receipt_data = {
+            "sale_id": sale.id,
+            "transaction_id": sale.transaction_id,
+            "timestamp": sale.transaction_date.isoformat() if sale.transaction_date else datetime.utcnow().isoformat(),
+            "store_name": "PETPOOJA",
+            "cashier_name": cashier_token.get("cashier_name", "Cashier"),
+            "customer_name": sale.customer_name,
+            "items": [
+                {
+                    "name": item.name,
+                    "quantity": item.quantity,
+                    "unit_price": float(item.unit_price),
+                    "line_total": float(item.line_total)
+                }
+                for item in items
+            ],
+            "subtotal": float(sale.total_amount - sale.tax),
+            "discount": float(sale.discount),
+            "gst": float(sale.tax),
+            "total": float(sale.total_amount),
+            "payment_method": sale.payment_method
+        }
+        
+        if use_mock:
+            printer = MockReceiptPrinter(paper_width=paper_width)
+        else:
+            printer = EscPosReceiptPrinter(host=printer_host, port=9100, paper_width=paper_width)
+        
+        success = printer.print_receipt(receipt_data)
+        
+        return {
+            "success": success,
+            "sale_id": sale_id,
+            "transaction_id": sale.transaction_id,
+            "message": "Receipt printed successfully" if success else "Failed to print receipt",
+            "printer_type": "mock" if use_mock else "thermal",
+            "paper_width": paper_width
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Print failed: {str(e)}"
+        )
+
+
+@router.get("/printer/test")
+async def test_printer(
+    use_mock: bool = True,
+    paper_width: int = 58,
+    cashier_token = Depends(verify_pos_token)
+):
+    """Test printer connectivity and output"""
+    try:
+        if use_mock:
+            printer = MockReceiptPrinter(paper_width=paper_width)
+        else:
+            printer = EscPosReceiptPrinter(paper_width=paper_width)
+        
+        success = printer.test_print()
+        
+        return {
+            "success": success,
+            "message": "Printer test completed",
+            "printer_type": "mock" if use_mock else "thermal",
+            "paper_width": paper_width
+        }
+    
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Printer test failed: {str(e)}"
+        )
