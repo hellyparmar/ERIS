@@ -24,8 +24,8 @@ class EInvoiceAddress(BaseModel):
     Addr1: str = Field(..., max_length=100, description="Address Line 1")
     Addr2: Optional[str] = Field(None, max_length=100, description="Address Line 2")
     Loc: str = Field(..., max_length=50, description="Location/City")
-    Pin: str = Field(..., regex=r'^\d{6}$', description="6-digit PIN code")
-    Stcd: str = Field(..., regex=r'^\d{2}$', description="State Code")
+    Pin: str = Field(..., pattern=r'^\d{6}$', description="6-digit PIN code")
+    Stcd: str = Field(..., pattern=r'^\d{2}$', description="State Code")
     
     class Config:
         schema_extra = {
@@ -41,14 +41,14 @@ class EInvoiceAddress(BaseModel):
 
 class EInvoiceSellerDetails(BaseModel):
     """Seller details for E-Invoice"""
-    Gstin: str = Field(..., regex=r'^\d{2}[A-Z]{5}\d{4}[A-Z]{1}[A-Z\d]{1}[Z]{1}[A-Z\d]{1}$')
+    Gstin: str = Field(..., pattern=r'^\d{2}[A-Z]{5}\d{4}[A-Z]{1}[A-Z\d]{1}[Z]{1}[A-Z\d]{1}$')
     LglNm: str = Field(..., max_length=100, description="Legal Name")
     TrdNm: Optional[str] = Field(None, max_length=100, description="Trade Name")
     Addr1: str
     Addr2: Optional[str] = None
     Loc: str
-    Pin: str = Field(..., regex=r'^\d{6}$')
-    Stcd: str = Field(..., regex=r'^\d{2}$')
+    Pin: str = Field(..., pattern=r'^\d{6}$')
+    Stcd: str = Field(..., pattern=r'^\d{2}$')
     Ph: Optional[str] = Field(None, max_length=15)
     Em: Optional[str] = Field(None, max_length=100)
 
@@ -58,12 +58,12 @@ class EInvoiceBuyerDetails(BaseModel):
     Gstin: Optional[str] = Field(None, regex=r'^\d{2}[A-Z]{5}\d{4}[A-Z]{1}[A-Z\d]{1}[Z]{1}[A-Z\d]{1}$')
     LglNm: str = Field(..., max_length=100)
     TrdNm: Optional[str] = None
-    Pos: str = Field(..., regex=r'^\d{2}$', description="Place of Supply")
+    Pos: str = Field(..., pattern=r'^\d{2}$', description="Place of Supply")
     Addr1: str
     Addr2: Optional[str] = None
     Loc: str
-    Pin: str = Field(..., regex=r'^\d{6}$')
-    Stcd: str = Field(..., regex=r'^\d{2}$')
+    Pin: str = Field(..., pattern=r'^\d{6}$')
+    Stcd: str = Field(..., pattern=r'^\d{2}$')
     Ph: Optional[str] = None
     Em: Optional[str] = None
 
@@ -72,7 +72,7 @@ class EInvoiceItemDetails(BaseModel):
     """Line item for E-Invoice"""
     SlNo: str = Field(..., description="Serial Number")
     PrdDesc: str = Field(..., max_length=300, description="Product Description")
-    IsServc: str = Field(..., regex=r'^[NY]$', description="Is Service (Y/N)")
+    IsServc: str = Field(..., pattern=r'^[NY]$', description="Is Service (Y/N)")
     HsnCd: str = Field(..., max_length=8, description="HSN/SAC Code")
     Barcde: Optional[str] = None
     Qty: Decimal = Field(..., description="Quantity")

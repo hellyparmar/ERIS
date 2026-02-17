@@ -184,7 +184,7 @@ class StoreStats(BaseModel):
 
 class SubscriptionUpdate(BaseModel):
     """Update subscription plan"""
-    plan: str = Field(..., regex=r'^(free|basic|pro|enterprise)$')
+    plan: str = Field(..., pattern=r'^(free|basic|pro|enterprise)$')
     billing_cycle: str = Field('monthly', regex=r'^(monthly|yearly)$')
 
 

@@ -24,8 +24,8 @@ router = APIRouter(prefix="/api/v1/gst", tags=["GST Compliance"])
 
 class TaxCalculationRequest(BaseModel):
     """Request to calculate GST tax"""
-    seller_state_code: str = Field(..., regex=r'^\d{2}$')
-    buyer_state_code: str = Field(..., regex=r'^\d{2}$')
+    seller_state_code: str = Field(..., pattern=r'^\d{2}$')
+    buyer_state_code: str = Field(..., pattern=r'^\d{2}$')
     reverse_charge: bool = False
     
     items: List[Dict] = Field(..., description="List of line items")

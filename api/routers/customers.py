@@ -38,7 +38,7 @@ class CreditLimitAssign(BaseModel):
 
 class PaymentRecord(BaseModel):
     amount: Decimal = Field(..., gt=0)
-    payment_method: str = Field(..., regex="^(cash|card|upi|bank_transfer)$")
+    payment_method: str = Field(..., pattern="^(cash|card|upi|bank_transfer)$")
     reference_number: Optional[str] = None
     notes: Optional[str] = None
     created_by: Optional[int] = None

@@ -36,8 +36,9 @@ from api.routers import (
     dashboard, tally_integration, odoo_sync,
     reports, enterprise, # New router
     weather,  # Weather API router
-    products, sales, pos_auth, inventory_control, customers, loyalty # Added by user
+    pos_auth, inventory_control, customers, loyalty # Phase 1-3 routers
 )
+
 
 # Import middleware
 from api.middleware.rate_limiter import APIRateLimitMiddleware
