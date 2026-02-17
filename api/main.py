@@ -202,6 +202,14 @@ app.include_router(pos_integration.router, tags=["POS Integration"])
 from api.routers import bill_management
 app.include_router(bill_management.router, tags=["Bill Management"])
 
+# POS Manager Override (Phase 1B - Manager Approvals)
+from api.routers import pos_override
+app.include_router(pos_override.router, tags=["POS Manager Override"])
+
+# POS Day Open/Close (Phase 1B - Cash Register Management)
+from api.routers import pos_dayclose
+app.include_router(pos_dayclose.router, tags=["Cash Register Management"])
+
 # Causal Inference Endpoints
 from api.routers import causal
 app.include_router(causal.router, tags=["Causal Inference"])

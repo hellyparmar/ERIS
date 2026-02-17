@@ -274,3 +274,69 @@ class Referral(Base):
     
     # Relationships
     referrer = relationship("Customer", foreign_keys=[referrer_id]) # back_populates removed for load simplicity
+
+# ==================== POS OPERATIONS ====================
+
+class DayClose(Base):
+    """Daily cash register reconciliation"""
+    __tablename__ = "day_close"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(DateTime(timezone=True), nullable=False, index=True)
+    
+    # Opening
+    opened_at = Column(DateTime(timezone=True), nullable=False)
+    opened_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    opening_float = Column(DECIMAL(12, 2), nullable=False)
+    
+    # Closing
+    closed_at = Column(DateTime(timezone=True))
+    closed_by = Column(Integer, ForeignKey("users.id"))
+    closing_float = Column(DECIMAL(12, 2))
+    
+    # Reconciliation
+    expected_cash = Column(DECIMAL(12, 2))
+    physical_cash = Column(DECIMAL(12, 2))
+    variance = Column(DECIMAL(12, 2))  # Difference between expected and physical
+    reconciliation_status = Column(String(50))  # matched, small_variance, large_variance
+    
+    notes = Column(Text)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+class ManagerOverride(Base):
+    """Manager approvals for high-value operations"""
+    __tablename__ = "manager_overrides"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    override_type = Column(String(50), nullable=False, index=True)  # discount, refund, price, quantity
+    sale_id = Column(Integer, ForeignKey("sales.id"), nullable=False, index=True)
+    
+    # Request details
+    requested_by = Column(Integer, ForeignKey("users.id"), nullable=False)  # Cashier
+    requested_amount = Column(DECIMAL(12, 2), nullable=False)
+    request_reason = Column(String(500))
+    
+    # Approval
+    approved_by = Column(Integer, ForeignKey("users.id"))  # Manager
+    approval_status = Column(String(50), default="pending", index=True)  # pending, approved, rejected
+    override_code = Column(String(8), unique=True, index=True)
+    code_expires_at = Column(DateTime(timezone=True))
+    code_used_at = Column(DateTime(timezone=True))
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+class AuditLog(Base):
+    """Audit trail for all manager actions"""
+    __tablename__ = "audit_logs"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    action = Column(String(100), nullable=False, index=True)
+    entity_type = Column(String(50))  # sale, override, dayclose, etc
+    entity_id = Column(Integer, index=True)
+    
+    details = Column(JSON)  # Context details as JSON
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    ip_address = Column(String(50))
