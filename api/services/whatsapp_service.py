@@ -1,12 +1,15 @@
 """
 WhatsApp Receipt Service
-Send digital receipts and payment reminders via WhatsApp (Twilio)
+Send digital receipts and payment reminders via WhatsApp
+Support for MSG91 (primary) and Twilio (fallback)
 WITH CIRCUIT BREAKER PROTECTION
 """
 
 import os
 import logging
-from typing import Optional, List
+import requests
+import json
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 # Import email fallback
@@ -15,9 +18,21 @@ from api.middleware.rate_limiter import rate_limiter
 from api.utils.circuit_breakers import twilio_circuit_breaker, FallbackHandler
 
 # Import Twilio Client directly
-from twilio.rest import Client
+try:
+    from twilio.rest import Client
+    TWILIO_AVAILABLE = True
+except ImportError:
+    TWILIO_AVAILABLE = False
+    Client = None
 
 logger = logging.getLogger(__name__)
+
+# MSG91 Configuration
+MSG91_API_KEY = os.getenv("MSG91_API_KEY", "")
+MSG91_SENDER_ID = os.getenv("MSG91_SENDER_ID", "R-DIOS")
+MSG91_ROUTE = os.getenv("MSG91_ROUTE", "4")
+MSG91_BASE_URL = "https://control.msg91.com/api/sendhttp"
+MSG91_ENABLED = bool(MSG91_API_KEY)
 
 # Twilio configuration
 TWILIO_ENABLED = os.getenv("TWILIO_ENABLED", "false").lower() == "true"

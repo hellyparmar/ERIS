@@ -210,6 +210,10 @@ app.include_router(pos_override.router, tags=["POS Manager Override"])
 from api.routers import pos_dayclose
 app.include_router(pos_dayclose.router, tags=["Cash Register Management"])
 
+# POS Offline Sync (Phase 1B - Offline Queue Management)
+from api.routers import pos_offline_sync
+app.include_router(pos_offline_sync.router, tags=["Offline Sync"])
+
 # Causal Inference Endpoints
 from api.routers import causal
 app.include_router(causal.router, tags=["Causal Inference"])
