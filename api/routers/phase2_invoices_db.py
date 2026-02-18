@@ -4,11 +4,12 @@ Phase 2: Invoice Management REST API Endpoints with Database Integration
 Complete invoice lifecycle management with GST compliance and database persistence
 """
 
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, Body
 from typing import List, Optional
 from datetime import date, datetime
 from decimal import Decimal
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
 
 from api.db.database import get_db
 from api.db.phase2_models import (
@@ -16,7 +17,35 @@ from api.db.phase2_models import (
 )
 from api.services.phase2_invoice_service import phase2_invoice_service, InvoiceLineItem
 
-router = APIRouter(prefix="/api/v2/invoices", tags=["invoices"])
+router = APIRouter(prefix="/api/v2/invoice", tags=["invoices"])
+
+
+# ==================== Request Models ====================
+
+class LineItemRequest(BaseModel):
+    """Line item in invoice"""
+    product_id: Optional[str] = None
+    product_name: str
+    hsn_code: str
+    quantity: Decimal
+    unit_rate: Decimal
+    tax_rate: Decimal
+
+
+class InvoiceCreateRequest(BaseModel):
+    """Invoice creation request"""
+    business_id: int
+    customer_id: int
+    customer_name: str
+    customer_email: Optional[str] = None
+    customer_phone: Optional[str] = None
+    customer_gst_number: Optional[str] = None
+    billing_address: str
+    shipping_address: Optional[str] = None
+    line_items: List[LineItemRequest]
+    payment_terms: Optional[str] = None
+    notes: Optional[str] = None
+    is_intra_state: bool = True
 
 
 # ==================== Helper Functions ====================
@@ -54,79 +83,77 @@ def calculate_invoice_totals(line_items_data: List[dict]) -> dict:
 
 @router.post("/create")
 def create_invoice(
-    business_id: str,
-    customer_name: str,
-    customer_id: Optional[str] = None,
-    customer_email: Optional[str] = None,
-    customer_phone: Optional[str] = None,
-    customer_gst_number: Optional[str] = None,
-    billing_address: str = None,
-    shipping_address: Optional[str] = None,
-    line_items: List[dict] = None,
-    payment_terms: Optional[str] = None,
-    notes: Optional[str] = None,
-    is_inter_state: bool = False,
+    request: InvoiceCreateRequest,
     db: Session = Depends(get_db)
 ):
     """
     Create a new GST-compliant invoice
     
     Args:
-        business_id: Business ID
-        customer_name: Customer name
-        line_items: List of items with quantity, rate, hsn_code, tax_rate
+        request: Invoice creation request with line items
         
     Returns:
         Created invoice with all calculations
     """
     try:
-        if not line_items:
+        if not request.line_items:
             raise ValueError("At least one line item required")
         
+        # Convert line items to dicts for calculation
+        line_items_data = [item.dict() for item in request.line_items]
+        
         # Calculate totals using service
-        totals = calculate_invoice_totals(line_items)
+        totals = calculate_invoice_totals(line_items_data)
         
         # Generate invoice number
-        invoice_number = generate_invoice_number(business_id, db)
+        invoice_number = generate_invoice_number(str(request.business_id), db)
         
         # Create invoice record
         invoice = Invoice(
             invoice_number=invoice_number,
-            business_id=business_id,
-            customer_id=customer_id or customer_name,
-            customer_name=customer_name,
-            customer_email=customer_email,
-            customer_phone=customer_phone,
-            customer_gst_number=customer_gst_number,
-            billing_address=billing_address or "Not provided",
-            shipping_address=shipping_address,
+            business_id=request.business_id,
+            customer_id=request.customer_id,
+            customer_name=request.customer_name,
+            customer_gst_number=request.customer_gst_number,
+            billing_address=request.billing_address,
+            shipping_address=request.shipping_address,
             invoice_date=date.today(),
-            total_taxable=Decimal(str(totals.get("subtotal", 0))),
-            total_cgst=Decimal(str(totals.get("cgst", 0))) if not is_inter_state else Decimal(0),
-            total_sgst=Decimal(str(totals.get("sgst", 0))) if not is_inter_state else Decimal(0),
-            total_igst=Decimal(str(totals.get("igst", 0))) if is_inter_state else Decimal(0),
+            subtotal=Decimal(str(totals.get("subtotal", 0))),
+            cgst_amount=Decimal(str(totals.get("cgst", 0))) if request.is_intra_state else Decimal(0),
+            sgst_amount=Decimal(str(totals.get("sgst", 0))) if request.is_intra_state else Decimal(0),
+            igst_amount=Decimal(str(totals.get("igst", 0))) if not request.is_intra_state else Decimal(0),
             total_tax=Decimal(str(totals.get("total_tax", 0))),
-            total_amount=Decimal(str(totals.get("final_amount", 0))),
-            payment_terms=payment_terms,
-            notes=notes,
-            is_inter_state=is_inter_state,
+            grand_total=Decimal(str(totals.get("final_amount", 0))),
+            payment_terms=request.payment_terms,
+            notes=request.notes,
+            is_inter_state=not request.is_intra_state,
             payment_status="UNPAID"
         )
         db.add(invoice)
         db.flush()  # Get the invoice ID
         
         # Create line items
-        for item_data in line_items:
+        for item_data in request.line_items:
+            quantity = Decimal(str(item_data.quantity))
+            unit_rate = Decimal(str(item_data.unit_rate))
+            tax_rate = Decimal(str(item_data.tax_rate))
+            
+            line_amount = quantity * unit_rate
+            tax_amount = line_amount * (tax_rate / Decimal(100))
+            line_total = line_amount + tax_amount
+            
             line_item = InvoiceLineItemModel(
                 invoice_id=invoice.id,
-                product_id=item_data.get("product_id", ""),
-                product_name=item_data.get("product_name"),
-                hsn_code=item_data.get("hsn_code"),
-                quantity=Decimal(str(item_data.get("quantity", 1))),
-                unit_rate=Decimal(str(item_data.get("unit_rate", 0))),
-                tax_rate=Decimal(str(item_data.get("tax_rate", 18))),
-                discount_percentage=Decimal(str(item_data.get("discount_percentage", 0))),
-                description=item_data.get("description")
+                product_id=item_data.product_id,
+                product_name=item_data.product_name,
+                hsn_code=item_data.hsn_code,
+                quantity=quantity,
+                unit_rate=unit_rate,
+                tax_rate=tax_rate,
+                line_amount=line_amount,
+                line_total=line_total,
+                discount_percentage=Decimal("0"),
+                description=None
             )
             db.add(line_item)
         
@@ -139,7 +166,7 @@ def create_invoice(
                 "invoice_number": invoice.invoice_number,
                 "business_id": invoice.business_id,
                 "customer_name": invoice.customer_name,
-                "total_taxable": float(invoice.total_taxable),
+                "subtotal": float(invoice.subtotal),
                 "total_tax": float(invoice.total_tax),
                 "total_amount": float(invoice.total_amount),
                 "payment_status": invoice.payment_status,
