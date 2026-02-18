@@ -22,6 +22,11 @@ class Business(Base):
     name = Column(String(255), nullable=False)
     gst_number = Column(String(15), unique=True, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    invoices = relationship("Invoice", back_populates="business")
+    customer_credits = relationship("CustomerCredit", back_populates="business")
+    gst_config = relationship("GSTConfiguration", back_populates="business")
 
 
 class Customer(Base):
@@ -32,6 +37,10 @@ class Customer(Base):
     name = Column(String(255), nullable=False)
     gst_number = Column(String(15), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    invoices = relationship("Invoice", back_populates="customer")
+    credit_account = relationship("CustomerCredit", back_populates="customer", uselist=False)
 
 
 class Product(Base):
@@ -42,6 +51,9 @@ class Product(Base):
     name = Column(String(255), nullable=False)
     hsn_code = Column(String(8), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    invoice_items = relationship("InvoiceLineItem", back_populates="product")
 
 
 # ==================== Invoice Models ====================

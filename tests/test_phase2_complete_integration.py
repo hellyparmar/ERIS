@@ -77,16 +77,45 @@ def db():
 
 
 @pytest.fixture(scope="function")
-def gst_config(db):
+def business(db):
+    """Create sample business"""
+    from api.db.phase2_models import Business
+    business_obj = Business(
+        name="Test Retail Business",
+        gst_number="27AAFCU5055K1Z0"
+    )
+    db.add(business_obj)
+    db.commit()
+    return business_obj
+
+
+@pytest.fixture(scope="function")
+def customer(db):
+    """Create sample customer"""
+    from api.db.phase2_models import Customer
+    customer_obj = Customer(
+        name="Test Customer",
+        gst_number="18AABCT7890H1Z1"
+    )
+    db.add(customer_obj)
+    db.commit()
+    return customer_obj
+
+
+@pytest.fixture(scope="function")
+def gst_config(db, business):
     """Create sample GST configuration"""
+    from datetime import date
     config = GSTConfiguration(
-        business_id="BIZ001",
-        gstin="27AAFCU5055K1Z0",
+        business_id=business.id,
+        gst_number="27AAFCU5055K1Z0",
         business_name="Test Retail Business",
-        financial_year="2024-04-01",
-        intra_state_cgst=Decimal("9"),
-        intra_state_sgst=Decimal("9"),
-        inter_state_igst=Decimal("18")
+        business_address="123 Main Street",
+        city="Mumbai",
+        state="Maharashtra",
+        pincode="400001",
+        financial_year_start=date(2024, 4, 1),
+        financial_year_end=date(2025, 3, 31)
     )
     db.add(config)
     db.commit()
@@ -94,16 +123,15 @@ def gst_config(db):
 
 
 @pytest.fixture(scope="function")
-def credit_account(db):
+def credit_account(db, business, customer):
     """Create sample credit account"""
     account = CustomerCredit(
-        business_id="BIZ001",
-        customer_id="CUST001",
-        customer_name="Test Customer",
+        business_id=business.id,
+        customer_id=customer.id,
         credit_limit=Decimal("50000"),
-        used_credit=Decimal("10000"),
+        current_balance=Decimal("10000"),
         credit_score=75,
-        credit_status="GOOD"
+        credit_rating="GOOD"
     )
     db.add(account)
     db.commit()
@@ -111,23 +139,30 @@ def credit_account(db):
 
 
 @pytest.fixture(scope="function")
-def sample_invoice_data():
+def sample_invoice_data(business, customer):
     """Sample invoice data"""
     return {
-        "business_id": "BIZ001",
-        "customer_id": "CUST001",
-        "customer_name": "Test Customer",
+        "business_id": business.id,
+        "customer_id": customer.id,
+        "customer_name": customer.name,
+        "customer_gst_number": customer.gst_number,
+        "billing_address": "123 Main Street, Mumbai",
+        "shipping_address": "123 Main Street, Mumbai",
         "line_items": [
             {
+                "product_id": "PROD001",
                 "product_name": "Product A",
-                "quantity": 2,
-                "unit_price": "500.00",
+                "hsn_code": "62149090",
+                "quantity": "2",
+                "unit_rate": "500.00",
                 "tax_rate": "18"
             },
             {
+                "product_id": "PROD002",
                 "product_name": "Product B",
-                "quantity": 1,
-                "unit_price": "1000.00",
+                "hsn_code": "85043020",
+                "quantity": "1",
+                "unit_rate": "1000.00",
                 "tax_rate": "18"
             }
         ],
