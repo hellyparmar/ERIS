@@ -7,7 +7,7 @@ Integrates all routers, database, middleware, and configuration
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.middleware.gzip import GZIPMiddleware
+from starlette.middleware.gzip import GZIPMiddleware
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 import logging

@@ -11,6 +11,11 @@ from sqlalchemy.pool import QueuePool
 import os
 from contextlib import contextmanager
 
+# Import Base for ORM models
+from .base import Base
+
+__all__ = ["Base", "engine", "SessionLocal", "get_db", "get_db_transaction", "get_db_readonly", "init_db", "healthcheck_db"]
+
 # Database configuration
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
