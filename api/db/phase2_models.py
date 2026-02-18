@@ -12,6 +12,40 @@ from sqlalchemy.orm import relationship
 from .base import Base
 
 
+# ==================== Supporting Models ====================
+
+class Business(Base):
+    """Business model for testing"""
+    __tablename__ = "businesses"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False)
+    gst_number = Column(String(15), unique=True, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class Customer(Base):
+    """Customer model for testing"""
+    __tablename__ = "customers"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False)
+    gst_number = Column(String(15), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class Product(Base):
+    """Product model for testing"""
+    __tablename__ = "products"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False)
+    hsn_code = Column(String(8), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+# ==================== Invoice Models ====================
+
 class Invoice(Base):
     """Invoice model for GST-compliant invoicing"""
     __tablename__ = "invoices"

@@ -7,7 +7,6 @@ Integrates all routers, database, middleware, and configuration
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from starlette.middleware.gzip import GZIPMiddleware
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 import logging
@@ -18,10 +17,11 @@ import os
 from api.db.database import init_db, healthcheck_db
 
 # Import Phase 1 routers
-from api.routers.phase1_pos import router as pos_router
-from api.routers.phase1_inventory import router as inventory_router
-from api.routers.phase1_users import router as users_router
-from api.routers.phase1_reports import router as reports_router
+from api.routers.pos import router as pos_router
+from api.routers.inventory import router as inventory_router
+from api.routers.auth import router as users_router
+from api.routers.reports import router as reports_router
+from api.routers.health import router as health_router
 
 # Import Phase 2 routers - with database integration
 from api.routers.phase2_invoices_db import router as invoices_router
@@ -103,12 +103,6 @@ app.add_middleware(
 app.add_middleware(
     TrustedHostMiddleware,
     allowed_hosts=["localhost", "127.0.0.1", os.getenv("DOMAIN", "localhost")]
-)
-
-# GZIP compression
-app.add_middleware(
-    GZIPMiddleware,
-    minimum_size=1000
 )
 
 

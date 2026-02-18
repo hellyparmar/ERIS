@@ -14,7 +14,7 @@ from api.db.database import get_db
 from api.db.phase2_models import (
     Invoice, InvoiceLineItem as InvoiceLineItemModel, InvoicePayment
 )
-from api.services.phase2_invoice_service import phase2_invoice_service, InvoiceLineItem, InvoiceDetails
+from api.services.phase2_invoice_service import phase2_invoice_service, InvoiceLineItem
 
 router = APIRouter(prefix="/api/v2/invoices", tags=["invoices"])
 

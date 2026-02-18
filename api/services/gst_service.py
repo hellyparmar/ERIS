@@ -411,4 +411,4 @@ class GSTService:
 
 
 # Initialize global GST service
-gst_service = GSSTService()
+gst_service = GSTService()
