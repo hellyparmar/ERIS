@@ -38,6 +38,11 @@ const Returns = lazy(() => import('./pages/Returns'));
 const Suppliers = lazy(() => import('./pages/Suppliers'));
 const Promotions = lazy(() => import('./pages/Promotions'));
 const Monitoring = lazy(() => import('./pages/Monitoring'));
+// Phase 3 — Billing & Compliance
+const Khata = lazy(() => import('./pages/Khata'));
+const DayClose = lazy(() => import('./pages/DayClose'));
+const GSTInvoice = lazy(() => import('./pages/GSTInvoice'));
+const GSTRates = lazy(() => import('./pages/GSTRates'));
 
 // Loading Fallback
 const LoadingSpinner = () => (
@@ -117,6 +122,11 @@ const MainLayout = () => {
                 <Route path="/suppliers" element={<Suppliers />} />
                 <Route path="/promotions" element={<Promotions />} />
                 <Route path="/monitoring" element={<Monitoring />} />
+                {/* Phase 3 — Billing & Compliance */}
+                <Route path="/khata" element={<Khata />} />
+                <Route path="/day-close" element={<DayClose />} />
+                <Route path="/gst-invoice" element={<GSTInvoice />} />
+                <Route path="/gst-rates" element={<GSTRates />} />
               </Routes>
             </Suspense>
           </main>

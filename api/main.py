@@ -37,7 +37,8 @@ from api.routers import (
     reports, enterprise, # New router
     weather,  # Weather API router
     forecasting, pos, alerts,  # ML & Business routers
-    pos_auth, pos_sales, inventory_control, customers, loyalty # Phase 1-3 routers
+    pos_auth, pos_sales, inventory_control, customers, loyalty, # Phase 1-3 routers
+    khata, gstr1  # Phase 3 Billing & Compliance
 )
 
 
@@ -209,6 +210,10 @@ app.include_router(pos_override.router, tags=["POS Manager Override"])
 # POS Day Open/Close (Phase 1B - Cash Register Management)
 from api.routers import pos_dayclose
 app.include_router(pos_dayclose.router, tags=["Cash Register Management"])
+
+# Phase 3 — Billing & Compliance
+app.include_router(khata.router, tags=["Khata Credit Tracking"])
+app.include_router(gstr1.router, tags=["GST Compliance"])
 
 # POS Offline Sync (Phase 1B - Offline Queue Management)
 from api.routers import pos_offline_sync
