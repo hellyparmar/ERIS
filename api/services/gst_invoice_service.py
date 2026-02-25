@@ -89,15 +89,28 @@ def generate_invoice_for_sale(
     Fetches sale + line items, calculates GST breakdown.
     """
     # Fetch sale
-    sale = db.execute(text("""
-        SELECT s.id, s.transaction_id, s.customer_id, s.total_amount,
-               s.tax, s.discount, s.payment_method, s.transaction_date,
-               c.name as customer_name, c.phone as customer_phone,
-               c.gstin as customer_gstin
-        FROM sales s
-        LEFT JOIN customers c ON c.id = s.customer_id
-        WHERE s.id = :sale_id
-    """), {"sale_id": sale_id}).fetchone()
+    # Use a safe query — gstin may or may not exist on the customers table
+    try:
+        sale = db.execute(text("""
+            SELECT s.id, s.transaction_id, s.customer_id, s.total_amount,
+                   s.tax, s.discount, s.payment_method, s.transaction_date,
+                   c.name as customer_name, c.phone as customer_phone,
+                   COALESCE(c.gstin, '') as customer_gstin
+            FROM sales s
+            LEFT JOIN customers c ON c.id = s.customer_id
+            WHERE s.id = :sale_id
+        """), {"sale_id": sale_id}).fetchone()
+    except Exception:
+        # Fallback: query without gstin if column not yet present
+        sale = db.execute(text("""
+            SELECT s.id, s.transaction_id, s.customer_id, s.total_amount,
+                   s.tax, s.discount, s.payment_method, s.transaction_date,
+                   c.name as customer_name, c.phone as customer_phone,
+                   '' as customer_gstin
+            FROM sales s
+            LEFT JOIN customers c ON c.id = s.customer_id
+            WHERE s.id = :sale_id
+        """), {"sale_id": sale_id}).fetchone()
 
     if not sale:
         raise ValueError(f"Sale {sale_id} not found")

@@ -263,6 +263,9 @@ class Customer(Base):
     # Tally Integration
     tally_ledger_name = Column(String(255))  # Exact name of the Ledger in Tally
     
+    # GST
+    gstin = Column(String(15), nullable=True)  # Customer GSTIN for B2B invoicing
+    
     # Loyalty Program (NEW)
     loyalty_points = Column(Integer, default=0)
     referral_code = Column(String(20), unique=True, index=True) # Unique code for inviting others
