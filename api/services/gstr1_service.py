@@ -47,7 +47,6 @@ def get_b2c_summary(db: Session, month: int, year: int) -> Dict[str, Any]:
         FROM sales
         WHERE transaction_date >= :start
           AND transaction_date <  :end
-          AND status = 'completed'
     """), {"start": start, "end": end}).fetchone()
 
     invoice_count = int(result[0] or 0)
@@ -88,7 +87,6 @@ def get_hsn_summary(db: Session, month: int, year: int) -> List[Dict[str, Any]]:
             JOIN sales s ON s.id = si.sale_id
             WHERE s.transaction_date >= :start
               AND s.transaction_date <  :end
-              AND s.status = 'completed'
             GROUP BY p.hsn_code, p.category
             ORDER BY taxable_value DESC
             LIMIT 20

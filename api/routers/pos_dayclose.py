@@ -176,8 +176,7 @@ async def close_day(
                   SUM(CASE WHEN payment_method = 'card' THEN total_amount ELSE 0 END) as card_sales,
                   SUM(CASE WHEN payment_method = 'khata' THEN total_amount ELSE 0 END) as khata_sales
                 FROM sales
-                WHERE DATE(created_at) = CURRENT_DATE
-                  AND status = 'completed'
+                WHERE DATE(transaction_date) = CURRENT_DATE
             """))
             
             sales_data = result.fetchone()

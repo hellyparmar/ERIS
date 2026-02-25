@@ -6,6 +6,11 @@ import { useToast } from '../components/ui/Toast';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
+const getAuthHeaders = () => ({
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${localStorage.getItem('pos_token') || ''}`,
+});
+
 const DayClose = () => {
     const { addToast } = useToast();
     const [dayStatus, setDayStatus] = useState(null);
@@ -20,7 +25,9 @@ const DayClose = () => {
 
     const fetchStatus = async () => {
         try {
-            const res = await fetch(`${API_BASE}/api/v1/pos/day/status`);
+            const res = await fetch(`${API_BASE}/api/v1/pos/day/status`, {
+                headers: getAuthHeaders()
+            });
             const data = await res.json();
             if (data.success) setDayStatus(data.data);
         } catch (e) {
@@ -39,7 +46,7 @@ const DayClose = () => {
         try {
             const res = await fetch(`${API_BASE}/api/v1/pos/day/open`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: getAuthHeaders(),
                 body: JSON.stringify({ opening_float: parseFloat(openFloat), notes: openNotes })
             });
             const data = await res.json();
@@ -63,7 +70,7 @@ const DayClose = () => {
         try {
             const res = await fetch(`${API_BASE}/api/v1/pos/day/close`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: getAuthHeaders(),
                 body: JSON.stringify({
                     physical_cash_count: parseFloat(physicalCash),
                     cheques_count: parseFloat(chequesCount || '0'),
@@ -231,8 +238,8 @@ const DayClose = () => {
                     </div>
                     <div className="mt-4 text-center">
                         <span className={`px-4 py-2 rounded-full text-sm font-semibold ${reconciliation.reconciliation_status === 'matched' ? 'bg-green-500/20 text-green-400' :
-                                reconciliation.reconciliation_status === 'small_variance' ? 'bg-yellow-500/20 text-yellow-400' :
-                                    'bg-red-500/20 text-red-400'
+                            reconciliation.reconciliation_status === 'small_variance' ? 'bg-yellow-500/20 text-yellow-400' :
+                                'bg-red-500/20 text-red-400'
                             }`}>
                             {reconciliation.reconciliation_status?.replace('_', ' ').toUpperCase()}
                         </span>
