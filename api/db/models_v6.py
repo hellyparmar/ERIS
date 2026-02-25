@@ -253,7 +253,7 @@ class SaleItem(Base):
     __tablename__ = "sale_items"
     
     id = Column(BigInteger, primary_key=True)
-    sale_id = Column(BigInteger, nullable=False)
+    sale_id = Column(BigInteger, ForeignKey("sales.id", ondelete="CASCADE"), nullable=False)
     sale_date = Column(TIMESTAMP(timezone=True), nullable=False)
     product_id = Column(BigInteger, ForeignKey("products.id", ondelete="RESTRICT"))
     

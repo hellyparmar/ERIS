@@ -157,7 +157,7 @@ class TestAPIIntegration:
         # Register
         register_data = {
             "username": f"testuser_{datetime.now().timestamp()}",
-            "password": "TestPass123!",
+            "password": "TestPass123",
             "email": f"test_{datetime.now().timestamp()}@test.com"
         }
         

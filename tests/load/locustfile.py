@@ -158,7 +158,7 @@ class AdminUser(HttpUser):
         # Login as admin
         response = self.client.post(
             "/auth/login",
-            data={"username": "admin", "password": "AdminPass123!"}
+            data={"username": "admin", "password": "AdminPass123"}
         )
         
         if response.status_code == 200:

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     ShoppingCart,
     Search,
@@ -15,27 +15,125 @@ import {
     DollarSign,
     Wifi,
     WifiOff,
-    Check
+    Check,
+    LogOut,
+    User
 } from 'lucide-react';
 import GlassCard from '../components/ui/GlassCard';
 import GradientButton from '../components/ui/GradientButton';
 import { useToast } from '../components/ui/Toast';
+import PINLogin from '../components/pos/PINLogin';
+import BarcodeScanner from '../components/inventory/BarcodeScanner';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
+// Idle timeout: 30 minutes in milliseconds
+const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
+
 const POS = () => {
     const { addToast } = useToast();
-    const [cart, setCart] = useState([
-        { id: 1, name: 'Wireless Headphones', price: 1250, quantity: 2, sku: 'WH-001' },
-        { id: 2, name: 'Smart Watch', price: 4500, quantity: 1, sku: 'SW-002' }
-    ]);
+
+    // ── Auth State ───────────────────────────────────────────────────────────
+    const [isAuthenticated, setIsAuthenticated] = useState(() => {
+        const token = localStorage.getItem('pos_token');
+        const lastActivity = localStorage.getItem('pos_last_activity');
+        if (!token || !lastActivity) return false;
+        // Check if session has expired
+        return Date.now() - parseInt(lastActivity) < IDLE_TIMEOUT_MS;
+    });
+    const [cashier, setCashier] = useState(() => {
+        try {
+            return JSON.parse(localStorage.getItem('pos_cashier') || 'null');
+        } catch {
+            return null;
+        }
+    });
+    const idleTimerRef = useRef(null);
+
+    // ── POS State ────────────────────────────────────────────────────────────
+    const [cart, setCart] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [paymentMethod, setPaymentMethod] = useState('cash');
-    const [isOnline] = useState(true);
+    const [isOnline, setIsOnline] = useState(navigator.onLine);
     const [showReceipt, setShowReceipt] = useState(false);
+    const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
     const [invoiceId] = useState(() => `INV-${Math.floor(Date.now() / 1000).toString().slice(-4)}`);
 
-    // Mock products for search
+    // ── Online/Offline detector ──────────────────────────────────────────────
+    useEffect(() => {
+        const handleOnline = () => setIsOnline(true);
+        const handleOffline = () => setIsOnline(false);
+        window.addEventListener('online', handleOnline);
+        window.addEventListener('offline', handleOffline);
+        return () => {
+            window.removeEventListener('online', handleOnline);
+            window.removeEventListener('offline', handleOffline);
+        };
+    }, []);
+
+    // ── Idle Auto-Logout ─────────────────────────────────────────────────────
+    const resetIdleTimer = useCallback(() => {
+        localStorage.setItem('pos_last_activity', Date.now().toString());
+        if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+        idleTimerRef.current = setTimeout(() => {
+            handleLogout(true);
+        }, IDLE_TIMEOUT_MS);
+    }, []); // eslint-disable-line
+
+    useEffect(() => {
+        if (!isAuthenticated) return;
+
+        // Start idle timer
+        resetIdleTimer();
+
+        // Reset on user activity
+        const events = ['mousemove', 'keydown', 'click', 'touchstart', 'scroll'];
+        events.forEach(e => window.addEventListener(e, resetIdleTimer));
+
+        return () => {
+            events.forEach(e => window.removeEventListener(e, resetIdleTimer));
+            if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+        };
+    }, [isAuthenticated, resetIdleTimer]);
+
+    // ── Auth Handlers ────────────────────────────────────────────────────────
+    const handleLoginSuccess = (data) => {
+        setCashier({
+            id: data.cashier_id,
+            name: data.cashier_name,
+            role: data.role
+        });
+        setIsAuthenticated(true);
+        addToast(`Welcome, ${data.cashier_name}!`, 'success');
+    };
+
+    const handleLogout = useCallback(async (isIdle = false) => {
+        try {
+            const token = localStorage.getItem('pos_token');
+            if (token) {
+                await fetch(`${API_BASE}/auth/pos/logout`, {
+                    method: 'POST',
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+            }
+        } catch {
+            // Logout even if API call fails
+        } finally {
+            localStorage.removeItem('pos_token');
+            localStorage.removeItem('pos_cashier');
+            localStorage.removeItem('pos_last_activity');
+            setIsAuthenticated(false);
+            setCashier(null);
+            setCart([]);
+            if (isIdle) {
+                addToast('Session expired due to inactivity. Please log in again.', 'warning');
+            } else {
+                addToast('Logged out successfully', 'success');
+            }
+        }
+    }, [addToast]);
+
+    // ── Product Search (mock + API) ───────────────────────────────────────────
     const products = [
         { id: 3, name: 'Laptop Stand', price: 380, sku: 'LS-003' },
         { id: 4, name: 'USB-C Cable', price: 60, sku: 'UC-004' },
@@ -49,6 +147,7 @@ const POS = () => {
         p.sku.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
+    // ── Cart Helpers ─────────────────────────────────────────────────────────
     const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     const gstRate = 0.18;
     const gst = subtotal * gstRate;
@@ -76,14 +175,30 @@ const POS = () => {
         setSearchQuery('');
     };
 
+    // ── Barcode Scan Handler ─────────────────────────────────────────────────
+    const handleBarcodeScan = (productData) => {
+        if (productData) {
+            addToCart({
+                id: productData.id,
+                name: productData.name,
+                price: productData.price,
+                sku: productData.sku || productData.barcode
+            });
+            addToast(`Added: ${productData.name}`, 'success');
+        }
+        setShowBarcodeScanner(false);
+    };
+
+    // ── Checkout ─────────────────────────────────────────────────────────────
     const completeSale = async () => {
         if (cart.length === 0) {
             addToast('Cart is empty', 'error');
             return;
         }
 
+        const token = localStorage.getItem('pos_token');
+
         try {
-            // Transform cart to API format
             const checkoutData = {
                 items: cart.map(item => ({
                     product_id: item.id,
@@ -97,7 +212,8 @@ const POS = () => {
             const response = await fetch(`${API_BASE}/api/v1/pos/checkout`, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    ...(token && { Authorization: `Bearer ${token}` })
                 },
                 body: JSON.stringify(checkoutData)
             });
@@ -107,11 +223,10 @@ const POS = () => {
             if (data.success) {
                 addToast(`Sale completed! Total: ₹${data.data.total_amount}`, 'success');
                 setShowReceipt(true);
-                // Clear cart after successful checkout
                 setTimeout(() => {
                     setCart([]);
                     setShowReceipt(false);
-                }, 3000);
+                }, 5000);
             } else {
                 addToast(data.error || 'Checkout failed', 'error');
             }
@@ -133,8 +248,22 @@ const POS = () => {
         { id: 'wallet', label: 'Wallet', icon: Wallet }
     ];
 
+    // ── PIN Login Gate ────────────────────────────────────────────────────────
+    if (!isAuthenticated) {
+        return <PINLogin onLoginSuccess={handleLoginSuccess} />;
+    }
+
+    // ── Main POS UI ───────────────────────────────────────────────────────────
     return (
         <div className="min-h-screen space-y-8 animate-fade-in">
+            {/* Barcode Scanner Modal */}
+            {showBarcodeScanner && (
+                <BarcodeScanner
+                    onScan={handleBarcodeScan}
+                    onClose={() => setShowBarcodeScanner(false)}
+                />
+            )}
+
             {/* Header */}
             <div className="flex justify-between items-center">
                 <div>
@@ -142,32 +271,50 @@ const POS = () => {
                     <p className="text-muted-foreground">Quick sales entry and receipt generation</p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <div className={`flex items-center gap-2 px-4 py-2 rounded-lg ${isOnline ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
-                        }`}>
+                    {/* Cashier Info */}
+                    {cashier && (
+                        <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/10 text-primary">
+                            <User className="w-4 h-4" />
+                            <span className="text-sm font-semibold">{cashier.name}</span>
+                            <span className="text-xs text-muted-foreground">({cashier.role})</span>
+                        </div>
+                    )}
+                    {/* Online Status */}
+                    <div className={`flex items-center gap-2 px-4 py-2 rounded-lg ${isOnline ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
                         {isOnline ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
                         <span className="text-sm font-semibold">{isOnline ? 'Online' : 'Offline'}</span>
                     </div>
-                    <span className="text-xs text-muted-foreground">Last sync: 2m ago</span>
+                    {/* Logout */}
+                    <button
+                        onClick={() => handleLogout(false)}
+                        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors text-sm font-semibold"
+                    >
+                        <LogOut className="w-4 h-4" />
+                        Logout
+                    </button>
                 </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Left: Product Search & Cart */}
                 <div className="lg:col-span-2 space-y-6">
-                    {/* Search */}
+                    {/* Search + Barcode Scan */}
                     <GlassCard className="p-6">
                         <div className="flex gap-3 mb-4">
                             <div className="flex-1 relative">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                                 <input
                                     type="text"
-                                    placeholder="Search product by name or scan barcode..."
+                                    placeholder="Search product by name or SKU..."
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                     className="w-full pl-12 pr-4 py-3 rounded-lg bg-secondary/50 border border-border text-foreground focus:border-primary focus:outline-none"
                                 />
                             </div>
-                            <button className="px-6 py-3 rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:shadow-lg transition-all flex items-center gap-2">
+                            <button
+                                onClick={() => setShowBarcodeScanner(true)}
+                                className="px-6 py-3 rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:shadow-lg transition-all flex items-center gap-2"
+                            >
                                 <Camera className="w-5 h-5" />
                                 Scan
                             </button>
@@ -194,6 +341,9 @@ const POS = () => {
                                 ))}
                             </div>
                         )}
+                        {searchQuery && filteredProducts.length === 0 && (
+                            <p className="text-muted-foreground text-sm text-center py-4">No products found for "{searchQuery}"</p>
+                        )}
                     </GlassCard>
 
                     {/* Cart */}
@@ -217,7 +367,7 @@ const POS = () => {
                         {cart.length === 0 ? (
                             <div className="text-center py-12">
                                 <ShoppingCart className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-50" />
-                                <p className="text-muted-foreground">Cart is empty. Search and add products to begin.</p>
+                                <p className="text-muted-foreground">Cart is empty. Search or scan a product to begin.</p>
                             </div>
                         ) : (
                             <div className="space-y-3">
@@ -271,7 +421,7 @@ const POS = () => {
                             </div>
                             <div className="flex justify-between text-muted-foreground">
                                 <span>GST (18%):</span>
-                                <span className="font-semibold">₹{gst.toLocaleString()}</span>
+                                <span className="font-semibold">₹{gst.toFixed(2)}</span>
                             </div>
                             <div className="h-px bg-border my-3" />
                             <div className="flex justify-between">
@@ -332,6 +482,8 @@ const POS = () => {
                                 </div>
                             )}
                         </div>
+                        {/* Session info */}
+                        <p className="text-xs text-muted-foreground text-center mt-4">Session auto-expires after 30 min of inactivity</p>
                     </GlassCard>
 
                     {/* Receipt Preview */}
@@ -347,6 +499,7 @@ const POS = () => {
                                 <div className="border-t border-b border-black py-2 my-2">
                                     <p className="text-xs">Date: {new Date().toLocaleString()}</p>
                                     <p className="text-xs">Invoice: #{invoiceId}</p>
+                                    <p className="text-xs">Cashier: {cashier?.name || 'N/A'}</p>
                                 </div>
                                 {cart.map((item) => (
                                     <div key={item.id} className="flex justify-between text-xs mb-1">
@@ -361,7 +514,7 @@ const POS = () => {
                                     </div>
                                     <div className="flex justify-between text-xs">
                                         <span>GST (18%):</span>
-                                        <span>₹{gst.toLocaleString()}</span>
+                                        <span>₹{gst.toFixed(2)}</span>
                                     </div>
                                     <div className="flex justify-between font-bold mt-2">
                                         <span>Total:</span>

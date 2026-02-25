@@ -10,6 +10,7 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+from pydantic import BaseModel
 
 from api.db.database import get_db
 from api.db.phase2_models import (
@@ -20,27 +21,26 @@ from api.services.phase2_credit_service import phase2_credit_service
 router = APIRouter(prefix="/api/v2/credit", tags=["credit"])
 
 
+class CreditAccountCreateRequest(BaseModel):
+    business_id: int
+    customer_id: int
+    credit_limit: Decimal = Decimal("50000")
+    payment_terms_days: int = 30
+    notes: Optional[str] = None
+
+
 # ==================== Credit Account Management ====================
 
 @router.post("/accounts/create")
 def create_credit_account(
-    business_id: str,
-    customer_id: str,
-    customer_name: str,
-    customer_phone: Optional[str] = None,
-    customer_email: Optional[str] = None,
-    credit_limit: Decimal = Decimal("50000"),
-    payment_terms_days: int = 30,
-    notes: Optional[str] = None,
+    request: CreditAccountCreateRequest,
     db: Session = Depends(get_db)
 ):
     """
     Create a new credit account for customer
     
     Args:
-        customer_id: Unique customer identifier
-        credit_limit: Maximum credit available
-        payment_terms_days: Payment terms in days
+        request: Credit account creation request
         
     Returns:
         Created credit account details
@@ -48,22 +48,20 @@ def create_credit_account(
     try:
         # Check if account already exists
         existing = db.query(CustomerCredit).filter(
-            CustomerCredit.customer_id == customer_id
+            CustomerCredit.customer_id == request.customer_id
         ).first()
         
         if existing:
-            raise ValueError(f"Credit account already exists for {customer_id}")
+            raise ValueError(f"Credit account already exists for customer {request.customer_id}")
         
-        # Create account
+        # Create new credit account
         account = CustomerCredit(
-            business_id=business_id,
-            customer_id=customer_id,
-            customer_name=customer_name,
-            credit_limit=Decimal(str(credit_limit)),
-            used_credit=Decimal(0),
-            payment_terms_days=payment_terms_days,
-            credit_score=50,  # Initial score
-            credit_status="FAIR"
+            business_id=request.business_id,
+            customer_id=request.customer_id,
+            credit_limit=Decimal(str(request.credit_limit)),
+            current_balance=Decimal(0),
+            credit_score=100,  # Initial score
+            credit_rating="GOOD"
         )
         
         db.add(account)
@@ -72,11 +70,13 @@ def create_credit_account(
         return {
             "status": "success",
             "account": {
-                "customer_id": str(account.customer_id),
+                "id": account.id,
+                "customer_id": account.customer_id,
                 "credit_limit": float(account.credit_limit),
-                "available_credit": float(account.credit_limit),
-                "created_at": account.created_at.isoformat(),
-                "status": "ACTIVE"
+                "current_balance": float(account.current_balance),
+                "credit_score": account.credit_score,
+                "credit_rating": account.credit_rating,
+                "created_at": account.created_at.isoformat() if account.created_at else None
             }
         }
     

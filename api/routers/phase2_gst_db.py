@@ -10,6 +10,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_
+from pydantic import BaseModel
 
 from api.db.database import get_db
 from api.db.phase2_models import GSTConfiguration, Invoice, InvoiceLineItem
@@ -18,54 +19,52 @@ from api.services.gst_service import gst_service
 router = APIRouter(prefix="/api/v2/gst", tags=["gst"])
 
 
+# ==================== Request Models ====================
+
+class GSTConfigRequest(BaseModel):
+    business_id: int
+    gst_number: str
+    business_name: str
+    business_address: str
+    city: str
+    state: str
+    pincode: str
+    financial_year_start: date
+    financial_year_end: date
+
+
 # ==================== GST Configuration ====================
 
 @router.post("/config/setup")
 def setup_gst_configuration(
-    business_id: str,
-    gstin: str,
-    business_name: str,
-    financial_year: str = "2024-04-01",
-    gst_registration_date: date = None,
-    composition_eligible: bool = False,
-    composition_rate: Decimal = None,
-    intra_state_cgst: Decimal = Decimal("9"),
-    intra_state_sgst: Decimal = Decimal("9"),
-    inter_state_igst: Decimal = Decimal("18"),
+    request: GSTConfigRequest,
     db: Session = Depends(get_db)
 ):
     """
     Setup GST configuration for business
     
     Args:
-        business_id: Business unique identifier
-        gstin: GST registration number
-        financial_year: Financial year start date (FY 2024 = 2024-04-01)
-        composition_eligible: Composition scheme eligibility
+        request: GST configuration request
     """
     try:
         # Check if config already exists
         existing = db.query(GSTConfiguration).filter(
-            GSTConfiguration.business_id == business_id
+            GSTConfiguration.business_id == request.business_id
         ).first()
         
         if existing:
-            raise ValueError(f"GST configuration already exists for {business_id}")
+            raise ValueError(f"GST configuration already exists for business {request.business_id}")
         
         config = GSTConfiguration(
-            business_id=business_id,
-            gstin=gstin,
-            business_name=business_name,
-            financial_year=financial_year,
-            gst_registration_date=gst_registration_date or date.today(),
-            composition_eligible=composition_eligible,
-            composition_rate=Decimal(str(composition_rate)) if composition_rate else None,
-            intra_state_cgst=Decimal(str(intra_state_cgst)),
-            intra_state_sgst=Decimal(str(intra_state_sgst)),
-            inter_state_igst=Decimal(str(inter_state_igst)),
-            hsn_sac_enabled=True,
-            nil_rated_enabled=True,
-            zero_rated_enabled=True
+            business_id=request.business_id,
+            gst_number=request.gst_number,
+            business_name=request.business_name,
+            business_address=request.business_address,
+            city=request.city,
+            state=request.state,
+            pincode=request.pincode,
+            financial_year_start=request.financial_year_start,
+            financial_year_end=request.financial_year_end
         )
         
         db.add(config)
@@ -74,11 +73,14 @@ def setup_gst_configuration(
         return {
             "status": "success",
             "configuration": {
-                "business_id": business_id,
-                "gstin": gstin,
-                "financial_year": financial_year,
-                "intra_state_rate": f"{intra_state_cgst}% + {intra_state_sgst}%",
-                "inter_state_rate": f"{inter_state_igst}%",
+                "id": config.id,
+                "business_id": config.business_id,
+                "gst_number": config.gst_number,
+                "business_name": config.business_name,
+                "business_address": config.business_address,
+                "city": config.city,
+                "state": config.state,
+                "pincode": config.pincode,
                 "setup_date": datetime.utcnow().isoformat()
             }
         }
@@ -105,22 +107,20 @@ def get_gst_configuration(business_id: str, db: Session = Depends(get_db)):
         return {
             "status": "success",
             "configuration": {
+                "id": config.id,
                 "business_id": config.business_id,
-                "gstin": config.gstin,
+                "gst_number": config.gst_number,
                 "business_name": config.business_name,
-                "financial_year": config.financial_year,
-                "gst_registration_date": config.gst_registration_date.isoformat(),
-                "tax_rates": {
-                    "intra_state": {
-                        "cgst": float(config.intra_state_cgst),
-                        "sgst": float(config.intra_state_sgst)
-                    },
-                    "inter_state": {
-                        "igst": float(config.inter_state_igst)
-                    }
-                },
-                "composition_scheme": config.composition_eligible,
-                "composition_rate": float(config.composition_rate) if config.composition_rate else None
+                "business_address": config.business_address,
+                "city": config.city,
+                "state": config.state,
+                "pincode": config.pincode,
+                "financial_year_start": config.financial_year_start.isoformat(),
+                "financial_year_end": config.financial_year_end.isoformat(),
+                "is_registered": config.is_registered,
+                "is_composition": config.is_composition,
+                "default_tax_rate": float(config.default_tax_rate),
+                "enable_e_invoice": config.enable_e_invoice
             }
         }
     
@@ -133,12 +133,12 @@ def get_gst_configuration(business_id: str, db: Session = Depends(get_db)):
 @router.put("/config/{business_id}")
 def update_gst_configuration(
     business_id: str,
-    intra_state_cgst: Optional[Decimal] = None,
-    intra_state_sgst: Optional[Decimal] = None,
-    inter_state_igst: Optional[Decimal] = None,
+    default_tax_rate: Optional[Decimal] = None,
+    is_composition: Optional[bool] = None,
+    enable_e_invoice: Optional[bool] = None,
     db: Session = Depends(get_db)
 ):
-    """Update GST tax rates"""
+    """Update GST configuration"""
     try:
         config = db.query(GSTConfiguration).filter(
             GSTConfiguration.business_id == business_id
@@ -147,12 +147,12 @@ def update_gst_configuration(
         if not config:
             raise HTTPException(status_code=404, detail="GST configuration not found")
         
-        if intra_state_cgst:
-            config.intra_state_cgst = Decimal(str(intra_state_cgst))
-        if intra_state_sgst:
-            config.intra_state_sgst = Decimal(str(intra_state_sgst))
-        if inter_state_igst:
-            config.inter_state_igst = Decimal(str(inter_state_igst))
+        if default_tax_rate is not None:
+            config.default_tax_rate = Decimal(str(default_tax_rate))
+        if is_composition is not None:
+            config.is_composition = is_composition
+        if enable_e_invoice is not None:
+            config.enable_e_invoice = enable_e_invoice
         
         config.updated_at = datetime.utcnow()
         db.commit()
@@ -172,20 +172,20 @@ def update_gst_configuration(
 
 # ==================== Tax Calculations ====================
 
-@router.post("/calculate/intra-state")
-def calculate_intra_state_tax(
+@router.post("/calculate/tax")
+def calculate_tax(
     business_id: str,
     amount: Decimal,
     tax_rate: Optional[Decimal] = None,
     db: Session = Depends(get_db)
 ):
     """
-    Calculate GST for intra-state transaction (CGST + SGST)
+    Calculate GST tax on amount
     
     Args:
         business_id: Business identifier
         amount: Taxable amount
-        tax_rate: Optional override rate (uses config default if not provided)
+        tax_rate: Optional override rate (uses default if not provided)
     """
     try:
         config = db.query(GSTConfiguration).filter(
@@ -195,66 +195,21 @@ def calculate_intra_state_tax(
         if not config:
             raise HTTPException(status_code=404, detail="GST configuration not found")
         
+        # Use provided rate or default
+        rate = tax_rate if tax_rate else config.default_tax_rate
+        
         # Use service layer for calculation
-        result = gst_service.calculate_tax_intra_state(
+        result = gst_service.calculate_tax(
             amount=amount,
-            cgst_rate=float(config.intra_state_cgst),
-            sgst_rate=float(config.intra_state_sgst)
+            tax_rate=float(rate)
         )
         
         return {
             "status": "success",
             "calculation": {
                 "taxable_amount": float(amount),
-                "cgst_rate": float(config.intra_state_cgst),
-                "cgst_amount": result["cgst"],
-                "sgst_rate": float(config.intra_state_sgst),
-                "sgst_amount": result["sgst"],
-                "total_tax": result["total_tax"],
-                "total_amount": result["gross_amount"]
-            }
-        }
-    
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/calculate/inter-state")
-def calculate_inter_state_tax(
-    business_id: str,
-    amount: Decimal,
-    db: Session = Depends(get_db)
-):
-    """
-    Calculate GST for inter-state transaction (IGST only)
-    
-    Args:
-        business_id: Business identifier
-        amount: Taxable amount
-    """
-    try:
-        config = db.query(GSTConfiguration).filter(
-            GSTConfiguration.business_id == business_id
-        ).first()
-        
-        if not config:
-            raise HTTPException(status_code=404, detail="GST configuration not found")
-        
-        # Use service layer for calculation
-        result = gst_service.calculate_tax_inter_state(
-            amount=amount,
-            igst_rate=float(config.inter_state_igst)
-        )
-        
-        return {
-            "status": "success",
-            "calculation": {
-                "taxable_amount": float(amount),
-                "igst_rate": float(config.inter_state_igst),
-                "igst_amount": result["igst"],
-                "total_tax": result["igst"],
+                "tax_rate": float(rate),
+                "tax_amount": result["tax"],
                 "total_amount": result["gross_amount"]
             }
         }
@@ -269,7 +224,6 @@ def calculate_inter_state_tax(
 def calculate_line_items_tax(
     business_id: str,
     line_items: List[Dict],
-    is_intra_state: bool = True,
     db: Session = Depends(get_db)
 ):
     """
@@ -277,7 +231,6 @@ def calculate_line_items_tax(
     
     Args:
         line_items: List of {description, quantity, unit_price, tax_rate, hsn_code}
-        is_intra_state: CGST+SGST (True) or IGST (False)
     """
     try:
         config = db.query(GSTConfiguration).filter(
@@ -290,10 +243,7 @@ def calculate_line_items_tax(
         # Calculate using service
         result = gst_service.calculate_line_items(
             line_items=line_items,
-            cgst_rate=float(config.intra_state_cgst),
-            sgst_rate=float(config.intra_state_sgst),
-            igst_rate=float(config.inter_state_igst),
-            is_intra_state=is_intra_state
+            default_tax_rate=float(config.default_tax_rate)
         )
         
         return {
@@ -406,7 +356,7 @@ def generate_gstr3b_return(
     """
     Generate GSTR-3B return data (Monthly GST return)
     
-    GSTR-3B: Outward supplies - Inward supplies = Net GST to pay
+    GSTR-3B: Total GST collected on outward supplies
     """
     try:
         config = db.query(GSTConfiguration).filter(
@@ -423,25 +373,15 @@ def generate_gstr3b_return(
             func.year(Invoice.created_at) == year
         ).all()
         
-        outward_cgst = sum(
-            Decimal(str(getattr(inv, 'cgst_amount', 0))) for inv in invoices
-        )
-        outward_sgst = sum(
-            Decimal(str(getattr(inv, 'sgst_amount', 0))) for inv in invoices
-        )
-        outward_igst = sum(
-            Decimal(str(getattr(inv, 'igst_amount', 0))) for inv in invoices
+        total_tax_collected = sum(
+            Decimal(str(getattr(inv, 'total_tax', 0))) for inv in invoices
         )
         
-        # Input tax (placeholder)
-        input_cgst = Decimal(0)
-        input_sgst = Decimal(0)
-        input_igst = Decimal(0)
+        # Input tax (placeholder - not yet tracked)
+        total_input_tax = Decimal(0)
         
         # Payable tax
-        cgst_payable = outward_cgst - input_cgst
-        sgst_payable = outward_sgst - input_sgst
-        igst_payable = outward_igst - input_igst
+        net_payable_tax = total_tax_collected - total_input_tax
         
         return {
             "status": "success",
@@ -449,22 +389,10 @@ def generate_gstr3b_return(
                 "month": month,
                 "year": year,
                 "business_id": business_id,
-                "outward_supplies": {
-                    "cgst": float(outward_cgst),
-                    "sgst": float(outward_sgst),
-                    "igst": float(outward_igst)
-                },
-                "inward_supplies": {
-                    "cgst": float(input_cgst),
-                    "sgst": float(input_sgst),
-                    "igst": float(input_igst)
-                },
-                "gst_payable": {
-                    "cgst": float(cgst_payable),
-                    "sgst": float(sgst_payable),
-                    "igst": float(igst_payable),
-                    "total": float(cgst_payable + sgst_payable + igst_payable)
-                }
+                "outward_tax_collected": float(total_tax_collected),
+                "input_tax_available": float(total_input_tax),
+                "net_gst_payable": float(net_payable_tax),
+                "invoice_count": len(invoices)
             }
         }
     
@@ -490,14 +418,8 @@ def get_standard_tax_rates(business_id: str, db: Session = Depends(get_db)):
         return {
             "status": "success",
             "rates": {
-                "intra_state": {
-                    "cgst": float(config.intra_state_cgst),
-                    "sgst": float(config.intra_state_sgst),
-                    "total": float(config.intra_state_cgst + config.intra_state_sgst)
-                },
-                "inter_state": {
-                    "igst": float(config.inter_state_igst)
-                },
+                "default_tax_rate": float(config.default_tax_rate),
+                "is_composition": config.is_composition,
                 "effective_from": config.updated_at.isoformat()
             }
         }

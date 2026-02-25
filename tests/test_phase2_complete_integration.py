@@ -15,27 +15,56 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
+import os
 
 # Import database and app
 from api.db.database import Base, get_db
 from api.db.phase2_models import (
     Invoice, InvoiceLineItem, InvoicePayment,
     CustomerCredit, CreditTransaction, CreditReminder,
-    GSTConfiguration
+    GSTConfiguration, Business, Customer, Product
 )
 from main_phase2 import app
 
 
 # ==================== Test Database Setup ====================
 
-# Use SQLite for testing (in-memory)
-SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
+# Use PostgreSQL for testing - create a test database
+BASE_DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql://postgres:hellyNonu%4029@db.rmqawnaymxgttgaaeazc.supabase.co:5432/postgres"
+)
 
+# Extract base URL without database name to create test database
+base_parts = BASE_DATABASE_URL.rsplit('/', 1)
+base_url = base_parts[0]
+test_db_name = "test_rdios_db"
+TEST_DATABASE_URL = f"{base_url}/{test_db_name}"
+
+# Try to create the test database if it doesn't exist
+try:
+    # Connect to the main database to check if test database exists
+    main_engine = create_engine(BASE_DATABASE_URL, pool_pre_ping=True, echo=False)
+    with main_engine.connect() as conn:
+        conn.execute(text("COMMIT"))  # Commit any pending transaction
+        # Check if database exists
+        result = conn.execute(text(f"SELECT 1 FROM pg_database WHERE datname = '{test_db_name}'"))
+        if not result.fetchone():
+            # Database doesn't exist, create it
+            conn.execute(text(f"CREATE DATABASE {test_db_name}"))
+            conn.commit()
+    main_engine.dispose()
+    print(f"✅ Test database ready: {test_db_name}")
+except Exception as e:
+    print(f"⚠️  Database creation note: {e}")
+
+# Create engine for test database
 engine = create_engine(
-    SQLALCHEMY_DATABASE_URL,
-    connect_args={"check_same_thread": False}
+    TEST_DATABASE_URL,
+    pool_pre_ping=True,
+    echo=False
 )
 
 TestingSessionLocal = sessionmaker(
@@ -44,7 +73,12 @@ TestingSessionLocal = sessionmaker(
     bind=engine
 )
 
-Base.metadata.create_all(bind=engine)
+# Create all tables
+try:
+    Base.metadata.create_all(bind=engine)
+    print(f"✅ Tables created in test database")
+except Exception as e:
+    print(f"⚠️  Error creating tables: {e}")
 
 
 def override_get_db():
@@ -56,24 +90,25 @@ def override_get_db():
         db.close()
 
 
+# Apply the override BEFORE creating the client
 app.dependency_overrides[get_db] = override_get_db
 client = TestClient(app)
 
 
 # ==================== Test Fixtures ====================
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="function", autouse=False)
 def db():
-    """Database fixture"""
-    connection = engine.connect()
-    transaction = connection.begin()
-    session = TestingSessionLocal(bind=connection)
-    
-    yield session
-    
-    session.close()
-    transaction.rollback()
-    connection.close()
+    """Database fixture - creates a fresh transaction for each test"""
+    db = TestingSessionLocal()
+    try:
+        yield db
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
 
 
 @pytest.fixture(scope="function")
@@ -370,13 +405,15 @@ class TestGSTAPI:
     def test_setup_gst_configuration(self):
         """Test GST configuration setup"""
         response = client.post("/api/v2/gst/config/setup", json={
-            "business_id": "BIZ001",
-            "gstin": "27AAFCU5055K1Z0",
+            "business_id": 1,
+            "gst_number": "27AAFCU5055K1Z0",
             "business_name": "Test Business",
-            "financial_year": "2024-04-01",
-            "intra_state_cgst": "9",
-            "intra_state_sgst": "9",
-            "inter_state_igst": "18"
+            "business_address": "Test Address",
+            "city": "Test City",
+            "state": "Test State",
+            "pincode": "400001",
+            "financial_year_start": "2024-04-01",
+            "financial_year_end": "2025-03-31"
         })
         assert response.status_code == 200
         data = response.json()
@@ -384,15 +421,15 @@ class TestGSTAPI:
     
     def test_get_gst_configuration(self, gst_config):
         """Test getting GST configuration"""
-        response = client.get("/api/v2/gst/config/BIZ001")
+        response = client.get("/api/v2/gst/config/1")
         assert response.status_code == 200
         data = response.json()
-        assert data["configuration"]["gstin"] == "27AAFCU5055K1Z0"
+        assert data["configuration"]["gst_number"] == "27AAFCU5055K1Z0"
     
-    def test_calculate_intra_state_tax(self, gst_config):
-        """Test intra-state tax calculation"""
-        response = client.post("/api/v2/gst/calculate/intra-state", json={
-            "business_id": "BIZ001",
+    def test_calculate_tax(self, gst_config):
+        """Test tax calculation"""
+        response = client.post("/api/v2/gst/calculate/tax", json={
+            "business_id": 1,
             "amount": "1000"
         })
         assert response.status_code == 200

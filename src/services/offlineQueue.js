@@ -52,6 +52,7 @@ class OfflineQueue {
             console.error('[OfflineQueue] Failed to enqueue:', error);
             throw error;
         }
+    }
 
     /**
      * Get all pending operations
@@ -68,6 +69,7 @@ class OfflineQueue {
             console.error('[OfflineQueue] Failed to get pending:', error);
             return [];
         }
+    }
 
     /**
      * Get failed operations
@@ -79,6 +81,7 @@ class OfflineQueue {
             console.error('[OfflineQueue] Failed to get failed:', error);
             return [];
         }
+    }
 
     /**
      * Get operations with conflicts
@@ -90,6 +93,7 @@ class OfflineQueue {
             console.error('[OfflineQueue] Failed to get conflicts:', error);
             return [];
         }
+    }
 
     /**
      * Process entire queue
@@ -170,7 +174,9 @@ class OfflineQueue {
                                 error: error.message
                             });
                         }
+                    }
                 }
+            }
 
             console.log('[OfflineQueue] Queue processed:', results);
             return results;
@@ -178,6 +184,7 @@ class OfflineQueue {
         } finally {
             this.syncInProgress = false;
         }
+    }
 
     /**
      * Sync invoice to server
@@ -208,6 +215,7 @@ class OfflineQueue {
             }
             throw error;
         }
+    }
 
     /**
      * Sync payment to server
@@ -237,6 +245,7 @@ class OfflineQueue {
             }
             throw error;
         }
+    }
 
     /**
      * Sync inventory update to server
@@ -260,6 +269,7 @@ class OfflineQueue {
             }
             throw error;
         }
+    }
 
     /**
      * Sync customer update to server
@@ -281,6 +291,7 @@ class OfflineQueue {
             }
             throw error;
         }
+    }
 
     /**
      * Update operation status
@@ -299,6 +310,7 @@ class OfflineQueue {
         } catch (err) {
             console.error('[OfflineQueue] Failed to update status:', err);
         }
+    }
 
     /**
      * Retry failed operations
@@ -325,6 +337,7 @@ class OfflineQueue {
             console.error('[OfflineQueue] Failed to retry:', error);
             throw error;
         }
+    }
 
     /**
      * Clear completed operations
@@ -341,6 +354,7 @@ class OfflineQueue {
         } catch (error) {
             console.error('[OfflineQueue] Failed to clear completed:', error);
         }
+    }
 
     /**
      * Get queue statistics
@@ -367,6 +381,7 @@ class OfflineQueue {
             console.error('[OfflineQueue] Failed to get stats:', error);
             return null;
         }
+    }
 }
 
 // Export singleton instance

@@ -70,7 +70,7 @@ def test_login_with_valid_credentials(client, test_user):
     """Test login with correct username and password"""
     response = client.post(
         "/auth/login",
-        data={"username": "testuser", "password": "TestPass123!"}
+        data={"username": "testuser", "password": "TestPass123"}
     )
     
     assert response.status_code == status.HTTP_200_OK
@@ -147,7 +147,7 @@ def test_token_refresh(client, test_user):
     # First login
     login_response = client.post(
         "/auth/login",
-        data={"username": "testuser", "password": "TestPass123!"}
+        data={"username": "testuser", "password": "TestPass123"}
     )
     refresh_token = login_response.json()["refresh_token"]
     
@@ -176,8 +176,8 @@ def test_change_password(client, auth_headers, test_user):
     response = client.post(
         "/auth/change-password",
         params={
-            "old_password": "TestPass123!",
-            "new_password": "NewSecurePass456!"
+            "old_password": "TestPass123",
+            "new_password": "NewSecurePass"
         },
         headers=auth_headers
     )
