@@ -1,18 +1,13 @@
-"""
-POS Authentication Router
-Cashier PIN login with JWT tokens
-"""
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from pydantic import BaseModel
 from datetime import datetime, timedelta
-import jwt
-import os
+import jwt, os, bcrypt
 from dotenv import load_dotenv
 
 from api.db import get_db
-from api.models.cashier import Cashier
 
 load_dotenv('backend/.env')
 
@@ -39,40 +34,53 @@ class PINLoginResponse(BaseModel):
 @router.post("/login", response_model=PINLoginResponse)
 async def pos_login(request: PINLoginRequest, db: Session = Depends(get_db)):
     """
-    Authenticate cashier with 4-digit PIN
-    Returns JWT token valid for 8 hours
+    Authenticate cashier with 4-digit PIN.
+    Uses raw SQL to avoid ORM mapper registry conflicts.
     """
-    # Find active cashier by store
-    cashier = db.query(Cashier).filter(
-        Cashier.store_id == request.store_id,
-        Cashier.is_active == True
-    ).first()
-    
-    if not cashier or not cashier.verify_pin(request.pin):
+    # Fetch active cashier for this store (raw SQL — no ORM mapper)
+    result = db.execute(text("""
+        SELECT id, name, pin_hash, role, store_id
+        FROM cashiers
+        WHERE store_id = :store_id AND is_active = TRUE
+        LIMIT 10
+    """), {"store_id": request.store_id})
+    rows = result.fetchall()
+
+    # Find cashier whose PIN matches
+    cashier = None
+    for row in rows:
+        try:
+            if bcrypt.checkpw(request.pin.encode(), row[2].encode()):
+                cashier = {"id": row[0], "name": row[1], "pin_hash": row[2], "role": row[3], "store_id": row[4]}
+                break
+        except Exception:
+            continue
+
+    if not cashier:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid PIN or cashier not found"
         )
-    
+
     # Generate JWT token
     expires_at = datetime.utcnow() + timedelta(hours=POS_TOKEN_EXPIRY_HOURS)
     payload = {
-        "cashier_id": cashier.id,
-        "cashier_name": cashier.name,
-        "role": cashier.role,
-        "store_id": cashier.store_id,
+        "cashier_id": cashier["id"],
+        "cashier_name": cashier["name"],
+        "role": cashier["role"],
+        "store_id": cashier["store_id"],
         "exp": expires_at,
         "iat": datetime.utcnow(),
         "last_activity": datetime.utcnow().isoformat()
     }
-    
+
     token = jwt.encode(payload, POS_JWT_SECRET, algorithm="HS256")
-    
+
     return PINLoginResponse(
         access_token=token,
-        cashier_id=cashier.id,
-        cashier_name=cashier.name,
-        role=cashier.role,
+        cashier_id=cashier["id"],
+        cashier_name=cashier["name"],
+        role=cashier["role"],
         expires_at=expires_at
     )
 

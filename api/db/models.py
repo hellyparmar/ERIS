@@ -165,8 +165,8 @@ class CustomerCredit(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
-    # Relationships
-    customer = relationship("Customer", back_populates="credit_account")
+    # Relationships — use class directly to avoid ambiguity with models_v6.Customer
+    customer = relationship(Customer, back_populates="credit_account", foreign_keys=[customer_id])
 
 class Message(Base):
     """Unified communication hub"""
