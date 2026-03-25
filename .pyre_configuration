@@ -1,0 +1,13 @@
+{
+  "source_directories": ["backend"],
+  "search_path": [
+    "/home/petpooja/miniconda3/lib/python3.13/site-packages"
+  ],
+  "binary_directory": "/home/petpooja/miniconda3/bin",
+  "exclude_search_path_directories_from_source": true,
+  "ignore_all_errors": false,
+  "logger": null,
+  "critical_files": null,
+  "targets": [],
+  "workers": 4
+}
