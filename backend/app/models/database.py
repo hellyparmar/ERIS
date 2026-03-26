@@ -1,130 +1,131 @@
 """
-Database dependency injection for FastAPI
+database.py - Database Connection & Session Management
+MSc Data Science Project - Enterprise Retail Intelligence System
 
-Provides database session management with proper cleanup
+Supports SQLite (local dev / CI) and PostgreSQL (production).
 """
 
-from typing import Generator
-from sqlalchemy import create_engine, event
-from sqlalchemy.orm import sessionmaker, Session
-from sqlalchemy.pool import QueuePool
 import os
 import logging
 import time
+from typing import Generator
 from contextlib import contextmanager
+
+from sqlalchemy import create_engine, event, text
+from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.pool import QueuePool, StaticPool
+
+from .base import Base
 
 logger = logging.getLogger(__name__)
 
-# Import Base for ORM models
-from .base import Base
+# ── Configuration ─────────────────────────────────────────────────────────────
 
-__all__ = ["Base", "engine", "SessionLocal", "get_db", "get_db_transaction", "get_db_readonly", "init_db", "healthcheck_db"]
-
-# Database configuration
-# Support both SQLite (local development) and PostgreSQL (production)
-DATABASE_URL = os.getenv(
+DATABASE_URL: str = os.getenv(
     "DATABASE_URL",
-    "sqlite:///petpooja_retail_db.sqlite3"  # Changed to SQLite for local dev
+    "sqlite:///./eris_dev.sqlite3"   # local dev default
 )
 
-# Create engine with connection pooling
-# SQLite needs different settings than PostgreSQL
-if DATABASE_URL.startswith("sqlite"):
-    engine = create_engine(
-        DATABASE_URL,
-        connect_args={"check_same_thread": False},
-        echo=False
-    )
-else:
-    engine = create_engine(
-        DATABASE_URL,
+# ── Engine ────────────────────────────────────────────────────────────────────
+
+def _build_engine(url: str):
+    """Build the SQLAlchemy engine, adapting settings for SQLite vs PostgreSQL."""
+    if url.startswith("sqlite"):
+        return create_engine(
+            url,
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+            echo=False,
+        )
+    # PostgreSQL / production
+    return create_engine(
+        url,
         poolclass=QueuePool,
-        pool_size=20,
-        max_overflow=40,
+        pool_size=10,
+        max_overflow=20,
         pool_timeout=30,
-        pool_recycle=1800,
-        pool_pre_ping=True,
-        echo=False
+        pool_recycle=1800,   # recycle every 30 min to avoid stale connections
+        pool_pre_ping=True,  # verify connection before checkout
+        echo=False,
     )
+
+
+engine = _build_engine(DATABASE_URL)
+
+
+# ── Connection-hold monitoring ────────────────────────────────────────────────
 
 @event.listens_for(engine, "checkout")
-def receive_checkout(dbapi_connection, connection_record, connection_proxy):
-    connection_record.info['checkout_time'] = time.time()
+def on_checkout(dbapi_conn, conn_record, conn_proxy):
+    conn_record.info["checkout_time"] = time.monotonic()
+
 
 @event.listens_for(engine, "checkin")
-def receive_checkin(dbapi_connection, connection_record):
-    checkout_time = connection_record.info.get('checkout_time')
-    if checkout_time:
-        duration = time.time() - checkout_time
-        if duration > 1.0:
-            logger.warning(f"Long database connection hold explicitly detected: {duration:.2f}s")
+def on_checkin(dbapi_conn, conn_record):
+    start = conn_record.info.get("checkout_time")
+    if start:
+        duration = time.monotonic() - start
+        if duration > 2.0:
+            logger.warning("Slow DB connection: held for %.2fs", duration)
 
-# Create session factory
+
+# ── Session factory ───────────────────────────────────────────────────────────
+
 SessionLocal = sessionmaker(
     autocommit=False,
     autoflush=False,
-    bind=engine
+    bind=engine,
 )
 
 
+# ── FastAPI dependency ────────────────────────────────────────────────────────
+
 def get_db() -> Generator[Session, None, None]:
     """
-    FastAPI dependency for database session
-    
-    Yields a database session and ensures proper cleanup
-    
-    Usage:
-        @app.get("/items")
-        def get_items(db: Session = Depends(get_db)):
-            return db.query(Item).all()
-    
-    Yields:
-        Session: SQLAlchemy session object
+    Yield a SQLAlchemy session, ensuring teardown after each request.
+
+    Usage in a FastAPI route:
+        db: Session = Depends(get_db)
     """
     db = SessionLocal()
     try:
         yield db
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()
 
 
+# ── Transaction helper (for services / background tasks) ─────────────────────
+
 @contextmanager
 def get_db_transaction():
     """
-    Context manager for database transactions with automatic rollback
-    
+    Context manager that wraps work in a single transaction.
+
+    Commits on success, rolls back on any exception.
+
     Usage:
         with get_db_transaction() as db:
-            invoice = Invoice(...)
-            db.add(invoice)
-            # Automatically commits or rolls back
-    
-    Yields:
-        Session: SQLAlchemy session object
+            db.add(some_object)
     """
     db = SessionLocal()
     try:
         yield db
         db.commit()
-    except Exception as e:
+    except Exception:
         db.rollback()
-        raise e
+        raise
     finally:
         db.close()
 
 
+# ── Read-only helper ─────────────────────────────────────────────────────────
+
 @contextmanager
 def get_db_readonly():
-    """
-    Context manager for read-only database operations
-    
-    Usage:
-        with get_db_readonly() as db:
-            invoices = db.query(Invoice).all()
-    
-    Yields:
-        Session: SQLAlchemy session object
-    """
+    """Yield a session for read-only queries (no commit)."""
     db = SessionLocal()
     try:
         yield db
@@ -132,32 +133,50 @@ def get_db_readonly():
         db.close()
 
 
-def init_db():
-    """
-    Initialize database tables (create all tables)
-    
-    Should be called once during application startup
-    """
-    from app.api.db.models import Base as Phase1Base
-    from app.api.db.phase2_models import Base as Phase2Base
-    
-    # Create all Phase 1 and Phase 2 tables
-    Phase1Base.metadata.create_all(bind=engine)
-    Phase2Base.metadata.create_all(bind=engine)
-    print("✓ Database tables initialized")
+# ── Table initialisation ─────────────────────────────────────────────────────
 
+def init_db(drop_first: bool = False) -> None:
+    """
+    Create all tables defined across the models package.
+
+    Args:
+        drop_first: If True, drops all existing tables first (dev use only).
+    """
+    # Import all model modules to ensure they are registered with Base.metadata
+    import app.models.organization  # noqa: F401
+    import app.models.users         # noqa: F401
+    import app.models.product       # noqa: F401
+    import app.models.sale          # noqa: F401
+    import app.models.alert         # noqa: F401
+
+    if drop_first:
+        logger.warning("Dropping all tables — this is destructive!")
+        Base.metadata.drop_all(bind=engine)
+
+    Base.metadata.create_all(bind=engine)
+    logger.info("✓ Database tables initialised")
+
+
+# ── Health check ─────────────────────────────────────────────────────────────
 
 def healthcheck_db() -> bool:
-    """
-    Check database connectivity
-    
-    Returns:
-        bool: True if database is accessible, False otherwise
-    """
+    """Return True if the database is reachable."""
     try:
-        with engine.connect() as connection:
-            result = connection.execute("SELECT 1")
-            return result is not None
-    except Exception as e:
-        print(f"Database health check failed: {e}")
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return True
+    except Exception as exc:
+        logger.error("DB health check failed: %s", exc)
         return False
+
+
+__all__ = [
+    "Base",
+    "engine",
+    "SessionLocal",
+    "get_db",
+    "get_db_transaction",
+    "get_db_readonly",
+    "init_db",
+    "healthcheck_db",
+]
