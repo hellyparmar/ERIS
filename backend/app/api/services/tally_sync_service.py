@@ -11,7 +11,7 @@ import logging
 
 from app.api.integrations.tally_connector import TallyXMLConnector
 from app.api.db.models import Product, Customer
-from app.api.db.multitenant_models import Organization
+from app.models.multitenant_models import Organization
 
 logger = logging.getLogger(__name__)
 

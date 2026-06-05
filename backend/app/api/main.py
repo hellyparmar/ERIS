@@ -43,6 +43,8 @@ from app.api.routers import (
     suppliers,  # Phase 8 Supplier Management
     notifications  # Phase 15 Notifications
 )
+from app.api import sales as sales_api, forecasting as forecasting_api, ai_chat as ai_chat_api
+from app.api.v1 import forecasting as forecasting_v1, ai_assistant, invoices as invoices_v1
 
 
 # Import middleware
@@ -156,8 +158,11 @@ async def websocket(websocket):
 # Business endpoints (will add auth protection gradually)
 from app.api.routers import pos, alerts
 app.include_router(inventory.router, tags=["Inventory"])
+app.include_router(sales_api.router, tags=["Sales"])
+app.include_router(ai_chat_api.router, tags=["AI Chat"])
 app.include_router(alerts.router, tags=["Alerts"])
 app.include_router(forecasting.router, tags=["ML Forecasting"])
+app.include_router(forecasting_api.router, tags=["Forecasting"])
 app.include_router(reports.router, tags=["Reports"])
 app.include_router(pos_auth.router, tags=["POS Authentication"])
 app.include_router(pos_sales.router, tags=["POS Sales"])
@@ -174,6 +179,10 @@ app.include_router(community.router, tags=["Community Commerce"])
 app.include_router(predictions.router, prefix="/api/v1", tags=["Predictions"])
 app.include_router(data.router, prefix="/api/v1", tags=["Data Management"])
 app.include_router(models.router, prefix="/api/v1", tags=["Model Management"])
+app.include_router(forecasting_v1.router, prefix="/api/v1", tags=["Forecasting V1"])
+
+# New v1 Invoice Management Router (Advanced invoicing with GST, PDF, email, GSTR-1, Tally)
+app.include_router(invoices_v1.router, tags=["Invoice Management"])
 
 # R-DIOS v6.0 Thesis Module Endpoints
 app.include_router(sales_analytics.router, tags=["Sales Analytics"])

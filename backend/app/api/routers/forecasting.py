@@ -613,3 +613,92 @@ async def get_sales_trend(
     except Exception as e:
         logger.error(f"Trend error: {e}")
         return {"success": False, "error": str(e), "data": []}
+
+
+# ============================================================
+# CAUSAL ANALYSIS ENDPOINTS
+# ============================================================
+
+@router.get("/causal-analysis")
+async def analyze_causal_drivers(
+    outlet_id: str = Query(..., description="Outlet ID"),
+    days: int = Query(90, ge=30, le=365, description="Number of days to analyze"),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Perform causal analysis to identify what factors actually drive sales changes.
+    
+    Uses DoWhy library to estimate causal effects (not just correlation) of:
+    - Holidays
+    - Weekends
+    - Weather (temperature, rainfall)
+    - Economic indicators
+    - Special events
+    
+    Returns causal effect estimates with confidence intervals and p-values.
+    """
+    try:
+        from app.services.causal_analysis import CausalAnalysisService
+        
+        service = CausalAnalysisService(db)
+        result = service.analyze_sales_drivers(outlet_id, days)
+        
+        # Handle case when DoWhy is not available
+        if result.get("status") == "error" and "DoWhy not installed" in result.get("message", ""):
+            return {
+                "status": "unavailable",
+                "code": 503,
+                "message": "Causal analysis requires DoWhy library. Install: pip install dowhy",
+                "factors": [],
+            }
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Causal analysis error: {str(e)}", exc_info=True)
+        return {
+            "status": "error",
+            "message": f"Causal analysis failed: {str(e)}",
+            "factors": [],
+        }
+
+
+@router.get("/anomaly-explanation")
+async def explain_sales_anomaly(
+    outlet_id: str = Query(..., description="Outlet ID"),
+    date: str = Query(..., description="Date of anomaly (YYYY-MM-DD format)"),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Explain the causal factors behind a sales anomaly.
+    
+    For a date where sales deviated significantly from forecast,
+    identifies which factors (holiday, weather, events, etc.)
+    contributed to the deviation and estimates their contributions.
+    
+    Returns factor contributions summing to the total deviation.
+    """
+    try:
+        from app.services.causal_analysis import CausalAnalysisService
+        
+        service = CausalAnalysisService(db)
+        result = service.get_anomaly_explanation(outlet_id, date)
+        
+        # Handle case when DoWhy is not available
+        if result.get("status") == "error" and "DoWhy not installed" in result.get("message", ""):
+            return {
+                "status": "unavailable",
+                "code": 503,
+                "message": "Anomaly explanation requires DoWhy library. Install: pip install dowhy",
+            }
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Anomaly explanation error: {str(e)}", exc_info=True)
+        return {
+            "status": "error",
+            "message": f"Anomaly explanation failed: {str(e)}",
+        }

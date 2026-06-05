@@ -1,6 +1,6 @@
 """
-Direct Data Router - Returns data directly from SQLite database
-Bypasses ORM to work with existing schema
+Direct Data Router - Returns data directly from the database
+Bypasses ORM to work with the current schema
 """
 
 from fastapi import APIRouter, Depends, Query
@@ -19,7 +19,7 @@ async def get_customers(
 ):
     """Get customers directly from database"""
     try:
-        # Raw SQL query matching actual SQLite schema
+        # Raw SQL query matching the current database schema
         query = text("""
             SELECT id, name, email, phone, rfm_segment, customer_type, 
                    total_spent, last_purchase, registration_date

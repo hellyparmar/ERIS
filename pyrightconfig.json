@@ -1,11 +1,12 @@
 {
-  "include": ["backend/app/**"],
-  "venvPath": "/home/petpooja/miniconda3",
-  "venv": ".",
-  "pythonVersion": "3.13",
+  "include": ["backend/app/**", "tests/**", "backend/**"],
+  "extraPaths": ["backend"],
+  "venvPath": "/home/petpooja",
+  "venv": "myenv",
+  "pythonVersion": "3.10",
   "pythonPlatform": "Linux",
   "typeCheckingMode": "basic",
   "useLibraryCodeForTypes": true,
-  "reportMissingImports": "none",
-  "reportMissingModuleSource": "none"
+  "reportMissingImports": "warning",
+  "reportMissingModuleSource": "warning"
 }

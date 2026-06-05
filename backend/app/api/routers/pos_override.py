@@ -10,6 +10,7 @@ All overrides are audit logged.
 """
 
 from fastapi import APIRouter, HTTPException, Depends, status
+from sqlalchemy import select
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
 from datetime import datetime

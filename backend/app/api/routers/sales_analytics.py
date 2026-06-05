@@ -13,9 +13,7 @@ from decimal import Decimal
 import logging
 from fastapi import Request
 
-from app.api.utils.cache import cache_response
-from app.api.db import get_db
-from app.api.auth.dependencies import get_current_user
+from app.core.data_isolation import OutletDataAccess
 
 logger = logging.getLogger(__name__)
 
@@ -100,7 +98,7 @@ async def get_sales_summary(
         start_date = end_date - timedelta(days=30)
     
     query = text("""
-        SELECT 
+        SELECT
             COUNT(*) as total_orders,
             COALESCE(SUM(total_amount), 0) as total_revenue,
             COALESCE(AVG(total_amount), 0) as avg_order_value,
@@ -113,8 +111,35 @@ async def get_sales_summary(
         FROM sales
         WHERE sale_date >= :start_date AND sale_date < :end_date
     """)
-    
-    result = db.execute(query, {"start_date": start_date, "end_date": end_date + timedelta(days=1)})
+
+    # Apply outlet access control
+    allowed_outlet_ids = OutletDataAccess.get_allowed_outlet_ids(current_user)
+    if allowed_outlet_ids is not None:
+        if not allowed_outlet_ids:
+            # User has no outlet access
+            return {
+                "total_orders": 0,
+                "total_revenue": 0,
+                "avg_order_value": 0,
+                "total_gst": 0,
+                "total_discount": 0,
+                "unique_customers": 0,
+                "paid_orders": 0,
+                "pending_orders": 0,
+                "holiday_orders": 0,
+                "period_comparison": {
+                    "revenue_change_pct": 0,
+                    "orders_change_pct": 0
+                }
+            }
+
+        outlet_filter = " AND outlet_id = ANY(:outlet_ids)"
+        query = text(str(query) + outlet_filter)
+        params = {"start_date": start_date, "end_date": end_date + timedelta(days=1), "outlet_ids": allowed_outlet_ids}
+    else:
+        params = {"start_date": start_date, "end_date": end_date + timedelta(days=1)}
+
+    result = db.execute(query, params)
     row = result.fetchone()
     
     # Get previous period for comparison

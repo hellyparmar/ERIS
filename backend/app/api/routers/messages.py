@@ -4,6 +4,7 @@ Unified inbox for customer support, supplier POs, and internal chat
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from typing import Optional, List
 from datetime import datetime

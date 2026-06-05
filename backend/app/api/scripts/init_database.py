@@ -11,7 +11,8 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.models.database import create_tables, drop_tables, engine, SessionLocal
-from app.models.models import User, Product, Customer, Inventory, Sale, Alert, SyncLog, UserRole, AlertSeverity
+from app.models.schema import User, Product, InventoryMovement, Sale, Alert, SyncLog, UserRoleEnum, AlertSeverityEnum
+from app.models.customers import Customer
 from datetime import datetime, timedelta
 import random
 import hashlib
@@ -61,25 +62,22 @@ def seed_database():
         db.commit()
         print(f"✅ Created {len(products)} products")
         
-        # Create inventory for each product
+        # Create inventory movements for each product
         for product in products:
-            stock = random.randint(0, 500)
-            reserved = random.randint(0, min(stock, 50))
+            quantity = random.randint(50, 500)
             
-            inventory = Inventory(
+            movement = InventoryMovement(
                 product_id=product.id,
-                current_stock=stock,
-                reserved_stock=reserved,
-                available_stock=stock - reserved,
-                reorder_point=random.randint(20, 50),
-                reorder_quantity=random.randint(50, 200),
-                warehouse_location=f"W{random.randint(1, 5)}-A{random.randint(1, 10)}",
-                last_stocked_date=datetime.now() - timedelta(days=random.randint(0, 90))
+                quantity=quantity,
+                movement_type="purchase",
+                notes=f"Initial stock for {product.name}",
+                reference_id=None,
+                reference_type=None
             )
-            db.add(inventory)
+            db.add(movement)
         
         db.commit()
-        print("✅ Created inventory records")
+        print("✅ Created inventory movement records")
         
         # Create customers
         for i in range(1, 21):  # 20 customers

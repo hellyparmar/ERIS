@@ -1,63 +1,78 @@
-from fastapi import APIRouter, HTTPException, Depends, Request
+"""
+R-DIOS AI Assistant API (RAG-based)
+POST /api/v1/assistant/chat    — ask a question
+POST /api/v1/assistant/ingest  — rebuild knowledge base from live data
+GET  /api/v1/assistant/status  — check RAG system availability
+"""
+from fastapi import APIRouter, Depends
+from sqlalchemy import select
 from pydantic import BaseModel
-from typing import List, Optional
-from app.ml.assistant.llm_provider import llm
-from app.config import settings
-from app.middleware.auth import get_current_user
-from app.middleware.rate_limiter import limiter
-from app.models.multitenant_models import User
-import logging
+from typing import Optional
+from sqlalchemy.orm import Session
 
-logger = logging.getLogger(__name__)
+from app.database import get_db
+from app.core.deps import get_current_user
+from app.core.rag import rag_engine
+from app.models.schema import User, Outlet
 
-from app.schemas.assistant import ChatRequest, ChatResponse, AssistantStatusResponse
-from app.ml.assistant.agent import retail_agent
+router = APIRouter(prefix="/api/v1/assistant", tags=["assistant"])
 
-router = APIRouter(prefix="/api/v1/assistant", tags=["AI Assistant"])
 
-@router.post("/chat", response_model=ChatResponse)
-@limiter.limit("5/minute")
-async def chat(request: ChatRequest, req: Request, current_user: User = Depends(get_current_user)):
-    """
-    Interact with the Enterprise Retail Intelligence AI Assistant.
-    
-    This endpoint utilizes advanced RAG (Retrieval-Augmented Generation) 
-    to provide insights based on your organization's real-time data.
-    """
-    if not request.message or not request.message.strip():
-        raise HTTPException(status_code=400, detail="Message cannot be empty")
+class ChatRequest(BaseModel):
+    message: str
+    include_outlet_context: bool = True
 
-    if not settings.ENABLE_AI_ASSISTANT:
-        raise HTTPException(status_code=400, detail="AI Assistant is disabled. Set ENABLE_AI_ASSISTANT=true in .env")
 
-    if not retail_agent.llm.is_available():
-        raise HTTPException(
-            status_code=503,
-            detail="No AI provider available. Start Ollama (ollama serve) or add ANTHROPIC_API_KEY/OPENAI_API_KEY to .env"
-        )
+@router.post("/chat")
+async def chat(
+    body: ChatRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Ask the RAG-based AI assistant a question about the business."""
+    outlet_name = None
+    if current_user.outlet_id and body.include_outlet_context:
+        result = await db.execute(select(Outlet).where(Outlet.id == current_user.outlet_id))
+        outlet = result.scalar_one_or_none()
+        outlet_name = outlet.name if outlet else None
 
-    try:
-        # Pass conversation history to the Smart RAG Agent
-        history_dicts = [{"role": m.role, "content": m.content} for m in request.history]
-        result = await retail_agent.chat(request.message, history=history_dicts)
-        
-        return ChatResponse(
-            response=result["response"], 
-            provider=result["provider"],
-            rag_enhanced=result.get("rag_enhanced", True)
-        )
-    except Exception as e:
-        logger.error(f"AI Assistant Error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"AI error: {str(e)}")
-
-@router.get("/status", response_model=AssistantStatusResponse)
-async def assistant_status(current_user: User = Depends(get_current_user)):
-    """
-    Check the current operational status and configuration of the AI engine.
-    """
+    result = rag_engine.query(body.message, db=db, outlet_name=outlet_name)
     return {
-        "available": llm.is_available(),
-        "provider": llm.provider,
-        "model": settings.OLLAMA_MODEL if llm.provider == "ollama" else "cloud",
-        "ollama_url": settings.OLLAMA_BASE_URL if settings.USE_OLLAMA else None,
+        "question": body.message,
+        "answer": result["answer"],
+        "rag_enabled": result["rag_enabled"],
+        "sources_used": result["sources_used"],
+        "user_role": current_user.role,
+        "outlet_context": outlet_name,
     }
+
+
+@router.post("/ingest")
+async def ingest_knowledge(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Rebuild the RAG knowledge base from current database. Admin/manager only."""
+    count = rag_engine.ingest_business_context(db)
+    return {"message": f"Knowledge base updated with {count} documents", "documents_indexed": count}
+
+
+@router.get("/status")
+async def rag_status():
+    """Check RAG system availability."""
+    import requests as req
+    ollama_ok = False
+    try:
+        r = req.get("http://localhost:11434/api/tags", timeout=3)
+        ollama_ok = r.ok
+    except Exception:
+        pass
+
+    chroma_ok = False
+    try:
+        import chromadb
+        chroma_ok = True
+    except ImportError:
+        pass
+
+    return {"rag_available": rag_engine._initialized, "ollama_available": ollama_ok, "chromadb_available": chroma_ok}

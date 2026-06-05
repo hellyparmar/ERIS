@@ -14,7 +14,7 @@ from .base import Base
 
 # ==================== Supporting Models ====================
 
-class Business(Base):
+class Phase2Business(Base):
     """Business model for testing"""
     __tablename__ = "businesses"
     
@@ -24,14 +24,15 @@ class Business(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
-    invoices = relationship("Invoice", back_populates="business")
+    invoices = relationship("Phase2Invoice", back_populates="business")
     customer_credits = relationship("CustomerCredit", back_populates="business")
     gst_config = relationship("GSTConfiguration", back_populates="business")
 
 
-class Customer(Base):
+class Phase2Customer(Base):
     """Customer model for testing"""
     __tablename__ = "customers"
+    __table_args__ = {'extend_existing': True}
     
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
@@ -39,13 +40,14 @@ class Customer(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
-    invoices = relationship("Invoice", back_populates="customer")
+    invoices = relationship("Phase2Invoice", back_populates="customer")
     credit_account = relationship("CustomerCredit", back_populates="customer", uselist=False)
 
 
-class Product(Base):
+class Phase2Product(Base):
     """Product model for testing"""
     __tablename__ = "products"
+    __table_args__ = {'extend_existing': True}
     
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
@@ -58,9 +60,10 @@ class Product(Base):
 
 # ==================== Invoice Models ====================
 
-class Invoice(Base):
+class Phase2Invoice(Base):
     """Invoice model for GST-compliant invoicing"""
     __tablename__ = "invoices"
+    __table_args__ = {'extend_existing': True}
     
     id = Column(Integer, primary_key=True, index=True)
     business_id = Column(Integer, ForeignKey("businesses.id"), nullable=False)
@@ -123,8 +126,8 @@ class Invoice(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
-    business = relationship("Business", back_populates="invoices")
-    customer = relationship("Customer", back_populates="invoices")
+    business = relationship("Phase2Business", back_populates="invoices")
+    customer = relationship("Phase2Customer", back_populates="invoices")
     line_items = relationship("InvoiceLineItem", back_populates="invoice", cascade="all, delete-orphan")
     payments = relationship("InvoicePayment", back_populates="invoice", cascade="all, delete-orphan")
 
@@ -168,8 +171,8 @@ class InvoiceLineItem(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     
     # Relationships
-    invoice = relationship("Invoice", back_populates="line_items")
-    product = relationship("Product", back_populates="invoice_items")
+    invoice = relationship("Phase2Invoice", back_populates="line_items")
+    product = relationship("Phase2Product", back_populates="invoice_items")
 
 
 class InvoicePayment(Base):
@@ -193,7 +196,7 @@ class InvoicePayment(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     
     # Relationships
-    invoice = relationship("Invoice", back_populates="payments")
+    invoice = relationship("Phase2Invoice", back_populates="payments")
 
 
 class CustomerCredit(Base):
@@ -231,8 +234,8 @@ class CustomerCredit(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
-    business = relationship("Business", back_populates="customer_credits")
-    customer = relationship("Customer", back_populates="credit_account")
+    business = relationship("Phase2Business", back_populates="customer_credits")
+    customer = relationship("Phase2Customer", back_populates="credit_account")
     transactions = relationship("CreditTransaction", back_populates="credit_account", cascade="all, delete-orphan")
     reminders = relationship("CreditReminder", back_populates="credit_account", cascade="all, delete-orphan")
 
@@ -342,7 +345,7 @@ class GSTConfiguration(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
-    business = relationship("Business", back_populates="gst_config")
+    business = relationship("Phase2Business", back_populates="gst_config")
 
 
 # Extend existing tables with new fields (in migrations)

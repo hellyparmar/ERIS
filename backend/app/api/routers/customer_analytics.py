@@ -5,7 +5,7 @@ Uses materialized views for optimal performance
 
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import func, text, desc
+from sqlalchemy import func, text, desc, select
 from datetime import datetime, date, timedelta
 from typing import Optional, List, Dict, Any
 import logging
@@ -165,7 +165,7 @@ async def get_rfm_customers(
     Get list of customers with their RFM metrics and segments
     """
     try:
-        from app.api.db.multitenant_models import Customer, Invoice
+        from app.models.multitenant_models import Customer, Invoice
         
         # Base query joining Customer and Invoices
         # Note: This is a simplified "live" calculation. 

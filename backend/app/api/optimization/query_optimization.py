@@ -311,7 +311,8 @@ def monitor_query(func):
     Usage:
         @monitor_query
         def get_products(db: Session):
-            return db.query(Product).all()
+            result = await db.execute(select(Product))
+            return result.scalars().all()
     """
     @wraps(func)
     def wrapper(*args, **kwargs):

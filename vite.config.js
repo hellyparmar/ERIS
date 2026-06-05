@@ -8,7 +8,7 @@ import path from 'path'
 export default defineConfig({
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      '@': path.resolve(__dirname, './frontend/src'),
     },
   },
   plugins: [
@@ -32,6 +32,16 @@ export default defineConfig({
     }),
   ],
 
+  server: {
+    port: 5173,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, '/api')
+      }
+    }
+  },
   build: {
     // Enable source maps for production debugging
     sourcemap: false,
@@ -73,16 +83,6 @@ export default defineConfig({
       'recharts',
       'lucide-react',
     ],
-  },
-
-  // Server configuration
-  server: {
-    port: 5173,
-    strictPort: true,
-    host: true,
-    watch: {
-      ignored: ['**/.venv/**', '**/node_modules/**', '**/.git/**'],
-    },
   },
 
   // Preview configuration

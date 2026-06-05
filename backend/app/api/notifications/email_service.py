@@ -5,7 +5,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.application import MIMEApplication
 from typing import Optional, List, Dict, Any
-from ..config import settings
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +18,7 @@ class EmailService:
         self.user = settings.SMTP_USER
         self.password = settings.SMTP_PASSWORD
         self.from_email = settings.FROM_EMAIL
-        self.enabled = settings.EMAIL_ENABLED and bool(self.user) and bool(self.password)
+        self.enabled = settings.ENABLE_EMAIL and bool(self.user) and bool(self.password)
 
     def send_email(
         self, 

@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     DEBUG: bool = True
     
     # Database
-    DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/enterprise_retail"
+    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/enterprise_retail"
     REDIS_URL: str = "redis://localhost:6379/0"
     
     # AI/ML
@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     SMTP_PORT: int = 587
     SMTP_USER: Optional[str] = None
     SMTP_PASSWORD: Optional[str] = None
+    FROM_EMAIL: Optional[str] = None
     
     # WhatsApp (MSG91)
     MSG91_API_KEY: Optional[str] = None

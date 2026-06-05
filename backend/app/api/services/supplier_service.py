@@ -9,12 +9,14 @@ from typing import Optional, List
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
-from app.api.db.multitenant_models import Supplier, PurchaseOrder, PurchaseOrderItem, Product, Inventory
+from app.models.multitenant_models import Supplier, PurchaseOrder, PurchaseOrderItem, Product, Inventory
+from app.services.base_service import OutletIsolatedService
+from app.models.users import User
 
 
-class SupplierService:
-    def __init__(self, db: Session):
-        self.db = db
+class SupplierService(OutletIsolatedService):
+    def __init__(self, db: Session, current_user: Optional[User] = None):
+        super().__init__(db, current_user)
 
     # ==================== SUPPLIER CRUD ====================
 
@@ -216,6 +218,11 @@ class SupplierService:
         limit: int = 20
     ) -> dict:
         query = self.db.query(PurchaseOrder)
+        
+        # Apply outlet filtering
+        if self.allowed_outlet_ids is not None:
+            query = query.filter(PurchaseOrder.outlet_id.in_(self.allowed_outlet_ids))
+        
         if supplier_id:
             query = query.filter(PurchaseOrder.supplier_id == supplier_id)
         if status:
@@ -226,12 +233,23 @@ class SupplierService:
         return {"items": [self._po_dict(o) for o in orders], "total": total, "page": page}
 
     def get_purchase_order(self, po_id: int) -> Optional[PurchaseOrder]:
-        return self.db.query(PurchaseOrder).filter(PurchaseOrder.id == po_id).first()
+        query = self.db.query(PurchaseOrder).filter(PurchaseOrder.id == po_id)
+        
+        # Apply outlet filtering
+        if self.allowed_outlet_ids is not None:
+            query = query.filter(PurchaseOrder.outlet_id.in_(self.allowed_outlet_ids))
+        
+        return query.first()
 
     def update_po_status(self, po_id: int, status: str, notes: str | None = None) -> PurchaseOrder:
         po = self.db.query(PurchaseOrder).filter(PurchaseOrder.id == po_id).first()
         if not po:
             raise ValueError(f"Purchase order {po_id} not found")
+        
+        # Check outlet access
+        if not self.can_access_outlet(po.outlet_id):
+            raise ValueError(f"Access denied to outlet {po.outlet_id}")
+        
         po.status = status
         if notes:
             po.notes = (po.notes or "") + f"\n[{datetime.now().strftime('%Y-%m-%d')}] {notes}"
@@ -244,6 +262,10 @@ class SupplierService:
         po = self.db.query(PurchaseOrder).filter(PurchaseOrder.id == po_id).first()
         if not po:
             raise ValueError(f"Purchase order {po_id} not found")
+        
+        # Check outlet access
+        if not self.can_access_outlet(po.outlet_id):
+            raise ValueError(f"Access denied to outlet {po.outlet_id}")
 
         received_map = {r["product_id"]: r["quantity_received"] for r in received_items}
 

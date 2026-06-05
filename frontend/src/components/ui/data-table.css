@@ -1,0 +1,128 @@
+/* Data Table Styles */
+
+/* Wrapper for horizontal scrolling on mobile */
+.data-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: var(--radius-lg);
+}
+
+/* On tablet and larger screens, no scrolling needed */
+@media (min-width: 768px) {
+  .data-table-wrapper {
+    overflow-x: visible;
+  }
+}
+
+.data-table {
+  width: 100%;
+  background-color: var(--color-surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+  min-width: 600px; /* Ensure table has minimum width for scrolling */
+}
+
+@media (min-width: 768px) {
+  .data-table {
+    min-width: auto;
+  }
+}
+
+.data-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.data-table thead {
+  background-color: var(--color-input-bg);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.data-table th {
+  padding: var(--spacing-lg);
+  text-align: left;
+  font-weight: 600;
+  color: var(--color-primary);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.data-table tbody tr {
+  border-bottom: 1px solid var(--color-divider);
+  transition: background-color 0.2s ease;
+}
+
+.data-table tbody tr:hover {
+  background-color: var(--color-input-bg);
+}
+
+.data-table tbody tr.even {
+  background-color: transparent;
+}
+
+.data-table tbody tr.odd {
+  background-color: transparent;
+}
+
+.data-table td {
+  padding: var(--spacing-lg);
+  color: var(--color-primary);
+  white-space: nowrap;
+}
+
+/* Skeleton Loading */
+.skeleton-row td {
+  padding: var(--spacing-lg);
+}
+
+.skeleton-line {
+  height: 16px;
+  background: linear-gradient(
+    90deg,
+    var(--color-divider) 25%,
+    var(--color-input-bg) 50%,
+    var(--color-divider) 75%
+  );
+  background-size: 200% 100%;
+  border-radius: var(--radius-sm);
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Empty State */
+.empty-state {
+  padding: var(--spacing-3xl) var(--spacing-2xl);
+  text-align: center;
+  color: var(--color-secondary);
+  font-size: 14px;
+  min-height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .data-table table {
+    font-size: 12px;
+  }
+
+  .data-table th,
+  .data-table td {
+    padding: var(--spacing-md);
+  }
+}

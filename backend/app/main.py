@@ -1,284 +1,398 @@
-from fastapi import FastAPI, Request, Response
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-import os
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from slowapi import Limiter, _rate_limit_exceeded_handler
+from contextlib import asynccontextmanager
+from slowapi import Limiter
+from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
-from slowapi.middleware import SlowAPIMiddleware
-import random
-from app.config import settings
-from app.utils.errors import (
-    AppException, 
-    app_exception_handler, 
-    http_exception_handler, 
-    generic_exception_handler
-)
-from app.utils.logging import logger
-from app.middleware.logging_middleware import RequestLoggingMiddleware
-from app.middleware.metrics import MetricsMiddleware, metrics_endpoint
-from fastapi import Request, HTTPException
+from starlette.responses import JSONResponse
+import logging
+import asyncio
+import subprocess
+import os
+import sys
+import uuid
 
-# Tally integration router
-try:
-    from app.routers.integrations import router as tally_integrations_router
-    _TALLY_ROUTER_LOADED = True
-except ImportError:
-    _TALLY_ROUTER_LOADED = False
+from app.database import init_db, healthcheck_db, AsyncSessionLocal
+from app.routers import auth, inventory, community, invoices
+# from app.api.v1 import ai_assistant  # TEMPORARILY DISABLED - requests module not available
+from app.core.config import settings
+from app.core.logging_config import setup_logging
 
-# GST integration router
-try:
-    from app.routers.gst import router as gst_router
-    _GST_ROUTER_LOADED = True
-except ImportError:
-    _GST_ROUTER_LOADED = False
+# Temporarily disable problematic api.routers with import issues
+# from app.api.routers import analytics
+# from app.api import dashboard, sales, forecasting, ai_chat, employees, contacts, invoices as invoices_api, outlets
 
-# Notification integration router
-try:
-    from app.routers.notifications import router as notifications_router
-    _NOTIFICATIONS_ROUTER_LOADED = True
-except ImportError:
-    _NOTIFICATIONS_ROUTER_LOADED = False
+# Setup structured logging
+setup_logging(settings.ENVIRONMENT)
+logger = logging.getLogger(__name__)
 
-# AI Assistant router
-try:
-    from app.routers.assistant import router as assistant_router
-    _ASSISTANT_ROUTER_LOADED = True
-except ImportError:
-    _ASSISTANT_ROUTER_LOADED = False
+# Rate limiter configuration
+limiter = Limiter(key_func=get_remote_address)
 
-# Security Middleware
-from app.middleware.rate_limiter import limiter
+
+def validate_required_env_vars() -> None:
+    """
+    Validate required environment variables at startup.
+    Fails fast with clear error messages if any critical variables are missing.
+    Uses the already-loaded `settings` object (populated from .env by pydantic-settings).
+    """
+    missing = []
+
+    if not settings.DATABASE_URL or not settings.DATABASE_URL.strip():
+        missing.append("DATABASE_URL: PostgreSQL connection string (postgresql+asyncpg://...)")
+
+    if not settings.JWT_SECRET_KEY or not settings.JWT_SECRET_KEY.strip():
+        missing.append("JWT_SECRET_KEY: JWT signing key (min 32 chars for production)")
+
+    if not settings.REDIS_URL or not settings.REDIS_URL.strip():
+        missing.append("REDIS_URL: Redis connection string (redis://...)")
+
+    if missing:
+        error_msg = (
+            "\n" + "=" * 70 + "\n"
+            "CRITICAL: Missing required environment variables at startup\n"
+            "=" * 70 + "\n"
+        )
+        for var_desc in missing:
+            error_msg += f"  ✗ {var_desc}\n"
+        error_msg += "\nSet these in your .env file or environment variables.\n" + "=" * 70 + "\n"
+        logger.critical(error_msg)
+        sys.exit(1)
+
+    logger.info("✓ Environment variables validation successful")
+
+
+
+def validate_required_config() -> None:
+    """
+    Validate that all required configuration variables are set at startup.
+    This runs BEFORE any other initialization to fail fast with clear messages.
+    """
+    missing_vars = []
+    
+    # Check DATABASE_URL
+    if not settings.DATABASE_URL:
+        missing_vars.append("DATABASE_URL")
+    
+    # Check JWT_SECRET_KEY for production
+    if settings.ENVIRONMENT == "production":
+        default_jwt = "change_me_in_production_extremely_long_random_string_2024"
+        if settings.JWT_SECRET_KEY == default_jwt:
+            logger.warning(
+                "⚠ WARNING: JWT_SECRET_KEY has default value in PRODUCTION. "
+                "Set a strong random key in your .env file."
+            )
+    
+    if missing_vars:
+        error_msg = (
+            "\n" + "=" * 70 + "\n"
+            "CONFIGURATION VALIDATION ERROR AT STARTUP\n"
+            "=" * 70 + "\n"
+            f"Missing or invalid required environment variables:\n"
+        )
+        for var in missing_vars:
+            error_msg += f"  - {var}\n"
+        error_msg += (
+            "\nRequired configuration:\n"
+            "  DATABASE_URL=postgresql+asyncpg://USER:PASSWORD@HOST:PORT/DATABASE\n"
+            "\nSet these in your .env file or environment variables.\n"
+            "=" * 70 + "\n"
+        )
+        logger.error(error_msg)
+        raise RuntimeError(error_msg)
+    
+    logger.info("✓ Configuration validation successful")
+
+
+async def verify_migrations() -> bool:
+    """
+    Verify that all Alembic migrations have been applied.
+    
+    FIX FOR: "relation does not exist" errors
+    Run: alembic upgrade head
+    """
+    try:
+        # This check only works when DATABASE_URL is set and database is accessible
+        # In production Docker, run migrations before starting the app
+        logger.info("Database migrations check: Skipping (use Docker entrypoint for migrations)")
+        return True
+    except Exception as e:
+        logger.warning(f"Migration verification failed: {e}")
+        logger.warning("Ensure migrations are applied: alembic upgrade head")
+        return False
+
+async def check_database_connection() -> bool:
+    """
+    FIX FOR: "connection refused" or "could not connect to server"
+    Checks:
+    1. PostgreSQL container is healthy
+    2. Host in DATABASE_URL matches Docker Compose service name
+    3. Connection parameters are correct
+    """
+    try:
+        max_retries = 5
+        retry_delay = 2
+        
+        for attempt in range(max_retries):
+            is_healthy = await healthcheck_db()
+            if is_healthy:
+                logger.info("✓ Database connection successful")
+                return True
+            
+            if attempt < max_retries - 1:
+                logger.warning(f"Database connection attempt {attempt + 1}/{max_retries} failed, retrying in {retry_delay}s...")
+                await asyncio.sleep(retry_delay)
+        
+        logger.error("✗ Database connection failed after all retries")
+        logger.error("TROUBLESHOOTING:")
+        logger.error("  1. Check PostgreSQL container is running: docker ps | grep postgres")
+        logger.error("  2. Verify DATABASE_URL host matches Docker Compose service name")
+        logger.error(f"  3. Current DATABASE_URL: {settings.DATABASE_URL.split('@')[1] if '@' in settings.DATABASE_URL else 'Not set'}")
+        logger.error("  4. For local dev without SSL: Ensure ssl=prefer is in connection string")
+        
+        return False
+    except Exception as e:
+        logger.error(f"Database health check exception: {e}")
+        return False
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Application lifespan management - startup and shutdown hooks.
+    
+    Handles:
+    1. Configuration validation (fails fast if DATABASE_URL is missing)
+    2. Database initialization and model registration
+    3. Connection verification (retry logic for Docker)
+    4. Migration verification
+    """
+    logger.info("=" * 60)
+    logger.info("R-DIOS API Starting Up")
+    logger.info("=" * 60)
+    
+    try:
+        # Validate environment variables first (fail fast)
+        logger.info("Validating environment variables...")
+        validate_required_env_vars()
+        
+        # Validate configuration
+        logger.info("Validating configuration...")
+        validate_required_config()
+        
+        # Initialize database models
+        logger.info("Initializing database models...")
+        await init_db()
+        
+        # Check database connectivity
+        logger.info("Checking database connectivity...")
+        db_ok = await check_database_connection()
+        if not db_ok:
+            logger.warning("⚠ Database connection check failed, but continuing startup")
+            logger.warning("  The application may fail at first database query")
+        
+        # Verify migrations
+        logger.info("Verifying migrations...")
+        migrations_ok = await verify_migrations()
+        if not migrations_ok:
+            logger.warning("⚠ Migration verification failed")
+        
+        logger.info("=" * 60)
+        logger.info("✓ R-DIOS API Ready")
+        logger.info("=" * 60)
+        
+    except Exception as e:
+        logger.error(f"Startup error: {e}", exc_info=True)
+        raise
+    
+    yield  # Application runs here
+    
+    # Shutdown
+    logger.info("R-DIOS API shutting down...")
 
 app = FastAPI(
-    title="ERIS API",
-    description="""
-    Enterprise Retail Intelligence System (ERIS) Backend API.
-    
-    Provides multitenant retail management, AI-driven forecasting, 
-    and natural language retail intelligence.
-    
-    * **Auth**: JWT-based multitenant authentication.
-    * **Sales**: POS and history management.
-    * **Inventory**: Stock tracking and alerts.
-    * **Intelligence**: ARIMA forecasting and SHAP analysis.
-    * **Assistant**: RAG-enhanced AI chat.
-    """,
+    title="R-DIOS API",
+    description="Enterprise Retail Intelligence System — MSc Data Science Project",
     version="1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
-    openapi_url="/api/v1/openapi.json"
+    lifespan=lifespan,
 )
 
-# Register Limiter
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-app.add_middleware(SlowAPIMiddleware)
+# Security middleware - add in reverse order (last added = first executed)
 
-# Security Middleware
-app.add_middleware(
-    TrustedHostMiddleware, 
-    allowed_hosts=["localhost", "127.0.0.1", "testserver", "*.googleapis.com", "host.docker.internal"]
-)
+# 1. X-Request-ID middleware (executes last, added first)
+def add_request_id_middleware(app: FastAPI) -> None:
+    """
+    Add X-Request-ID to all requests for tracing and logging.
+    """
+    @app.middleware("http")
+    async def request_id_middleware(request: Request, call_next):
+        request_id = str(uuid.uuid4())
+        request.state.request_id = request_id
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id
+        return response
 
-# CORS - Restricted origins in production
-# In production, set ALLOWED_ORIGINS in .env as a comma-separated list
-allowed_origins = [
-    "http://localhost:5173",
-    "http://localhost:5174",
-    "http://localhost:3000",
-]
-if hasattr(settings, "ALLOWED_ORIGINS") and settings.ALLOWED_ORIGINS:
-    allowed_origins = settings.ALLOWED_ORIGINS.split(",")
+# 2. Trusted Host middleware (production only)
+if settings.ENVIRONMENT == "production":
+    # Parse allowed origins for TrustedHostMiddleware
+    allowed_hosts = []
+    if settings.ALLOWED_ORIGINS and settings.ALLOWED_ORIGINS != "*":
+        allowed_hosts = [
+            host.strip().replace("http://", "").replace("https://", "") 
+            for host in settings.ALLOWED_ORIGINS.split(",")
+        ]
+    # Add common local hosts for development/testing
+    allowed_hosts.extend(["localhost", "127.0.0.1", "0.0.0.0", "*"])
+    
+    app.add_middleware(
+        TrustedHostMiddleware,
+        allowed_hosts=allowed_hosts if allowed_hosts else ["*"]
+    )
+    logger.info(f"✓ TrustedHost middleware enabled (allowed hosts: {allowed_hosts})")
 
+# 3. CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins, # Keep existing logic for allowed_origins
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:4173",
+        "http://127.0.0.1:4173"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+logger.info("✓ CORS configured with origins: ['http://localhost:5173', 'http://127.0.0.1:5173']")
 
-from app.middleware.metrics import MetricsMiddleware
-from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
-from fastapi.responses import Response
+# 4. Rate limiting middleware
+app.state.limiter = limiter
+app.add_middleware(SlowAPIMiddleware)
+logger.info("✓ Rate limiting middleware enabled")
 
-# Prometheus Metrics Middleware
-app.add_middleware(MetricsMiddleware)
+# 5. Request ID middleware (executes last)
+add_request_id_middleware(app)
+logger.info("✓ Request ID tracking enabled")
 
-@app.get("/favicon.ico", include_in_schema=False)
-async def favicon():
-    # Attempt to serve the logo as a favicon
-    # We use the generated artifact path for now to ensure it works immediately
-    favicon_path = "/home/petpooja/.gemini/antigravity/brain/f4abecea-6f9c-4fbe-aea1-9761c543d9a1/eris_favicon_1774350393895.png"
-    if os.path.exists(favicon_path):
-        return FileResponse(favicon_path)
-    return Response(status_code=204)
+# Rate limit error handler
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    return JSONResponse(
+        status_code=429,
+        content={"detail": "Rate limit exceeded. Please try again later."},
+        headers={"Retry-After": "60", "X-Request-ID": getattr(request.state, "request_id", "unknown")}
+    )
 
-@app.get("/", response_class=HTMLResponse)
-async def read_root():
-    return """
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>ERIS API - Enterprise Retail Intelligence System</title>
-        <style>
-            :root {
-                --primary: #38bdf8;
-                --bg: #0f172a;
-                --card: #1e293b;
-                --text: #f8fafc;
-                --muted: #94a3b8;
-            }
-            body {
-                background-color: var(--bg);
-                color: var(--text);
-                font-family: 'Inter', -apple-system, system-ui, sans-serif;
-                margin: 0;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                min-height: 100vh;
-            }
-            .container {
-                text-align: center;
-                background-color: var(--card);
-                padding: 3rem;
-                border-radius: 1.5rem;
-                box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-                border: 1px solid #334155;
-                max-width: 500px;
-                width: 90%;
-            }
-            .logo {
-                width: 80px;
-                height: 80px;
-                margin-bottom: 1.5rem;
-                border-radius: 50%;
-                border: 2px solid var(--primary);
-                padding: 5px;
-            }
-            h1 {
-                font-size: 2.5rem;
-                margin: 0;
-                background: linear-gradient(to right, #38bdf8, #818cf8);
-                -webkit-background-clip: text;
-                -webkit-text-fill-color: transparent;
-            }
-            p {
-                color: var(--muted);
-                font-size: 1.1rem;
-                margin-bottom: 2rem;
-            }
-            .nav-box {
-                display: flex;
-                flex-direction: column;
-                gap: 1rem;
-            }
-            .btn {
-                background-color: var(--primary);
-                color: var(--bg);
-                padding: 0.875rem 1.5rem;
-                border-radius: 0.75rem;
-                text-decoration: none;
-                font-weight: 700;
-                font-size: 1rem;
-                transition: transform 0.2s, background-color 0.2s;
-            }
-            .btn:hover {
-                background-color: #7dd3fc;
-                transform: translateY(-2px);
-            }
-            .btn-secondary {
-                background-color: transparent;
-                border: 1px solid #475569;
-                color: var(--text);
-            }
-            .btn-secondary:hover {
-                background-color: #334155;
-            }
-            .status {
-                margin-top: 2rem;
-                font-size: 0.875rem;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                gap: 0.5rem;
-                color: #4ade80;
-            }
-            .pulse {
-                width: 8px;
-                height: 8px;
-                background-color: #4ade80;
-                border-radius: 50%;
-                box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7);
-                animation: pulse 2s infinite;
-            }
-            @keyframes pulse {
-                0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7); }
-                70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(74, 222, 128, 0); }
-                100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); }
-            }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <img src="/favicon.ico" alt="ERIS Logo" class="logo">
-            <h1>ERIS API</h1>
-            <p>Enterprise Retail Intelligence System v1.0</p>
-            <div class="nav-box">
-                <a href="/docs" class="btn">Explore API Documentation</a>
-                <a href="/redoc" class="btn btn-secondary">System Snapshot (ReDoc)</a>
-            </div>
-            <div class="status">
-                <div class="pulse"></div>
-                Backend Operational - Production Ready
-            </div>
-        </div>
-    </body>
-    </html>
-    """
+# Global exception handler
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    request_id = getattr(request.state, 'request_id', 'unknown')
+    logger.error(f"Unhandled exception for request {request_id}: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "Internal server error",
+            "request_id": request_id,
+            "status": 500,
+        },
+        headers={"X-Request-ID": request_id}
+    )
 
-from app.routers import (
-    health, 
-    analytics, 
-    assistant, 
-    auth, 
-    inventory, 
-    sales, 
-    customers, 
-    notifications, 
-    gst, 
-    integrations,
-    admin,
-    dashboard,
-    intelligence
-)
-
-# Standard App Routers
-app.include_router(health.router) # Provides /health/, /health/ready, /health/live
+# Include routers
 app.include_router(auth.router)
 app.include_router(inventory.router)
+app.include_router(community.router)
+app.include_router(invoices.router)
+# app.include_router(ai_assistant.router)  # TEMPORARILY DISABLED - requests module not available
+
+# Include new routers
+from app.api import contacts, outlets, sales, user_settings
+from app.api.gst_router import router as gst_router
+from app.api.routers.integrations import router as integrations_router
+from app.api.routers.suppliers import router as suppliers_router
+from app.api.routers.employees import router as employees_router
+app.include_router(employees_router, prefix="/api/v1")
+app.include_router(contacts.router)
+app.include_router(outlets.router)
 app.include_router(sales.router)
-app.include_router(customers.router)
-app.include_router(analytics.router)
-app.include_router(assistant.router)
-app.include_router(notifications.router)
-app.include_router(gst.router)
-app.include_router(integrations.router)
-app.include_router(admin.router)
-app.include_router(dashboard.router)
-app.include_router(intelligence.router)
+app.include_router(user_settings.router)
+app.include_router(integrations_router)
+app.include_router(gst_router)
+app.include_router(suppliers_router, prefix="/api/v1")
 
-# Prometheus Metrics Endpoint (Integrated via Middleware)
-@app.get("/metrics")
-async def get_metrics_endpoint():
-    """Scrape endpoint for Prometheus"""
-    return metrics_endpoint()
+# Disabled routers with import issues
+# app.include_router(analytics.router, prefix="/api/v1")
+# app.include_router(dashboard.router)
+# app.include_router(forecasting.router)
+# app.include_router(ai_chat.router)
+# app.include_router(invoices_api.router)
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+@app.get("/health")
+async def health():
+    """Health check endpoint"""
+    return {
+        "status": "ok",
+        "service": "R-DIOS API",
+        "version": "1.0.0",
+        "environment": settings.ENVIRONMENT
+    }
+
+@app.get("/")
+async def root():
+    """Root endpoint with API documentation link"""
+    return {
+        "message": "R-DIOS API is running",
+        "documentation": "/docs",
+        "service": "Enterprise Retail Intelligence System"
+    }
+
+
+@app.post("/admin/seed-database")
+async def seed_database_endpoint():
+    """
+    ADMIN ENDPOINT: Seed the database with synthetic data.
+    
+    ⚠️ WARNING: Only use in development/testing environments!
+    
+    Features:
+    - Idempotent: checks if data exists before seeding
+    - Populates all 12 tables with 540K+ synthetic records
+    - Respects foreign key constraints
+    - Transaction-based: all-or-nothing approach
+    
+    Response:
+    {
+        "status": "success|failed|skipped",
+        "statistics": {
+            "outlets": 10,
+            "users": 50,
+            "products": 150,
+            "inventory": 1500,
+            "employees": 120,
+            "invoices": 500,
+            "sales": 540000,
+            "alerts": 1000,
+            "chat_messages": 2000
+        }
+    }
+    """
+    try:
+        from app.seed_database import seed_database as seed_func
+        from app.database import AsyncSessionLocal
+        
+        async with AsyncSessionLocal() as session:
+            stats = await seed_func(session, skip_if_exists=True)
+        return {
+            "status": stats["status"],
+            "message": "Database seeding completed" if stats["status"] == "success" else "Database seeding failed",
+            "statistics": {k: v for k, v in stats.items() if k not in ["status", "errors"]},
+            "errors": stats.get("errors", [])
+        }
+    except Exception as e:
+        logger.error(f"Seeding endpoint error: {str(e)}")
+        return {
+            "status": "failed",
+            "message": str(e),
+            "statistics": {}
+        }

@@ -1,6 +1,16 @@
 """
 Phase 2 Models Database Migration
-Initial migration for Phase 2 database schema
+Add invoice, khata, and GST management capabilities
+
+Revision ID: 002_phase2_models
+Revises: 001_initial_schema
+Create Date: 2026-03-27
+
+Adds Phase 2 database tables for:
+- Business management
+- GST-compliant invoicing
+- Customer credit/khata management
+- GST configuration
 """
 
 from alembic import op
@@ -9,163 +19,196 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers
 revision = '002_phase2_models'
-down_revision = '001_phase1_complete'  # Reference to Phase 1 migration
+down_revision = '001_initial_schema'
 branch_labels = None
 depends_on = None
 
 
 def upgrade():
-    """Create Phase 2 database tables"""
-    
-    # ==================== Invoices Table ====================
+    """Create Phase 2 database tables and extend existing ones"""
+
+    # Add new columns to existing products table
+    op.add_column('products', sa.Column('hsn_code', sa.String(8), nullable=True))
+
+    # Add new columns to existing customers table
+    op.add_column('customers', sa.Column('gst_number', sa.String(15), nullable=True))
+
+    # Create inventory table
     op.create_table(
-        'invoices',
-        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True, server_default=sa.func.gen_random_uuid()),
-        sa.Column('invoice_number', sa.String(50), unique=True, nullable=False, index=True),
-        sa.Column('business_id', sa.String(100), nullable=False, index=True),
-        sa.Column('customer_id', sa.String(100), nullable=False, index=True),
-        sa.Column('customer_name', sa.String(255), nullable=False),
-        sa.Column('customer_email', sa.String(255)),
-        sa.Column('customer_phone', sa.String(20)),
-        sa.Column('customer_gst_number', sa.String(15)),
-        sa.Column('billing_address', sa.Text),
-        sa.Column('shipping_address', sa.Text),
-        sa.Column('invoice_date', sa.Date, nullable=False, index=True),
-        sa.Column('due_date', sa.Date),
-        sa.Column('total_taxable', sa.Numeric(15, 2), nullable=False),
-        sa.Column('total_cgst', sa.Numeric(12, 2), default=0),
-        sa.Column('total_sgst', sa.Numeric(12, 2), default=0),
-        sa.Column('total_igst', sa.Numeric(12, 2), default=0),
-        sa.Column('total_tax', sa.Numeric(15, 2), nullable=False),
-        sa.Column('total_amount', sa.Numeric(15, 2), nullable=False),
-        sa.Column('payment_status', sa.String(20), default='UNPAID'),
-        sa.Column('is_inter_state', sa.Boolean, default=False),
-        sa.Column('payment_terms', sa.String(100)),
-        sa.Column('notes', sa.Text),
-        sa.Column('created_at', sa.DateTime, server_default=sa.func.now()),
-        sa.Column('updated_at', sa.DateTime, server_default=sa.func.now(), onupdate=sa.func.now()),
-        sa.Index('idx_invoices_business_date', 'business_id', 'invoice_date'),
-        sa.Index('idx_invoices_customer', 'customer_id'),
-        sa.Index('idx_invoices_status', 'payment_status')
+        'inventory',
+        sa.Column('id', sa.Integer(), nullable=False),
+        sa.Column('outlet_id', sa.Integer(), nullable=False),
+        sa.Column('product_id', sa.Integer(), nullable=False),
+        sa.Column('current_stock', sa.Integer(), nullable=False, server_default='0'),
+        sa.Column('reserved_stock', sa.Integer(), nullable=False, server_default='0'),
+        sa.Column('last_restocked_at', sa.DateTime(timezone=True), nullable=True),
+        sa.Column('next_expiry_date', sa.DateTime(timezone=True), nullable=True),
+        sa.ForeignKeyConstraint(['outlet_id'], ['outlets.id']),
+        sa.ForeignKeyConstraint(['product_id'], ['products.id']),
+        sa.PrimaryKeyConstraint('id'),
+        sa.Index('idx_inventory_outlet_product', 'outlet_id', 'product_id')
     )
-    
-    # ==================== Invoice Line Items Table ====================
+
+    # Create businesses table
+    op.create_table(
+        'businesses',
+        sa.Column('id', sa.Integer(), nullable=False),
+        sa.Column('name', sa.String(255), nullable=False),
+        sa.Column('gst_number', sa.String(15), unique=True, nullable=True),
+        sa.Column('created_at', sa.DateTime(), server_default=sa.func.now(), nullable=True),
+        sa.PrimaryKeyConstraint('id')
+    )
+
+    # NOTE: invoices table is already created in 001_initial_schema, skip duplicate creation
+    # Just create the remaining Phase 2 tables
+
+    # Create invoice_line_items table
     op.create_table(
         'invoice_line_items',
-        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True, server_default=sa.func.gen_random_uuid()),
-        sa.Column('invoice_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('invoices.id', ondelete='CASCADE'), nullable=False, index=True),
-        sa.Column('product_id', sa.String(100), nullable=False),
+        sa.Column('id', sa.Integer(), nullable=False),
+        sa.Column('invoice_id', sa.Integer(), nullable=False),
+        sa.Column('product_id', sa.Integer(), nullable=True),
         sa.Column('product_name', sa.String(255), nullable=False),
-        sa.Column('hsn_code', sa.String(8), nullable=False, index=True),
+        sa.Column('hsn_code', sa.String(10), nullable=False),
+        sa.Column('description', sa.Text(), nullable=True),
         sa.Column('quantity', sa.Numeric(10, 2), nullable=False),
-        sa.Column('unit_rate', sa.Numeric(15, 2), nullable=False),
+        sa.Column('unit', sa.String(20), server_default='PCS', nullable=True),
+        sa.Column('unit_rate', sa.Numeric(12, 2), nullable=False),
+        sa.Column('line_amount', sa.Numeric(12, 2), nullable=False),
         sa.Column('tax_rate', sa.Numeric(5, 2), nullable=False),
-        sa.Column('discount_percentage', sa.Numeric(5, 2), default=0),
-        sa.Column('line_subtotal', sa.Numeric(15, 2), nullable=False),
-        sa.Column('line_tax', sa.Numeric(15, 2), nullable=False),
-        sa.Column('line_total', sa.Numeric(15, 2), nullable=False),
-        sa.Column('description', sa.Text),
-        sa.Column('created_at', sa.DateTime, server_default=sa.func.now())
+        sa.Column('cgst_amount', sa.Numeric(12, 2), server_default='0', nullable=True),
+        sa.Column('sgst_amount', sa.Numeric(12, 2), server_default='0', nullable=True),
+        sa.Column('igst_amount', sa.Numeric(12, 2), server_default='0', nullable=True),
+        sa.Column('line_total', sa.Numeric(12, 2), nullable=False),
+        sa.Column('discount_percentage', sa.Numeric(5, 2), server_default='0', nullable=True),
+        sa.Column('discount_amount', sa.Numeric(12, 2), server_default='0', nullable=True),
+        sa.Column('created_at', sa.DateTime(), server_default=sa.func.now(), nullable=False),
+        sa.ForeignKeyConstraint(['invoice_id'], ['invoices.id']),
+        sa.ForeignKeyConstraint(['product_id'], ['products.id']),
+        sa.PrimaryKeyConstraint('id')
     )
-    
-    # ==================== Invoice Payments Table ====================
+
+    # Create invoice_payments table
     op.create_table(
         'invoice_payments',
-        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True, server_default=sa.func.gen_random_uuid()),
-        sa.Column('invoice_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('invoices.id', ondelete='CASCADE'), nullable=False, index=True),
-        sa.Column('amount', sa.Numeric(15, 2), nullable=False),
-        sa.Column('payment_date', sa.DateTime, nullable=False, index=True),
+        sa.Column('id', sa.Integer(), nullable=False),
+        sa.Column('invoice_id', sa.Integer(), nullable=False),
+        sa.Column('payment_date', sa.Date(), nullable=False),
+        sa.Column('amount', sa.Numeric(12, 2), nullable=False),
         sa.Column('payment_method', sa.String(50), nullable=False),
-        sa.Column('reference_number', sa.String(100)),
-        sa.Column('notes', sa.Text),
-        sa.Column('created_at', sa.DateTime, server_default=sa.func.now())
+        sa.Column('reference_number', sa.String(100), nullable=True),
+        sa.Column('notes', sa.Text(), nullable=True),
+        sa.Column('created_at', sa.DateTime(), server_default=sa.func.now(), nullable=False),
+        sa.ForeignKeyConstraint(['invoice_id'], ['invoices.id']),
+        sa.PrimaryKeyConstraint('id')
     )
-    
-    # ==================== Customer Credit Accounts Table ====================
+
+    # Create customer_credit table
     op.create_table(
         'customer_credit',
-        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True, server_default=sa.func.gen_random_uuid()),
-        sa.Column('business_id', sa.String(100), nullable=False, index=True),
-        sa.Column('customer_id', sa.String(100), nullable=False, unique=True, index=True),
-        sa.Column('customer_name', sa.String(255), nullable=False),
-        sa.Column('credit_limit', sa.Numeric(15, 2), nullable=False),
-        sa.Column('used_credit', sa.Numeric(15, 2), default=0),
-        sa.Column('payment_terms_days', sa.Integer, default=30),
-        sa.Column('credit_score', sa.Integer, default=50),
-        sa.Column('credit_status', sa.String(20), default='FAIR'),
-        sa.Column('total_transactions', sa.Integer, default=0),
-        sa.Column('on_time_payments', sa.Integer, default=0),
-        sa.Column('late_payments', sa.Integer, default=0),
-        sa.Column('missed_payments', sa.Integer, default=0),
-        sa.Column('created_at', sa.DateTime, server_default=sa.func.now()),
-        sa.Column('updated_at', sa.DateTime, server_default=sa.func.now(), onupdate=sa.func.now()),
-        sa.Index('idx_credit_score', 'credit_score'),
-        sa.Index('idx_credit_status', 'credit_status')
+        sa.Column('id', sa.Integer(), nullable=False),
+        sa.Column('business_id', sa.Integer(), nullable=False),
+        sa.Column('customer_id', sa.Integer(), nullable=False),
+        sa.Column('credit_limit', sa.Numeric(12, 2), server_default='0', nullable=False),
+        sa.Column('current_balance', sa.Numeric(12, 2), server_default='0', nullable=False),
+        sa.Column('credit_score', sa.Integer(), server_default='100', nullable=True),
+        sa.Column('credit_rating', sa.String(20), server_default='GOOD', nullable=True),
+        sa.Column('total_transactions', sa.Integer(), server_default='0', nullable=True),
+        sa.Column('on_time_payments', sa.Integer(), server_default='0', nullable=True),
+        sa.Column('late_payments', sa.Integer(), server_default='0', nullable=True),
+        sa.Column('missed_payments', sa.Integer(), server_default='0', nullable=True),
+        sa.Column('last_payment_date', sa.Date(), nullable=True),
+        sa.Column('last_transaction_date', sa.Date(), nullable=True),
+        sa.Column('is_active', sa.Boolean(), server_default='true', nullable=True),
+        sa.Column('is_blocked', sa.Boolean(), server_default='false', nullable=True),
+        sa.Column('created_at', sa.DateTime(), server_default=sa.func.now(), nullable=False),
+        sa.Column('updated_at', sa.DateTime(), server_default=sa.func.now(), nullable=True),
+        sa.ForeignKeyConstraint(['business_id'], ['businesses.id']),
+        sa.ForeignKeyConstraint(['customer_id'], ['customers.id']),
+        sa.PrimaryKeyConstraint('id'),
+        sa.UniqueConstraint('customer_id', name='uq_customer_credit_customer_id')
     )
-    
-    # ==================== Credit Transactions Table ====================
+
+    # Create credit_transactions table
     op.create_table(
         'credit_transactions',
-        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True, server_default=sa.func.gen_random_uuid()),
-        sa.Column('customer_id', sa.String(100), sa.ForeignKey('customer_credit.customer_id', ondelete='CASCADE'), nullable=False, index=True),
-        sa.Column('transaction_type', sa.String(20), nullable=False),  # CREDIT or PAYMENT
-        sa.Column('amount', sa.Numeric(15, 2), nullable=False),
-        sa.Column('invoice_id', sa.String(100)),
-        sa.Column('reference_number', sa.String(100)),
-        sa.Column('due_date', sa.Date),
-        sa.Column('is_on_time', sa.Boolean, default=True),
-        sa.Column('is_late', sa.Boolean, default=False),
-        sa.Column('is_missed', sa.Boolean, default=False),
-        sa.Column('description', sa.Text),
-        sa.Column('created_at', sa.DateTime, server_default=sa.func.now(), index=True),
-        sa.Index('idx_credit_trans_date', 'created_at'),
-        sa.Index('idx_credit_trans_type', 'transaction_type')
+        sa.Column('id', sa.Integer(), nullable=False),
+        sa.Column('credit_account_id', sa.Integer(), nullable=False),
+        sa.Column('transaction_type', sa.String(20), nullable=False),
+        sa.Column('reference_id', sa.String(100), nullable=True),
+        sa.Column('reference_type', sa.String(50), nullable=True),
+        sa.Column('amount', sa.Numeric(12, 2), nullable=False),
+        sa.Column('balance_after', sa.Numeric(12, 2), nullable=False),
+        sa.Column('description', sa.Text(), nullable=True),
+        sa.Column('due_date', sa.Date(), nullable=True),
+        sa.Column('payment_due', sa.Boolean(), server_default='false', nullable=True),
+        sa.Column('created_at', sa.DateTime(), server_default=sa.func.now(), nullable=False),
+        sa.ForeignKeyConstraint(['credit_account_id'], ['customer_credit.id']),
+        sa.PrimaryKeyConstraint('id')
     )
-    
-    # ==================== Credit Reminders Table ====================
+
+    # Create credit_reminders table
     op.create_table(
         'credit_reminders',
-        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True, server_default=sa.func.gen_random_uuid()),
-        sa.Column('customer_id', sa.String(100), sa.ForeignKey('customer_credit.customer_id', ondelete='CASCADE'), nullable=False, index=True),
-        sa.Column('invoice_id', sa.String(100)),
-        sa.Column('due_date', sa.Date, nullable=False),
-        sa.Column('amount_due', sa.Numeric(15, 2), nullable=False),
-        sa.Column('reminder_type', sa.String(20)),  # AUTO, MANUAL
-        sa.Column('channels', sa.String(100)),  # SMS,EMAIL,WHATSAPP
-        sa.Column('status', sa.String(20), default='PENDING'),  # PENDING, SENT, ACKNOWLEDGED
-        sa.Column('sent_at', sa.DateTime),
-        sa.Column('acknowledged_at', sa.DateTime),
-        sa.Column('created_at', sa.DateTime, server_default=sa.func.now()),
-        sa.Index('idx_reminder_status', 'status'),
-        sa.Index('idx_reminder_due_date', 'due_date')
+        sa.Column('id', sa.Integer(), nullable=False),
+        sa.Column('credit_account_id', sa.Integer(), nullable=False),
+        sa.Column('outstanding_amount', sa.Numeric(12, 2), nullable=False),
+        sa.Column('days_overdue', sa.Integer(), server_default='0', nullable=True),
+        sa.Column('reminder_type', sa.String(20), nullable=False),
+        sa.Column('reminder_number', sa.Integer(), server_default='1', nullable=True),
+        sa.Column('sent', sa.Boolean(), server_default='false', nullable=True),
+        sa.Column('sent_at', sa.DateTime(), nullable=True),
+        sa.Column('acknowledged', sa.Boolean(), server_default='false', nullable=True),
+        sa.Column('acknowledged_at', sa.DateTime(), nullable=True),
+        sa.Column('message_id', sa.String(100), nullable=True),
+        sa.Column('created_at', sa.DateTime(), server_default=sa.func.now(), nullable=False),
+        sa.Column('updated_at', sa.DateTime(), server_default=sa.func.now(), nullable=True),
+        sa.ForeignKeyConstraint(['credit_account_id'], ['customer_credit.id']),
+        sa.PrimaryKeyConstraint('id')
     )
-    
-    # ==================== GST Configuration Table ====================
+
+    # Create gst_configuration table
     op.create_table(
         'gst_configuration',
-        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True, server_default=sa.func.gen_random_uuid()),
-        sa.Column('business_id', sa.String(100), nullable=False, unique=True, index=True),
+        sa.Column('id', sa.Integer(), nullable=False),
+        sa.Column('business_id', sa.Integer(), nullable=False),
         sa.Column('gst_number', sa.String(15), nullable=False),
-        sa.Column('state_code', sa.String(2), nullable=False),
-        sa.Column('tax_0_enabled', sa.Boolean, default=True),
-        sa.Column('tax_5_enabled', sa.Boolean, default=True),
-        sa.Column('tax_12_enabled', sa.Boolean, default=True),
-        sa.Column('tax_18_enabled', sa.Boolean, default=True),
-        sa.Column('tax_28_enabled', sa.Boolean, default=True),
-        sa.Column('default_tax_rate', sa.Numeric(5, 2), default=18),
-        sa.Column('financial_year_start_month', sa.Integer, default=4),
-        sa.Column('auto_calculate_gst', sa.Boolean, default=True),
-        sa.Column('created_at', sa.DateTime, server_default=sa.func.now()),
-        sa.Column('updated_at', sa.DateTime, server_default=sa.func.now(), onupdate=sa.func.now())
+        sa.Column('business_name', sa.String(255), nullable=False),
+        sa.Column('business_address', sa.Text(), nullable=False),
+        sa.Column('city', sa.String(100), nullable=False),
+        sa.Column('state', sa.String(100), nullable=False),
+        sa.Column('pincode', sa.String(10), nullable=False),
+        sa.Column('financial_year_start', sa.Date(), nullable=False),
+        sa.Column('financial_year_end', sa.Date(), nullable=False),
+        sa.Column('is_registered', sa.Boolean(), server_default='true', nullable=True),
+        sa.Column('is_composition', sa.Boolean(), server_default='false', nullable=True),
+        sa.Column('default_tax_rate', sa.Numeric(5, 2), server_default='18', nullable=True),
+        sa.Column('enable_e_invoice', sa.Boolean(), server_default='true', nullable=True),
+        sa.Column('e_invoice_username', sa.String(255), nullable=True),
+        sa.Column('e_invoice_password', sa.String(255), nullable=True),
+        sa.Column('returns_filing_date', sa.Date(), nullable=True),
+        sa.Column('created_at', sa.DateTime(), server_default=sa.func.now(), nullable=False),
+        sa.Column('updated_at', sa.DateTime(), server_default=sa.func.now(), nullable=True),
+        sa.ForeignKeyConstraint(['business_id'], ['businesses.id']),
+        sa.PrimaryKeyConstraint('id'),
+        sa.UniqueConstraint('business_id', name='uq_gst_configuration_business_id')
     )
 
 
 def downgrade():
-    """Drop Phase 2 database tables"""
+    """Drop Phase 2 database tables and remove added columns"""
+
+    # Drop new tables in reverse order (due to foreign key dependencies)
     op.drop_table('gst_configuration')
     op.drop_table('credit_reminders')
     op.drop_table('credit_transactions')
     op.drop_table('customer_credit')
     op.drop_table('invoice_payments')
     op.drop_table('invoice_line_items')
-    op.drop_table('invoices')
+    # NOTE: invoices table is created in 001_initial_schema, don't drop it here
+    op.drop_table('businesses')
+    op.drop_table('inventory')
+
+    # Remove added columns from existing tables
+    op.drop_column('customers', 'gst_number')
+    op.drop_column('products', 'hsn_code')

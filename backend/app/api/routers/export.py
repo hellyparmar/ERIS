@@ -4,6 +4,7 @@ Supports PDF, Excel, and CSV exports
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import select
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from typing import Optional, List
@@ -257,8 +258,8 @@ async def export_customers(
 ):
     """Export customer data in specified format"""
     try:
-        customers = db.query(Customer).all()
-        
+        result = await db.execute(select(Customer))
+        customers = result.scalars().all()
         customer_data = [
             {
                 "id": cust.id,

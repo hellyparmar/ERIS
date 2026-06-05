@@ -2,7 +2,7 @@ import os
 import requests
 import logging
 from typing import Optional, List, Dict, Any
-from ..config import settings
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -10,10 +10,10 @@ class WhatsAppService:
     """MSG91 based WhatsApp notification service"""
 
     def __init__(self):
-        self.auth_key = settings.MSG91_AUTH_KEY
+        self.auth_key = settings.MSG91_API_KEY
         self.sender_id = settings.MSG91_SENDER_ID
         self.base_url = "https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-send"
-        self.enabled = settings.WHATSAPP_ENABLED and bool(self.auth_key)
+        self.enabled = settings.ENABLE_WHATSAPP and bool(self.auth_key)
 
     def send_template_message(
         self, 

@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 import jwt, os, bcrypt
 from dotenv import load_dotenv
 
-from app.api.db import get_db
+from app.database import get_db
 
 load_dotenv('backend/.env')
 

@@ -8,7 +8,7 @@ if backend_path not in sys.path:
 
 from app.database import SessionLocal
 from app.models.multitenant_models import Product
-from app.models.models import Sale
+from app.models.schema import Sale
 
 from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings import HuggingFaceEmbeddings

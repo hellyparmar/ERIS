@@ -6,9 +6,10 @@ Covers POS transactions with itemised lines, tax, discounts, and payment trackin
 """
 
 import enum
+import uuid
 from sqlalchemy import (
-    Column, Integer, String, Boolean, ForeignKey,
-    DateTime, DECIMAL, Text, Index, UniqueConstraint
+    Column, String, Boolean, ForeignKey,
+    Integer, DateTime, DECIMAL, Text, Index, UniqueConstraint, text
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -52,7 +53,7 @@ class Sale(Base):
     """
     __tablename__ = "sales"
 
-    id              = Column(Integer, primary_key=True, index=True)
+    id              = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     transaction_id  = Column(String(100), unique=True, index=True)     # human-readable receipt no.
 
     # Tenant scope
@@ -60,8 +61,8 @@ class Sale(Base):
     store_id        = Column(Uuid(as_uuid=True), ForeignKey("stores.id"), nullable=False, index=True)
 
     # Parties
-    customer_id     = Column(Integer, ForeignKey("customers.id", ondelete="SET NULL"), index=True)
-    cashier_id      = Column(Integer, ForeignKey("users.id",     ondelete="SET NULL"), index=True)
+    customer_id     = Column(Uuid(as_uuid=True), ForeignKey("customers.id", ondelete="SET NULL"), index=True)
+    cashier_id      = Column(Uuid(as_uuid=True), ForeignKey("users.id",     ondelete="SET NULL"), index=True)
 
     # Financials (all in INR, 2dp)
     subtotal        = Column(DECIMAL(12, 2), nullable=False, default=0)
@@ -118,9 +119,9 @@ class SaleItem(Base):
     """
     __tablename__ = "sale_items"
 
-    id          = Column(Integer, primary_key=True, index=True)
-    sale_id     = Column(Integer, ForeignKey("sales.id",    ondelete="CASCADE"), nullable=False, index=True)
-    product_id  = Column(Integer, ForeignKey("products.id", ondelete="RESTRICT"), nullable=False, index=True)
+    id          = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    sale_id     = Column(Uuid(as_uuid=True), ForeignKey("sales.id",    ondelete="CASCADE"), nullable=False, index=True)
+    product_id  = Column(Uuid(as_uuid=True), ForeignKey("products.id", ondelete="RESTRICT"), nullable=False, index=True)
 
     # Snapshot pricing (frozen at time of sale)
     product_name = Column(String(255))          # denormalised for reporting

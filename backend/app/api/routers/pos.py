@@ -4,6 +4,7 @@ Handles checkout, cart management, and order creation
 """
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import List, Optional

@@ -10,12 +10,17 @@ from datetime import date, datetime
 from decimal import Decimal
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
+import os
+import requests
+import logging
 
 from app.api.db.database import get_db
 from app.api.db.phase2_models import (
     Invoice, InvoiceLineItem as InvoiceLineItemModel, InvoicePayment
 )
 from app.api.services.phase2_invoice_service import phase2_invoice_service, InvoiceLineItem
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v2/invoice", tags=["invoices"])
 
@@ -305,12 +310,81 @@ def send_invoice_whatsapp(
         if not invoice:
             raise HTTPException(status_code=404, detail="Invoice not found")
         
-        # TODO: Integrate with WhatsApp service (MSG91/Twilio)
-        return {
-            "status": "success",
-            "message": f"Invoice {invoice_id} queued for WhatsApp delivery to {customer_phone}",
-            "sent_at": datetime.utcnow().isoformat()
-        }
+        # Send invoice via WhatsApp using MSG91
+        msg91_api_key = os.getenv('MSG91_API_KEY')
+        msg91_sender_id = os.getenv('MSG91_SENDER_ID', 'ERISAL')
+        
+        if not msg91_api_key:
+            raise HTTPException(
+                status_code=500, 
+                detail="WhatsApp service not configured. MSG91_API_KEY not set."
+            )
+        
+        try:
+            # Format invoice message
+            invoice_message = f"""
+🧾 *ERIS Invoice #{invoice.invoice_number}*
+
+📅 Date: {invoice.created_at.strftime('%d/%m/%Y')}
+👤 Customer: {invoice.customer_name or 'Walk-in Customer'}
+📞 Phone: {customer_phone}
+
+📋 Items:
+"""
+            
+            # Add line items
+            for item in invoice.line_items:
+                invoice_message += f"• {item.product_name} (x{item.quantity}) - ₹{item.total:.2f}\n"
+            
+            invoice_message += f"""
+💰 Subtotal: ₹{invoice.subtotal:.2f}
+📊 GST: ₹{invoice.gst_amount:.2f}
+💵 Total: ₹{invoice.total:.2f}
+
+Thank you for your business! 🛒
+*Enterprise Retail Intelligence System*
+"""
+            
+            # Send via MSG91 WhatsApp API
+            response = requests.post(
+                'https://api.msg91.com/api/v2/sendsms',
+                json={
+                    'sender': msg91_sender_id,
+                    'route': '4',  # WhatsApp route
+                    'country': '91',  # India
+                    'sms': [{
+                        'message': invoice_message,
+                        'to': [customer_phone.lstrip('+')]
+                    }]
+                },
+                headers={
+                    'authkey': msg91_api_key,
+                    'Content-Type': 'application/json'
+                },
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                logger.info(f"WhatsApp invoice sent to {customer_phone} for invoice {invoice_id}")
+                return {
+                    "status": "success",
+                    "message": f"Invoice {invoice.invoice_number} sent via WhatsApp to {customer_phone}",
+                    "sent_at": datetime.utcnow().isoformat(),
+                    "provider": "MSG91"
+                }
+            else:
+                logger.error(f"MSG91 WhatsApp API error: {response.text}")
+                raise HTTPException(
+                    status_code=500, 
+                    detail=f"Failed to send WhatsApp message: {response.text}"
+                )
+                
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Network error sending WhatsApp invoice: {e}")
+            raise HTTPException(status_code=500, detail=f"Network error: {str(e)}")
+        except Exception as e:
+            logger.error(f"Unexpected error sending WhatsApp invoice: {e}")
+            raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
     
     except HTTPException:
         raise

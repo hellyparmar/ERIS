@@ -9,6 +9,7 @@ All reconciliation data is saved for audit.
 """
 
 from fastapi import APIRouter, HTTPException, Depends, status
+from sqlalchemy import select
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from datetime import datetime, date
@@ -76,13 +77,11 @@ async def open_day(
         from app.api.db.models import DayClose  # Assuming this table exists
         
         today = date.today()
-        existing = db.query(DayClose).filter(
-            and_(
+        result = await db.execute(select(DayClose).where(and_(
                 func.date(DayClose.created_at) == today,
                 DayClose.closed_at == None  # Not closed
-            )
-        ).first()
-        
+            )))
+        existing = result.scalar_one_or_none()
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -152,13 +151,11 @@ async def close_day(
         from app.api.db.models import DayClose, Sale
         
         today = date.today()
-        day_record = db.query(DayClose).filter(
-            and_(
+        result = await db.execute(select(DayClose).where(and_(
                 func.date(DayClose.created_at) == today,
                 DayClose.closed_at == None
-            )
-        ).first()
-        
+            )))
+        day_record = result.scalar_one_or_none()
         if not day_record:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -266,12 +263,11 @@ async def get_day_status(
         from app.api.db.models import DayClose
         
         today = date.today()
-        day_record = db.query(DayClose).filter(
-            and_(
+        result = await db.execute(select(DayClose).where(and_(
                 func.date(DayClose.created_at) == today
             )
-        ).order_by(DayClose.created_at.desc()).first()
-        
+        ).order_by(DayClose.created_at.desc()))
+        day_record = result.scalar_one_or_none()
         if not day_record:
             return {
                 "success": True,

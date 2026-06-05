@@ -9,7 +9,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from app.api.db import Base
+from .base import Base
 import enum
 
 

@@ -4,6 +4,7 @@ Reusable dependencies for route protection
 """
 
 from fastapi import Depends, HTTPException, status
+from sqlalchemy import select
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from typing import Optional
@@ -49,8 +50,8 @@ async def get_current_user(
         )
     
     # Get user from database
-    user = db.query(User).filter(User.id == int(user_id)).first()
-    
+    result = await db.execute(select(User).where(User.id == int(user_id)))
+    user = result.scalar_one_or_none()
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

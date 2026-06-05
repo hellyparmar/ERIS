@@ -14,6 +14,8 @@ from app.api.schemas.supplier import (
     PurchaseOrderCreate, PurchaseOrderResponse,
     ReceiveGoodsRequest, UpdatePOStatusRequest
 )
+from app.api.deps import get_current_active_user
+from app.models.users import User
 
 router = APIRouter(prefix="/suppliers", tags=["suppliers"])
 
@@ -127,20 +129,25 @@ async def list_all_purchase_orders(
     status: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """List all purchase orders across all suppliers"""
     try:
-        svc = SupplierService(db)
+        svc = SupplierService(db, current_user)
         return svc.list_purchase_orders(status=status, page=page, limit=limit)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/purchase-orders/{po_id}")
-async def get_purchase_order(po_id: int, db: Session = Depends(get_db)):
+async def get_purchase_order(
+    po_id: int, 
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
     """Get purchase order details"""
-    svc = SupplierService(db)
+    svc = SupplierService(db, current_user)
     po = svc.get_purchase_order(po_id)
     if not po:
         raise HTTPException(status_code=404, detail="Purchase order not found")
@@ -151,11 +158,12 @@ async def get_purchase_order(po_id: int, db: Session = Depends(get_db)):
 async def update_po_status(
     po_id: int,
     data: UpdatePOStatusRequest,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """Update purchase order status (sent, confirmed, paid, cancelled)"""
     try:
-        svc = SupplierService(db)
+        svc = SupplierService(db, current_user)
         po = svc.update_po_status(po_id, data.status, data.notes)
         return {"success": True, "data": svc._po_dict(po), "message": f"Status updated to {data.status}"}
     except ValueError as e:
@@ -168,11 +176,12 @@ async def update_po_status(
 async def receive_goods(
     po_id: int,
     data: ReceiveGoodsRequest,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """Mark goods as received and update inventory stock levels"""
     try:
-        svc = SupplierService(db)
+        svc = SupplierService(db, current_user)
         po = svc.receive_goods(po_id, data.items, data.notes)
         return {
             "success": True,

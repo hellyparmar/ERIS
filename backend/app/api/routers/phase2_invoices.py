@@ -5,6 +5,7 @@ Status: Advanced invoicing with QR codes, credit management, email/WhatsApp deli
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
+from sqlalchemy import select
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -296,7 +297,7 @@ async def list_invoices(
     Returns:
     - List of invoices with summary info
     """
-    query = db.query(Invoice).filter(Invoice.business_id == current_user["business_id"])
+    result = await db.execute(select(Invoice).where(Invoice.business_id == current_user["business_id"])
     
     if status:
         query = query.filter(Invoice.status == status)
@@ -342,25 +343,24 @@ async def get_invoice_details(
     Returns:
     - Full invoice data with line items, payment history, credit status
     """
-    invoice = db.query(Invoice).filter(
-        Invoice.id == invoice_id,
-        Invoice.business_id == current_user["business_id"]
-    ).first()
-    
+    result = await db.execute(select(Invoice).where(Invoice.id == invoice_id,
+        Invoice.business_id == current_user["business_id"]))
+    query = result.scalar_one_or_none()
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
     
-    line_items = db.query(InvoiceLineItem).filter(InvoiceLineItem.invoice_id == invoice_id).all()
-    payments = db.query(InvoicePayment).filter(InvoicePayment.invoice_id == invoice_id).all()
-    
+    result = await db.execute(select(InvoiceLineItem).where(InvoiceLineItem.invoice_id == invoice_id))
+    invoice = result.scalars().all()
+    result = await db.execute(select(InvoicePayment).where(InvoicePayment.invoice_id == invoice_id))
+    payments = result.scalars().all()
     # Calculate credit score if credit given
     credit_score = None
     if invoice.due_date:
         customer_credit = db.query(CustomerCredit).filter(
             CustomerCredit.customer_id == invoice.customer_id,
-            CustomerCredit.business_id == current_user["business_id"]
-        ).first()
-        
+            CustomerCredit.business_id == current_user["business_id"]))
+    
+    line_items = result.scalar_one_or_none()
         if customer_credit:
             credit_score = {
                 "score": customer_credit.credit_score,
@@ -448,11 +448,9 @@ async def finalize_invoice(
     Returns:
     - Updated invoice status
     """
-    invoice = db.query(Invoice).filter(
-        Invoice.id == invoice_id,
-        Invoice.business_id == current_user["business_id"]
-    ).first()
-    
+    result = await db.execute(select(Invoice).where(Invoice.id == invoice_id,
+        Invoice.business_id == current_user["business_id"]))
+    invoice = result.scalar_one_or_none()
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
     
@@ -492,11 +490,9 @@ async def record_payment(
     Returns:
     - Payment confirmation, updated balance
     """
-    invoice = db.query(Invoice).filter(
-        Invoice.id == invoice_id,
-        Invoice.business_id == current_user["business_id"]
-    ).first()
-    
+    result = await db.execute(select(Invoice).where(Invoice.id == invoice_id,
+        Invoice.business_id == current_user["business_id"]))
+    invoice = result.scalar_one_or_none()
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
     
@@ -562,11 +558,9 @@ async def update_credit_limit(
     Returns:
     - Updated credit account details
     """
-    customer_credit = db.query(CustomerCredit).filter(
-        CustomerCredit.customer_id == customer_id,
-        CustomerCredit.business_id == current_user["business_id"]
-    ).first()
-    
+    result = await db.execute(select(CustomerCredit).where(CustomerCredit.customer_id == customer_id,
+        CustomerCredit.business_id == current_user["business_id"]))
+    customer_credit = result.scalar_one_or_none()
     if not customer_credit:
         raise HTTPException(status_code=404, detail="Customer credit account not found")
     
@@ -603,11 +597,9 @@ async def get_credit_status(
     - Aging analysis (0-30, 30-60, 60-90, 90+ days)
     - Recommendations
     """
-    customer_credit = db.query(CustomerCredit).filter(
-        CustomerCredit.customer_id == customer_id,
-        CustomerCredit.business_id == current_user["business_id"]
-    ).first()
-    
+    result = await db.execute(select(CustomerCredit).where(CustomerCredit.customer_id == customer_id,
+        CustomerCredit.business_id == current_user["business_id"]))
+    customer_credit = result.scalar_one_or_none()
     if not customer_credit:
         raise HTTPException(status_code=404, detail="Customer credit account not found")
     
@@ -663,8 +655,8 @@ async def send_payment_reminder(
     Returns:
     - Reminder sent confirmation, delivery status
     """
-    invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
-    
+    result = await db.execute(select(Invoice).where(Invoice.id == invoice_id))
+    invoice = result.scalar_one_or_none()
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
     

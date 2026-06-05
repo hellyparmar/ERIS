@@ -2,7 +2,7 @@
 database.py - Database Connection & Session Management
 MSc Data Science Project - Enterprise Retail Intelligence System
 
-Supports SQLite (local dev / CI) and PostgreSQL (production).
+Supports PostgreSQL only.
 """
 
 import os
@@ -13,7 +13,7 @@ from contextlib import contextmanager
 
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import sessionmaker, Session
-from sqlalchemy.pool import QueuePool, StaticPool
+from sqlalchemy.pool import QueuePool
 
 from .base import Base
 
@@ -23,29 +23,21 @@ logger = logging.getLogger(__name__)
 
 DATABASE_URL: str = os.getenv(
     "DATABASE_URL",
-    "sqlite:///./eris_dev.sqlite3"   # local dev default
+    "postgresql+psycopg://eris_admin:JnCSXvJLgIY7V8KtUd2TT26QXkbgvuwv@localhost:5434/eris_production"
 )
 
 # ── Engine ────────────────────────────────────────────────────────────────────
 
 def _build_engine(url: str):
-    """Build the SQLAlchemy engine, adapting settings for SQLite vs PostgreSQL."""
-    if url.startswith("sqlite"):
-        return create_engine(
-            url,
-            connect_args={"check_same_thread": False},
-            poolclass=StaticPool,
-            echo=False,
-        )
-    # PostgreSQL / production
+    """Build the SQLAlchemy engine for PostgreSQL only."""
     return create_engine(
         url,
         poolclass=QueuePool,
         pool_size=10,
         max_overflow=20,
         pool_timeout=30,
-        pool_recycle=1800,   # recycle every 30 min to avoid stale connections
-        pool_pre_ping=True,  # verify connection before checkout
+        pool_recycle=1800,
+        pool_pre_ping=True,
         echo=False,
     )
 
@@ -146,6 +138,8 @@ def init_db(drop_first: bool = False) -> None:
     import app.models.organization  # noqa: F401
     import app.models.users         # noqa: F401
     import app.models.product       # noqa: F401
+    import app.models.customers     # noqa: F401
+    import app.models.invoicing     # noqa: F401
     import app.models.sale          # noqa: F401
     import app.models.alert         # noqa: F401
 

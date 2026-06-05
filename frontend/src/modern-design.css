@@ -1,0 +1,461 @@
+/* Clean Design System - No Glassmorphism, No Neon */
+
+:root {
+    /* Clean color palette - no gradients or neon */
+    --bg-primary: #f8fafc;
+    --text-primary: #0f172a;
+}
+
+/* Clean card styling */
+.glass-card {
+    background: var(--bg-surface);
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    transition: box-shadow 200ms ease;
+}
+
+.glass-card:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+/* Remove all neon and glow effects */
+.dark .glass-card:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+/* Clean button styling */
+button {
+    border-radius: 8px;
+    transition: all 150ms ease;
+}
+
+/* Form inputs */
+input, select, textarea {
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #374151;
+    transition: all 150ms ease;
+}
+
+input:focus, select:focus, textarea:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1);
+    border-color: #9ca3af;
+}
+
+/* Dark theme form inputs */
+.dark input, .dark select, .dark textarea {
+    background: #1f2937;
+    border-color: #374151;
+    color: #f9fafb;
+}
+
+.dark input:focus, .dark select:focus, .dark textarea:focus {
+    box-shadow: 0 0 0 3px rgba(180, 130, 40, 0.2);
+    border-color: #f59e0b;
+}
+
+/* Clean gradient text - no neon */
+.gradient-text {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* Light mode: use solid dark color */
+:not(.dark) .gradient-text {
+    background: #111827;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* Clean enterprise button system */
+.btn-enterprise {
+    font-weight: 600;
+    padding: 0.625rem 1.25rem;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    transition: all 150ms ease;
+}
+
+/* Primary button - theme aware */
+.btn-enterprise-primary {
+    background: var(--accent);
+    color: white;
+}
+
+.btn-enterprise-primary:hover {
+    background: var(--accent-gradient-dark);
+}
+
+/* Secondary button */
+.btn-enterprise-secondary {
+    background: transparent;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+}
+
+.btn-enterprise-secondary:hover {
+    background: var(--accent-soft);
+}
+
+/* Clean table styling */
+table {
+    border-collapse: collapse;
+    width: 100%;
+}
+
+table th {
+    background: var(--bg-hover);
+    padding: 12px 16px;
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 1px solid var(--border-sm);
+}
+
+table td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-sm);
+}
+
+table tr:nth-child(even) {
+    background: var(--bg-hover);
+}
+
+table tr:hover {
+    background: var(--bg-surface);
+}
+
+/* Status badges - muted colors only */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    background: var(--success-soft);
+    color: var(--success);
+}
+
+/* Clean spacing */
+.card-padding {
+    padding: 20px 24px;
+}
+
+.section-spacing {
+    margin-bottom: 24px;
+}
+
+/* Subtle animations only */
+.fade-in {
+    animation: fadeIn 200ms ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.card {
+    position: relative;
+    overflow: hidden;
+    /* Inner glow + soft drop shadow */
+    box-shadow:
+        0 4px 6px -1px rgba(0, 0, 0, 0.1),
+        0 2px 4px -1px rgba(0, 0, 0, 0.06),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.btn-enterprise:hover:not(:disabled) {
+    filter: saturate(1.1) brightness(1.1);
+    transform: translateY(-1px);
+    box-shadow:
+        0 10px 15px -3px rgba(0, 0, 0, 0.1),
+        0 4px 6px -2px rgba(0, 0, 0, 0.05),
+        inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+.btn-enterprise:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.btn-enterprise:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Primary Action - Enterprise Blue */
+.btn-enterprise-primary {
+    background-color: #3b82f6;
+    color: white;
+    box-shadow:
+        0 4px 6px -1px rgba(59, 130, 246, 0.3),
+        0 2px 4px -1px rgba(59, 130, 246, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+.btn-enterprise-primary:hover:not(:disabled) {
+    background-color: #2563eb;
+    box-shadow:
+        0 10px 15px -3px rgba(59, 130, 246, 0.4),
+        0 4px 6px -2px rgba(59, 130, 246, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+/* Success Action - Professional Green */
+.btn-enterprise-success {
+    background-color: #d1fae5;
+    color: #065f46;
+    border: 1px solid #a7f3d0;
+    box-shadow:
+        0 1px 3px 0 rgba(0, 0, 0, 0.1),
+        0 1px 2px 0 rgba(0, 0, 0, 0.06);
+}
+
+.btn-enterprise-success:hover:not(:disabled) {
+    background-color: #a7f3d0;
+    color: #064e3b;
+    border-color: #6ee7b7;
+    box-shadow:
+        0 4px 6px -1px rgba(0, 0, 0, 0.1),
+        0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* Destructive Action - Ruby Red */
+.btn-enterprise-destructive {
+    background-color: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fecaca;
+    box-shadow:
+        0 1px 3px 0 rgba(0, 0, 0, 0.1),
+        0 1px 2px 0 rgba(0, 0, 0, 0.06);
+}
+
+.btn-enterprise-destructive:hover:not(:disabled) {
+    background-color: #fecaca;
+    color: #7f1d1d;
+    border-color: #fca5a5;
+    box-shadow:
+        0 4px 6px -1px rgba(0, 0, 0, 0.1),
+        0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* Dark Mode Adjustments - Even more luminous for better visibility */
+.dark .btn-enterprise-primary {
+    background-color: #60a5fa;
+}
+
+.dark .btn-enterprise-primary:hover:not(:disabled) {
+    background-color: #3b82f6;
+}
+
+.dark .btn-enterprise-success {
+    background-color: #064e3b;
+    color: #d1fae5;
+    border-color: #065f46;
+}
+
+.dark .btn-enterprise-success:hover:not(:disabled) {
+    background-color: #065f46;
+    color: #ecfdf5;
+    border-color: #047857;
+}
+
+.dark .btn-enterprise-destructive {
+    background-color: #7f1d1d;
+    color: #fee2e2;
+    border-color: #991b1b;
+}
+
+.dark .btn-enterprise-destructive:hover:not(:disabled) {
+    background-color: #991b1b;
+    color: #fef2f2;
+    border-color: #b91c1c;
+}
+
+/* Animations */
+.fade-in-up {
+    animation: fadeInUp 0.6s ease-out;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.shimmer {
+    background: linear-gradient(90deg,
+            rgba(255, 255, 255, 0.05) 0%,
+            rgba(255, 255, 255, 0.1) 50%,
+            rgba(255, 255, 255, 0.05) 100%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+    0% {
+        background-position: -200% 0;
+    }
+
+    100% {
+        background-position: 200% 0;
+    }
+}
+
+/* ========================================
+   LIGHT MODE ENHANCEMENTS
+   ======================================== */
+
+/* Light Mode Text Contrast Standards (WCAG AA Compliance) */
+:not(.dark) .text-gray-400 {
+    color: #6b7280 !important;
+    /* gray-500 for better contrast */
+}
+
+:not(.dark) .text-gray-500 {
+    color: #4b5563 !important;
+    /* gray-600 for better contrast */
+}
+
+/* Light Mode Interactive Elements Hover */
+:not(.dark) button:not(:disabled):hover,
+:not(.dark) input:hover,
+:not(.dark) select:hover {
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15) !important;
+    border-color: rgba(59, 130, 246, 0.3) !important;
+    transition: all 0.2s ease;
+}
+
+/* Light Mode Glass Card Hover */
+:not(.dark) .glass-card:hover {
+    box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.08);
+    border-color: rgba(59, 130, 246, 0.2);
+    transform: translateY(-2px);
+}
+
+/* Typography Hierarchy for Light Mode */
+:not(.dark) h1,
+:not(.dark) h2,
+:not(.dark) h3 {
+    color: #111827;
+    /* gray-900 for maximum contrast */
+    font-weight: 700;
+}
+
+:not(.dark) p {
+    color: #374151;
+    /* gray-700 for body text */
+}
+
+:not(.dark) label,
+:not(.dark) .text-sm {
+    color: #4b5563;
+    /* gray-600 for labels */
+}
+
+/* Stronger Borders for Tables/Cards in Light Mode */
+html:not(.dark) .border,
+html:not(.dark) .border-t,
+html:not(.dark) .border-b,
+html:not(.dark) .border-l,
+html:not(.dark) .border-r {
+    border-color: #cbd5e1 !important;
+    /* slate-300 strong */
+}
+
+html:not(.dark) table th,
+html:not(.dark) table td {
+    border-color: #cbd5e1 !important;
+}
+
+html:not(.dark) .card-standard,
+html:not(.dark) .glass-card {
+    border: none !important;
+    /* Removed thick border for floating effect */
+    background: white;
+    /* Ensure visibility against light bg */
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+}
+
+.dark .glass-card {
+    border: none !important;
+}
+
+/* Ensure all random gray text is darkened */
+:not(.dark) .text-muted-foreground,
+:not(.dark) .text-gray-400,
+:not(.dark) .text-slate-400,
+:not(.dark) .text-zinc-400 {
+    color: #475569 !important;
+    /* slate-600 */
+}
+
+/* ========================================
+   GLOBAL SHADOW ENFORCEMENT
+   ======================================== */
+
+/* Strong Shadows for All Cards & Tables */
+.card-standard,
+.glass-card,
+.glass,
+table,
+.table-container {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Enhanced Table Shadow specifically */
+table {
+    border-collapse: separate;
+    border-spacing: 0;
+    border-radius: 0.5rem;
+    overflow: hidden;
+}
+
+/* Dark Mode Shadow Glow */
+.dark .card-standard,
+.dark .glass-card,
+.dark .glass,
+.dark table,
+.dark .table-container {
+    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* ========================================
+   GLOBAL HOVER EFFECTS (INTERACTIVE LIFT)
+   ======================================== */
+
+.card-standard,
+table,
+.table-container {
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+    /* Bouncy spring matching GlassCard */
+}
+
+.card-standard:hover,
+table:hover,
+.table-container:hover {
+    transform: translateY(-4px) !important;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15) !important;
+    cursor: pointer;
+}
+
+/* Ensure Dark Mode Hover utilizes glow */
+.dark .card-standard:hover,
+.dark table:hover,
+.dark .table-container:hover {
+    box-shadow: 0 0 30px rgba(6, 182, 212, 0.2), 0 0 0 1px rgba(6, 182, 212, 0.4) !important;
+    /* Cyan spill */
+}

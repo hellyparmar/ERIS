@@ -12,10 +12,11 @@ from datetime import datetime, timedelta
 from app.middleware.auth import get_current_user
 from app.middleware.rate_limiter import limiter
 from app.models.multitenant_models import User, Product, Inventory
-from app.models.models import Sale, Alert, SaleItem
+from app.models.sale import Sale, SaleItem
+from app.models.schema import Alert
 from app.database import get_db
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, select
 
 from app.schemas.analytics import MetricData, AlertsResponse, ChartDataResponse
 from datetime import timezone

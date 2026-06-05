@@ -1,11 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
+from sqlalchemy import select
 from typing import List, Optional
 from datetime import datetime
+from uuid import UUID
 import uuid
 from decimal import Decimal
 from app.database import get_db
-from app.models.models import Sale, SaleItem, PaymentStatus
+from app.models.sale import Sale, SaleItem, SalePaymentStatus
 from app.models.multitenant_models import Inventory, Product, User
 from app.schemas.sales import SaleCreate, SaleResponse, SalesAnalytics
 from app.middleware.auth import get_current_user
@@ -13,8 +16,8 @@ from app.middleware.auth import get_current_user
 router = APIRouter(prefix="/api/v1/sales", tags=["Sales"])
 
 @router.get("/", response_model=List[SaleResponse])
-def get_sales(
-    db: Session = Depends(get_db),
+async def get_sales(
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -23,9 +26,12 @@ def get_sales(
     Includes line items and payment status.
     """
     from app.models.multitenant_models import Store
-    sales = db.query(Sale).join(Store, Sale.store_id == Store.id).filter(
-        Store.organization_id == current_user.organization_id
-    ).all()
+    result = await db.execute(
+        select(Sale).join(Store, Sale.store_id == Store.id).where(
+            Store.organization_id == current_user.organization_id
+        )
+    )
+    sales = result.scalars().all()
     return sales
 
 @router.get("/summary")
@@ -44,7 +50,7 @@ def get_daily_sales_report(date: Optional[str] = None, current_user: User = Depe
 
 @router.get("/{sale_id}", response_model=SaleResponse)
 def get_sale(
-    sale_id: int,
+    sale_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -79,6 +85,7 @@ def create_sale(
             raise HTTPException(status_code=404, detail=f"Product {item.product_id} not found")
         
         inventory = db.query(Inventory).filter(Inventory.product_id == item.product_id).first()
+        
         if not inventory or inventory.current_stock < item.quantity:
             raise HTTPException(status_code=400, detail=f"Insufficient stock for product {product.name}")
         
@@ -97,7 +104,7 @@ def create_sale(
         inventory.current_stock -= item.quantity
         inventory.available_stock -= item.quantity
 
-    final_total = total_amount - sale_in.discount + sale_in.tax
+    final_total = total_amount - sale_in.discount + sale_in.tax_amount
     sale_uid = uuid.uuid4().hex
     
     new_sale = Sale(
@@ -106,10 +113,10 @@ def create_sale(
         store_id=sale_in.store_id,
         transaction_date=datetime.now(timezone.utc).replace(tzinfo=None),
         discount=sale_in.discount,
-        tax=sale_in.tax,
+        tax_amount=sale_in.tax_amount,
         total_amount=final_total,
         payment_method=sale_in.payment_method,
-        payment_status=PaymentStatus.PAID,
+        payment_status=SalePaymentStatus.PAID.value,
         items=sale_items
     )
     

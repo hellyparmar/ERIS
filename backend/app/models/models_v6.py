@@ -46,6 +46,7 @@ class User(Base):
 class Customer(Base):
     """B2C customer management with RFM analytics"""
     __tablename__ = "customers"
+    __table_args__ = {'extend_existing': True}
     
     id = Column(BigInteger, primary_key=True)
     user_id = Column(BigInteger, ForeignKey("users.id", ondelete="SET NULL"))

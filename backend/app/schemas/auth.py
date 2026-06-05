@@ -22,21 +22,27 @@ class TokenData(BaseModel):
 
 class UserBase(BaseModel):
     email: EmailStr
-    full_name: Optional[str] = None
+    username: str
 
-class UserRegister(UserBase):
+class UserRegister(BaseModel):
+    email: EmailStr
+    username: str
     password: str = Field(..., min_length=8, description="User password (min 8 chars)")
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
     organization_name: str = Field(..., description="Name of the retail organization")
-    role: UserRole = Field(UserRole.ANALYST, description="Requested user role")
+    role: str = Field("staff", description="Requested user role")
 
     model_config = {
         "json_schema_extra": {
             "example": {
                 "email": "admin@example.com",
-                "full_name": "Admin User",
+                "username": "admin_user",
                 "password": "securepassword123",
+                "first_name": "Admin",
+                "last_name": "User",
                 "organization_name": "Mega Retail Corp",
-                "role": "ADMIN"
+                "role": "staff"
             }
         }
     }
@@ -54,9 +60,11 @@ class UserLogin(BaseModel):
         }
     }
 
-class UserResponse(UserBase):
+class UserResponse(BaseModel):
     id: int
-    role: UserRole
+    email: EmailStr
+    username: str
+    role: str
     organization_id: UUID
     is_active: bool
     created_at: datetime
@@ -67,8 +75,8 @@ class UserResponse(UserBase):
             "example": {
                 "id": 1,
                 "email": "admin@example.com",
-                "full_name": "Admin User",
-                "role": "ADMIN",
+                "username": "admin_user",
+                "role": "staff",
                 "organization_id": "550e8400-e29b-41d4-a716-446655440000",
                 "is_active": True,
                 "created_at": "2024-03-24T10:00:00"

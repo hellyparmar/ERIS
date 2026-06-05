@@ -9,15 +9,22 @@ Post-sale event chain handlers:
 """
 
 from app.api.events.events import (
+from sqlalchemy import select
     Event, EventBus, EventType, EventStatus,
     SaleCreatedEvent, InventoryDeductedEvent, LoyaltyPointsAwardedEvent,
     ReorderAlertEvent, ForecastUpdatedEvent, AnomalyDetectedEvent,
     get_event_bus
 )
 from app.api.db.database import SessionLocal
-from app.api.db.multitenant_models import Inventory, Product, Customer, Invoice
+from app.models.multitenant_models import Inventory, Product, Customer, Invoice
+from app.ml.forecasting.prophet_forecaster import ProphetForecaster
+from app.ml.forecasting.lstm_forecaster import LSTMForecaster
+from app.ml.forecasting.ensemble import EnsembleForecaster
+from app.models.forecast import Forecast, ForecastType
+from app.models import SaleTransaction
 import uuid
 import logging
+from datetime import datetime, timedelta
 from datetime import datetime, timedelta
 from typing import Optional, Dict, List
 from decimal import Decimal
@@ -275,31 +282,140 @@ class ForecastUpdateHandler:
     @staticmethod
     async def handle(event: SaleCreatedEvent) -> bool:
         """
-        Update forecasts for products sold
-        Currently a no-op placeholder
+        Update forecasts for products sold using ML models
         """
         try:
             event_bus = get_event_bus()
             
             logger.info(f"Forecast update triggered for {len(event.items)} products")
             
-            # TODO: Implement ML-based forecasting when Forecast model is added
-            # For now, just log and return success
+            # Get database session
+            db = SessionLocal()
             
-            forecast_event = ForecastUpdatedEvent(
-                aggregate_id=event.sale_id,
-                tenant_id=event.tenant_id,
-                user_id=event.user_id,
-                data={
-                    "sale_id": str(event.sale_id),
-                    "items_count": len(event.items),
-                    "status": "forecast_updated_placeholder"
-                }
-            )
-            
-            await event_bus.publish(forecast_event)
-            
-            return True
+            try:
+                # Process each product in the sale
+                updated_products = []
+                
+                for item in event.items:
+                    product_id = item.get('product_id')
+                    if not product_id:
+                        continue
+                    
+                    # Get product and outlet info
+                    result = await db.execute(select(Product).where(Product.id == product_id))
+                    product = result.scalar_one_or_none()
+                    if not product:
+                        continue
+                    
+                    # Get outlet from sale
+                    result = await db.execute(select(SaleTransaction).where(SaleTransaction.id == event.sale_id))
+                    sale = result.scalar_one_or_none()
+                    if not sale or not sale.outlet_id:
+                        continue
+                    
+                    outlet_id = sale.outlet_id
+                    
+                    try:
+                        # Initialize forecasters
+                        prophet_forecaster = ProphetForecaster()
+                        lstm_forecaster = LSTMForecaster()
+                        ensemble_forecaster = EnsembleForecaster()
+                        
+                        # Get historical sales data for this product (last 90 days)
+                        end_date = datetime.now().date()
+                        start_date = end_date - timedelta(days=90)
+                        
+                        # Query historical sales
+                        historical_sales = db.query(
+                            SaleTransaction.created_at,
+                            SaleTransaction.total_amount
+                        ).filter(
+                            SaleTransaction.outlet_id == outlet_id,
+                            SaleTransaction.created_at >= start_date,
+                            SaleTransaction.created_at <= end_date
+                        ).all()
+                        
+                        if len(historical_sales) < 7:  # Need at least a week of data
+                            logger.info(f"Insufficient historical data for product {product_id}")
+                            continue
+                        
+                        # Convert to DataFrame for forecasting
+                        import pandas as pd
+                        df = pd.DataFrame(historical_sales, columns=['ds', 'y'])
+                        df['ds'] = pd.to_datetime(df['ds'])
+                        df = df.set_index('ds').resample('D').sum().reset_index()
+                        
+                        # Generate forecasts using ensemble model
+                        forecast_result = ensemble_forecaster.forecast(
+                            df, 
+                            periods=30,  # 30-day forecast
+                            product_id=product_id
+                        )
+                        
+                        if forecast_result and 'forecast' in forecast_result:
+                            forecast_df = forecast_result['forecast']
+                            
+                            # Save forecast to database
+                            for _, row in forecast_df.iterrows():
+                                forecast_date = row['ds'].date()
+                                forecast_value = float(row['yhat'])
+                                lower_bound = float(row.get('yhat_lower', forecast_value * 0.8))
+                                upper_bound = float(row.get('yhat_upper', forecast_value * 1.2))
+                                
+                                # Check if forecast already exists
+                                result = await db.execute(select(Forecast).where(Forecast.outlet_id == outlet_id,
+                                    Forecast.product_id == product_id,
+                                    Forecast.forecast_date == forecast_date,
+                                    Forecast.forecast_type == ForecastType.demand))
+                                existing = result.scalar_one_or_none()
+                                if existing:
+                                    # Update existing forecast
+                                    existing.forecast_value = forecast_value
+                                    existing.lower_bound = lower_bound
+                                    existing.upper_bound = upper_bound
+                                    existing.generated_at = datetime.utcnow()
+                                else:
+                                    # Create new forecast
+                                    new_forecast = Forecast(
+                                        outlet_id=outlet_id,
+                                        product_id=product_id,
+                                        forecast_type=ForecastType.demand,
+                                        model_used='ensemble',
+                                        forecast_date=forecast_date,
+                                        forecast_value=forecast_value,
+                                        lower_bound=lower_bound,
+                                        upper_bound=upper_bound,
+                                        generated_at=datetime.utcnow()
+                                    )
+                                    db.add(new_forecast)
+                            
+                            updated_products.append(product_id)
+                            logger.info(f"Updated forecast for product {product_id}")
+                        
+                    except Exception as e:
+                        logger.error(f"Error forecasting product {product_id}: {e}")
+                        continue
+                
+                db.commit()
+                
+                forecast_event = ForecastUpdatedEvent(
+                    aggregate_id=event.sale_id,
+                    tenant_id=event.tenant_id,
+                    user_id=event.user_id,
+                    data={
+                        "sale_id": str(event.sale_id),
+                        "items_count": len(event.items),
+                        "products_updated": len(updated_products),
+                        "status": "forecast_updated_ml"
+                    }
+                )
+                
+                await event_bus.publish(forecast_event)
+                
+                return True
+                
+            finally:
+                db.close()
             
         except Exception as e:
             logger.error(f"Forecast update handler failed: {e}")

@@ -5,7 +5,7 @@ Generates alerts from inventory, sales, and system events
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, select
 from typing import List, Dict, Optional
 from datetime import datetime, timedelta
 from app.api.db import get_db
@@ -157,8 +157,8 @@ async def get_alerts(
 @router.patch("/{alert_id}/acknowledge")
 async def acknowledge_alert(alert_id: int, db: Session = Depends(get_db)):
     """Mark an alert as acknowledged"""
-    alert = db.query(Alert).filter(Alert.id == alert_id).first()
-    
+    result = await db.execute(select(Alert).where(Alert.id == alert_id))
+    alert = result.scalar_one_or_none()
     if not alert:
         return {"success": False, "error": "Alert not found"}
     
@@ -188,14 +188,12 @@ async def generate_inventory_alerts(db: Session = Depends(get_db)):
     
     for inventory, product in low_stock_items:
         # Check if alert already exists for this product
-        existing = db.query(Alert).filter(
-            and_(
+        result = await db.execute(select(Alert).where(and_(
                 Alert.related_product_id == product.id,
                 Alert.category == "stock",
                 Alert.is_acknowledged == False
-            )
-        ).first()
-        
+            )))
+        existing = result.scalar_one_or_none()
         if not existing:
             alert = Alert(
                 severity=AlertSeverity.WARNING,
@@ -213,15 +211,13 @@ async def generate_inventory_alerts(db: Session = Depends(get_db)):
     ).filter(Inventory.current_stock == 0).all()
     
     for inventory, product in out_of_stock:
-        existing = db.query(Alert).filter(
-            and_(
+        result = await db.execute(select(Alert).where(and_(
                 Alert.related_product_id == product.id,
                 Alert.category == "stock",
                 Alert.severity == AlertSeverity.CRITICAL,
                 Alert.is_acknowledged == False
-            )
-        ).first()
-        
+            )))
+        existing = result.scalar_one_or_none()
         if not existing:
             alert = Alert(
                 severity=AlertSeverity.CRITICAL,

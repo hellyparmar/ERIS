@@ -5,7 +5,7 @@ Exposes metrics for visualization in Grafana
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, select
 from datetime import datetime, timedelta
 
 from app.api.db import get_db
@@ -24,7 +24,7 @@ async def prometheus_metrics(db: Session = Depends(get_db)):
     
     # Business metrics
     total_invoices = db.query(Invoice).count()
-    paid_invoices = db.query(Invoice).filter(Invoice.payment_status == "paid").count()
+    result = await db.execute(select(Invoice).where(Invoice.payment_status == "paid").count()
     overdue_invoices = db.query(Invoice).filter(Invoice.payment_status == "overdue").count()
     
     total_messages = db.query(Message).count()
@@ -176,8 +176,8 @@ async def get_trends(days: int = 30, db: Session = Depends(get_db)):
         func.sum(Invoice.total_amount).label('revenue')
     ).filter(
         func.date(Invoice.created_at) >= start_date
-    ).group_by(func.date(Invoice.created_at)).all()
-    
+    ).group_by(func.date(Invoice.created_at)))
+    paid_invoices = result.scalars().all()
     # Daily message trends
     message_trends = db.query(
         func.date(Message.sent_at).label('date'),

@@ -18,7 +18,7 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 from enum import Enum
-from sqlalchemy import create_engine, Column, String, Integer, DateTime, Text, Boolean
+from sqlalchemy import create_engine, Column, String, Integer, DateTime, Text, Boolean, select
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 

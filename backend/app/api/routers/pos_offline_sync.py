@@ -6,6 +6,7 @@ Returns sync status for each transaction
 """
 
 from fastapi import APIRouter, HTTPException, Depends, status
+from sqlalchemy import select
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 import logging
@@ -83,11 +84,9 @@ async def sync_offline_transactions(
                 from datetime import timedelta
                 
                 hour_ago = datetime.utcnow() - timedelta(hours=1)
-                duplicate = db.query(Sale).filter(
-                    Sale.transaction_id == offline_txn.id,
-                    Sale.created_at >= hour_ago
-                ).first()
-                
+                result = await db.execute(select(Sale).where(Sale.transaction_id == offline_txn.id,
+                    Sale.created_at >= hour_ago))
+                duplicate = result.scalar_one_or_none()
                 if duplicate:
                     logger.warning(f"Duplicate transaction detected: {offline_txn.id}")
                     synced.append(SyncTransactionResponse(
@@ -185,10 +184,9 @@ async def get_sync_status(
     try:
         from app.api.db.models import Sale
         
-        sale = db.query(Sale).filter(
-            Sale.transaction_id == transaction_id
-        ).first()
+        result = await db.execute(select(Sale).where(Sale.transaction_id == transaction_id))
         
+        sale = result.scalar_one_or_none()
         if sale:
             return {
                 "synced": True,

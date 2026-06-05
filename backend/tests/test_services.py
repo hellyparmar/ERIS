@@ -13,7 +13,7 @@ class TestEmployeeService:
     """Tests for EmployeeService business logic."""
 
     def setup_emp(self, db, suffix="001"):
-        from api.db.employee_models import Employee, EmployeeRole
+        from app.models.employee_models import Employee, EmployeeRole
         emp = Employee(
             employee_id=f"EMP{suffix}",
             name=f"Worker {suffix}",
@@ -26,14 +26,14 @@ class TestEmployeeService:
         return emp
 
     def test_generate_employee_id_is_sequential(self, db):
-        from api.services.employee_service import EmployeeService
+        from app.api.services.employee_service import EmployeeService
         svc = EmployeeService(db)
         id1 = svc._generate_employee_id()
         assert id1.startswith("EMP")
         assert id1[3:].isdigit()
 
     def test_create_employee_stores_record(self, db):
-        from api.services.employee_service import EmployeeService
+        from app.api.services.employee_service import EmployeeService
         svc = EmployeeService(db)
         emp = svc.create_employee({
             "name": "Neeta Joshi",
@@ -45,7 +45,7 @@ class TestEmployeeService:
         assert emp.role.value == "cashier"
 
     def test_list_employees_pagination(self, db):
-        from api.services.employee_service import EmployeeService
+        from app.api.services.employee_service import EmployeeService
         svc = EmployeeService(db)
         for i in range(5):
             svc.create_employee({"name": f"Emp{i}", "phone": f"980000000{i}", "role": "cashier"})
@@ -55,7 +55,7 @@ class TestEmployeeService:
         assert result["total"] >= 5
 
     def test_clock_in_creates_attendance(self, db):
-        from api.services.employee_service import EmployeeService
+        from app.api.services.employee_service import EmployeeService
         svc = EmployeeService(db)
         emp = svc.create_employee({"name": "Raj", "phone": "9800000100", "role": "cashier"})
         record = svc.clock_in(emp.id)
@@ -63,8 +63,8 @@ class TestEmployeeService:
         assert record.clock_out is None
 
     def test_clock_out_calculates_hours(self, db):
-        from api.services.employee_service import EmployeeService
-        from api.db.employee_models import Attendance, AttendanceStatus
+        from app.api.services.employee_service import EmployeeService
+        from app.models.employee_models import Attendance, AttendanceStatus
         svc = EmployeeService(db)
         emp = svc.create_employee({"name": "Sita", "phone": "9800000200", "role": "cashier"})
 
@@ -78,7 +78,7 @@ class TestEmployeeService:
         db.add(att)
         db.commit()
 
-        with patch("api.services.employee_service.datetime") as mock_dt:
+        with patch("app.api.services.employee_service.datetime") as mock_dt:
             mock_dt.now.return_value = datetime(2026, 3, 18, 15, 0, 0)
             mock_dt.side_effect = datetime
             result = svc.clock_out(emp.id)
@@ -86,7 +86,7 @@ class TestEmployeeService:
         assert result.total_hours > 0
 
     def test_double_clock_in_raises(self, db):
-        from api.services.employee_service import EmployeeService
+        from app.api.services.employee_service import EmployeeService
         svc = EmployeeService(db)
         emp = svc.create_employee({"name": "Akash", "phone": "9800000300", "role": "cashier"})
         svc.clock_in(emp.id)
@@ -94,14 +94,14 @@ class TestEmployeeService:
             svc.clock_in(emp.id)
 
     def test_update_employee(self, db):
-        from api.services.employee_service import EmployeeService
+        from app.api.services.employee_service import EmployeeService
         svc = EmployeeService(db)
         emp = svc.create_employee({"name": "Old Name", "phone": "9800000400", "role": "cashier"})
         updated = svc.update_employee(emp.id, {"name": "New Name"})
         assert updated.name == "New Name"
 
     def test_delete_employee_soft_deletes(self, db):
-        from api.services.employee_service import EmployeeService
+        from app.api.services.employee_service import EmployeeService
         svc = EmployeeService(db)
         emp = svc.create_employee({"name": "Temp Worker", "phone": "9800000500", "role": "cashier"})
         result = svc.delete_employee(emp.id)
@@ -114,14 +114,14 @@ class TestSupplierService:
     """Tests for SupplierService."""
 
     def test_generate_supplier_code(self, db):
-        from api.services.supplier_service import SupplierService
+        from app.api.services.supplier_service import SupplierService
         import uuid
         svc = SupplierService(db)
         code = svc._generate_supplier_code()
         assert code.startswith("SUP")
 
     def test_create_supplier(self, db):
-        from api.services.supplier_service import SupplierService
+        from app.api.services.supplier_service import SupplierService
         import uuid
         svc = SupplierService(db)
         s = svc.create_supplier({
@@ -135,7 +135,7 @@ class TestSupplierService:
         assert s.payment_terms_days == 15
 
     def test_list_suppliers_search(self, db):
-        from api.services.supplier_service import SupplierService
+        from app.api.services.supplier_service import SupplierService
         import uuid
         org_id = str(uuid.uuid4())
         svc = SupplierService(db)
@@ -146,7 +146,7 @@ class TestSupplierService:
         assert any("Agro" in s["name"] for s in result["items"])
 
     def test_update_supplier(self, db):
-        from api.services.supplier_service import SupplierService
+        from app.api.services.supplier_service import SupplierService
         import uuid
         svc = SupplierService(db)
         s = svc.create_supplier({"name": "Old Supplier", "organization_id": str(uuid.uuid4())})
@@ -154,7 +154,7 @@ class TestSupplierService:
         assert updated.name == "Updated Supplier"
 
     def test_delete_supplier_soft_deletes(self, db):
-        from api.services.supplier_service import SupplierService
+        from app.api.services.supplier_service import SupplierService
         import uuid
         svc = SupplierService(db)
         s = svc.create_supplier({"name": "Temp Supplier", "organization_id": str(uuid.uuid4())})

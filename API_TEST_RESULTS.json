@@ -1,0 +1,14 @@
+{
+  "passed": 0,
+  "failed": 1,
+  "errors": [
+    {
+      "name": "Health Check",
+      "endpoint": "/api/v1/health",
+      "message": "Connection refused - Backend server not running"
+    }
+  ],
+  "warnings": [],
+  "test_start": "2026-04-16T14:50:55.175997",
+  "endpoints_tested": {}
+}

@@ -7,7 +7,7 @@ Provides time-aware, realistic metrics using actual database queries.
 
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
-from sqlalchemy import func, desc, and_
+from sqlalchemy import func, desc, and_, select
 from datetime import datetime, timedelta
 import logging
 from typing import Dict, List, Any
@@ -15,7 +15,7 @@ from typing import Dict, List, Any
 # Database Imports
 from app.api.db import get_db
 from app.api.db.models import Sale, SaleItem
-from app.api.db.multitenant_models import Product, Inventory, Customer
+from app.models.multitenant_models import Product, Inventory, Customer
 
 logger = logging.getLogger(__name__)
 
@@ -145,10 +145,8 @@ def get_revenue_trend(db: Session, end_date: datetime, days: int = 7) -> List[Di
     """Get revenue per day for the last N days ending at end_date"""
     start_date = end_date - timedelta(days=days-1)
     
-    # SQLite requires specific date handling, but SQLAlchemy abstracts most.
-    # However, grouping by date can be tricky. We'll query raw records and aggregate 
-    # if volume is low, or use func.date logic if SQL supported.
-    # Given 100k rows, straight aggregation in SQL is better.
+    # Date handling is delegated to SQLAlchemy and the PostgreSQL dialect.
+    # Grouping by date is handled using the database's native date functions.
     
     results = db.query(
         func.date(Sale.transaction_date).label("date"),

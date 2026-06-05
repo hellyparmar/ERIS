@@ -4,6 +4,7 @@ Handles OAuth flow, token management, and refresh
 """
 
 import os
+from sqlalchemy import select
 import secrets
 from datetime import datetime, timedelta
 from typing import Optional

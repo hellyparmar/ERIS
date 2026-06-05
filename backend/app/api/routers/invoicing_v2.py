@@ -5,7 +5,7 @@ Complete invoicing system with GST, TDS, and payment management
 
 from fastapi import APIRouter, Query, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import text, func
+from sqlalchemy import text, func, select
 from typing import Optional, List, Dict
 from datetime import datetime, timedelta
 from pydantic import BaseModel
@@ -183,8 +183,8 @@ async def get_invoice(
     from app.api.db.invoicing_models import Invoice
     
     try:
-        invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
-        
+        result = await db.execute(select(Invoice).where(Invoice.id == invoice_id))
+        invoice = result.scalar_one_or_none()
         if not invoice:
             return {"success": False, "error": "Invoice not found"}
         
@@ -320,8 +320,8 @@ async def record_payment(
     from app.api.db.invoicing_models import Invoice, Payment
     
     try:
-        invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
-        
+        result = await db.execute(select(Invoice).where(Invoice.id == invoice_id))
+        invoice = result.scalar_one_or_none()
         if not invoice:
             return {"success": False, "error": "Invoice not found"}
         
@@ -545,8 +545,7 @@ async def get_overdue_invoices(
     try:
         today = datetime.now()
         
-        query = db.query(Invoice).filter(
-            Invoice.due_date < today,
+        result = await db.execute(select(Invoice).where(Invoice.due_date < today,
             Invoice.payment_status != "paid",
             Invoice.status != "cancelled"
         ).order_by(Invoice.due_date.asc()).all()
@@ -594,8 +593,9 @@ async def get_invoice_pdf(
     from fastapi.responses import StreamingResponse
     
     try:
-        invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+        invoice = db.query(Invoice).filter(Invoice.id == invoice_id))
         
+        query = result.scalar_one_or_none()
         if not invoice:
             return {"success": False, "error": "Invoice not found"}
         
@@ -658,8 +658,8 @@ async def email_invoice(
     from app.api.services.invoice_email_service import send_invoice_email
     
     try:
-        invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
-        
+        result = await db.execute(select(Invoice).where(Invoice.id == invoice_id))
+        invoice = result.scalar_one_or_none()
         if not invoice:
             return {"success": False, "error": "Invoice not found"}
         

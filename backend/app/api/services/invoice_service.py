@@ -9,16 +9,31 @@ from typing import Optional, List, Dict
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, func
 
-from app.api.db.models import (
-    Invoice, InvoicePayment, CustomerCredit, Customer, 
-    Product, Sale, PaymentStatus
-)
+Invoice = None
+InvoicePayment = None
+Customer = None
+Product = None
 
-class InvoiceService:
+def _load_phase2_models():
+    global Invoice, InvoicePayment, Customer, Product
+    if Invoice is None:
+        from app.models.phase2_models import Invoice as Phase2Invoice, InvoicePayment as Phase2InvoicePayment, Customer as Phase2Customer, Product as Phase2Product
+        Invoice = Phase2Invoice
+        InvoicePayment = Phase2InvoicePayment
+        Customer = Phase2Customer
+        Product = Phase2Product
+
+from app.models.sale import Sale
+from app.models.schema import PaymentStatusEnum as PaymentStatus
+from app.services.base_service import OutletIsolatedService
+from app.models.users import User
+
+class InvoiceService(OutletIsolatedService):
     """Service for invoice operations with GST automation"""
     
-    def __init__(self, db: Session):
-        self.db = db
+    def __init__(self, db: Session, current_user: User):
+        _load_phase2_models()
+        super().__init__(db, current_user)
     
     def generate_invoice_number(self) -> str:
         """Generate unique invoice number: INV-YYYYMMDD-XXXX"""
@@ -335,7 +350,7 @@ class InvoiceService:
 
     def generate_pdf(self, invoice_id: int) -> bytes:
         from app.api.gst.invoice_generator import GSTInvoiceGenerator
-        from app.api.db.multitenant_models import Organization
+        from app.models.multitenant_models import Organization
         
         invoice = self.db.query(Invoice).filter(Invoice.id == invoice_id).first()
         if not invoice:
@@ -414,7 +429,7 @@ class InvoiceService:
     def send_invoice(self, invoice_id: int, method: str) -> bool:
         from app.api.notifications.notification_service import NotificationService
         from app.api.notifications.templates import TemplateType
-        from app.api.db.multitenant_models import Organization
+        from app.models.multitenant_models import Organization
         
         invoice = self.db.query(Invoice).filter(Invoice.id == invoice_id).first()
         if not invoice:

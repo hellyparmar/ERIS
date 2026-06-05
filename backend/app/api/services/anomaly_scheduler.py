@@ -9,6 +9,7 @@ Configuration:
 """
 
 import logging
+from sqlalchemy import select
 from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -178,12 +179,10 @@ def _cleanup_old_alerts_job():
             # Find old unacknowledged alerts
             cutoff_date = datetime.now() - timedelta(days=7)
             
-            old_alerts = db.query(Alert).filter(
-                and_(
+            old_alerts = db.query(Alert).filter(and_(
                     Alert.is_acknowledged == False,
                     Alert.created_at < cutoff_date
-                )
-            ).all()
+                )).all()
             
             count = len(old_alerts)
             

@@ -9,15 +9,17 @@ from typing import Optional, List
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
-from app.api.db.employee_models import (
+from app.models.employee_models import (
     Employee, Attendance, PerformanceMetric, LeaveRequest,
     EmployeeRole, AttendanceStatus
 )
+from app.services.base_service import OutletIsolatedService
+from app.models.users import User
 
 
-class EmployeeService:
-    def __init__(self, db: Session):
-        self.db = db
+class EmployeeService(OutletIsolatedService):
+    def __init__(self, db: Session, current_user: Optional[User] = None):
+        super().__init__(db, current_user)
 
     # ==================== EMPLOYEE CRUD ====================
 
@@ -356,7 +358,7 @@ class EmployeeService:
     # ==================== LEAVE ====================
 
     def request_leave(self, data: dict) -> LeaveRequest:
-        from app.api.db.employee_models import LeaveType
+        from app.models.employee_models import LeaveType
         start = data["start_date"]
         end = data["end_date"]
         total_days = (end - start).days + 1

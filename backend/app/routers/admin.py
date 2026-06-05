@@ -532,3 +532,101 @@ async def get_resource_usage():
     except Exception as e:
         logger.error(f"Error getting resource usage: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== Database Seeding ====================
+
+class SeedDatabaseRequest(BaseModel):
+    """Request model for database seeding"""
+    num_days: int = 365
+    num_products: int = 50
+    num_customers: int = 20
+    force_reseed: bool = False
+
+
+@router.post("/database/seed")
+async def seed_database(request: SeedDatabaseRequest, background_tasks: BackgroundTasks):
+    """
+    Seed database with synthetic initial data.
+    
+    **Requires Admin Role**
+    
+    This endpoint allows administrators to populate the database with realistic
+    synthetic data for testing, demos, and development.
+    
+    Parameters:
+    - `num_days`: Number of days of sales history to generate (default: 365)
+    - `num_products`: Number of products to create (default: 50)
+    - `num_customers`: Number of customers to create (default: 20)
+    - `force_reseed`: If true, will reseed even if data exists (default: false)
+    
+    Returns:
+    - Status of seeding operation
+    - Data summary (counts of created records)
+    """
+    try:
+        from app.core.database_seeder import DatabaseSeeder
+        
+        seeder = DatabaseSeeder()
+        
+        # Check if database already has data
+        summary = seeder.get_data_summary()
+        total_records = sum(summary.values())
+        
+        if total_records > 0 and not request.force_reseed:
+            return {
+                "status": "skipped",
+                "message": "Database already contains data. Use force_reseed=true to override.",
+                "current_data": summary,
+                "timestamp": datetime.now()
+            }
+        
+        # Schedule seeding in background
+        background_tasks.add_task(
+            seeder.seed_database,
+            request.num_days,
+            request.num_products,
+            request.num_customers
+        )
+        
+        return {
+            "status": "seeding_started",
+            "message": "Database seeding initiated in background",
+            "parameters": {
+                "num_days": request.num_days,
+                "num_products": request.num_products,
+                "num_customers": request.num_customers
+            },
+            "timestamp": datetime.now()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error seeding database: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Database seeding failed: {str(e)}")
+
+
+@router.get("/database/data-summary")
+async def get_database_summary():
+    """
+    Get summary of current database contents.
+    
+    **Requires Admin Role**
+    
+    Returns count of records in each major table.
+    """
+    try:
+        from app.core.database_seeder import DatabaseSeeder
+        
+        seeder = DatabaseSeeder()
+        summary = seeder.get_data_summary()
+        total_records = sum(summary.values())
+        
+        return {
+            "total_records": total_records,
+            "by_table": summary,
+            "timestamp": datetime.now()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting database summary: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error getting database summary: {str(e)}")

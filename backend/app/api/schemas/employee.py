@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field, EmailStr
 from typing import Optional, List
 from datetime import date, datetime
 from enum import Enum
+from uuid import UUID
 
 
 class EmployeeRole(str, Enum):
@@ -16,6 +17,12 @@ class EmployeeRole(str, Enum):
     SECURITY = "security"
     CLEANER = "cleaner"
     OTHER = "other"
+
+
+class EmployeeShift(str, Enum):
+    MORNING = "morning"
+    EVENING = "evening"
+    NIGHT = "night"
 
 
 class AttendanceStatus(str, Enum):
@@ -38,64 +45,58 @@ class LeaveType(str, Enum):
 # ==================== EMPLOYEE ====================
 
 class EmployeeCreate(BaseModel):
-    name: str = Field(..., min_length=2, max_length=100)
+    outlet_id: UUID = Field(..., description="Outlet ID where employee works")
+    name: str = Field(..., min_length=2, max_length=255)
     phone: str = Field(..., min_length=10, max_length=20)
-    email: Optional[str] = None
-    role: EmployeeRole = EmployeeRole.SALES_ASSOCIATE
-    store_id: Optional[int] = None
-    hire_date: Optional[date] = None
-    salary: Optional[float] = None
-    salary_type: Optional[str] = "monthly"
-    address: Optional[str] = None
-    emergency_contact_name: Optional[str] = None
-    emergency_contact_phone: Optional[str] = None
+    email: str = Field(..., min_length=5, max_length=255)
+    role: str = Field(..., min_length=2, max_length=100)
+    salary: float = Field(..., gt=0)
+    joining_date: date
+    shift: EmployeeShift = EmployeeShift.MORNING
 
 
 class EmployeeUpdate(BaseModel):
     name: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[str] = None
-    role: Optional[EmployeeRole] = None
-    store_id: Optional[int] = None
+    role: Optional[str] = None
     salary: Optional[float] = None
-    salary_type: Optional[str] = None
-    address: Optional[str] = None
-    emergency_contact_name: Optional[str] = None
-    emergency_contact_phone: Optional[str] = None
+    shift: Optional[EmployeeShift] = None
     is_active: Optional[bool] = None
 
 
 class EmployeeResponse(BaseModel):
-    id: int
-    employee_id: str
+    employee_id: UUID
+    outlet_id: UUID
     name: str
-    email: Optional[str]
+    email: str
     phone: str
     role: str
-    store_id: Optional[int]
-    hire_date: Optional[date]
+    salary: float
+    joining_date: date
+    shift: str
     is_active: bool
-    salary: Optional[float]
-    salary_type: Optional[str]
-    address: Optional[str]
-    emergency_contact_name: Optional[str]
-    emergency_contact_phone: Optional[str]
-    created_at: Optional[datetime]
+    created_at: datetime
+    updated_at: datetime
 
     class Config:
         from_attributes = True
 
 
-# ==================== ATTENDANCE ====================
+class EmployeeListResponse(BaseModel):
+    page: int
+    per_page: int
+    total: int
+    total_pages: int
+    items: List[EmployeeResponse]
 
-class ClockInRequest(BaseModel):
-    employee_id: int
-    notes: Optional[str] = None
 
-
-class ClockOutRequest(BaseModel):
-    employee_id: int
-    notes: Optional[str] = None
+class AttendanceSummary(BaseModel):
+    shift_distribution: dict
+    role_distribution: dict
+    attendance_rate: float
+    total_employees: int
+    active_employees: int
 
 
 class AttendanceResponse(BaseModel):
@@ -169,3 +170,13 @@ class LeaveResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class ClockInRequest(BaseModel):
+    employee_id: int
+    notes: Optional[str] = None
+
+
+class ClockOutRequest(BaseModel):
+    employee_id: int
+    notes: Optional[str] = None

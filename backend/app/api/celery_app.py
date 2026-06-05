@@ -69,6 +69,12 @@ celery_app.conf.update(
             'task': 'api.tasks.external_factors.sync_weather',
             'schedule': crontab(minute=0),  # Every hour
         },
+        
+        # Alert monitoring (every 15 minutes)
+        'run-alert-engine': {
+            'task': 'alerts.run_alert_engine',
+            'schedule': crontab(minute='*/15'),  # Every 15 minutes
+        },
     }
 )
 

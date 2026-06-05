@@ -15,6 +15,7 @@ tracking with issue management
 """
 
 from fastapi import APIRouter, HTTPException, Depends, Query, File, UploadFile
+from sqlalchemy import select
 from typing import List, Optional, Dict, Any
 from datetime import datetime, date
 from decimal import Decimal
@@ -143,10 +144,13 @@ def sync_with_tally(
 def _full_tally_sync(business_id: int, db: Session) -> dict:
     """Full synchronization"""
     
-    customers = db.query(Customer).all()
-    invoices = db.query(Invoice).all()
-    payments = db.query(Payment).all()
+    result = await db.execute(select(Customer))
     
+    customers = result.scalars().all()
+    result = await db.execute(select(Invoice))
+    invoices = result.scalars().all()
+    result = await db.execute(select(Payment))
+    payments = result.scalars().all()
     return {
         "ledgers_synced": len(customers),
         "invoices_synced": len(invoices),
@@ -173,20 +177,18 @@ def _incremental_tally_sync(business_id: int, start_date: date, end_date: date, 
     
     from sqlalchemy import and_
     
-    invoices = db.query(Invoice).filter(
-        and_(
+    result = await db.execute(select(Invoice).where(and_(
             Invoice.invoice_date >= start_date,
             Invoice.invoice_date <= end_date
         )
     ).all()
     
-    payments = db.query(Payment).filter(
-        and_(
+    result = await db.execute(select(Payment).where(and_(
             Payment.payment_date >= start_date,
             Payment.payment_date <= end_date
-        )
-    ).all()
+        )))
     
+    payments = result.scalars().all()
     return {
         "period": f"{start_date} to {end_date}",
         "invoices_synced": len(invoices),
@@ -198,8 +200,9 @@ def _incremental_tally_sync(business_id: int, start_date: date, end_date: date, 
 def _ledger_only_sync(business_id: int, db: Session) -> dict:
     """Ledger-only synchronization"""
     
-    customers = db.query(Customer).all()
+    result = await db.execute(select(Customer))
     
+    customers = result.scalars().all()
     return {
         "ledgers_synced": len(customers),
         "sync_method": "ledger_only",
@@ -231,8 +234,8 @@ def get_tally_ledgers(
         Ledger information ready for Tally
     """
     try:
-        customers = db.query(Customer).all()
-        
+        result = await db.execute(select(Customer))
+        customers = result.scalars().all()
         return {
             "business_id": business_id,
             "total_ledgers": len(customers),
@@ -271,8 +274,8 @@ def export_tally_xml(
         XML data for Tally import
     """
     try:
-        customers = db.query(Customer).all()
-        
+        result = await db.execute(select(Customer))
+        customers = result.scalars().all()
         # Create XML structure
         root = ET.Element("BODY")
         head = ET.SubElement(root, "HEAD")
@@ -330,9 +333,9 @@ async def import_tally_xml(
             
             # Find matching customer and update
             customer = db.query(Customer).filter(
-                Customer.tally_ledger_name == name
-            ).first()
-            
+                Customer.tally_ledger_name == name))
+    
+    invoices = result.scalar_one_or_none()
             if customer:
                 imported_count += 1
         

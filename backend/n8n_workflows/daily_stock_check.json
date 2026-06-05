@@ -1,0 +1,115 @@
+{
+  "name": "R-DIOS Daily Stock Check",
+  "description": "Automated daily stock check that creates alerts for low inventory",
+  "nodes": [
+    {
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [240, 300],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Check Low Stock",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [460, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "http://backend:8000/api/webhooks/check-low-stock",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-n8n-secret",
+              "value": "rdios-n8n-secret"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "IF Critical Alerts",
+      "type": "n8n-nodes-base.if",
+      "position": [680, 300],
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json.alerts_created}}",
+              "operation": "largerEqual",
+              "value2": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Send Alert Email",
+      "type": "n8n-nodes-base.emailSendGmail",
+      "position": [900, 200],
+      "parameters": {
+        "fromEmail": "alerts@rdios.local",
+        "toEmail": "admin@rdios.local",
+        "subject": "🚨 Stock Alert: Low Inventory Detected",
+        "htmlBody": "<h2>Low Stock Items</h2>\n<p>Found {{$json.alerts_created}} new low stock situations:</p>\n<ul>\n{{#each $json.items}}\n<li><strong>{{this.product}}</strong> at {{this.outlet}}: {{this.stock}} units (reorder: {{this.reorder_level}}) - {{this.severity}}</li>\n{{/each}}\n</ul>"
+      }
+    },
+    {
+      "name": "Log Success",
+      "type": "n8n-nodes-base.code",
+      "position": [900, 400],
+      "parameters": {
+        "jsCode": "return {\n  success: true,\n  timestamp: new Date().toISOString(),\n  alertsProcessed: $json.alerts_created\n};"
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Check Low Stock",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Low Stock": {
+      "main": [
+        [
+          {
+            "node": "IF Critical Alerts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Critical Alerts": {
+      "main": [
+        [
+          {
+            "node": "Send Alert Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

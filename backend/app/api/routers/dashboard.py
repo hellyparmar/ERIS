@@ -4,6 +4,7 @@ Month 4: Integration of all analytics modules
 """
 
 from fastapi import APIRouter, Depends, Query, HTTPException
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from datetime import datetime, date, timedelta
 from typing import Optional, List, Dict, Any
@@ -616,7 +617,7 @@ async def get_realtime_dashboard_metrics(
     try:
         from sqlalchemy import func, desc, and_
         from app.api.db.models import Sale, SaleItem
-        from app.api.db.multitenant_models import Product, Inventory
+        from app.models.multitenant_models import Product, Inventory
 
         now = datetime.now()
         today_start = datetime.combine(now.date(), datetime.min.time())

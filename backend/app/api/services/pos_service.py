@@ -10,7 +10,13 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from fastapi import HTTPException
 
-from app.api.db.models import Sale, SaleItem, Inventory, Customer, Product
+from app.models.customers import Customer
+from app.models.sale import Sale
+from app.models.sale import SaleItem
+from app.models.inventory import Inventory
+from app.models.product import Product
+from app.models.users import User
+from app.core.data_isolation import OutletDataAccess
 
 logger = logging.getLogger(__name__)
 
@@ -33,10 +39,27 @@ def complete_sale(cart: dict, payment: dict, cashier_id: int, db: Session) -> di
         HTTPException 500: Database error
     """
     try:
+        # Get cashier user and validate outlet access
+        cashier = db.query(User).filter(User.id == cashier_id).first()
+        if not cashier:
+            raise ValueError("Invalid cashier ID")
+        
+        if not cashier.outlet_id:
+            raise ValueError("Cashier not assigned to an outlet")
+        
+        outlet_data_access = OutletDataAccess(cashier)
+        allowed_outlet_ids = outlet_data_access.get_allowed_outlet_ids()
+        
+        # Cashier must be assigned to exactly one outlet
+        if len(allowed_outlet_ids) != 1:
+            raise ValueError("Cashier must be assigned to exactly one outlet")
+        
+        outlet_id = allowed_outlet_ids[0]
         # Step 1: Lock all inventory rows first (prevents race conditions / overselling)
         product_ids = [i['product_id'] for i in cart['items']]
         inv_rows = db.query(Inventory).filter(
-            Inventory.product_id.in_(product_ids)
+            Inventory.product_id.in_(product_ids),
+            Inventory.outlet_id == outlet_id
         ).with_for_update().all()
         inv_map = {i.product_id: i for i in inv_rows}
 
@@ -58,15 +81,20 @@ def complete_sale(cart: dict, payment: dict, cashier_id: int, db: Session) -> di
         transaction_id = f"TXN{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
         sale = Sale(
             transaction_id=transaction_id,
+            organization_id=getattr(cashier, 'organization_id', None),
+            store_id=outlet_id,
             customer_id=cart.get('customer_id'),
-            store_id=1,  # Default store - TODO: Get from context
-            transaction_date=datetime.now(),
+            cashier_id=cashier_id,
+            subtotal=cart.get('subtotal', 0),
             discount=0.0,  # TODO: Handle discounts
-            tax=cart.get('gst_amount', 0),
+            tax_amount=cart.get('gst_amount', 0),
             total_amount=cart['total'],
+            amount_paid=cart['total'],
             payment_method=payment['method'],
             payment_status=PaymentStatus.PAID,
-            source='pos'
+            channel='pos',
+            notes='POS sale',
+            transaction_date=datetime.now(),
         )
         db.add(sale)
         db.flush()  # Get sale.id without committing yet

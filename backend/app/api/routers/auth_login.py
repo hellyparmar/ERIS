@@ -5,6 +5,7 @@ FLOW 2: Cashier PIN login → pos_token (8 hours)
 """
 
 from fastapi import APIRouter, HTTPException, status, Depends
+from sqlalchemy import select
 from pydantic import BaseModel
 from typing import Dict, Any
 import logging
@@ -63,7 +64,8 @@ async def manager_login(request: LoginRequest, db=Depends(get_db)):
     try:
         # Query user from database
         from app.api.db.models import User
-        user = db.query(User).filter_by(email=request.username).first()
+        result = await db.execute(select(User).where(User.email == request.username))
+        user = result.scalar_one_or_none()
         
         if not user:
             logger.warning(f"Login attempt failed: user {request.username} not found")
@@ -144,7 +146,8 @@ async def cashier_login(request: POSLoginRequest, db=Depends(get_db)):
         
         # Query employee from database
         from app.api.db.models import Employee
-        employee = db.query(Employee).filter_by(id=request.employee_id).first()
+        result = await db.execute(select(Employee).where(Employee.id == request.employee_id))
+        employee = result.scalar_one_or_none()
         
         if not employee:
             logger.warning(f"POS login attempt failed: employee {request.employee_id} not found")

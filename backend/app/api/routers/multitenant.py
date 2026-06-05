@@ -13,10 +13,10 @@ from app.api.schemas.multitenant import (
     Store, StoreCreate, StoreUpdate, StoreSummary, StoreStats,
     StoreTransferRequest, UserStoreAccess, UpdateUserStoreAccess
 )
-from app.api.db.multitenant_models import Organization as OrgModel, Store as StoreModel
+from app.models.multitenant_models import Organization as OrgModel, Store as StoreModel
 from app.api.middleware.tenant_context import get_current_organization, require_organization
 from app.api.dependencies import get_db, get_current_user
-from sqlalchemy import func
+from sqlalchemy import func, select
 
 router = APIRouter(prefix="/api/v1", tags=["Multi-Tenant"])
 
@@ -37,8 +37,9 @@ async def get_current_organization_details(
     if not org_id:
         raise HTTPException(404, "User has no organization")
     
-    org = db.query(OrgModel).filter(OrgModel.id == org_id).first()
+    result = await db.execute(select(OrgModel).where(OrgModel.id == org_id))
     
+    org = result.scalar_one_or_none()
     if not org:
         raise HTTPException(404, "Organization not found")
     
@@ -58,8 +59,8 @@ async def update_current_organization(
         raise HTTPException(403, "Only owner or admin can update organization")
     
     org_id = current_user.get('organization_id')
-    org = db.query(OrgModel).filter(OrgModel.id == org_id).first()
-    
+    result = await db.execute(select(OrgModel).where(OrgModel.id == org_id))
+    org = result.scalar_one_or_none()
     if not org:
         raise HTTPException(404, "Organization not found")
     
@@ -84,12 +85,10 @@ async def get_organization_stats(
     org_id = current_user.get('organization_id')
     
     # Count stores
-    total_stores = db.query(StoreModel).filter(
-        StoreModel.organization_id == org_id
+    result = await db.execute(select(StoreModel).where(StoreModel.organization_id == org_id
     ).count()
     
-    active_stores = db.query(StoreModel).filter(
-        StoreModel.organization_id == org_id,
+    result = await db.execute(select(StoreModel).where(StoreModel.organization_id == org_id,
         StoreModel.is_active == True
     ).count()
     
@@ -129,8 +128,9 @@ async def list_stores(
     if active_only:
         query = query.filter(StoreModel.is_active == True)
     
-    stores = query.order_by(StoreModel.created_at.desc()).all()
+    stores = query.order_by(StoreModel.created_at.desc()))
     
+    active_stores = result.scalars().all()
     return stores
 
 
@@ -144,9 +144,8 @@ async def get_store(
     """Get store by ID"""
     store = db.query(StoreModel).filter(
         StoreModel.id == store_id,
-        StoreModel.organization_id == current_user.get('organization_id')
-    ).first()
-    
+        StoreModel.organization_id == current_user.get('organization_id')))
+    total_stores = result.scalar_one_or_none()
     if not store:
         raise HTTPException(404, "Store not found")
     
@@ -169,11 +168,9 @@ async def create_store(
     
     # Check if code already exists
     if store.code:
-        existing = db.query(StoreModel).filter(
-            StoreModel.organization_id == org_id,
-            StoreModel.code == store.code
-        ).first()
-        
+        result = await db.execute(select(StoreModel).where(StoreModel.organization_id == org_id,
+            StoreModel.code == store.code))
+        existing = result.scalar_one_or_none()
         if existing:
             raise HTTPException(400, f"Store with code '{store.code}' already exists")
     
@@ -201,11 +198,10 @@ async def update_store(
     if current_user.get('role') not in ['owner', 'admin', 'manager']:
         raise HTTPException(403, "Only owner/admin/manager can update stores")
     
-    store = db.query(StoreModel).filter(
-        StoreModel.id == store_id,
-        StoreModel.organization_id == current_user.get('organization_id')
-    ).first()
+    result = await db.execute(select(StoreModel).where(StoreModel.id == store_id,
+        StoreModel.organization_id == current_user.get('organization_id')))
     
+    store = result.scalar_one_or_none()
     if not store:
         raise HTTPException(404, "Store not found")
     
@@ -233,11 +229,10 @@ async def delete_store(
     if current_user.get('role') not in ['owner', 'admin']:
         raise HTTPException(403, "Only owner/admin can delete stores")
     
-    store = db.query(StoreModel).filter(
-        StoreModel.id == store_id,
-        StoreModel.organization_id == current_user.get('organization_id')
-    ).first()
+    result = await db.execute(select(StoreModel).where(StoreModel.id == store_id,
+        StoreModel.organization_id == current_user.get('organization_id')))
     
+    store = result.scalar_one_or_none()
     if not store:
         raise HTTPException(404, "Store not found")
     
@@ -263,11 +258,9 @@ async def get_store_stats(
     current_user: dict = Depends(get_current_user)
 ):
     """Get store statistics"""
-    store = db.query(StoreModel).filter(
-        StoreModel.id == store_id,
-        StoreModel.organization_id == current_user.get('organization_id')
-    ).first()
-    
+    result = await db.execute(select(StoreModel).where(StoreModel.id == store_id,
+        StoreModel.organization_id == current_user.get('organization_id')))
+    store = result.scalar_one_or_none()
     if not store:
         raise HTTPException(404, "Store not found")
     
@@ -339,16 +332,13 @@ async def transfer_inventory_between_stores(
     # Verify both stores belong to organization
     org_id = current_user.get('organization_id')
     
-    from_store = db.query(StoreModel).filter(
-        StoreModel.id == transfer.from_store_id,
-        StoreModel.organization_id == org_id
-    ).first()
+    result = await db.execute(select(StoreModel).where(StoreModel.id == transfer.from_store_id,
+        StoreModel.organization_id == org_id))
     
-    to_store = db.query(StoreModel).filter(
-        StoreModel.id == transfer.to_store_id,
-        StoreModel.organization_id == org_id
-    ).first()
-    
+    from_store = result.scalar_one_or_none()
+    result = await db.execute(select(StoreModel).where(StoreModel.id == transfer.to_store_id,
+        StoreModel.organization_id == org_id))
+    to_store = result.scalar_one_or_none()
     if not from_store or not to_store:
         raise HTTPException(404, "Store not found or access denied")
     

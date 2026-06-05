@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from datetime import datetime
 import hashlib
 
-from sqlalchemy import and_, or_, not_, text, event
+from sqlalchemy import and_, or_, not_, text, event, select
 from sqlalchemy.orm import Session, Query
 from sqlalchemy.sql import ClauseElement
 from app.api.db import models

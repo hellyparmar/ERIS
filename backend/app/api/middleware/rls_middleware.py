@@ -21,6 +21,8 @@ from typing import Optional, Callable, Any
 from fastapi import FastAPI, Request, HTTPException, status, Depends
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
+import os
+from jose import jwt, JWTError
 
 from app.api.core.rls_database import TenantContextManager
 
@@ -293,20 +295,47 @@ class RLSMiddleware(BaseHTTPMiddleware):
         """
         Verify JWT token and extract tenant info.
         
-        This is a placeholder. In production, integrate with your actual JWT
-        verification logic (e.g., python-jose, PyJWT, etc.)
+        Uses python-jose library for secure JWT verification.
         """
-        # TODO: Implement actual JWT verification
-        # For now, this is a stub
         try:
-            # In production, decode and validate JWT here
-            # jwt_payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
-            # return TenantInfo(
-            #     tenant_id=jwt_payload["tenant_id"],
-            #     user_id=jwt_payload["user_id"],
-            #     username=jwt_payload["username"],
-            #     roles=jwt_payload.get("roles", []),
-            # )
+            # JWT configuration (same as used in auth system)
+            SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your-secret-key-change-in-production-2026!rdios")
+            ALGORITHM = "HS256"
+            
+            # Decode and verify JWT
+            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            
+            # Check token type
+            if payload.get("type") not in ("access", "pos"):
+                logger.warning(f"Invalid token type in JWT: {payload.get('type')}")
+                return None
+            
+            # Extract required fields
+            user_id = payload.get("sub")
+            tenant_id = payload.get("tenant_id")
+            username = payload.get("username")
+            roles = payload.get("role", [])
+            
+            if not user_id or not tenant_id:
+                logger.warning("JWT missing required fields: sub or tenant_id")
+                return None
+            
+            # Convert roles to list if it's a single string
+            if isinstance(roles, str):
+                roles = [roles]
+            
+            return TenantInfo(
+                tenant_id=str(tenant_id),
+                user_id=int(user_id),
+                username=username or f"user_{user_id}",
+                roles=roles,
+            )
+            
+        except JWTError as e:
+            logger.warning(f"JWT verification failed: {str(e)}")
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected error during JWT verification: {str(e)}")
             return None
         except Exception as e:
             logger.debug(f"JWT verification failed: {e}")

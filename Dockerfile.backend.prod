@@ -1,0 +1,71 @@
+# Multi-stage Dockerfile for production backend
+# Stage 1: Builder
+FROM python:3.13-slim as builder
+
+WORKDIR /tmp
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements
+COPY backend/requirements.txt .
+
+# Create wheel files (faster installation)
+RUN pip install --user --no-cache-dir --no-warn-script-location \
+    -r requirements.txt
+
+# Stage 2: Runtime
+FROM python:3.13-slim as runtime
+
+WORKDIR /app
+
+# Install runtime dependencies only
+RUN apt-get update && apt-get install -y \
+    libpq5 \
+    curl \
+    postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy Python packages from builder
+COPY --from=builder /root/.local /root/.local
+
+# Set PATH
+ENV PATH=/root/.local/bin:$PATH \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Copy application code
+COPY backend/ /app/
+
+# Create data directories
+RUN mkdir -p /app/data/chroma_db /app/data/causal_cache /app/models \
+    && chmod 755 /app/data /app/models
+
+# Health check script
+COPY <<EOF /usr/local/bin/healthcheck.sh
+#!/bin/bash
+curl -f http://localhost:8000/health || exit 1
+EOF
+
+RUN chmod +x /usr/local/bin/healthcheck.sh
+
+# Non-root user
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+RUN chown -R appuser:appuser /app
+USER appuser
+
+# Expose port
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=40s \
+    CMD /usr/local/bin/healthcheck.sh
+
+# Default command (can be overridden)
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

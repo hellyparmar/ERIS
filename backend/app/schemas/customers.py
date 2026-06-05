@@ -11,11 +11,9 @@ class CustomerBase(BaseModel):
     name: str = Field(..., min_length=2, max_length=100)
     email: Optional[EmailStr] = None
     phone: Optional[str] = Field(None, pattern=r"^\+?[1-9]\d{9,14}$")
-    whatsapp_number: Optional[str] = Field(None, pattern=r"^\+?[1-9]\d{9,14}$")
     city: Optional[str] = None
-    tally_ledger_name: Optional[str] = None
 
-    @field_validator("phone", "whatsapp_number")
+    @field_validator("phone")
     @classmethod
     def validate_phone(cls, v: Optional[str]) -> Optional[str]:
         if v is None:
@@ -45,7 +43,6 @@ class CustomerUpdate(BaseModel):
 
 class CustomerResponse(CustomerBase):
     id: int
-    customer_code: str
     loyalty_points: int
     created_at: datetime
 

@@ -251,7 +251,7 @@ async def get_pending_orders(
     return pending
 
 @router.get("/sales-metrics", response_model=SalesMetricsResponse)
-async def get_sales_metrics(period: str = Query("daily", regex="^(hourly|daily|weekly|monthly)$")):
+async def get_sales_metrics(period: str = Query("daily", pattern="^(hourly|daily|weekly|monthly)$")):
     """
     Retrieve sales KPIs for a specified time period.
     """

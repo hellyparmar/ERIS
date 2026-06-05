@@ -1,0 +1,119 @@
+/* Stat Card Styles - Intelly Aesthetic */
+
+.stat-card {
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-2xl);
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-card);
+  border: 1px solid var(--color-border);
+  transition: all 0.2s ease;
+}
+
+.stat-card:hover {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+}
+
+.stat-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--spacing-lg);
+}
+
+.stat-card-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0;
+}
+
+.stat-card-icon {
+  font-size: 24px;
+  opacity: 0.8;
+}
+
+.stat-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.stat-card-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--color-primary);
+  line-height: 1;
+}
+
+.stat-card-trend {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: 12px;
+}
+
+.trend-value {
+  font-weight: 600;
+}
+
+.trend-period {
+  color: var(--color-secondary);
+  font-weight: 500;
+}
+
+/* Color Variants */
+.stat-card-yellow {
+  background: linear-gradient(135deg, var(--color-card-yellow-bg) 0%, rgba(254, 249, 195, 0.5) 100%);
+}
+
+.stat-card-yellow .stat-card-title {
+  color: var(--color-card-yellow-text);
+}
+
+.stat-card-pink {
+  background: linear-gradient(135deg, var(--color-card-pink-bg) 0%, rgba(252, 231, 243, 0.5) 100%);
+}
+
+.stat-card-pink .stat-card-title {
+  color: var(--color-card-pink-text);
+}
+
+.stat-card-green {
+  background: linear-gradient(135deg, var(--color-card-green-bg) 0%, rgba(220, 252, 231, 0.5) 100%);
+}
+
+.stat-card-green .stat-card-title {
+  color: var(--color-card-green-text);
+}
+
+.stat-card-blue {
+  background: linear-gradient(135deg, var(--color-card-blue-bg) 0%, rgba(219, 234, 254, 0.5) 100%);
+}
+
+.stat-card-blue .stat-card-title {
+  color: var(--color-card-blue-text);
+}
+
+.stat-card-purple {
+  background: linear-gradient(135deg, var(--color-card-purple-bg) 0%, rgba(237, 233, 254, 0.5) 100%);
+}
+
+.stat-card-purple .stat-card-title {
+  color: var(--color-card-purple-text);
+}
+
+/* Trend Indicators */
+.trend-positive {
+  color: #10B981;
+}
+
+.trend-negative {
+  color: #EF4444;
+}
+
+.trend-neutral {
+  color: var(--color-secondary);
+}

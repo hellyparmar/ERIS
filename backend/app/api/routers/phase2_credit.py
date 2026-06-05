@@ -5,6 +5,7 @@ Status: Advanced credit scoring, aging analysis, payment reminders
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime, timedelta
@@ -89,11 +90,9 @@ async def create_credit_account(
     - New credit account with initial limits
     """
     # Check if account exists
-    existing = db.query(CustomerCredit).filter(
-        CustomerCredit.customer_id == request.customer_id,
-        CustomerCredit.business_id == current_user["business_id"]
-    ).first()
-    
+    result = await db.execute(select(CustomerCredit).where(CustomerCredit.customer_id == request.customer_id,
+        CustomerCredit.business_id == current_user["business_id"]))
+    existing = result.scalar_one_or_none()
     if existing:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -175,8 +174,7 @@ async def list_credit_accounts(
     Returns:
     - List of credit accounts with summary
     """
-    query = db.query(CustomerCredit).filter(
-        CustomerCredit.business_id == current_user["business_id"]
+    result = await db.execute(select(CustomerCredit).where(CustomerCredit.business_id == current_user["business_id"]
     )
     
     if credit_rating:
@@ -223,25 +221,20 @@ async def get_credit_account(
     Returns:
     - Account details, credit score factors, payment history
     """
-    account = db.query(CustomerCredit).filter(
-        CustomerCredit.customer_id == customer_id,
-        CustomerCredit.business_id == current_user["business_id"]
-    ).first()
-    
+    result = await db.execute(select(CustomerCredit).where(CustomerCredit.customer_id == customer_id,
+        CustomerCredit.business_id == current_user["business_id"]))
+    query = result.scalar_one_or_none()
     if not account:
         raise HTTPException(status_code=404, detail="Credit account not found")
     
     # Get recent transactions
-    recent_transactions = db.query(CreditTransaction).filter(
-        CreditTransaction.customer_credit_id == account.id
-    ).order_by(CreditTransaction.created_at.desc()).limit(10).all()
-    
+    result = await db.execute(select(CreditTransaction).where(CreditTransaction.customer_credit_id == account.id
+    ).order_by(CreditTransaction.created_at.desc()).limit(10))
+    account = result.scalars().all()
     # Get outstanding invoices
-    outstanding_invoices = db.query(Invoice).filter(
-        Invoice.customer_id == customer_id,
-        Invoice.payment_status != "PAID"
-    ).all()
-    
+    result = await db.execute(select(Invoice).where(Invoice.customer_id == customer_id,
+        Invoice.payment_status != "PAID"))
+    outstanding_invoices = result.scalars().all()
     return {
         "account": {
             "account_id": str(account.id),
@@ -314,11 +307,9 @@ async def record_transaction(
     Returns:
     - Transaction recorded, updated balance and credit score
     """
-    account = db.query(CustomerCredit).filter(
-        CustomerCredit.customer_id == customer_id,
-        CustomerCredit.business_id == current_user["business_id"]
-    ).first()
-    
+    result = await db.execute(select(CustomerCredit).where(CustomerCredit.customer_id == customer_id,
+        CustomerCredit.business_id == current_user["business_id"]))
+    recent_transactions = result.scalar_one_or_none()
     if not account:
         raise HTTPException(status_code=404, detail="Credit account not found")
     
@@ -405,11 +396,9 @@ async def record_payment(
     Returns:
     - Payment recorded, updated balance, credit score adjustment
     """
-    account = db.query(CustomerCredit).filter(
-        CustomerCredit.customer_id == customer_id,
-        CustomerCredit.business_id == current_user["business_id"]
-    ).first()
-    
+    result = await db.execute(select(CustomerCredit).where(CustomerCredit.customer_id == customer_id,
+        CustomerCredit.business_id == current_user["business_id"]))
+    account = result.scalar_one_or_none()
     if not account:
         raise HTTPException(status_code=404, detail="Credit account not found")
     
@@ -427,11 +416,9 @@ async def record_payment(
         account.current_balance = new_balance
         
         # Check if payment was on time or late
-        outstanding_invoices = db.query(Invoice).filter(
-            Invoice.customer_id == customer_id,
-            Invoice.due_date <= datetime.now()
-        ).all()
-        
+        result = await db.execute(select(Invoice).where(Invoice.customer_id == customer_id,
+            Invoice.due_date <= datetime.now()))
+    account = result.scalars().all()
         if outstanding_invoices:
             account.late_payments += 1
         else:
@@ -494,11 +481,9 @@ async def make_adjustment(
     Returns:
     - Adjustment applied, updated credit details
     """
-    account = db.query(CustomerCredit).filter(
-        CustomerCredit.customer_id == customer_id,
-        CustomerCredit.business_id == current_user["business_id"]
-    ).first()
-    
+    result = await db.execute(select(CustomerCredit).where(CustomerCredit.customer_id == customer_id,
+        CustomerCredit.business_id == current_user["business_id"]))
+        outstanding_invoices = result.scalar_one_or_none()
     if not account:
         raise HTTPException(status_code=404, detail="Credit account not found")
     
@@ -577,11 +562,9 @@ async def get_credit_score_analysis(
     Returns:
     - Score breakdown, contributing factors, recommendations
     """
-    account = db.query(CustomerCredit).filter(
-        CustomerCredit.customer_id == customer_id,
-        CustomerCredit.business_id == current_user["business_id"]
-    ).first()
-    
+    result = await db.execute(select(CustomerCredit).where(CustomerCredit.customer_id == customer_id,
+        CustomerCredit.business_id == current_user["business_id"]))
+    account = result.scalar_one_or_none()
     if not account:
         raise HTTPException(status_code=404, detail="Credit account not found")
     
@@ -639,11 +622,9 @@ async def can_extend_credit(
     Returns:
     - Approval decision with reasons
     """
-    account = db.query(CustomerCredit).filter(
-        CustomerCredit.customer_id == customer_id,
-        CustomerCredit.business_id == current_user["business_id"]
-    ).first()
-    
+    result = await db.execute(select(CustomerCredit).where(CustomerCredit.customer_id == customer_id,
+        CustomerCredit.business_id == current_user["business_id"]))
+    account = result.scalar_one_or_none()
     if not account:
         raise HTTPException(status_code=404, detail="Credit account not found")
     
@@ -693,11 +674,9 @@ async def get_aging_report(
     - Invoices grouped by overdue days
     - Total outstanding, payment due
     """
-    account = db.query(CustomerCredit).filter(
-        CustomerCredit.customer_id == customer_id,
-        CustomerCredit.business_id == current_user["business_id"]
-    ).first()
-    
+    result = await db.execute(select(CustomerCredit).where(CustomerCredit.customer_id == customer_id,
+        CustomerCredit.business_id == current_user["business_id"]))
+    account = result.scalar_one_or_none()
     if not account:
         raise HTTPException(status_code=404, detail="Credit account not found")
     
@@ -728,10 +707,8 @@ async def get_business_credit_analysis(
     - Customer credit distribution
     - High-risk customers
     """
-    accounts = db.query(CustomerCredit).filter(
-        CustomerCredit.business_id == current_user["business_id"]
-    ).all()
-    
+    result = await db.execute(select(CustomerCredit).where(CustomerCredit.business_id == current_user["business_id"]))
+    account = result.scalars().all()
     total_credit_limit = sum(acc.credit_limit for acc in accounts)
     total_outstanding = sum(acc.current_balance for acc in accounts)
     total_available = total_credit_limit - total_outstanding
@@ -800,9 +777,8 @@ async def block_account(
     """
     account = db.query(CustomerCredit).filter(
         CustomerCredit.customer_id == customer_id,
-        CustomerCredit.business_id == current_user["business_id"]
-    ).first()
-    
+        CustomerCredit.business_id == current_user["business_id"]))
+    accounts = result.scalar_one_or_none()
     if not account:
         raise HTTPException(status_code=404, detail="Credit account not found")
     
@@ -839,11 +815,9 @@ async def unblock_account(
     Returns:
     - Account unblocked confirmation
     """
-    account = db.query(CustomerCredit).filter(
-        CustomerCredit.customer_id == customer_id,
-        CustomerCredit.business_id == current_user["business_id"]
-    ).first()
-    
+    result = await db.execute(select(CustomerCredit).where(CustomerCredit.customer_id == customer_id,
+        CustomerCredit.business_id == current_user["business_id"]))
+    account = result.scalar_one_or_none()
     if not account:
         raise HTTPException(status_code=404, detail="Credit account not found")
     

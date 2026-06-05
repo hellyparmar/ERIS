@@ -35,7 +35,9 @@ COPY --from=builder /build/wheels /wheels
 RUN pip install --no-cache /wheels/*
 
 # Copy Application Code (Ensure correct context)
-COPY backend/ .
+COPY backend/ /app/
+COPY alembic/ /app/alembic/
+COPY alembic.ini /app/
 
 # Fix permissions
 RUN chown -R erisuser:erisuser /app

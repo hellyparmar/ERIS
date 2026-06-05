@@ -62,8 +62,7 @@ def create_customer(
     # Create Customer
     uid = uuid.uuid4().hex
     new_customer = Customer(
-        **customer_in.model_dump(),
-        customer_code=f"CUST-{uid[0:6].upper()}"
+        **customer_in.model_dump()
     )
     db.add(new_customer)
     db.commit()

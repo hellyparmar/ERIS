@@ -4,6 +4,7 @@ Login, Register, Token Refresh endpoints
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr, Field
@@ -11,7 +12,7 @@ from typing import Optional
 from datetime import timedelta
 
 from app.api.db import get_db
-from app.api.db.multitenant_models import User
+from app.models.multitenant_models import User
 from app.api.auth.password import hash_password, verify_password
 from app.api.auth.jwt_handler import (
     create_access_token,
@@ -86,7 +87,8 @@ async def register(
     - **full_name**: Optional full name
     """
     # Check if email exists
-    existing_email = db.query(User).filter(User.email == user_data.email).first()
+    result = await db.execute(select(User).where(User.email == user_data.email))
+    existing_email = result.scalar_one_or_none()
     if existing_email:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -161,8 +163,8 @@ async def login(
     logger.info(f"Found user: {user_id}, {user_email_db}")
     
     # Find user object to check for lockout and manage failed attempts
-    user_obj = db.query(User).filter(User.id == user_id).first()
-    
+    result = await db.execute(select(User).where(User.id == user_id))
+    user_obj = result.scalar_one_or_none()
     if user_obj:
         # Check if account is currently locked
         if user_obj.locked_until and user_obj.locked_until > datetime.now(timezone.utc):
@@ -254,7 +256,8 @@ async def refresh_token(
     user_id = payload.get("sub")
     
     # Verify user exists
-    user = db.query(User).filter(User.id == int(user_id)).first()
+    result = await db.execute(select(User).where(User.id == int(user_id)))
+    user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

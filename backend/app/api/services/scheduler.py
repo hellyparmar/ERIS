@@ -8,7 +8,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 from sqlalchemy import text
 import logging
 from datetime import datetime, timedelta
-from app.api.db.database_postgres import SessionLocal
+from app.database import SessionLocal
 from app.api.integrations.odoo_connector import OdooClient
 from app.api.services.reporting_service import ReportingService
 

@@ -11,7 +11,7 @@ import logging
 
 from app.api.db import get_db
 from app.api.auth.dependencies import get_current_active_user
-from app.api.db.multitenant_models import Store, User
+from app.models.multitenant_models import Store, User
 from app.api.db.models import Sale
 
 logger = logging.getLogger(__name__)

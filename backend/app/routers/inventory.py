@@ -1,169 +1,204 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
-from typing import List
+from fastapi import APIRouter, Depends, Query, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import func, select
+from pydantic import BaseModel
+from typing import Optional
 from app.database import get_db
-from app.schemas.inventory import ProductCreate, ProductUpdate, ProductResponse, LowStockResponse, StoreResponse
-from app.models.multitenant_models import Product, Inventory, User, Store
-from app.middleware.auth import get_current_user
+from app.models import Inventory, Product, Outlet, Alert, User
+from app.core.deps import get_current_user
+from datetime import date
+import logging
 
-router = APIRouter(prefix="/api/v1/inventory", tags=["Inventory"])
+logger = logging.getLogger(__name__)
 
-@router.get("/products", response_model=List[ProductResponse])
-def get_products(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+router = APIRouter(prefix="/api/v1/inventory", tags=["inventory"])
+
+class InventoryUpdate(BaseModel):
+    current_stock: Optional[int] = None
+    reorder_level: Optional[int] = None
+    max_stock: Optional[int] = None
+
+@router.get("/list")
+async def list_inventory(
+    outlet_id: Optional[int] = None,
+    low_stock_only: bool = False,
+    search: Optional[str] = None,
+    category: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 50,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
-    List all products belonging to the user's organization.
+    List inventory items with optional filters.
     
-    Returns a list of products with their current stock levels across all stores.
+    ERROR FIXES:
+    - Uses AsyncSession instead of sync Session
+    - All database operations use await
+    - Proper error handling for async context
     """
-    products = db.query(Product).filter(
-        Product.organization_id == current_user.organization_id
-    ).all()
-    
-    # Enrich with stock levels
-    response = []
-    for p in products:
-        product_data = ProductResponse.model_validate(p)
-        inventory = db.query(Inventory).filter(Inventory.product_id == p.id).first()
-        product_data.current_stock = inventory.current_stock if inventory else 0
-        response.append(product_data)
+    try:
+        # Build query with proper async patterns
+        query = (
+            select(Inventory, Product.name, Product.category, Product.sku,
+                   Product.selling_price, Product.gst_rate, Outlet.name.label("outlet_name"))
+            .join(Product, Product.id == Inventory.product_id)
+            .join(Outlet, Outlet.id == Inventory.outlet_id)
+        )
         
-    return response
-
-@router.get("/products/{product_id}", response_model=ProductResponse)
-def get_product(
-    product_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """
-    Retrieve details for a specific product by ID.
-    
-    Includes real-time stock information.
-    """
-    product = db.query(Product).filter(
-        Product.id == product_id,
-        Product.organization_id == current_user.organization_id
-    ).first()
-    
-    if not product:
-        raise HTTPException(status_code=404, detail="Product not found")
+        if outlet_id:
+            query = query.where(Inventory.outlet_id == outlet_id)
+        elif current_user.role == "manager" and current_user.outlet_id:
+            query = query.where(Inventory.outlet_id == current_user.outlet_id)
         
-    product_data = ProductResponse.model_validate(product)
-    inventory = db.query(Inventory).filter(Inventory.product_id == product.id).first()
-    product_data.current_stock = inventory.current_stock if inventory else 0
-    return product_data
-
-@router.post("/products", response_model=ProductResponse, status_code=status.HTTP_201_CREATED)
-def create_product(
-    product_in: ProductCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """
-    Create a new product and initialize its inventory record.
-    
-    - **sku**: Unique identifier for the product.
-    - **initial_stock**: Starting stock level to be recorded in the designated store.
-    """
-    # Check if SKU already exists for this organization
-    if db.query(Product).filter(
-        Product.sku == product_in.sku,
-        Product.organization_id == current_user.organization_id
-    ).first():
-        raise HTTPException(status_code=400, detail="Product with this SKU already exists")
-    
-    # Create Product
-    product_data = product_in.model_dump(exclude={"initial_stock", "store_id", "organization_id"})
-    new_product = Product(**product_data, organization_id=current_user.organization_id)
-    db.add(new_product)
-    db.commit()
-    db.refresh(new_product)
-    
-    # Initialize Inventory
-    new_inventory = Inventory(
-        product_id=new_product.id,
-        current_stock=product_in.initial_stock,
-        available_stock=product_in.initial_stock,
-        store_id=product_in.store_id
-    )
-    db.add(new_inventory)
-    db.commit()
-    
-    res = ProductResponse.model_validate(new_product)
-    res.current_stock = product_in.initial_stock
-    return res
-
-@router.put("/products/{product_id}", response_model=ProductResponse)
-def update_product(
-    product_id: int,
-    product_in: ProductUpdate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """
-    Update attributes of an existing product.
-    
-    Only provided fields will be updated.
-    """
-    product = db.query(Product).filter(
-        Product.id == product_id,
-        Product.organization_id == current_user.organization_id
-    ).first()
-    
-    if not product:
-        raise HTTPException(status_code=404, detail="Product not found")
+        if low_stock_only:
+            query = query.where(Inventory.current_stock <= Inventory.reorder_level)
         
-    update_data = product_in.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(product, key, value)
-    
-    db.commit()
-    db.refresh(product)
-    
-    res = ProductResponse.model_validate(product)
-    inventory = db.query(Inventory).filter(Inventory.product_id == product.id).first()
-    res.current_stock = inventory.current_stock if inventory else 0
-    return res
-
-@router.get("/low-stock", response_model=List[LowStockResponse])
-def get_low_stock(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """
-    Retrieve a list of products where current stock is at or below the reorder point.
-    
-    Useful for procurement and restocking alerts.
-    """
-    low_stock_items = db.query(Inventory).join(Product).filter(
-        Product.organization_id == current_user.organization_id,
-        Inventory.current_stock <= Inventory.reorder_point
-    ).all()
-    
-    response = []
-    for item in low_stock_items:
-        response.append({
-            "product_id": item.product_id,
-            "sku": item.product.sku,
-            "name": item.product.name,
-            "current_stock": item.current_stock,
-            "reorder_point": item.reorder_point,
-            "store_id": item.store_id
-        })
+        if search:
+            query = query.where(Product.name.ilike(f"%{search}%"))
         
-    return response
+        if category:
+            query = query.where(Product.category == category)
+        
+        # Get total count
+        count_query = select(func.count()).select_from(Inventory).where(Inventory.outlet_id == outlet_id if outlet_id else True)
+        total_result = await db.execute(count_query)
+        total = total_result.scalar() or 0
+        
+        # Get paginated results
+        query = query.order_by(Inventory.current_stock.asc()).offset(skip).limit(limit)
+        result = await db.execute(query)
+        rows = result.fetchall()
+        
+        return {
+            "total": total,
+            "items": [{
+                "id": r.Inventory.id,
+                "product_name": r.name,
+                "category": r.category,
+                "sku": r.sku,
+                "outlet_name": r.outlet_name,
+                "selling_price": r.selling_price,
+                "gst_rate": r.gst_rate,
+                "current_stock": r.Inventory.current_stock,
+                "reorder_level": r.Inventory.reorder_level,
+                "max_stock": r.Inventory.max_stock,
+                "last_restocked": str(r.Inventory.last_restocked) if r.Inventory.last_restocked else None,
+                "status": "out" if r.Inventory.current_stock == 0 else "low" if r.Inventory.current_stock <= r.Inventory.reorder_level else "ok",
+                "stock_pct": round(r.Inventory.current_stock / r.Inventory.max_stock * 100, 1) if r.Inventory.max_stock > 0 else 0,
+            } for r in rows]
+        }
+    except Exception as e:
+        logger.error(f"Error listing inventory: {e}")
+        raise HTTPException(status_code=500, detail="Failed to list inventory")
 
-@router.get("/stores", response_model=List[StoreResponse])
-def get_stores(
-    db: Session = Depends(get_db),
+@router.get("/summary")
+async def inventory_summary(
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
-    List all physical/logical stores belonging to the organization.
+    Get inventory summary statistics.
+    
+    ERROR FIXES:
+    - Uses AsyncSession with await
+    - Proper async query execution
     """
-    return db.query(Store).filter(
-        Store.organization_id == current_user.organization_id
-    ).all()
+    try:
+        # Count total inventory
+        total_result = await db.execute(select(func.count(Inventory.id)))
+        total = total_result.scalar() or 0
+        
+        # Count out of stock
+        out_result = await db.execute(
+            select(func.count(Inventory.id)).where(Inventory.current_stock == 0)
+        )
+        out = out_result.scalar() or 0
+        
+        # Count low stock
+        low_result = await db.execute(
+            select(func.count(Inventory.id)).where(
+                Inventory.current_stock > 0,
+                Inventory.current_stock <= Inventory.reorder_level
+            )
+        )
+        low = low_result.scalar() or 0
+        
+        return {
+            "total": total,
+            "out_of_stock": out,
+            "low_stock": low,
+            "healthy": total - out - low
+        }
+    except Exception as e:
+        logger.error(f"Error getting inventory summary: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get inventory summary")
+
+@router.patch("/{inventory_id}")
+async def update_inventory(
+    inventory_id: int,
+    body: InventoryUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Update inventory item with new stock levels.
+    
+    ERROR FIXES:
+    - Uses async database operations with await
+    - Proper transaction handling
+    """
+    try:
+        # Fetch inventory item
+        result = await db.execute(
+            select(Inventory).where(Inventory.id == inventory_id)
+        )
+        item = result.scalar_one_or_none()
+        
+        if not item:
+            raise HTTPException(status_code=404, detail="Inventory item not found")
+        
+        # Update fields
+        if body.current_stock is not None:
+            item.current_stock = body.current_stock
+            item.last_restocked = date.today()
+            await _check_and_resolve_alert(db, item.outlet_id, item.product_id)
+        
+        if body.reorder_level is not None:
+            item.reorder_level = body.reorder_level
+        
+        if body.max_stock is not None:
+            item.max_stock = body.max_stock
+        
+        await db.commit()
+        
+        return {"message": "Updated", "id": inventory_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Error updating inventory: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update inventory")
+
+async def _check_and_resolve_alert(db: AsyncSession, outlet_id: int, product_id: int):
+    """Resolve inventory-related alerts"""
+    try:
+        result = await db.execute(
+            select(Alert).where(
+                Alert.outlet_id == outlet_id,
+                Alert.product_id == product_id,
+                Alert.category == "inventory",
+                Alert.is_resolved == False
+            )
+        )
+        alerts = result.scalars().all()
+        
+        for alert in alerts:
+            alert.is_resolved = True
+        
+        if alerts:
+            await db.commit()
+    except Exception as e:
+        logger.error(f"Error resolving alerts: {e}")
+        # Don't raise - this is a side effect
+

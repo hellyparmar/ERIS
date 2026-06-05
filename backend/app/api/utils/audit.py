@@ -10,7 +10,7 @@ import logging
 from typing import Any, Dict, Optional
 
 from app.api.db.audit_models import AuditLog
-from app.api.db.multitenant_models import User
+from app.models.multitenant_models import User
 
 logger = logging.getLogger(__name__)
 

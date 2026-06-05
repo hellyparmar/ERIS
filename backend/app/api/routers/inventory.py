@@ -4,6 +4,7 @@ Uses repository pattern to access real database
 """
 
 from fastapi import APIRouter, Query, Depends, Request
+from sqlalchemy import select
 from typing import Optional
 from sqlalchemy.orm import Session
 from app.api.db import get_db

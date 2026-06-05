@@ -96,7 +96,7 @@ async def get_sync_status():
 @router.post("/sync/trigger")
 async def trigger_tally_sync(
     background_tasks: BackgroundTasks,
-    sync_type: str = Query("all", regex="^(all|ledger|inventory|accounts|bills)$")
+    sync_type: str = Query("all", pattern="^(all|ledger|inventory|accounts|bills)$")
 ):
     """Trigger manual Tally sync"""
     try:

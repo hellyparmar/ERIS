@@ -1,0 +1,225 @@
+/* Header Styles - Intelly Aesthetic */
+
+.header {
+  position: sticky;
+  top: 0;
+  left: 240px;
+  right: 0;
+  height: 64px;
+  background-color: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
+  z-index: 99;
+}
+
+.header-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 100%;
+  padding: 0 var(--spacing-3xl);
+  gap: var(--spacing-2xl);
+}
+
+.header-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-primary);
+  margin: 0;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-lg);
+}
+
+.notification-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background-color: var(--color-input-bg);
+  color: var(--color-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.notification-btn:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+/* User Menu */
+.user-menu-wrapper {
+  position: relative;
+}
+
+.user-button {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background-color: var(--color-input-bg);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.user-button:hover {
+  border-color: var(--color-primary);
+  background-color: var(--color-surface);
+}
+
+.user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, #E8A020, #D4A800);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: white;
+  flex-shrink: 0;
+}
+
+.user-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.user-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.user-role {
+  font-size: 11px;
+  color: var(--color-secondary);
+  text-transform: capitalize;
+}
+
+/* User Dropdown */
+.user-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: var(--spacing-sm);
+  width: 200px;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  z-index: 100;
+  animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dropdown-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-lg);
+  border-bottom: 1px solid var(--color-divider);
+  font-size: 13px;
+}
+
+.dropdown-label {
+  color: var(--color-secondary);
+  font-weight: 500;
+}
+
+.dropdown-value {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.dropdown-divider {
+  height: 1px;
+  background-color: var(--color-divider);
+  margin: 0;
+}
+
+.dropdown-logout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-md);
+  width: 100%;
+  padding: var(--spacing-lg);
+  border: none;
+  background: none;
+  color: var(--color-danger-text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.dropdown-logout:hover {
+  background-color: var(--color-danger-bg);
+}
+
+/* Responsive */
+@media (max-width: 1023px) {
+  .header {
+    left: 60px;
+  }
+
+  .header-content {
+    padding: 0 var(--spacing-2xl);
+  }
+
+  .header-title {
+    font-size: 18px;
+  }
+}
+
+@media (max-width: 767px) {
+  .header {
+    left: 0;
+    right: 0;
+  }
+
+  .header-content {
+    padding: 0 var(--spacing-lg);
+  }
+
+  .header-title {
+    display: none;
+  }
+}
+
+@media (max-width: 639px) {
+  .header-content {
+    padding: 0 12px;
+  }
+
+  .notification-btn {
+    width: 36px;
+    height: 36px;
+  }
+
+  .user-button {
+    display: none;
+  }
+}

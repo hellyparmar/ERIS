@@ -1,53 +1,94 @@
-from pydantic import BaseModel, Field, UUID4, validator
-from typing import List, Optional, Any
-from datetime import datetime
-from decimal import Decimal
-from enum import Enum
+"""
+Pydantic schemas for Invoice Management endpoints
+"""
 
-class PaymentStatus(str, Enum):
+from pydantic import BaseModel, Field
+from typing import Optional, List, Dict, Any
+from datetime import date, datetime
+from enum import Enum
+from uuid import UUID
+
+
+class InvoiceStatus(str, Enum):
     PAID = "paid"
-    PARTIAL = "partial"
     PENDING = "pending"
     OVERDUE = "overdue"
 
-class InvoicePaymentCreate(BaseModel):
-    amount_paid: Decimal = Field(..., gt=0, description="Amount paid in this transaction")
-    payment_method: str = Field(..., max_length=50, example="UPI")
-    reference_number: Optional[str] = Field(None, max_length=100)
+
+# ==================== INVOICE ====================
+
+class InvoiceCreate(BaseModel):
+    contact_id: UUID = Field(..., description="Business contact ID")
+    outlet_id: UUID = Field(..., description="Outlet ID")
+    total_amount: float = Field(..., gt=0)
+    tax_amount: float = Field(..., ge=0)
+    items: Dict[str, Any] = Field(..., description="Invoice items as JSON")
+    issue_date: date
+    due_date: date
     notes: Optional[str] = None
 
-class InvoicePaymentResponse(InvoicePaymentCreate):
-    id: int
-    invoice_id: int
-    payment_date: datetime
+
+class InvoiceUpdate(BaseModel):
+    status: Optional[InvoiceStatus] = None
+    paid_date: Optional[date] = None
+    notes: Optional[str] = None
+
+
+class InvoiceResponse(BaseModel):
+    invoice_id: UUID
+    contact_id: UUID
+    outlet_id: UUID
+    total_amount: float
+    tax_amount: float
+    items: Dict[str, Any]
+    status: str
+    issue_date: date
+    due_date: date
+    paid_date: Optional[date]
+    notes: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+
+    # Related data
+    contact: Optional[Dict[str, Any]] = None
 
     class Config:
         from_attributes = True
 
-class InvoiceSendRequest(BaseModel):
-    method: str = Field(..., example="whatsapp", description="Method of sending: 'whatsapp' or 'email'")
 
-class InvoiceBase(BaseModel):
-    invoice_number: str
-    customer_id: int
-    hsn_code: Optional[str] = None
-    tax_rate: Optional[Decimal] = None
-    taxable_amount: Optional[Decimal] = None
-    tax_amount: Optional[Decimal] = None
-    total_amount: Decimal
-    
-    payment_status: PaymentStatus
-    amount_paid: Decimal
-    amount_due: Decimal
+class InvoiceListResponse(BaseModel):
+    page: int
+    per_page: int
+    total: int
+    total_pages: int
+    items: List[InvoiceResponse]
 
-    tally_sync_status: str
-    receipt_sent_via: Optional[str] = None
-    
-    invoice_date: datetime
-    due_date: Optional[datetime] = None
-    
-    organization_id: UUID4
-    store_id: UUID4
+
+class OverdueInvoiceResponse(BaseModel):
+    invoice_id: UUID
+    contact_id: UUID
+    outlet_id: UUID
+    contact_name: str
+    contact_company: str
+    total_amount: float
+    due_date: date
+    days_overdue: int
+    status: str
+
+
+class OverdueInvoicesListResponse(BaseModel):
+    total_overdue: int
+    total_amount: float
+    items: List[OverdueInvoiceResponse]
+
+
+class InvoiceSummaryResponse(BaseModel):
+    period_days: int
+    paid_amount: float
+    pending_amount: float
+    overdue_amount: float
+    total_amount: float
+    invoice_count: int
 
 class InvoiceResponse(InvoiceBase):
     id: int
