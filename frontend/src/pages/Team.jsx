@@ -1,264 +1,230 @@
-/**
- * Enterprise Retail Intelligence System v3.0
- * TEAM PAGE - Team Management
- * 
- * Features:
- * - Premium Grid Layout
- * - Role-based visual hierarchy
- * - Interactive Profile Cards
- */
-
-import { useEffect, useState } from 'react';
-import { useLanguage } from '../hooks/useLanguage';
-import { Users, Mail, Phone, Shield, Activity, Calendar, MoreVertical, Plus } from 'lucide-react';
-import GlassCard from '../components/ui/GlassCard';
-import GradientButton from '../components/ui/GradientButton';
+import { useState } from 'react';
+import { Users, Mail, Phone, Shield, Activity, Calendar, MoreVertical, Plus, UserPlus } from 'lucide-react';
 import { useToast } from '../components/ui/Toast';
 
+const teamMembers = [
+  { id: 1, name: 'Rajesh Kumar', role: 'Admin', department: 'Management', email: 'rajesh.k@rdios.com', phone: '+91 98765 43210', status: 'active', initials: 'RK', lastActive: 'Now' },
+  { id: 2, name: 'Priya Sharma', role: 'Manager', department: 'Sales', email: 'priya.s@rdios.com', phone: '+91 98765 43211', status: 'active', initials: 'PS', lastActive: '5m ago' },
+  { id: 3, name: 'Amit Verma', role: 'Analyst', department: 'Data', email: 'amit.v@rdios.com', phone: '+91 98765 43212', status: 'away', initials: 'AV', lastActive: '15m ago' },
+  { id: 4, name: 'Sneha Patel', role: 'Admin', department: 'Finance', email: 'sneha.p@rdios.com', phone: '+91 98765 43213', status: 'active', initials: 'SP', lastActive: '1h ago' },
+  { id: 5, name: 'Vikram Singh', role: 'Manager', department: 'Operations', email: 'vikram.s@rdios.com', phone: '+91 98765 43214', status: 'offline', initials: 'VS', lastActive: '3h ago' },
+  { id: 6, name: 'Neha Gupta', role: 'Analyst', department: 'Inventory', email: 'neha.g@rdios.com', phone: '+91 98765 43215', status: 'away', initials: 'NG', lastActive: '30m ago' },
+  { id: 7, name: 'Rohit Malhotra', role: 'Manager', department: 'Marketing', email: 'rohit.m@rdios.com', phone: '+91 98765 43216', status: 'offline', initials: 'RM', lastActive: '1d ago' },
+  { id: 8, name: 'Ananya Reddy', role: 'Admin', department: 'HR', email: 'ananya.r@rdios.com', phone: '+91 98765 43217', status: 'active', initials: 'AR', lastActive: '10m ago' },
+];
+
+const statusDot = (status) => {
+  const colors = { active: '#22c55e', away: '#f59e0b', offline: '#525252' };
+  return { width: 8, height: 8, borderRadius: '50%', background: colors[status] || '#525252', display: 'inline-block' };
+};
+
+const roleGradient = (role) => {
+  const g = {
+    Admin: ['#f59e0b', '#d97706'],
+    Manager: ['#22c55e', '#16a34a'],
+    Analyst: ['#3b82f6', '#2563eb'],
+  };
+  return g[role] || ['#525252', '#404040'];
+};
+
 const Team = () => {
-    const { t } = useLanguage();
-    const { addToast } = useToast();
-    const [filter, setFilter] = useState('all');
+  const { showToast: addToast } = useToast();
+  const [filter, setFilter] = useState('all');
 
-    // Mock team data
-    const teamMembers = [
-        {
-            id: 1,
-            name: 'Rajesh Kumar',
-            role: 'Admin',
-            department: 'Management',
-            email: 'rajesh.k@rdios.com',
-            phone: '+91 98765 43210',
-            status: 'active',
-            gradient: 'from-blue-500 to-purple-600',
-            initials: 'RK',
-            lastActive: 'Now'
-        },
-        {
-            id: 2,
-            name: 'Priya Sharma',
-            role: 'Manager',
-            department: 'Sales',
-            email: 'priya.s@rdios.com',
-            phone: '+91 98765 43211',
-            status: 'active',
-            gradient: 'from-pink-500 to-rose-600',
-            initials: 'PS',
-            lastActive: '5m ago'
-        },
-        {
-            id: 3,
-            name: 'Amit Patel',
-            role: 'Analyst',
-            department: 'Analytics',
-            email: 'amit.p@rdios.com',
-            phone: '+91 98765 43212',
-            status: 'away',
-            gradient: 'from-emerald-500 to-teal-600',
-            initials: 'AP',
-            lastActive: '1h ago'
-        },
-        {
-            id: 4,
-            name: 'Sneha Reddy',
-            role: 'Associate',
-            department: 'Inventory',
-            email: 'sneha.r@rdios.com',
-            phone: '+91 98765 43213',
-            status: 'active',
-            gradient: 'from-orange-500 to-amber-600',
-            initials: 'SR',
-            lastActive: '10m ago'
-        },
-        {
-            id: 5,
-            name: 'Vikram Singh',
-            role: 'Manager',
-            department: 'Operations',
-            email: 'vikram.s@rdios.com',
-            phone: '+91 98765 43214',
-            status: 'offline',
-            gradient: 'from-cyan-500 to-blue-600',
-            initials: 'VS',
-            lastActive: '2d ago'
-        },
-        {
-            id: 6,
-            name: 'Anjali Gupta',
-            role: 'Support',
-            department: 'Customer Care',
-            email: 'anjali.g@rdios.com',
-            phone: '+91 98765 43215',
-            status: 'active',
-            gradient: 'from-violet-500 to-purple-600',
-            initials: 'AG',
-            lastActive: 'Now'
-        }
-    ];
+  const filteredMembers = filter === 'all' ? teamMembers : teamMembers.filter(m => m.role.toLowerCase() === filter);
 
-    const getStatusColor = (status) => {
-        switch (status) {
-            case 'active': return 'bg-green-500 box-shadow-green';
-            case 'away': return 'bg-yellow-500 box-shadow-yellow';
-            case 'offline': return 'bg-gray-500';
-            default: return 'bg-gray-400';
-        }
-    };
+  const counts = {
+    total: teamMembers.length,
+    active: teamMembers.filter(m => m.status === 'active').length,
+    admins: teamMembers.filter(m => m.role === 'Admin').length,
+    managers: teamMembers.filter(m => m.role === 'Manager').length,
+  };
 
-    const getRoleGradient = (role) => {
-        switch (role) {
-            case 'Admin': return 'from-purple-500 to-indigo-600';
-            case 'Manager': return 'from-blue-500 to-cyan-600';
-            case 'Analyst': return 'from-emerald-500 to-teal-600';
-            default: return 'from-gray-500 to-slate-600';
-        }
-    };
+  const analystsCount = teamMembers.filter(m => m.role === 'Analyst').length;
 
-    const filteredMembers = filter === 'all'
-        ? teamMembers
-        : teamMembers.filter(m => m.role.toLowerCase() === filter || m.status === filter);
-
-    return (
-        <div className="space-y-8 fade-in-up min-h-screen p-6">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                    <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent mb-2">Team Management</h1>
-                    <p className="text-muted-foreground">Collaborate and manage access controls</p>
-                </div>
-                <GradientButton
-                    className="flex items-center justify-center gap-2 whitespace-nowrap box-shadow-glow"
-                    onClick={() => addToast("Invite User Modal Opened", "info")}
-                >
-                    <Plus size={18} /> Invite Member
-                </GradientButton>
-            </div>
-
-            {/* Team Metrics - Added to fix reported layout/sizing issues */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <GlassCard className="p-5 flex items-center justify-between">
-                    <div>
-                        <p className="text-sm font-medium text-muted-foreground">Total Members</p>
-                        <h3 className="text-2xl font-bold text-foreground mt-1">{teamMembers.length}</h3>
-                    </div>
-                    <div className="p-4 rounded-xl bg-blue-500 bg-opacity-80 dark:bg-opacity-90 shadow-[0_0_15px_rgba(59,130,246,0.5)] flex items-center justify-center">
-                        <Users className="w-6 h-6 text-white" strokeWidth={2.5} />
-                    </div>
-                </GlassCard>
-                <GlassCard className="p-5 flex items-center justify-between">
-                    <div>
-                        <p className="text-sm font-medium text-muted-foreground">Active Now</p>
-                        <h3 className="text-2xl font-bold text-foreground mt-1">
-                            {teamMembers.filter(m => m.status === 'active').length}
-                        </h3>
-                    </div>
-                    <div className="p-4 rounded-xl bg-green-500 bg-opacity-80 dark:bg-opacity-90 shadow-[0_0_15px_rgba(34,197,94,0.5)] flex items-center justify-center">
-                        <Activity className="w-6 h-6 text-white" strokeWidth={2.5} />
-                    </div>
-                </GlassCard>
-                <GlassCard className="p-5 flex items-center justify-between">
-                    <div>
-                        <p className="text-sm font-medium text-muted-foreground">Admins</p>
-                        <h3 className="text-2xl font-bold text-foreground mt-1">
-                            {teamMembers.filter(m => m.role === 'Admin').length}
-                        </h3>
-                    </div>
-                    <div className="p-4 rounded-xl bg-purple-500 bg-opacity-80 dark:bg-opacity-90 shadow-[0_0_15px_rgba(168,85,247,0.5)] flex items-center justify-center">
-                        <Shield className="w-6 h-6 text-white" strokeWidth={2.5} />
-                    </div>
-                </GlassCard>
-                <GlassCard className="p-5 flex items-center justify-between">
-                    <div>
-                        <p className="text-sm font-medium text-muted-foreground">Managers</p>
-                        <h3 className="text-2xl font-bold text-foreground mt-1">
-                            {teamMembers.filter(m => m.role === 'Manager').length}
-                        </h3>
-                    </div>
-                    <div className="p-4 rounded-xl bg-orange-500 bg-opacity-80 dark:bg-opacity-90 shadow-[0_0_15px_rgba(249,115,22,0.5)] flex items-center justify-center">
-                        <Users className="w-6 h-6 text-white" strokeWidth={2.5} />
-                    </div>
-                </GlassCard>
-            </div>
-
-            {/* Quick Stats & Filters */}
-            <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
-                {['All', 'Active', 'Admin', 'Manager', 'Analyst'].map((item) => (
-                    <button
-                        key={item}
-                        onClick={() => setFilter(item.toLowerCase())}
-                        className={`px-4 py-2 rounded-full text-sm font-medium transition-all whitespace-nowrap border ${filter === item.toLowerCase()
-                            ? 'bg-white/10 border-white/20 text-white shadow-lg backdrop-blur-md'
-                            : 'bg-transparent border-transparent text-muted-foreground hover:text-foreground hover:bg-white/5'
-                            }`}
-                    >
-                        {item}
-                    </button>
-                ))}
-            </div>
-
-            {/* Team Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                
-                    {filteredMembers.map((member) => (
-                        <div
-                            key={member.id}
-                        >
-                            <GlassCard className="h-full group relative overflow-hidden hover:border-blue-500/30 transition-colors duration-300">
-                                {/* Banner Gradient */}
-                                <div className={`h-24 w-full bg-gradient-to-r ${getRoleGradient(member.role)} opacity-80 group-hover:opacity-100 transition-opacity`} />
-
-                                {/* Avatar */}
-                                <div className="absolute top-12 left-6">
-                                    <div className="relative">
-                                        <div className="w-20 h-20 rounded-2xl bg-white dark:bg-gray-900 p-1 shadow-xl transition-colors">
-                                            <div className={`w-full h-full rounded-xl bg-gradient-to-br ${member.gradient} flex items-center justify-center text-white text-2xl font-bold`}>
-                                                {member.initials}
-                                            </div>
-                                        </div>
-                                        <div className={`absolute -bottom-1 -right-1 w-5 h-5 border-4 border-white dark:border-gray-900 rounded-full ${getStatusColor(member.status)}`} />
-                                    </div>
-                                </div>
-
-                                {/* Actions */}
-                                <div className="absolute top-4 right-4">
-                                    <button className="p-2 rounded-full bg-black/20 hover:bg-black/40 text-white/80 hover:text-white transition backdrop-blur-md">
-                                        <MoreVertical size={16} />
-                                    </button>
-                                </div>
-
-                                {/* Content */}
-                                <div className="pt-12 p-6">
-                                    <div className="mb-4">
-                                        <h3 className="text-xl font-bold text-foreground group-hover:text-primary transition-colors">{member.name}</h3>
-                                        <p className="text-sm text-muted-foreground">{member.role} • {member.department}</p>
-                                    </div>
-
-                                    <div className="space-y-3">
-                                        <div className="flex items-center gap-3 text-sm text-muted-foreground bg-secondary/50 p-2 rounded-lg">
-                                            <Mail size={14} className="text-blue-400" />
-                                            <span className="truncate">{member.email}</span>
-                                        </div>
-                                        <div className="flex items-center gap-3 text-sm text-muted-foreground bg-secondary/50 p-2 rounded-lg">
-                                            <Phone size={14} className="text-green-400 shrink-0" />
-                                            <span className="truncate">{member.phone}</span>
-                                        </div>
-                                    </div>
-
-                                    <div className="mt-6 flex items-center justify-between text-xs text-muted-foreground border-t border-border pt-4">
-                                        <div className="flex items-center gap-1">
-                                            <Activity size={12} />
-                                            Last active: <span className="text-foreground">{member.lastActive}</span>
-                                        </div>
-                                        <button className="text-primary hover:text-primary/80 transition-colors">View Profile</button>
-                                    </div>
-                                </div>
-                            </GlassCard>
-                        </div>
-                    ))}
-                
-            </div>
+  return (
+    <div className="team-page" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+        <div>
+          <p className="page-subtitle" style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>Collaborate, manage roles, and review organization access controls</p>
         </div>
-    );
+        <button className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 18px', fontSize: 13, borderRadius: 8, background: 'var(--accent)', color: '#0f0f0f', fontWeight: 600, border: 'none', cursor: 'pointer' }} onClick={() => addToast("Invite User Modal Opened", "info")}>
+          <UserPlus size={15} /> Invite Member
+        </button>
+      </div>
+
+      {/* Stats — Bento Grid */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+        gap: '16px',
+      }}>
+        {/* Total Members - Span 2 on larger screens */}
+        <div style={{
+          gridColumn: 'span 2',
+          background: 'var(--bg-card)',
+          border: '1px solid var(--border)',
+          borderRadius: '12px',
+          padding: '24px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          position: 'relative',
+          overflow: 'hidden'
+        }}>
+          <div style={{ position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', background: 'var(--accent)' }} />
+          <div>
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Total Workspace Members</div>
+            <div style={{ fontSize: '40px', fontWeight: 800, color: 'var(--text-primary)', marginTop: '12px', lineHeight: 1 }}>{counts.total}</div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', textAlign: 'right' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--accent-green)' }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent-green)' }} />
+              <span>{counts.active} Active Online</span>
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+              {teamMembers.filter(m => m.status === 'away').length} Away &bull; {teamMembers.filter(m => m.status === 'offline').length} Offline
+            </div>
+          </div>
+        </div>
+
+        {/* Admins Card */}
+        <div style={{
+          background: 'var(--bg-card)',
+          border: '1px solid var(--border)',
+          borderRadius: '12px',
+          padding: '24px',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          minHeight: '120px'
+        }}>
+          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Administrators</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '12px' }}>
+            <div style={{ fontSize: '36px', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1 }}>{counts.admins}</div>
+            <span style={{ fontSize: '12px', color: 'var(--accent)', fontWeight: 500 }}>Full Control</span>
+          </div>
+        </div>
+
+        {/* Managers Card */}
+        <div style={{
+          background: 'var(--bg-card)',
+          border: '1px solid var(--border)',
+          borderRadius: '12px',
+          padding: '24px',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          minHeight: '120px'
+        }}>
+          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Managers & Analysts</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '12px' }}>
+            <div style={{ fontSize: '36px', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1 }}>{counts.managers + analystsCount}</div>
+            <span style={{ fontSize: '12px', color: 'var(--accent-blue)', fontWeight: 500 }}>{counts.managers} Mgr / {analystsCount} Anl</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Filter pills */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: '12px', flexWrap: 'wrap', gap: '12px' }}>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {['All', 'Admin', 'Manager', 'Analyst'].map((item) => {
+            const isActive = filter === item.toLowerCase();
+            return (
+              <button
+                key={item}
+                onClick={() => setFilter(item.toLowerCase())}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  background: isActive ? 'var(--accent)' : 'transparent',
+                  color: isActive ? '#0f0f0f' : 'var(--text-secondary)',
+                  border: isActive ? 'none' : '1px solid var(--border)',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  fontFamily: 'inherit',
+                }}
+              >
+                {item}
+              </button>
+            );
+          })}
+        </div>
+        <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+          Showing {filteredMembers.length} of {teamMembers.length} team members
+        </div>
+      </div>
+
+      {/* Team Cards Grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
+        {filteredMembers.map((member) => {
+          const [c1, c2] = roleGradient(member.role);
+          return (
+            <div
+              key={member.id}
+              style={{
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border)',
+                borderRadius: '12px',
+                padding: '20px',
+                transition: 'transform 0.2s, border-color 0.2s, box-shadow 0.2s',
+                position: 'relative',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                gap: '16px'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.borderColor = 'rgba(245, 158, 11, 0.2)';
+                e.currentTarget.style.boxShadow = 'var(--shadow-md)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.borderColor = 'var(--border)';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+                <div style={{ width: 44, height: 44, borderRadius: '8px', background: `linear-gradient(135deg, ${c1}, ${c2})`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0f0f0f', fontWeight: 700, fontSize: 14, flexShrink: 0 }}>
+                  {member.initials}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{member.name}</h3>
+                    <span style={statusDot(member.status)} />
+                  </div>
+                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: '2px 0 0 0' }}>{member.role} &bull; {member.department}</p>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px 14px', background: 'var(--bg-muted)', borderRadius: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '12px', color: 'var(--text-primary)' }}>
+                  <Mail size={13} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{member.email}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '12px', color: 'var(--text-primary)' }}>
+                  <Phone size={13} style={{ color: 'var(--accent-green)', flexShrink: 0 }} />
+                  <span>{member.phone}</span>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-secondary)', borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Activity size={12} />
+                  <span>Active {member.lastActive}</span>
+                </div>
+                <button style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>View Profile</button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 };
 
 export default Team;

@@ -1,17 +1,5 @@
-
 import React, { useState } from 'react';
-import {
-    FileText,
-    TrendingUp,
-    AlertCircle,
-    CheckCircle,
-    Download,
-    Calendar,
-    DollarSign,
-    PieChart
-} from 'lucide-react';
-import GlassCard from '../components/ui/GlassCard';
-import GradientButton from '../components/ui/GradientButton';
+import { FileText, AlertCircle } from 'lucide-react';
 import { useToast } from '../contexts/ToastContext';
 import { Line, Doughnut } from 'react-chartjs-2';
 import {
@@ -26,14 +14,14 @@ import {
     Filler,
     ArcElement
 } from 'chart.js';
+import '../styles/fresh-design.css';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler, ArcElement);
 
 const TaxCompliance = () => {
     const { showToast } = useToast();
-    const [activeTab, setActiveTab] = useState('gst'); // gst, tds, income_tax
+    const [activeTab, setActiveTab] = useState('gst');
 
-    // Determine if we are in dark mode (simple check)
     const isDark = document.documentElement.classList.contains('dark');
     const textColor = isDark ? '#e2e8f0' : '#475569';
     const gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
@@ -90,58 +78,43 @@ const TaxCompliance = () => {
         ]
     };
 
-
-
     return (
-        <div className="min-h-screen fade-in-up space-y-8 p-6">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                    <h1 className="text-4xl font-bold gradient-text mb-2">Tax & Compliance</h1>
-                    <p className="text-muted-foreground">Automated tax liability tracking and filing</p>
+        <div className="fresh-page">
+            <div style={{ marginBottom: 32 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+                    <button
+                        className="fresh-btn primary"
+                        style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+                        onClick={() => showToast('Tax Filing initiated to GST Portal successfully.', 'success')}
+                    >
+                        <FileText size={16} /> File Returns
+                    </button>
                 </div>
-                <GradientButton
-                    className="flex items-center justify-center gap-2 whitespace-nowrap"
-                    onClick={() => showToast('Tax Filing initiated to GST Portal successfully.', 'success')}
-                >
-                    <FileText size={16} /> File Returns
-                </GradientButton>
+                <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>GST filing and compliance tracking</p>
             </div>
 
-            {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <GlassCard className="p-6">
-                    <div className="flex justify-between items-start mb-2">
-                        <span className="text-muted-foreground text-sm">Total Tax Liability</span>
-                        <DollarSign className="text-blue-500 w-5 h-5" />
-                    </div>
-                    <h3 className="text-2xl font-bold text-foreground">₹{taxSummary.total_liability.toLocaleString()}</h3>
-                </GlassCard>
-                <GlassCard className="p-6">
-                    <div className="flex justify-between items-start mb-2">
-                        <span className="text-gray-400 text-sm">Tax Paid</span>
-                        <CheckCircle className="text-green-500 w-5 h-5" />
-                    </div>
-                    <h3 className="text-2xl font-bold text-green-500">₹{taxSummary.paid.toLocaleString()}</h3>
-                </GlassCard>
-                <GlassCard className="p-6">
-                    <div className="flex justify-between items-start mb-2">
-                        <span className="text-gray-400 text-sm">Pending Due</span>
-                        <AlertCircle className="text-red-500 w-5 h-5" />
-                    </div>
-                    <h3 className="text-2xl font-bold text-red-500">₹{taxSummary.pending.toLocaleString()}</h3>
-                </GlassCard>
-                <GlassCard className="p-6">
-                    <div className="flex justify-between items-start mb-2">
-                        <span className="text-muted-foreground text-sm">Next Due Date</span>
-                        <Calendar className="text-yellow-500 w-5 h-5" />
-                    </div>
-                    <h3 className="text-2xl font-bold text-foreground">{taxSummary.next_due}</h3>
-                </GlassCard>
+            {/* Summary Metrics */}
+            <div className="fresh-metrics">
+                <div className="fresh-metric">
+                    <div className="fresh-metric-value">₹{taxSummary.total_liability.toLocaleString()}</div>
+                    <div className="fresh-metric-label">Total Tax Liability</div>
+                </div>
+                <div className="fresh-metric">
+                    <div className="fresh-metric-value" style={{ color: 'var(--success)' }}>₹{taxSummary.paid.toLocaleString()}</div>
+                    <div className="fresh-metric-label">Tax Paid</div>
+                </div>
+                <div className="fresh-metric">
+                    <div className="fresh-metric-value" style={{ color: 'var(--error)' }}>₹{taxSummary.pending.toLocaleString()}</div>
+                    <div className="fresh-metric-label">Pending Due</div>
+                </div>
+                <div className="fresh-metric">
+                    <div className="fresh-metric-value">{taxSummary.next_due}</div>
+                    <div className="fresh-metric-label">Next Due Date</div>
+                </div>
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-4 border-b border-gray-200 dark:border-gray-800 pb-2">
+            <div className="fresh-pills" style={{ marginBottom: 24 }}>
                 {[
                     { id: 'gst', label: 'GST Returns' },
                     { id: 'tds', label: 'TDS Filing' },
@@ -149,87 +122,80 @@ const TaxCompliance = () => {
                 ].map((tab) => (
                     <button
                         key={tab.id}
+                        className={`fresh-pill ${activeTab === tab.id ? 'active' : ''}`}
                         onClick={() => setActiveTab(tab.id)}
-                        className={`px-4 py-2 font-medium transition-all relative ${activeTab === tab.id
-                            ? 'text-primary'
-                            : 'text-muted-foreground hover:text-foreground'
-                            }`}
                     >
                         {tab.label}
-                        {activeTab === tab.id && (
-                            <div
-                                layoutId="activeTaxTab"
-                                className="absolute bottom-[-9px] left-0 right-0 h-0.5 bg-blue-500"
-                            />
-                        )}
                     </button>
                 ))}
             </div>
 
-            {/* Content Area */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Main Visual */}
-                <div className="lg:col-span-2">
-                    <GlassCard className="p-6 h-full">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
-                                {activeTab === 'gst' ? 'GST Liability vs Credit' :
-                                    activeTab === 'tds' ? 'TDS Category Breakdown' : 'Tax Projection'}
-                            </h3>
-                        </div>
-                        <div className="h-[350px]">
-                            {activeTab === 'gst' && <Line data={gstData} options={chartOptions} />}
-                            {activeTab === 'tds' && (
-                                <div className="flex items-center justify-center h-full">
-                                    <div className="w-[300px] h-[300px]">
-                                        <Doughnut data={tdsData} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }} />
-                                    </div>
+            {/* Main Content */}
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 24 }}>
+                {/* Chart */}
+                <div className="fresh-section">
+                    <div className="fresh-section-header">
+                        <span className="fresh-section-title">
+                            {activeTab === 'gst' ? 'GST Liability vs Credit' :
+                             activeTab === 'tds' ? 'TDS Category Breakdown' : 'Tax Projection'}
+                        </span>
+                    </div>
+                    <div className="fresh-chart" style={{ height: 350 }}>
+                        {activeTab === 'gst' && <Line data={gstData} options={chartOptions} />}
+                        {activeTab === 'tds' && (
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                                <div style={{ width: 300, height: 300 }}>
+                                    <Doughnut data={tdsData} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }} />
                                 </div>
-                            )}
-                            {activeTab === 'income_tax' && (
-                                <div className="flex items-center justify-center h-full text-gray-500">
-                                    Advance Tax Projection Chart (Data coming soon)
-                                </div>
-                            )}
-                        </div>
-                    </GlassCard>
+                            </div>
+                        )}
+                        {activeTab === 'income_tax' && (
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>
+                                Advance Tax Projection Chart (Data coming soon)
+                            </div>
+                        )}
+                    </div>
                 </div>
 
-                {/* Right Side: Calculation / Breakdown */}
-                <div className="lg:col-span-1 space-y-6">
-                    <GlassCard className="p-6">
-                        <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Detailed Calculation</h3>
-                        <div className="space-y-4 text-sm">
-                            <div className="flex justify-between py-2 border-b border-border">
-                                <span className="text-muted-foreground">Gross Revenue</span>
-                                <span className="text-foreground font-medium">₹12,45,000</span>
+                {/* Sidebar */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+                    {/* Detailed Calculation */}
+                    <div className="fresh-section">
+                        <div className="fresh-section-header">
+                            <span className="fresh-section-title">Detailed Calculation</span>
+                        </div>
+                        <div className="fresh-list">
+                            <div className="fresh-list-item">
+                                <span className="fresh-list-label">Gross Revenue</span>
+                                <span className="fresh-list-value">₹12,45,000</span>
                             </div>
-                            <div className="flex justify-between py-2 border-b border-border">
-                                <span className="text-muted-foreground">Taxable Amount</span>
-                                <span className="text-foreground font-medium">₹10,50,000</span>
+                            <div className="fresh-list-item">
+                                <span className="fresh-list-label">Taxable Amount</span>
+                                <span className="fresh-list-value">₹10,50,000</span>
                             </div>
-                            <div className="flex justify-between py-2 border-b border-border">
-                                <span className="text-muted-foreground">Applicable Rate</span>
-                                <span className="text-foreground font-medium">18%</span>
+                            <div className="fresh-list-item">
+                                <span className="fresh-list-label">Applicable Rate</span>
+                                <span className="fresh-list-value">18%</span>
                             </div>
-                            <div className="flex justify-between py-2 pt-4">
-                                <span className="text-foreground font-bold">Total Tax</span>
-                                <span className="text-blue-500 font-bold">₹1,89,000</span>
+                            <div className="fresh-list-item" style={{ borderBottom: 'none', marginTop: 8 }}>
+                                <span className="fresh-list-label" style={{ fontWeight: 600 }}>Total Tax</span>
+                                <span className="fresh-list-value" style={{ color: 'var(--accent)', fontWeight: 600 }}>₹1,89,000</span>
                             </div>
                         </div>
-                    </GlassCard>
+                    </div>
 
-                    <GlassCard className="p-6 bg-blue-50 dark:bg-blue-900/10">
-                        <div className="flex items-start gap-3">
-                            <AlertCircle className="text-blue-500 mt-1" size={20} />
+                    {/* Compliance Tip */}
+                    <div className="fresh-section" style={{ background: 'var(--accent-soft)' }}>
+                        <div style={{ display: 'flex', gap: 12 }}>
+                            <AlertCircle size={20} style={{ color: 'var(--accent)', flexShrink: 0, marginTop: 2 }} />
                             <div>
-                                <h4 className="font-bold text-blue-700 dark:text-blue-200">Compliance Tip</h4>
-                                <p className="text-sm text-blue-600 dark:text-blue-300 mt-1">
+                                <div className="fresh-section-title" style={{ fontSize: 14, marginBottom: 4 }}>Compliance Tip</div>
+                                <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>
                                     File your GSTR-1 by the 11th to avoid penalties. You have pending invoices.
                                 </p>
                             </div>
                         </div>
-                    </GlassCard>
+                    </div>
                 </div>
             </div>
         </div>

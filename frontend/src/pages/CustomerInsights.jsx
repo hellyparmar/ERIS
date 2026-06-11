@@ -9,7 +9,7 @@ import {
     ChevronDown, ChevronUp, AlertTriangle, Crown, Heart,
     Zap, Clock, XCircle, UserX, Moon
 } from 'lucide-react';
-import GlassCard from '../components/ui/GlassCard';
+import '../styles/fresh-design.css';
 import api from '../lib/api';
 import { getCustomerMetrics } from '../utils/customerAnalytics';
 import { Line, Doughnut } from 'react-chartjs-2';
@@ -26,7 +26,6 @@ import {
     Filler
 } from 'chart.js';
 
-// Register ChartJS components
 ChartJS.register(
     CategoryScale,
     LinearScale,
@@ -39,7 +38,6 @@ ChartJS.register(
     Filler
 );
 
-// SortIcon component outside of render
 const SortIcon = ({ field, sortBy, sortOrder }) => {
     if (sortBy !== field) return null;
     return sortOrder === 'asc' ? <ChevronUp size={16} /> : <ChevronDown size={16} />;
@@ -55,29 +53,21 @@ const CustomerInsights = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const customersPerPage = 10;
 
-    // State for API-fetched summary
     const [apiSummary, setApiSummary] = useState(null);
 
-    // Fetch customers from API
     useEffect(() => {
         const fetchCustomers = async () => {
             setLoading(true);
             try {
-                // Fetch summary first
                 const summaryRes = await api.get('/api/analytics/customers/rfm/summary');
                 setApiSummary(summaryRes.data);
 
-                // Fetch customer list (limit 200 for performance for now)
                 const customersRes = await api.get('/api/analytics/customers/rfm/customers?limit=200');
 
-                // Process fetched customers
                 const processedCustomers = customersRes.data.map(c => ({
                     ...c,
-                    // Ensure churnRisk is 0-100 for display (backend sends 0.0-1.0)
                     churnRisk: c.churn_risk_score > 1 ? c.churn_risk_score : c.churn_risk_score * 100,
-                    // Use stored segment or fallback
                     segment: c.segment || 'Regular',
-                    // Map snake_case to camelCase where needed by UI
                     totalSpent: c.total_spent,
                     lastPurchaseDate: c.last_purchase_date,
                     rfmScore: {
@@ -98,27 +88,25 @@ const CustomerInsights = () => {
         fetchCustomers();
     }, []);
 
-    // Calculate metrics locally if API summary fails, or use API summary
     const metrics = useMemo(() => {
         if (apiSummary) return {
             totalCustomers: apiSummary.total_customers,
             totalRevenue: apiSummary.total_revenue,
-            activeCustomers: customers.filter(c => c.rfmScore.r >= 3).length, // Rough approximation
-            retentionRate: 85, // Placeholder or fetch from backend
+            activeCustomers: customers.filter(c => c.rfmScore.r >= 3).length,
+            retentionRate: 85,
             avgCustomerValue: apiSummary.total_revenue / (apiSummary.total_customers || 1),
-            avgOrderValue: 450, // Placeholder
+            avgOrderValue: 450,
             avgPurchasesPerCustomer: 3.5
         };
         return getCustomerMetrics(customers);
     }, [customers, apiSummary]);
 
-    // Calculate Distribution for Charts locally from fetched customers
     const chartDistribution = useMemo(() => {
         const dist = {};
         customers.forEach(c => {
             dist[c.segment] = (dist[c.segment] || 0) + 1;
         });
-        
+
         if (Object.keys(dist).length === 0 && loading) {
             return {
                 'Champions': 12,
@@ -130,29 +118,24 @@ const CustomerInsights = () => {
                 'Regular': 35
             };
         }
-        
+
         return dist;
     }, [customers, loading]);
 
-    // Calculate Growth Trend (Mocked or derived from real dates)
     const growthTrend = useMemo(() => {
-        // Group customers by creation date or first purchase date (using lastPurchaseDate as proxy if needed, or better yet, fetch this)
-        // For now, we'll mock a realistic trend based on customer volume
         const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
         return months.map(m => ({
             month: m,
-            newCustomers: Math.floor(Math.random() * 20) + 5 // Placeholder
+            newCustomers: Math.floor(Math.random() * 20) + 5
         }));
     }, []);
 
-
-    // Segment icons mapping
     const segmentIcons = {
         'Champions': Crown,
-        'Loyal': Heart, // Mapped from backend 'Loyal'
+        'Loyal': Heart,
         'Loyal Customers': Heart,
         'Potential Loyalist': TrendingUp,
-        'New': Zap, // Mapped from backend 'New'
+        'New': Zap,
         'Recent Customers': Zap,
         'Promising': Target,
         'Need Attention': AlertTriangle,
@@ -162,27 +145,26 @@ const CustomerInsights = () => {
         "Can't Lose Them": XCircle,
         'Hibernating': Moon,
         'Lost': UserX,
-        'Whale': Crown // Integrated Synthetic Data Segment
+        'Whale': Crown
     };
 
     const getSegmentColor = (segment) => {
         const colors = {
-            'Champions': { text: 'text-amber-400', bg: 'from-amber-400 to-yellow-600', border: 'border-amber-400/50', glow: 'shadow-amber-400/20' },
-            'Whale': { text: 'text-amber-400', bg: 'from-amber-400 to-yellow-600', border: 'border-amber-400/50', glow: 'shadow-amber-400/20' },
-            'Loyal': { text: 'text-blue-400', bg: 'from-blue-400 to-blue-600', border: 'border-blue-400/50', glow: 'shadow-blue-400/20' },
-            'Loyal Customers': { text: 'text-blue-400', bg: 'from-blue-400 to-blue-600', border: 'border-blue-400/50', glow: 'shadow-blue-400/20' },
-            'Potential Loyalist': { text: 'text-green-400', bg: 'from-green-400 to-emerald-600', border: 'border-green-400/50', glow: 'shadow-green-400/20' },
-            'New': { text: 'text-cyan-400', bg: 'from-cyan-400 to-cyan-600', border: 'border-cyan-400/50', glow: 'shadow-cyan-400/20' },
-            'Recent Customers': { text: 'text-cyan-400', bg: 'from-cyan-400 to-cyan-600', border: 'border-cyan-400/50', glow: 'shadow-cyan-400/20' },
-            'At Risk': { text: 'text-red-400', bg: 'from-red-400 to-red-600', border: 'border-red-400/50', glow: 'shadow-red-400/20' },
-            'Cant Lose': { text: 'text-pink-400', bg: 'from-pink-400 to-rose-600', border: 'border-pink-400/50', glow: 'shadow-pink-400/20' },
-            'Hibernating': { text: 'text-gray-400', bg: 'from-gray-400 to-gray-600', border: 'border-gray-400/50', glow: 'shadow-gray-400/20' },
-            'Regular': { text: 'text-slate-400', bg: 'from-slate-400 to-slate-600', border: 'border-slate-400/50', glow: 'shadow-slate-400/20' }
+            'Champions': { text: 'text-[var(--champions-text)]', bg: 'bg-[var(--champions-bg)]', border: 'border-[var(--champions-border)]' },
+            'Whale': { text: 'text-[var(--champions-text)]', bg: 'bg-[var(--champions-bg)]', border: 'border-[var(--champions-border)]' },
+            'Loyal': { text: 'text-[var(--loyal-text)]', bg: 'bg-[var(--loyal-bg)]', border: 'border-[var(--loyal-border)]' },
+            'Loyal Customers': { text: 'text-[var(--loyal-text)]', bg: 'bg-[var(--loyal-bg)]', border: 'border-[var(--loyal-border)]' },
+            'Potential Loyalist': { text: 'text-[var(--success-text)]', bg: 'bg-[var(--success-bg)]', border: 'border-[var(--success-border)]' },
+            'New': { text: 'text-[var(--info-text)]', bg: 'bg-[var(--info-bg)]', border: 'border-[var(--info-border)]' },
+            'Recent Customers': { text: 'text-[var(--info-text)]', bg: 'bg-[var(--info-bg)]', border: 'border-[var(--info-border)]' },
+            'At Risk': { text: 'text-[var(--error-text)]', bg: 'bg-[var(--error-bg)]', border: 'border-[var(--error-border)]' },
+            'Cant Lose': { text: 'text-[var(--warning-text)]', bg: 'bg-[var(--warning-bg)]', border: 'border-[var(--warning-border)]' },
+            'Hibernating': { text: 'text-[var(--muted-text)]', bg: 'bg-[var(--muted-bg)]', border: 'border-[var(--muted-border)]' },
+            'Regular': { text: 'text-[var(--muted-text)]', bg: 'bg-[var(--muted-bg)]', border: 'border-[var(--muted-border)]' }
         };
         return colors[segment] || colors['Regular'];
     };
 
-    // Filter and sort customers
     const filteredCustomers = useMemo(() => {
         let filtered = customers;
 
@@ -216,7 +198,6 @@ const CustomerInsights = () => {
         return filtered;
     }, [customers, selectedSegment, searchQuery, sortBy, sortOrder]);
 
-    // Pagination
     const totalPages = Math.ceil(filteredCustomers.length / customersPerPage);
     const paginatedCustomers = filteredCustomers.slice(
         (currentPage - 1) * customersPerPage,
@@ -241,79 +222,60 @@ const CustomerInsights = () => {
     }
 
     return (
-        <div className="min-h-screen space-y-8 animate-fade-in p-6">
-            {/* Header */}
-            <div
-            >
-                <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-purple bg-clip-text text-transparent mb-2">
-                    Customer Insights
-                </h1>
-                <p className="text-muted-foreground">
-                    Deep Learning Churn Predictions & Segmentation
+        <div className="fresh-page">
+            <div style={{ marginBottom: 32 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+                    <div className="flex items-center gap-3">
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[var(--text-muted)]" size={18} />
+                            <input
+                                type="text"
+                                placeholder="Search customers..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="pl-10 pr-4 py-2 bg-[var(--bg-muted)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-primary"
+                            />
+                        </div>
+                        {selectedSegment !== 'all' && (
+                            <button
+                                onClick={() => setSelectedSegment('all')}
+                                className="fresh-btn"
+                            >
+                                Clear Filter
+                            </button>
+                        )}
+                    </div>
+                </div>
+                <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
+                    Customer behavior and segmentation analysis
                 </p>
             </div>
 
-            {/* Overview Metrics */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <GlassCard variant="gradient" className="p-6 animate-slide-up stagger-1">
-                    <div className="flex items-center justify-between mb-2">
-                        <Users className="text-primary" size={24} />
-                        <span className="text-xs text-muted-foreground">Total Database</span>
-                    </div>
-                    <p className="text-3xl font-bold text-foreground">
-                        {metrics.totalCustomers.toLocaleString()}
-                    </p>
-                    <p className="text-sm text-muted-foreground mt-1">Active Profiles</p>
-                </GlassCard>
-
-                <GlassCard variant="gradient" className="p-6 animate-slide-up stagger-2">
-                    <div className="flex items-center justify-between mb-2">
-                        <DollarSign className="text-success" size={24} />
-                        <span className="text-xs text-muted-foreground">Revenue Impact</span>
-                    </div>
-                    <p className="text-3xl font-bold text-foreground">
-                        ₹{(metrics.totalRevenue / 100000).toFixed(2)}L
-                    </p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                        Lifetime Value
-                    </p>
-                </GlassCard>
-
-                <GlassCard variant="gradient" className="p-6 animate-slide-up stagger-3">
-                    <div className="flex items-center justify-between mb-2">
-                        <AlertTriangle className="text-warning" size={24} />
-                        <span className="text-xs text-muted-foreground">Revenue at Risk</span>
-                    </div>
-                    <p className="text-3xl font-bold text-foreground">
-                        {/* Calculate rudimentary 'At Risk' revenue */}
-                        ₹{(customers.filter(c => c.segment === 'At Risk' || c.churnRisk > 50).reduce((acc, c) => acc + c.totalSpent, 0) / 100000).toFixed(2)}L
-                    </p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                        High Churn Probability
-                    </p>
-                </GlassCard>
-
-                <GlassCard variant="gradient" className="p-6 animate-slide-up stagger-4">
-                    <div className="flex items-center justify-between mb-2">
-                        <Target className="text-purple-500" size={24} />
-                        <span className="text-xs text-muted-foreground">Retention</span>
-                    </div>
-                    <p className="text-3xl font-bold text-foreground">
-                        {customers.length > 0 ? Math.round((customers.filter(c => c.segment === 'Champions' || c.segment === 'Loyal').length / customers.length) * 100) : 0}%
-                    </p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                        Loyal & Champions
-                    </p>
-                </GlassCard>
+            <div className="fresh-metrics">
+                <div className="fresh-metric">
+                    <div className="fresh-metric-value">{metrics.totalCustomers.toLocaleString()}</div>
+                    <div className="fresh-metric-label">Total Customers</div>
+                </div>
+                <div className="fresh-metric">
+                    <div className="fresh-metric-value">₹{(metrics.avgCustomerValue / 1000).toFixed(1)}k</div>
+                    <div className="fresh-metric-label">Avg Spend</div>
+                </div>
+                <div className="fresh-metric">
+                    <div className="fresh-metric-value">₹{(customers.filter(c => c.segment === 'At Risk' || c.churnRisk > 50).reduce((acc, c) => acc + c.totalSpent, 0) / 100000).toFixed(2)}L</div>
+                    <div className="fresh-metric-label">At Risk</div>
+                </div>
+                <div className="fresh-metric">
+                    <div className="fresh-metric-value">{customers.length > 0 ? Math.round((customers.filter(c => c.segment === 'Champions' || c.segment === 'Loyal').length / customers.length) * 100) : 0}%</div>
+                    <div className="fresh-metric-label">Repeat Rate</div>
+                </div>
             </div>
 
-            {/* RFM Segments Grid */}
-            <div>
-                <h2 className="text-2xl font-bold bg-gradient-to-r from-primary to-purple bg-clip-text text-transparent mb-4">
-                    AI Segments
-                </h2>
+            <div className="fresh-section">
+                <div className="fresh-section-header">
+                    <span className="fresh-section-title">AI Segments</span>
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    {apiSummary && apiSummary.segments.map((segmentData, idx) => {
+                    {apiSummary && apiSummary.segments.map((segmentData) => {
                         const segmentName = segmentData.segment;
                         const colors = getSegmentColor(segmentName);
                         const Icon = segmentIcons[segmentName] || Users;
@@ -322,45 +284,37 @@ const CustomerInsights = () => {
                         return (
                             <div
                                 key={segmentName}
-                                className="h-full"
+                                onClick={() => setSelectedSegment(isSelected ? 'all' : segmentName)}
+                                className={`p-4 cursor-pointer transition-all hover:scale-105 h-full flex flex-col justify-between rounded-xl border border-[var(--border)] ${isSelected ? 'ring-2 ring-[var(--accent)]' : ''}`}
+                                style={{ backgroundColor: 'var(--bg-card)' }}
                             >
-                                <GlassCard
-                                    variant="gradient"
-                                    onClick={() => setSelectedSegment(isSelected ? 'all' : segmentName)}
-                                    className={`p-4 cursor-pointer transition-all hover:scale-105 h-full flex flex-col justify-between ${isSelected ? `ring-2 ${colors.glow}` : ''
-                                        } ${colors.glow}`}
-                                >
-                                    <div>
-                                        <div className="flex items-start justify-between mb-3">
-                                            <div className={`p-2 rounded-lg bg-gradient-to-br ${colors.bg} bg-opacity-20`}>
-                                                <Icon className={colors.text} size={20} />
-                                            </div>
-                                            <span className="text-xs text-muted-foreground">{segmentData.percentage}%</span>
+                                <div>
+                                    <div className="flex items-start justify-between mb-3">
+                                        <div className={`p-2 rounded-lg ${colors.bg}`}>
+                                            <Icon className={colors.text} size={20} />
                                         </div>
-                                        <h3 className={`font-semibold mb-1 ${colors.text}`}>{segmentName}</h3>
-                                        <p className="text-2xl font-bold text-foreground mb-2">{segmentData.customer_count}</p>
-                                        <div className="text-xs text-muted-foreground mb-2">
-                                            Avg: ₹{(segmentData.avg_lifetime_value / 1000).toFixed(0)}k
-                                        </div>
+                                        <span className="text-xs text-[var(--text-muted)]">{segmentData.percentage}%</span>
                                     </div>
-                                    <p className="text-xs text-muted-foreground line-clamp-2 mt-2">
-                                        {/* Use backend summary action or fallback */}
-                                        {apiSummary.segment_actions?.[segmentName] || "No action defined"}
-                                    </p>
-                                </GlassCard>
+                                    <h3 className={`font-semibold mb-1 ${colors.text}`}>{segmentName}</h3>
+                                    <p className="text-2xl font-bold text-[var(--text-primary)] mb-2">{segmentData.customer_count}</p>
+                                    <div className="text-xs text-[var(--text-muted)] mb-2">
+                                        Avg: ₹{(segmentData.avg_lifetime_value / 1000).toFixed(0)}k
+                                    </div>
+                                </div>
+                                <p className="text-xs text-[var(--text-muted)] line-clamp-2 mt-2">
+                                    {apiSummary.segment_actions?.[segmentName] || "No action defined"}
+                                </p>
                             </div>
                         );
                     })}
                 </div>
             </div>
 
-            {/* Analytics Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Customer Growth Trend */}
-                <GlassCard variant="gradient" className="p-6 animate-slide-up stagger-1">
-                    <h2 className="text-xl font-bold bg-gradient-to-r from-primary to-purple bg-clip-text text-transparent mb-4">
-                        Customer Growth Trend
-                    </h2>
+                <div className="fresh-section">
+                    <div className="fresh-section-header">
+                        <span className="fresh-section-title">Customer Growth Trend</span>
+                    </div>
                     <div className="h-64">
                         <Line
                             data={{
@@ -380,32 +334,31 @@ const CustomerInsights = () => {
                                 plugins: {
                                     legend: { display: false },
                                     tooltip: {
-                                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                                        backgroundColor: 'var(--bg-card)',
                                         padding: 12,
-                                        titleColor: '#fff',
-                                        bodyColor: '#fff'
+                                        titleColor: 'var(--text-primary)',
+                                        bodyColor: 'var(--text-secondary)'
                                     }
                                 },
                                 scales: {
                                     x: {
-                                        grid: { color: 'rgba(255, 255, 255, 0.1)' },
-                                        ticks: { color: '#9ca3af' }
+                                        grid: { color: 'rgba(255,255,255,0.04)' },
+                                        ticks: { color: 'var(--text-muted)' }
                                     },
                                     y: {
-                                        grid: { color: 'rgba(255, 255, 255, 0.1)' },
-                                        ticks: { color: '#9ca3af' }
+                                        grid: { color: 'rgba(255,255,255,0.04)' },
+                                        ticks: { color: 'var(--text-muted)' }
                                     }
                                 }
                             }}
                         />
                     </div>
-                </GlassCard>
+                </div>
 
-                {/* Segment Distribution */}
-                <GlassCard variant="gradient" className="p-6 animate-slide-up stagger-2">
-                    <h2 className="text-xl font-bold bg-gradient-to-r from-primary to-purple bg-clip-text text-transparent mb-4">
-                        Segment Distribution
-                    </h2>
+                <div className="fresh-section">
+                    <div className="fresh-section-header">
+                        <span className="fresh-section-title">Segment Distribution</span>
+                    </div>
                     <div className="h-64 flex items-center justify-center">
                         <Doughnut
                             data={{
@@ -413,17 +366,17 @@ const CustomerInsights = () => {
                                 datasets: [{
                                     data: Object.values(chartDistribution),
                                     backgroundColor: [
-                                        'var(--warning)',  // Champions
-                                        'var(--accent)',  // Loyal
-                                        'var(--success)',   // Potential
-                                        'var(--info)',   // Recent
-                                        'var(--error)',  // Need Attention
-                                        'var(--warning)',  // About to Sleep
-                                        'var(--error)',   // At Risk
-                                        'var(--success)',  // Can't Lose
-                                        'var(--text-muted)', // Hibernating
-                                        'var(--text-secondary)', // Lost
-                                        'var(--info)'   // Promising
+                                        'var(--warning)',
+                                        'var(--accent)',
+                                        'var(--success)',
+                                        'var(--info)',
+                                        'var(--error)',
+                                        'var(--warning)',
+                                        'var(--error)',
+                                        'var(--success)',
+                                        'var(--text-muted)',
+                                        'var(--text-secondary)',
+                                        'var(--info)'
                                     ],
                                     borderWidth: 0
                                 }]
@@ -435,104 +388,83 @@ const CustomerInsights = () => {
                                     legend: {
                                         position: 'right',
                                         labels: {
-                                            color: '#9ca3af',
+                                            color: 'var(--text-muted)',
                                             padding: 10,
                                             font: { size: 11 }
                                         }
                                     },
                                     tooltip: {
-                                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                                        backgroundColor: 'var(--bg-card)',
                                         padding: 12,
-                                        titleColor: '#fff',
-                                        bodyColor: '#fff'
+                                        titleColor: 'var(--text-primary)',
+                                        bodyColor: 'var(--text-secondary)'
                                     }
                                 }
                             }}
                         />
                     </div>
                     {loading && <p className="text-center text-sm text-gray-400 mt-2">Loading real data...</p>}
-                </GlassCard>
+                </div>
             </div>
 
-            {/* Customer Table */}
-            <GlassCard variant="gradient" className="p-6">
-                <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-xl font-bold bg-gradient-to-r from-primary to-purple bg-clip-text text-transparent">
+            <div className="fresh-section">
+                <div className="fresh-section-header">
+                    <span className="fresh-section-title">
                         Customer Monitor
                         {selectedSegment !== 'all' && (
-                            <span className="ml-2 text-sm font-normal text-muted-foreground">
+                            <span className="ml-2 text-sm font-normal text-[var(--text-muted)]">
                                 ({selectedSegment})
                             </span>
                         )}
-                    </h2>
-                    <div className="flex gap-3">
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" size={18} />
-                            <input
-                                type="text"
-                                placeholder="Search customers..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="pl-10 pr-4 py-2 bg-muted/30 border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                            />
-                        </div>
-                        {selectedSegment !== 'all' && (
-                            <button
-                                onClick={() => setSelectedSegment('all')}
-                                className="px-4 py-2 bg-muted/30 hover:bg-muted/50 rounded-lg text-foreground transition-all border border-border"
-                            >
-                                Clear Filter
-                            </button>
-                        )}
-                    </div>
+                    </span>
                 </div>
 
                 <div className="overflow-x-auto">
-                    <table className="w-full">
+                    <table className="fresh-table">
                         <thead>
-                            <tr className="border-b border-border">
-                                <th onClick={() => handleSort('name')} className="text-left py-3 px-4 text-muted-foreground font-semibold text-sm uppercase cursor-pointer hover:text-foreground">
+                            <tr className="border-b border-[var(--border)]">
+                                <th onClick={() => handleSort('name')} className="text-left py-3 px-4 text-xs font-medium text-[var(--text-faint)] uppercase tracking-wider cursor-pointer hover:text-[var(--text-primary)]">
                                     Customer <SortIcon field="name" sortBy={sortBy} sortOrder={sortOrder} />
                                 </th>
-                                <th onClick={() => handleSort('segment')} className="text-left py-3 px-4 text-muted-foreground font-semibold text-sm uppercase cursor-pointer hover:text-foreground">
+                                <th onClick={() => handleSort('segment')} className="text-left py-3 px-4 text-xs font-medium text-[var(--text-faint)] uppercase tracking-wider cursor-pointer hover:text-[var(--text-primary)]">
                                     AI Segment <SortIcon field="segment" sortBy={sortBy} sortOrder={sortOrder} />
                                 </th>
-                                <th onClick={() => handleSort('totalSpent')} className="text-right py-3 px-4 text-muted-foreground font-semibold text-sm uppercase cursor-pointer hover:text-foreground">
+                                <th onClick={() => handleSort('totalSpent')} className="text-right py-3 px-4 text-xs font-medium text-[var(--text-faint)] uppercase tracking-wider cursor-pointer hover:text-[var(--text-primary)]">
                                     LTV <SortIcon field="totalSpent" sortBy={sortBy} sortOrder={sortOrder} />
                                 </th>
-                                <th onClick={() => handleSort('lastPurchaseDate')} className="text-right py-3 px-4 text-muted-foreground font-semibold text-sm uppercase cursor-pointer hover:text-foreground">
+                                <th onClick={() => handleSort('lastPurchaseDate')} className="text-right py-3 px-4 text-xs font-medium text-[var(--text-faint)] uppercase tracking-wider cursor-pointer hover:text-[var(--text-primary)]">
                                     Last Active <SortIcon field="lastPurchaseDate" sortBy={sortBy} sortOrder={sortOrder} />
                                 </th>
-                                <th onClick={() => handleSort('churnRisk')} className="text-left py-3 px-4 text-muted-foreground font-semibold text-sm uppercase cursor-pointer hover:text-foreground w-48">
+                                <th onClick={() => handleSort('churnRisk')} className="text-left py-3 px-4 text-xs font-medium text-[var(--text-faint)] uppercase tracking-wider cursor-pointer hover:text-[var(--text-primary)] w-48">
                                     Churn Probability <SortIcon field="churnRisk" sortBy={sortBy} sortOrder={sortOrder} />
                                 </th>
                             </tr>
                         </thead>
                         <tbody>
-                            {paginatedCustomers.map((customer, idx) => {
+                            {paginatedCustomers.map((customer) => {
                                 const colors = getSegmentColor(customer.segment);
                                 return (
-                                    <motion.tr
+                                    <tr
                                         key={customer.id}
-                                        className="border-b border-border/50 hover:bg-gradient-to-r hover:from-primary/5 hover:to-purple/5 transition-all"
+                                        className="border-b border-[var(--border)] hover:bg-[var(--bg-muted)] transition-all"
                                     >
                                         <td className="py-4 px-4">
                                             <div>
-                                                <p className="font-semibold text-foreground">{customer.name}</p>
-                                                <p className="text-xs text-muted-foreground">{customer.email}</p>
+                                                <p className="font-semibold text-[var(--text-primary)]">{customer.name}</p>
+                                                <p className="text-xs text-[var(--text-muted)]">{customer.email}</p>
                                             </div>
                                         </td>
                                         <td className="py-4 px-4">
-                                            <span className={`px-3 py-1 rounded-full text-xs font-bold border ${colors.text} ${colors.border} ${colors.bg} bg-opacity-20`}>
+                                            <span className={`px-3 py-1 rounded-full text-xs font-bold border ${colors.text} ${colors.border} ${colors.bg}`}>
                                                 {customer.segment}
                                             </span>
                                         </td>
                                         <td className="py-4 px-4 text-right">
-                                            <span className="font-bold text-foreground">
+                                            <span className="font-bold text-[var(--text-primary)]">
                                                 ₹{customer.totalSpent.toLocaleString()}
                                             </span>
                                         </td>
-                                        <td className="py-4 px-4 text-right text-muted-foreground text-sm">
+                                        <td className="py-4 px-4 text-right text-[var(--text-muted)] text-sm">
                                             {customer.lastPurchaseDate ? new Date(customer.lastPurchaseDate).toLocaleDateString('en-IN') : 'N/A'}
                                         </td>
                                         <td className="py-4 px-4">
@@ -541,11 +473,11 @@ const CustomerInsights = () => {
                                                     <span className={customer.churnRisk > 50 ? 'text-red-400 font-bold' : 'text-green-400'}>
                                                         {customer.churnRisk.toFixed(1)}%
                                                     </span>
-                                                    <span className="text-muted-foreground text-[10px]">
+                                                    <span className="text-[var(--text-muted)] text-[10px]">
                                                         {customer.churnRisk > 70 ? 'HIGH RISK' : customer.churnRisk > 30 ? 'MONITOR' : 'SAFE'}
                                                     </span>
                                                 </div>
-                                                <div className="w-full h-2 bg-muted/30 rounded-full overflow-hidden">
+                                                <div className="w-full h-2 bg-[var(--bg-muted)] rounded-full overflow-hidden">
                                                     <div
                                                         className={`h-full transition-all ${customer.churnRisk >= 70 ? 'bg-red-500' :
                                                             customer.churnRisk >= 40 ? 'bg-orange-500' :
@@ -556,41 +488,40 @@ const CustomerInsights = () => {
                                                 </div>
                                             </div>
                                         </td>
-                                    </motion.tr>
+                                    </tr>
                                 );
                             })}
                         </tbody>
                     </table>
                 </div>
 
-                {/* Pagination */}
                 {totalPages > 1 && (
-                    <div className="flex items-center justify-between mt-6 pt-4 border-t border-border">
-                        <p className="text-sm text-muted-foreground">
+                    <div className="flex items-center justify-between mt-6 pt-4 border-t border-[var(--border)]">
+                        <p className="text-sm text-[var(--text-muted)]">
                             Showing {((currentPage - 1) * customersPerPage) + 1} to {Math.min(currentPage * customersPerPage, filteredCustomers.length)} of {filteredCustomers.length} customers
                         </p>
                         <div className="flex gap-2">
                             <button
                                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                                 disabled={currentPage === 1}
-                                className="px-4 py-2 bg-muted/30 hover:bg-muted/50 rounded-lg text-foreground transition-all border border-border disabled:cursor-not-allowed"
+                                className="fresh-btn disabled:cursor-not-allowed"
                             >
                                 Previous
                             </button>
-                            <span className="px-4 py-2 text-muted-foreground">
+                            <span className="px-4 py-2 text-[var(--text-muted)]">
                                 Page {currentPage} of {totalPages}
                             </span>
                             <button
                                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                                 disabled={currentPage === totalPages}
-                                className="px-4 py-2 bg-muted/30 hover:bg-muted/50 rounded-lg text-foreground transition-all border border-border disabled:cursor-not-allowed"
+                                className="fresh-btn disabled:cursor-not-allowed"
                             >
                                 Next
                             </button>
                         </div>
                     </div>
                 )}
-            </GlassCard>
+            </div>
         </div>
     );
 };

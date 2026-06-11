@@ -1,411 +1,308 @@
-import React, { useState } from 'react';
-import { Save, RefreshCw, CheckCircle, AlertCircle, Database, Server, User, Key, Globe, ShoppingCart, CreditCard, ExternalLink } from 'lucide-react';
-import UnifiedCard from '../components/ui/UnifiedCard';
-import ActionButton from '../components/ui/ActionButton';
-import { useToast } from '../contexts/ToastContext';
+import { useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Search, X, Save, RefreshCw, CheckCircle2, AlertCircle, ExternalLink,
+  Eye, EyeOff, Server, Database, User, Key, Globe,
+  Loader2, Zap, Settings
+} from 'lucide-react';
+import '../styles/integrations.css';
 
-// Mock Organization ID for demo
-const ORG_ID = '00000000-0000-0000-0000-000000000001';
-
-const INTEGRATION_TABS = [
-    { id: 'odoo', name: 'Odoo ERP', icon: Database, bgClass: 'bg-purple-500', shadowColor: 'rgba(168, 85, 247, 0.5)' },
-    { id: 'zoho', name: 'Zoho Books', icon: CreditCard, bgClass: 'bg-yellow-500', shadowColor: 'rgba(234, 179, 8, 0.5)' },
-    { id: 'shopify', name: 'Shopify', icon: ShoppingCart, bgClass: 'bg-green-500', shadowColor: 'rgba(34, 197, 94, 0.5)' },
-    { id: 'woocommerce', name: 'WooCommerce', icon: Globe, bgClass: 'bg-blue-500', shadowColor: 'rgba(59, 130, 246, 0.5)' }
+/* ── Integration Catalogue ─────────────────────────────────── */
+const INTEGRATIONS = [
+  {
+    id: 'odoo', name: 'Odoo ERP', desc: 'Sync products, customers and accounting data.', category: 'ERP',
+    emoji: '🟢', color: '#16A34A', bg: '#DCFCE7',
+    fields: [
+      { key:'url',      label:'Server URL',    icon:Server,   type:'text',     placeholder:'https://your-odoo.com' },
+      { key:'db_name',  label:'Database Name', icon:Database, type:'text',     placeholder:'your_database' },
+      { key:'username', label:'Username',      icon:User,     type:'text',     placeholder:'admin@example.com' },
+      { key:'api_key',  label:'API Key',       icon:Key,      type:'password', placeholder:'••••••••••••' },
+    ],
+    toggles: [{ key:'sync_products', label:'Sync Products' }, { key:'sync_customers', label:'Sync Customers' }],
+    defaults: { url:'', db_name:'', username:'', api_key:'', sync_products:true, sync_customers:true },
+    guide: ['Log in to your Odoo instance.', 'Go to Profile → Account Security.', 'Click Generate New API Key.', 'Copy and paste the key above.'],
+  },
+  {
+    id: 'zoho', name: 'Zoho Books', desc: 'Sync invoices and financial records.', category: 'Accounting',
+    emoji: '🟡', color: '#D97706', bg: '#FEF3C7',
+    fields: [
+      { key:'org_id',        label:'Organization ID', icon:Database, type:'text',     placeholder:'123456789' },
+      { key:'client_id',     label:'Client ID',       icon:Key,      type:'text',     placeholder:'1000.XXXXX' },
+      { key:'client_secret', label:'Client Secret',   icon:Key,      type:'password', placeholder:'••••••••••••' },
+    ],
+    toggles: [{ key:'sync_invoices', label:'Sync Invoices' }],
+    defaults: { org_id:'', client_id:'', client_secret:'', sync_invoices:true },
+    guide: ['Go to Zoho Developer Console.', 'Register a new Server-based Application.', 'Copy Client ID and Client Secret.'],
+  },
+  {
+    id: 'shopify', name: 'Shopify', desc: 'Sync inventory and orders from your store.', category: 'E-commerce',
+    emoji: '🛍️', color: '#16A34A', bg: '#DCFCE7',
+    fields: [
+      { key:'shop_url',     label:'Shop URL',     icon:Globe, type:'text',     placeholder:'your-store.myshopify.com' },
+      { key:'access_token', label:'Access Token', icon:Key,   type:'password', placeholder:'shpat_••••••••••' },
+    ],
+    toggles: [{ key:'sync_inventory', label:'Sync Inventory' }],
+    defaults: { shop_url:'', access_token:'', sync_inventory:true },
+    guide: ['Go to Shopify Admin → Apps.', 'Create a Custom App.', 'Reveal Admin API Access Token.'],
+  },
+  {
+    id: 'woocommerce', name: 'WooCommerce', desc: 'Import orders and product catalog.', category: 'E-commerce',
+    emoji: '🛒', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)',
+    fields: [
+      { key:'store_url',       label:'Store URL',       icon:Globe, type:'text',     placeholder:'https://your-store.com' },
+      { key:'consumer_key',    label:'Consumer Key',    icon:Key,   type:'text',     placeholder:'ck_••••••••••' },
+      { key:'consumer_secret', label:'Consumer Secret', icon:Key,   type:'password', placeholder:'cs_••••••••••' },
+    ],
+    toggles: [{ key:'sync_orders', label:'Sync Orders' }],
+    defaults: { store_url:'', consumer_key:'', consumer_secret:'', sync_orders:true },
+    guide: ['Go to WooCommerce → Settings → Advanced.', 'Click REST API → Add Key.', 'Set Permissions to Read/Write and generate.'],
+  },
 ];
 
-const Integrations = () => {
-    const { showToast } = useToast();
-    const [activeTab, setActiveTab] = useState('odoo');
-    const [loading, setLoading] = useState(false);
-    const [testing, setTesting] = useState(false);
-    const [status, setStatus] = useState({ type: '', message: '' });
+/* ── Field Input ── */
+function FieldInput({ field, value, onChange }) {
+  const [visible, setVisible] = useState(false);
+  const Icon = field.icon;
+  return (
+    <div className="intg-field">
+      <label><Icon size={13}/>{field.label}</label>
+      <div className="intg-input-wrap">
+        <Icon size={14} className="intg-input-icon"/>
+        <input
+          className="intg-input"
+          type={field.type === 'password' && !visible ? 'password' : 'text'}
+          value={value || ''}
+          onChange={e => onChange(field.key, e.target.value)}
+          placeholder={field.placeholder}
+        />
+        {field.type === 'password' && (
+          <button className="intg-eye-btn" type="button" onClick={() => setVisible(v => !v)}>
+            {visible ? <EyeOff size={14}/> : <Eye size={14}/>}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
 
-    // Connections state (persisted connection status)
-    const [connections, setConnections] = useState({
-        odoo: false,
-        zoho: false,
-        shopify: false,
-        woocommerce: false
-    });
+/* ── Modal ── */
+function IntegrationModal({ integ, config, onChange, onClose, connected, onTest, onSave, onDisconnect, syncInterval, setSync, testState, saveLoading }) {
+  return (
+    <div className="intg-modal-overlay" onClick={onClose}>
+      <motion.div className="intg-modal" onClick={e => e.stopPropagation()}
+        initial={{ opacity:0, scale:0.95, y:16 }} animate={{ opacity:1, scale:1, y:0 }}
+        exit={{ opacity:0, scale:0.95, y:16 }} transition={{ duration:0.2 }}>
 
-    // Dynamic configuration state
-    const [configs, setConfigs] = useState({
-        odoo: { url: '', db_name: '', username: '', api_key: '', sync_products: true, sync_customers: true },
-        zoho: { org_id: '', client_id: '', client_secret: '', sync_invoices: true },
-        shopify: { shop_url: '', access_token: '', sync_inventory: true },
-        woocommerce: { store_url: '', consumer_key: '', consumer_secret: '', sync_orders: true }
-    });
-
-    const [syncInterval, setSyncInterval] = useState('1h');
-
-    const handleConfigChange = (field, value) => {
-        setConfigs(prev => ({
-            ...prev,
-            [activeTab]: {
-                ...prev[activeTab],
-                [field]: value
-            }
-        }));
-    };
-
-    const handleTestConnection = async () => {
-        setTesting(true);
-        setStatus({ type: '', message: '' });
-
-        // Simulate API call for different integrations
-        setTimeout(() => {
-            const isSuccess = Math.random() > 0.1; // 90% success chance
-            if (isSuccess) {
-                setStatus({
-                    type: 'success',
-                    message: `Connected to ${INTEGRATION_TABS.find(t => t.id === activeTab)?.name} successfully!`
-                });
-                setConnections(prev => ({ ...prev, [activeTab]: true }));
-            } else {
-                setStatus({
-                    type: 'error',
-                    message: 'Connection failed. Please check your credentials.'
-                });
-            }
-            setTesting(false);
-        }, 1500);
-    };
-
-    const handleSave = async () => {
-        setLoading(true);
-        // Simulate save
-        setTimeout(() => {
-            setStatus({ type: 'success', message: 'Configuration saved successfully!' });
-            setLoading(false);
-        }, 1000);
-    };
-
-    const renderFormFields = () => {
-        const config = configs[activeTab];
-        const inputClass = "w-full bg-background border border-input rounded-lg p-3 text-foreground focus:ring-2 focus:ring-ring focus:outline-none placeholder-muted-foreground transition";
-
-        switch (activeTab) {
-            case 'odoo':
-                return (
-                    <>
-                        <div className="space-y-4">
-                            <h3 className="text-lg font-semibold text-foreground">Connection Details</h3>
-                            <div className="space-y-2">
-                                <label className="text-sm text-muted-foreground flex items-center gap-2"><Server size={14} /> Server URL</label>
-                                <input type="text" value={config.url} onChange={(e) => handleConfigChange('url', e.target.value)}
-                                    placeholder="https://your-odoo-instance.com" className={inputClass} />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-sm text-muted-foreground flex items-center gap-2"><Database size={14} /> Database Name</label>
-                                <input type="text" value={config.db_name} onChange={(e) => handleConfigChange('db_name', e.target.value)}
-                                    placeholder="your_database" className={inputClass} />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-sm text-muted-foreground flex items-center gap-2"><User size={14} /> Username</label>
-                                <input type="text" value={config.username} onChange={(e) => handleConfigChange('username', e.target.value)}
-                                    placeholder="admin@example.com" className={inputClass} />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-sm text-muted-foreground flex items-center gap-2"><Key size={14} /> API Key</label>
-                                <input type="password" value={config.api_key} onChange={(e) => handleConfigChange('api_key', e.target.value)}
-                                    placeholder="••••••••••••••••" className={inputClass} />
-                            </div>
-                        </div>
-                    </>
-                );
-            case 'zoho':
-                return (
-                    <div className="space-y-4">
-                        <h3 className="text-lg font-semibold text-foreground">Connection Details</h3>
-                        <div className="space-y-2">
-                            <label className="text-sm text-muted-foreground">Organization ID</label>
-                            <input type="text" value={config.org_id} onChange={(e) => handleConfigChange('org_id', e.target.value)}
-                                placeholder="123456789" className={inputClass} />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-sm text-muted-foreground">Client ID</label>
-                            <input type="text" value={config.client_id} onChange={(e) => handleConfigChange('client_id', e.target.value)}
-                                placeholder="1000.XXXXXXXXXXXXXXX" className={inputClass} />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-sm text-muted-foreground">Client Secret</label>
-                            <input type="password" value={config.client_secret} onChange={(e) => handleConfigChange('client_secret', e.target.value)}
-                                placeholder="••••••••••••••••" className={inputClass} />
-                        </div>
-                    </div>
-                );
-            case 'shopify':
-                return (
-                    <div className="space-y-4">
-                        <h3 className="text-lg font-semibold text-foreground">Connection Details</h3>
-                        <div className="space-y-2">
-                            <label className="text-sm text-muted-foreground">Shop URL</label>
-                            <input type="text" value={config.shop_url} onChange={(e) => handleConfigChange('shop_url', e.target.value)}
-                                placeholder="your-store.myshopify.com" className={inputClass} />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-sm text-muted-foreground">Access Token</label>
-                            <input type="password" value={config.access_token} onChange={(e) => handleConfigChange('access_token', e.target.value)}
-                                placeholder="shpat_••••••••••••••••" className={inputClass} />
-                        </div>
-                    </div>
-                );
-            case 'woocommerce':
-                return (
-                    <div className="space-y-4">
-                        <h3 className="text-lg font-semibold text-foreground">Connection Details</h3>
-                        <div className="space-y-2">
-                            <label className="text-sm text-muted-foreground">Store URL</label>
-                            <input type="text" value={config.store_url} onChange={(e) => handleConfigChange('store_url', e.target.value)}
-                                placeholder="https://your-store.com" className={inputClass} />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-sm text-muted-foreground">Consumer Key</label>
-                            <input type="text" value={config.consumer_key} onChange={(e) => handleConfigChange('consumer_key', e.target.value)}
-                                placeholder="ck_••••••••••••••••" className={inputClass} />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-sm text-muted-foreground">Consumer Secret</label>
-                            <input type="password" value={config.consumer_secret} onChange={(e) => handleConfigChange('consumer_secret', e.target.value)}
-                                placeholder="cs_••••••••••••••••" className={inputClass} />
-                        </div>
-                    </div>
-                );
-            default: return null;
-        }
-    };
-
-    const renderSyncToggles = () => {
-        const config = configs[activeTab];
-        const toggles = {
-            odoo: [
-                { key: 'sync_products', label: 'Sync Products' },
-                { key: 'sync_customers', label: 'Sync Customers' }
-            ],
-            zoho: [{ key: 'sync_invoices', label: 'Sync Invoices' }],
-            shopify: [{ key: 'sync_inventory', label: 'Sync Inventory' }],
-            woocommerce: [{ key: 'sync_orders', label: 'Sync Orders' }]
-        };
-
-        return (
-            <div className="mt-6 space-y-3">
-                <h3 className="text-sm font-semibold text-foreground">Sync Options</h3>
-                {toggles[activeTab]?.map(toggle => (
-                    <label key={toggle.key} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg cursor-pointer hover:bg-muted/50 transition">
-                        <span className="text-sm text-foreground">{toggle.label}</span>
-                        <input
-                            type="checkbox"
-                            checked={config[toggle.key]}
-                            onChange={(e) => handleConfigChange(toggle.key, e.target.checked)}
-                            className="w-4 h-4 rounded border-border bg-background checked:bg-primary focus:ring-2 focus:ring-ring"
-                        />
-                    </label>
-                ))}
-            </div>
-        );
-    };
-
-    const renderGuide = () => {
-        const guides = {
-            odoo: [
-                'Log in to Odoo Database.',
-                'Go to Profile → Account Security.',
-                'Generate new API Key.',
-                'Enter details appropriately.'
-            ],
-            zoho: [
-                'Go to Zoho Developer Console.',
-                'Register a new specific Client.',
-                'Copy Client ID and Secret.'
-            ],
-            shopify: [
-                'Go to Shopify Admin → Apps.',
-                'Create a Custom App.',
-                'Reveal Admin API Access Token.'
-            ],
-            woocommerce: [
-                'Go to WooCommerce → Settings → Advanced.',
-                'REST API → Add Key.',
-                'Generate Consumer Key/Secret.'
-            ]
-        };
-
-        return (
-            <ul className="space-y-3 text-sm text-muted-foreground">
-                {guides[activeTab]?.map((step, idx) => (
-                    <li key={idx} className="flex gap-2">
-                        <span className="bg-muted w-5 h-5 rounded-full flex items-center justify-center text-xs text-foreground flex-shrink-0">
-                            {idx + 1}
-                        </span>
-                        <span>{step}</span>
-                    </li>
-                ))}
-            </ul>
-        );
-    };
-
-    return (
-        <div className="min-h-screen space-y-8 p-6">
-            {/* Header */}
-            <div
-            >
-                <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-purple bg-clip-text text-transparent mb-2">
-                    Integrations
-                </h1>
-                <p className="text-muted-foreground">Manage third-party connections and APIs</p>
-            </div>
-
-            {/* Integration Tabs - Strict Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                {INTEGRATION_TABS.map((tab, idx) => {
-                    const isActive = activeTab === tab.id;
-                    const isConnected = connections[tab.id];
-                    const Icon = tab.icon;
-                    return (
-                        <button
-                            key={tab.id}
-                            onClick={() => setActiveTab(tab.id)}
-                            className={`p-5 rounded-xl border transition-all relative text-left group ${isActive
-                                ? 'bg-primary/5 border-primary shadow-lg shadow-primary/10'
-                                : 'bg-card border-border hover:border-primary/30 hover:shadow-md'
-                                }`}
-                        >
-                            <div className="flex items-center gap-4">
-                                <div
-                                    className={`p-3 rounded-xl ${tab.bgClass} shadow-lg group-hover:scale-110 transition-transform duration-300`}
-                                    style={{ boxShadow: `0 0 20px ${tab.shadowColor}` }}
-                                >
-                                    <Icon size={24} className="text-white drop-shadow-md" />
-                                </div>
-                                <div className="flex-1">
-                                    <div className="flex items-center justify-between">
-                                        <h3 className="font-bold text-foreground text-lg">{tab.name}</h3>
-                                        {isConnected && (
-                                            <CheckCircle size={18} className="text-green-500" />
-                                        )}
-                                    </div>
-                                    <div className="mt-1">
-                                        {isConnected ? (
-                                            <span className="inline-flex items-center text-xs font-medium text-green-600 dark:text-green-400 bg-green-500/10 px-2 py-1 rounded-full">
-                                                ● Connected
-                                            </span>
-                                        ) : (
-                                            <span className="inline-flex items-center text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded-full border border-border">
-                                                Not Configured
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        </button>
-                    )
-                })}
-            </div>
-
-            {/* Main Content Area */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Left: Configuration Form */}
-                <div className="lg:col-span-2">
-                    <UnifiedCard
-                        title={`Configure ${INTEGRATION_TABS.find(t => t.id === activeTab)?.name}`}
-                        subtitle="Fill up the information of third-party database to enable real-time sync"
-                        actions={
-                            connections[activeTab] && (
-                                <span className="px-3 py-1 rounded-full bg-green-500/10 text-green-600 dark:text-green-500 text-xs font-medium border border-green-500/20">
-                                    • Active
-                                </span>
-                            )
-                        }
-                    >
-                        {renderFormFields()}
-                        {renderSyncToggles()}
-
-                        {/* Status Message */}
-                        
-                            {status.message && (
-                                <div
-                                    className={`mt-4 p-3 rounded-lg flex items-center gap-2 text-sm ${status.type === 'success'
-                                        ? 'bg-green-500/10 text-green-600 dark:text-green-500 border border-green-500/20'
-                                        : 'bg-destructive/10 text-destructive border border-destructive/20'
-                                        }`}
-                                >
-                                    {status.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
-                                    {status.message}
-                                </div>
-                            )}
-                        
-
-                        <div className="flex gap-4 mt-6 pt-6 border-t border-border">
-                            <button
-                                onClick={handleTestConnection}
-                                disabled={testing}
-                                className="btn-enterprise btn-enterprise-primary flex-1 flex items-center justify-center gap-2"
-                            >
-                                <RefreshCw size={16} className={testing ? 'animate-spin' : ''} />
-                                {connections[activeTab] ? 'Test & Reconnect' : 'Connect App'}
-                            </button>
-
-                            <button
-                                onClick={handleSave}
-                                disabled={loading}
-                                className="btn-enterprise btn-enterprise-success flex items-center justify-center gap-2"
-                            >
-                                <Save size={16} />
-                                Save
-                            </button>
-                        </div>
-                    </UnifiedCard>
-                </div>
-
-                {/* Right: Info & Status */}
-                <div className="space-y-6">
-                    <UnifiedCard title="Auto-Sync Status">
-                        <div className="space-y-4">
-                            <div className="flex justify-between items-center p-4 bg-muted/30 rounded-lg">
-                                <div>
-                                    <p className="text-muted-foreground text-sm font-semibold">Scheduler</p>
-                                    <p className="text-muted-foreground font-medium flex items-center gap-2">
-                                        <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                                        Running
-                                    </p>
-                                </div>
-                                <RefreshCw size={20} className="text-muted-foreground animate-spin-slow" />
-                            </div>
-
-                            <div className="p-4 bg-muted/30 rounded-lg">
-                                <div className="flex justify-between items-center mb-2">
-                                    <p className="text-muted-foreground text-sm">Sync Interval</p>
-                                    <select
-                                        value={syncInterval}
-                                        onChange={(e) => setSyncInterval(e.target.value)}
-                                        className="bg-background text-xs text-foreground border border-input rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-ring"
-                                    >
-                                        <option value="30m">30 Mins</option>
-                                        <option value="1h">1 Hour</option>
-                                        <option value="6h">6 Hours</option>
-                                        <option value="24h">24 Hours</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                    </UnifiedCard>
-
-                    <UnifiedCard title="How to Connect">
-                        {renderGuide()}
-                        <div className="mt-6 pt-4 border-t border-border">
-                            <button
-                                onClick={() => showToast('Opening Documentation in new tab...', 'info')}
-                                className="text-xs text-primary flex items-center gap-1 hover:underline"
-                            >
-                                <ExternalLink size={12} /> View Documentation
-                            </button>
-                        </div>
-                    </UnifiedCard>
-                </div>
-            </div>
+        <div className="intg-modal__header">
+          <div className="intg-modal__header-icon" style={{ background: integ.bg }}>
+            <span>{integ.emoji}</span>
+          </div>
+          <div className="intg-modal__header-text">
+            <h2>{integ.name}</h2>
+            <p style={{ color: connected ? '#059669' : 'var(--text-muted)' }}>
+              {connected ? '● Connected' : 'Not configured'}
+            </p>
+          </div>
+          <button className="intg-modal__close" onClick={onClose}><X size={16}/></button>
         </div>
-    );
-};
 
-export default Integrations;
+        <div className="intg-modal__body">
+          <div>
+            <p className="intg-divider">Connection Details</p>
+            <div className="intg-form" style={{ marginTop:14 }}>
+              {integ.fields.map(f => <FieldInput key={f.key} field={f} value={config[f.key]} onChange={onChange}/>)}
+            </div>
+          </div>
+
+          <div>
+            <p className="intg-divider">Sync Options</p>
+            <div className="intg-sync-options" style={{ marginTop:14 }}>
+              {integ.toggles.map(t => (
+                <label key={t.key} className="intg-toggle-row">
+                  <span>{t.label}</span>
+                  <span className="intg-toggle">
+                    <input type="checkbox" checked={!!config[t.key]} onChange={e => onChange(t.key, e.target.checked)}/>
+                    <span className="intg-toggle-slider"/>
+                  </span>
+                </label>
+              ))}
+              <div className="intg-interval-row">
+                <span>Sync Interval</span>
+                <select className="intg-select" value={syncInterval} onChange={e => setSync(e.target.value)}>
+                  <option value="rt">Real-time</option>
+                  <option value="1h">1 Hour</option>
+                  <option value="4h">4 Hours</option>
+                  <option value="24h">Daily</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <AnimatePresence>
+            {testState.msg && (
+              <motion.div className={`intg-status-alert ${testState.type}`}
+                initial={{ opacity:0, height:0 }} animate={{ opacity:1, height:'auto' }} exit={{ opacity:0, height:0 }}>
+                {testState.type === 'success' ? <CheckCircle2 size={15}/> : <AlertCircle size={15}/>}
+                {testState.msg}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <div>
+            <p className="intg-divider">How to Connect</p>
+            <div className="intg-guide" style={{ marginTop:14 }}>
+              {integ.guide.map((step, i) => (
+                <div key={i} className="intg-guide__step">
+                  <div className="intg-guide__num">{i+1}</div>
+                  <p className="intg-guide__text">{step}</p>
+                </div>
+              ))}
+            </div>
+            <button className="intg-btn intg-btn--secondary" style={{ marginTop:14, fontSize:12 }}>
+              <ExternalLink size={13}/> View Documentation
+            </button>
+          </div>
+        </div>
+
+        <div className="intg-modal__footer">
+          {connected && <button className="intg-btn intg-btn--danger" onClick={onDisconnect}>Disconnect</button>}
+          <button className="intg-btn intg-btn--secondary" onClick={onTest} disabled={testState.loading}>
+            {testState.loading ? <Loader2 size={14} className="intg-spin"/> : <RefreshCw size={14}/>}
+            {testState.loading ? 'Testing…' : 'Test Connection'}
+          </button>
+          <button className="intg-btn intg-btn--primary" onClick={onSave} disabled={saveLoading}>
+            {saveLoading ? <Loader2 size={14} className="intg-spin"/> : <Save size={14}/>}
+            {saveLoading ? 'Saving…' : 'Save Changes'}
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+/* ── Card ── */
+function IntegrationCard({ integ, connected, onClick }) {
+  return (
+    <motion.div className={`intg-card ${connected ? 'connected' : ''}`} onClick={onClick}
+      initial={{ opacity:0, y:12 }} animate={{ opacity:1, y:0 }} whileHover={{ y:-5 }} transition={{ duration:0.2 }}>
+      <div className="intg-card__stripe" style={{ background:`linear-gradient(90deg, ${integ.color}, transparent)` }}/>
+      <div className="intg-card__top">
+        <div className="intg-card__icon" style={{ background: integ.bg }}>
+          <span style={{ fontSize:26 }}>{integ.emoji}</span>
+        </div>
+        <div className="intg-card__info">
+          <div className="intg-card__name">{integ.name}</div>
+          <div className="intg-card__desc">{integ.desc}</div>
+          <span className="intg-card__category">{integ.category}</span>
+        </div>
+      </div>
+      <div className="intg-card__status">
+        <span className={`intg-card__status-dot ${connected ? 'connected' : 'idle'}`}/>
+        <span className={connected ? 'status-connected' : 'status-idle'}>
+          {connected ? 'Connected' : 'Not Configured'}
+        </span>
+      </div>
+      <button className={`intg-card__cta ${connected ? 'connected-cta' : ''}`} onClick={e => { e.stopPropagation(); onClick(); }}>
+        {connected ? <><Settings size={13}/>Reconfigure</> : <><Zap size={13}/>Connect</>}
+      </button>
+    </motion.div>
+  );
+}
+
+/* ── Main Page ── */
+export default function Integrations() {
+  const [search, setSearch] = useState('');
+  const [connections, setConnections] = useState({ odoo:false, zoho:false, shopify:false, woocommerce:false });
+  const [configs, setConfigs] = useState(Object.fromEntries(INTEGRATIONS.map(i => [i.id, { ...i.defaults }])));
+  const [syncs, setSyncs] = useState(Object.fromEntries(INTEGRATIONS.map(i => [i.id, '1h'])));
+  const [activeModal, setActiveModal] = useState(null);
+  const [testState, setTestState] = useState({ loading:false, type:'', msg:'' });
+  const [saveLoading, setSaveLoading] = useState(false);
+
+  const openModal = (id) => { setActiveModal(id); setTestState({ loading:false, type:'', msg:'' }); };
+
+  const handleTest = () => {
+    setTestState({ loading:true, type:'', msg:'' });
+    setTimeout(() => {
+      const ok = Math.random() > 0.15;
+      setTestState({ loading:false, type: ok?'success':'error', msg: ok ? `Connected to ${INTEGRATIONS.find(i=>i.id===activeModal)?.name} successfully!` : 'Connection failed. Please verify your credentials.' });
+      if (ok) setConnections(p => ({ ...p, [activeModal]:true }));
+    }, 1500);
+  };
+
+  const handleSave = () => { setSaveLoading(true); setTimeout(()=>setSaveLoading(false), 900); };
+  const handleDisconnect = () => { setConnections(p => ({ ...p, [activeModal]:false })); setActiveModal(null); };
+
+  const filtered = useMemo(() => INTEGRATIONS.filter(i => !search || i.name.toLowerCase().includes(search.toLowerCase()) || i.category.toLowerCase().includes(search.toLowerCase())), [search]);
+  const connectedList = filtered.filter(i => connections[i.id]);
+  const availableList = filtered.filter(i => !connections[i.id]);
+  const activeInteg = INTEGRATIONS.find(i => i.id === activeModal);
+
+  return (
+    <div className="intg-page">
+      <div className="intg-header">
+        <div className="intg-header__left">
+          <p>Connect third-party services and sync your data automatically</p>
+        </div>
+        <div className="intg-search">
+          <Search size={15} className="intg-search__icon"/>
+          <input placeholder="Search integrations…" value={search} onChange={e => setSearch(e.target.value)}/>
+        </div>
+      </div>
+
+      {connectedList.length > 0 && (
+        <div>
+          <div className="intg-section-label"><h2>Connected</h2><span>{connectedList.length}</span></div>
+          <div className="intg-grid">
+            {connectedList.map((integ,i) => (
+              <motion.div key={integ.id} initial={{ opacity:0, y:12 }} animate={{ opacity:1, y:0 }} transition={{ delay:i*0.06 }}>
+                <IntegrationCard integ={integ} connected onClick={() => openModal(integ.id)}/>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {availableList.length > 0 && (
+        <div>
+          <div className="intg-section-label"><h2>Available</h2><span>{availableList.length}</span></div>
+          <div className="intg-grid">
+            {availableList.map((integ,i) => (
+              <motion.div key={integ.id} initial={{ opacity:0, y:12 }} animate={{ opacity:1, y:0 }} transition={{ delay:i*0.06 }}>
+                <IntegrationCard integ={integ} connected={false} onClick={() => openModal(integ.id)}/>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {filtered.length === 0 && (
+        <div className="intg-empty">
+          <Search size={36} style={{ color:'var(--text-faint)' }}/>
+          <h3>No integrations found</h3>
+          <p>Try a different search term.</p>
+          <button className="intg-btn intg-btn--secondary" onClick={() => setSearch('')}>Clear Search</button>
+        </div>
+      )}
+
+      <AnimatePresence>
+        {activeModal && activeInteg && (
+          <IntegrationModal
+            integ={activeInteg}
+            config={configs[activeModal]}
+            onChange={(k,v) => setConfigs(p => ({ ...p, [activeModal]: { ...p[activeModal], [k]:v } }))}
+            onClose={() => setActiveModal(null)}
+            connected={connections[activeModal]}
+            onTest={handleTest}
+            onSave={handleSave}
+            onDisconnect={handleDisconnect}
+            syncInterval={syncs[activeModal]}
+            setSync={v => setSyncs(p => ({ ...p, [activeModal]:v }))}
+            testState={testState}
+            saveLoading={saveLoading}
+          />
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}

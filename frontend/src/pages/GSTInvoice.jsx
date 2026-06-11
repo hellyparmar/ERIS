@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { FileText, Download, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
-import GlassCard from '../components/ui/GlassCard';
-import GradientButton from '../components/ui/GradientButton';
 import { useToast } from '../components/ui/Toast';
+import '../styles/fresh-design.css';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -49,128 +48,137 @@ const GSTInvoice = () => {
     for (let y = 2023; y <= now.getFullYear() + 1; y++) years.push(y);
 
     return (
-        <div className="min-h-screen space-y-8 animate-fade-in">
-            <div>
-                <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-purple bg-clip-text text-transparent mb-2">GST Invoice & GSTR-1</h1>
-                <p className="text-muted-foreground">View GST summaries and export GSTR-1 for filing</p>
+        <div className="fresh-page">
+            <div style={{ marginBottom: 32 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                        <button onClick={fetchGSTR1} disabled={loading} className="fresh-btn primary">
+                            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                            {loading ? 'Fetching...' : 'Generate GSTR-1'}
+                        </button>
+                        {gstr1Data && (
+                            <button onClick={downloadJSON} className="fresh-btn">
+                                <Download className="w-4 h-4" /> Download JSON
+                            </button>
+                        )}
+                    </div>
+                </div>
+                <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>Generate and manage GST invoices</p>
             </div>
 
-            <GlassCard className="p-6">
-                <div className="flex flex-wrap items-end gap-4">
+            <div className="fresh-section">
+                <div className="fresh-section-header">
+                    <span className="fresh-section-title">Period</span>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, padding: '16px 0' }}>
                     <div>
-                        <label className="block text-sm font-medium text-muted-foreground mb-2">Month</label>
+                        <label className="fresh-metric-label" style={{ marginBottom: 6 }}>Month</label>
                         <select value={month} onChange={e => setMonth(parseInt(e.target.value))}
-                            className="px-4 py-3 rounded-lg bg-secondary/50 border border-border text-foreground focus:border-primary focus:outline-none min-w-[160px]">
+                            style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-primary)', fontSize: 13, minWidth: 160 }}>
                             {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
                         </select>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-muted-foreground mb-2">Year</label>
+                        <label className="fresh-metric-label" style={{ marginBottom: 6 }}>Year</label>
                         <select value={year} onChange={e => setYear(parseInt(e.target.value))}
-                            className="px-4 py-3 rounded-lg bg-secondary/50 border border-border text-foreground focus:border-primary focus:outline-none">
+                            style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-primary)', fontSize: 13 }}>
                             {years.map(y => <option key={y} value={y}>{y}</option>)}
                         </select>
                     </div>
-                    <GradientButton onClick={fetchGSTR1} disabled={loading} className="py-3">
-                        <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-                        {loading ? 'Fetching...' : 'Generate GSTR-1'}
-                    </GradientButton>
-                    {gstr1Data && (
-                        <button onClick={downloadJSON}
-                            className="flex items-center gap-2 px-4 py-3 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-colors font-medium">
-                            <Download className="w-4 h-4" /> Download JSON
-                        </button>
-                    )}
                 </div>
-            </GlassCard>
+            </div>
 
             {validation && (
-                <GlassCard className={`p-4 border ${validation.is_valid ? 'border-green-500/30 bg-green-500/5' : 'border-yellow-500/30 bg-yellow-500/5'}`}>
-                    <div className="flex items-center gap-3">
+                <div className="fresh-section" style={{ borderLeft: `3px solid ${validation.is_valid ? 'var(--success)' : 'var(--warning)'}` }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
                         {validation.is_valid
-                            ? <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />
-                            : <AlertCircle className="w-5 h-5 text-yellow-400 flex-shrink-0" />}
+                            ? <CheckCircle className="w-5 h-5" style={{ color: 'var(--success)', flexShrink: 0, marginTop: 1 }} />
+                            : <AlertCircle className="w-5 h-5" style={{ color: 'var(--warning)', flexShrink: 0, marginTop: 1 }} />}
                         <div>
-                            <p className={`font-medium ${validation.is_valid ? 'text-green-400' : 'text-yellow-400'}`}>
+                            <p style={{ fontWeight: 500, color: validation.is_valid ? 'var(--success)' : 'var(--warning)' }}>
                                 {validation.is_valid ? 'Data is valid for filing' : `${validation.issues?.length} issue(s) found`}
                             </p>
                             {validation.issues?.map((issue, i) => (
-                                <p key={i} className="text-sm text-muted-foreground mt-1">{issue.message}</p>
+                                <p key={i} style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>{issue.message}</p>
                             ))}
                         </div>
                     </div>
-                </GlassCard>
+                </div>
             )}
 
             {gstr1Data && (
                 <>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="fresh-metrics">
                         {[
-                            { label: 'Taxable Value', value: `₹${gstr1Data.b2c_summary?.taxable_value?.toLocaleString()}`, color: 'text-blue-400' },
-                            { label: 'CGST', value: `₹${gstr1Data.b2c_summary?.cgst?.toFixed(2)}`, color: 'text-green-400' },
-                            { label: 'SGST', value: `₹${gstr1Data.b2c_summary?.sgst?.toFixed(2)}`, color: 'text-purple-400' },
-                            { label: 'Total Tax', value: `₹${gstr1Data.total_liability?.total_tax?.toFixed(2)}`, color: 'text-yellow-400' },
-                        ].map(({ label, value, color }) => (
-                            <GlassCard key={label} className="p-4 text-center">
-                                <p className="text-sm text-muted-foreground mb-1">{label}</p>
-                                <p className={`text-2xl font-bold ${color}`}>{value}</p>
-                            </GlassCard>
+                            { label: 'Taxable Value', value: `₹${gstr1Data.b2c_summary?.taxable_value?.toLocaleString()}` },
+                            { label: 'CGST', value: `₹${gstr1Data.b2c_summary?.cgst?.toFixed(2)}` },
+                            { label: 'SGST', value: `₹${gstr1Data.b2c_summary?.sgst?.toFixed(2)}` },
+                            { label: 'Total Tax', value: `₹${gstr1Data.total_liability?.total_tax?.toFixed(2)}` },
+                        ].map(({ label, value }) => (
+                            <div key={label} className="fresh-metric">
+                                <div className="fresh-metric-value">{value}</div>
+                                <div className="fresh-metric-label">{label}</div>
+                            </div>
                         ))}
                     </div>
 
-                    <GlassCard className="p-6">
-                        <h3 className="text-lg font-bold gradient-text mb-4">B2C Sales — {gstr1Data.filing_period}</h3>
-                        <table className="w-full text-sm">
+                    <div className="fresh-section">
+                        <div className="fresh-section-header">
+                            <span className="fresh-section-title">B2C Sales — {gstr1Data.filing_period}</span>
+                        </div>
+                        <table className="fresh-table">
                             <thead>
-                                <tr className="text-muted-foreground text-left border-b border-border">
-                                    <th className="pb-3 pr-4">Type</th>
-                                    <th className="pb-3 pr-4 text-right">Invoices</th>
-                                    <th className="pb-3 pr-4 text-right">Taxable</th>
-                                    <th className="pb-3 pr-4 text-right">CGST</th>
-                                    <th className="pb-3 text-right">SGST</th>
+                                <tr>
+                                    <th>Type</th>
+                                    <th className="num">Invoices</th>
+                                    <th className="num">Taxable</th>
+                                    <th className="num">CGST</th>
+                                    <th className="num">SGST</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr>
-                                    <td className="py-3 pr-4 text-foreground font-medium">B2C (Unregistered)</td>
-                                    <td className="py-3 pr-4 text-right text-muted-foreground">{gstr1Data.b2c_summary?.invoice_count}</td>
-                                    <td className="py-3 pr-4 text-right">₹{gstr1Data.b2c_summary?.taxable_value?.toLocaleString()}</td>
-                                    <td className="py-3 pr-4 text-right text-green-400">₹{gstr1Data.b2c_summary?.cgst?.toFixed(2)}</td>
-                                    <td className="py-3 text-right text-purple-400">₹{gstr1Data.b2c_summary?.sgst?.toFixed(2)}</td>
+                                    <td style={{ fontWeight: 500 }}>B2C (Unregistered)</td>
+                                    <td className="num" style={{ color: 'var(--text-muted)' }}>{gstr1Data.b2c_summary?.invoice_count}</td>
+                                    <td className="num">₹{gstr1Data.b2c_summary?.taxable_value?.toLocaleString()}</td>
+                                    <td className="num" style={{ color: 'var(--success)' }}>₹{gstr1Data.b2c_summary?.cgst?.toFixed(2)}</td>
+                                    <td className="num" style={{ color: 'var(--accent)' }}>₹{gstr1Data.b2c_summary?.sgst?.toFixed(2)}</td>
                                 </tr>
                             </tbody>
                         </table>
-                    </GlassCard>
+                    </div>
 
-                    <GlassCard className="p-6">
-                        <h3 className="text-lg font-bold gradient-text mb-4">HSN Summary</h3>
-                        <table className="w-full text-sm">
+                    <div className="fresh-section">
+                        <div className="fresh-section-header">
+                            <span className="fresh-section-title">HSN Summary</span>
+                        </div>
+                        <table className="fresh-table">
                             <thead>
-                                <tr className="text-muted-foreground text-left border-b border-border">
-                                    <th className="pb-3 pr-4">HSN</th>
-                                    <th className="pb-3 pr-4">Description</th>
-                                    <th className="pb-3 text-right">GST Rate</th>
+                                <tr>
+                                    <th>HSN</th>
+                                    <th>Description</th>
+                                    <th className="num">GST Rate</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-border">
+                            <tbody>
                                 {gstr1Data.hsn_summary?.map(h => (
                                     <tr key={h.hsn_code}>
-                                        <td className="py-3 pr-4 font-mono text-primary">{h.hsn_code}</td>
-                                        <td className="py-3 pr-4 text-foreground">{h.description}</td>
-                                        <td className="py-3 text-right text-yellow-400">{h.igst_rate}%</td>
+                                        <td style={{ fontFamily: 'monospace', color: 'var(--accent)' }}>{h.hsn_code}</td>
+                                        <td>{h.description}</td>
+                                        <td className="num"><span className="fresh-badge yellow">{h.igst_rate}%</span></td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
-                    </GlassCard>
+                    </div>
                 </>
             )}
 
             {!gstr1Data && !loading && (
-                <GlassCard className="p-12 text-center">
-                    <FileText className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-40" />
-                    <p className="text-muted-foreground">Select a period and click "Generate GSTR-1" to view tax summary</p>
-                </GlassCard>
+                <div className="fresh-section" style={{ padding: 48, textAlign: 'center' }}>
+                    <FileText className="w-16 h-16" style={{ color: 'var(--text-muted)', margin: '0 auto 16px', opacity: 0.4 }} />
+                    <p style={{ color: 'var(--text-muted)' }}>Select a period and click "Generate GSTR-1" to view tax summary</p>
+                </div>
             )}
         </div>
     );

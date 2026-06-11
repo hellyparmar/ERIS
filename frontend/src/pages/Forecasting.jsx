@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import {
   ComposedChart, AreaChart, BarChart, Area, Line, Bar,
@@ -51,20 +51,21 @@ export default function Forecasting() {
   const [expandedFactors, setExpandedFactors] = useState(false);
   const [isGeneratingForecast, setIsGeneratingForecast] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
+  const elapsedRef = useRef(0);
 
-  // Simulate progress
   React.useEffect(() => {
     if (!isGeneratingForecast) return;
+
+    elapsedRef.current = 0;
+    setElapsedTime(0);
     
     const interval = setInterval(() => {
-      setElapsedTime(prev => prev + 1);
-      if (elapsedTime > 3) {
-        // Show progress indicator after 3 seconds
-      }
+      elapsedRef.current += 1;
+      setElapsedTime(elapsedRef.current);
     }, 1000);
     
     return () => clearInterval(interval);
-  }, [isGeneratingForecast, elapsedTime]);
+  }, [isGeneratingForecast]);
 
   // Get User Context
   const { data: userData } = useQuery({
@@ -193,7 +194,6 @@ export default function Forecasting() {
     <div className="forecasting">
       {/* Header */}
       <div className="forecasting-header">
-        <h1 className="page-title">Sales & Inventory Forecasting</h1>
         <p className="page-subtitle">AI-powered predictions using Prophet model</p>
       </div>
 

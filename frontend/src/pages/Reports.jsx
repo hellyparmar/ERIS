@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import api from '../utils/api';
 import { useToast } from '../contexts/ToastContext';
 import DataTable from '../components/ui/DataTable';
-import StatCard from '../components/StatCard';
+import StatCard from '../components/ui/StatCard';
 
 const Reports = () => {
     const { showToast } = useToast();
@@ -192,9 +192,6 @@ const Reports = () => {
         <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '24px' }}>
             {/* Header */}
             <div style={{ marginBottom: '32px' }}>
-                <h1 style={{ fontSize: '28px', fontWeight: '600', marginBottom: '8px', color: '#1a1a1a' }}>
-                    Reports & Analytics
-                </h1>
                 <p style={{ color: '#666' }}>Comprehensive business intelligence and metrics</p>
             </div>
 
@@ -348,11 +345,17 @@ const Reports = () => {
                                     </h3>
                                     <ResponsiveContainer width="100%" height={300}>
                                         <LineChart data={chartData}>
+                                            <defs>
+                                                <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+<stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3} />
+<stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
+                                                </linearGradient>
+                                            </defs>
                                             <CartesianGrid strokeDasharray="3 3" />
                                             <XAxis dataKey="date" />
                                             <YAxis />
                                             <Tooltip />
-                                            <Line type="monotone" dataKey="revenue" stroke="#d97e68" strokeWidth={2} />
+                                            <Line type="monotone" dataKey="revenue" stroke="#f59e0b" strokeWidth={2} fill="url(#colorRevenue)" />
                                         </LineChart>
                                     </ResponsiveContainer>
                                 </div>

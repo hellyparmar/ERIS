@@ -23,7 +23,6 @@ const Outlets = () => {
             if (selectedCity) params.append('city', selectedCity);
             return api.get(`/api/v1/outlets?${params}`).then(r => r.data.data || []);
         },
-        staleTime: 30000
     });
 
     // Filter outlets
@@ -91,7 +90,6 @@ const Outlets = () => {
         return (
             <div className="outlets-container">
                 <div className="outlets-header">
-                    <h1 className="outlets-title">Outlets & Stores</h1>
                 </div>
                 <div className="skeleton-filters"></div>
                 <div className="skeleton-grid"></div>
@@ -104,8 +102,7 @@ const Outlets = () => {
             {/* Header */}
             <div className="outlets-header">
                 <div className="outlets-title-group">
-                    <h1 className="outlets-title">Outlets & Stores</h1>
-                    <span className="outlets-count-badge">{filteredOutlets.length}</span>
+                    <span className="outlets-count-badge" style={{ width: 'auto', padding: '0 12px', borderRadius: '4px' }}>{filteredOutlets.length} Active</span>
                 </div>
                 <button className="btn-add-outlet" onClick={() => setIsAddFormOpen(true)}>
                     <Plus size={18} />

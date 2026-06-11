@@ -203,7 +203,6 @@ const Alerts = () => {
     <div className="alerts-container">
       {/* Header */}
       <div className="alerts-header">
-        <h1 className="page-title">Inventory Alerts</h1>
         <p className="page-subtitle">Monitor and manage low stock, overstock, and expiry warnings</p>
       </div>
 

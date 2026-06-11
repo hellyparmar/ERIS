@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { Settings, Percent, Save, Edit2, X, CheckCircle } from 'lucide-react';
-import GlassCard from '../components/ui/GlassCard';
-import GradientButton from '../components/ui/GradientButton';
 import { useToast } from '../components/ui/Toast';
+import '../styles/fresh-design.css';
 
 const DEFAULT_GST_RATES = [
     { category: 'Essentials', description: 'Rice, wheat, milk, eggs, vegetables', gstin_rate: 0, cgst: 0, sgst: 0, cess: 0, example_hsn: '0401' },
@@ -49,125 +48,115 @@ const GSTRates = () => {
     };
 
     const getRateBadgeColor = (rate) => {
-        if (rate === 0) return 'bg-green-500/20 text-green-400';
-        if (rate <= 5) return 'bg-blue-500/20 text-blue-400';
-        if (rate <= 12) return 'bg-yellow-500/20 text-yellow-400';
-        if (rate <= 18) return 'bg-orange-500/20 text-orange-400';
-        return 'bg-red-500/20 text-red-400';
+        if (rate === 0) return 'fresh-badge green';
+        if (rate <= 5) return 'fresh-badge green';
+        if (rate <= 12) return 'fresh-badge yellow';
+        if (rate <= 18) return 'fresh-badge yellow';
+        return 'fresh-badge red';
     };
 
     return (
-        <div className="min-h-screen space-y-8 animate-fade-in">
-            <div>
-                <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-purple bg-clip-text text-transparent mb-2">GST Rates Configuration</h1>
-                <p className="text-muted-foreground">Configure GST rates per category for your business type</p>
+        <div className="fresh-page">
+            <div style={{ marginBottom: 32 }}>
+                <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>GST rate lookup and tax slab management</p>
             </div>
 
-            {/* Business Presets */}
-            <GlassCard className="p-6">
-                <h3 className="text-lg font-bold gradient-text mb-4 flex items-center gap-2">
-                    <Settings className="w-5 h-5" /> Quick Presets by Business Type
-                </h3>
-                <div className="flex flex-wrap gap-3">
+            <div className="fresh-section">
+                <div className="fresh-section-header">
+                    <span className="fresh-section-title"><Settings size={16} /> Quick Presets by Business Type</span>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                     {BUSINESS_PRESETS.map(preset => (
                         <button key={preset.label}
                             onClick={() => addToast(`Preset "${preset.label}" applied (UI demo)`, 'success')}
-                            className="px-4 py-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors font-medium text-sm">
+                            className="fresh-btn">
                             {preset.label}
-                            <span className="ml-2 text-xs opacity-70">{preset.rates.join('%, ')}%</span>
+                            <span style={{ marginLeft: 6, fontSize: 11, opacity: 0.7 }}>{preset.rates.join('%, ')}%</span>
                         </button>
                     ))}
                 </div>
-            </GlassCard>
+            </div>
 
-            {/* GST Rate Table */}
-            <GlassCard className="p-6">
-                <h3 className="text-lg font-bold gradient-text mb-6 flex items-center gap-2">
-                    <Percent className="w-5 h-5" /> GST Rate Slabs
-                </h3>
-                <div className="space-y-4">
-                    {rates.map((rate, idx) => (
-                        <div key={rate.category}
-                            className={`p-5 rounded-xl border transition-all ${editingIdx === idx ? 'border-primary bg-primary/5' : 'border-border bg-secondary/20 hover:bg-secondary/30'}`}>
-                            {editingIdx === idx ? (
-                                /* Edit Mode */
-                                <div className="space-y-3">
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div>
-                                            <label className="block text-xs font-medium text-muted-foreground mb-1">Category Name</label>
-                                            <input value={editValues.category} onChange={e => setEditValues({ ...editValues, category: e.target.value })}
-                                                className="w-full px-3 py-2 rounded-lg bg-background border border-border text-foreground text-sm focus:border-primary focus:outline-none" />
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-medium text-muted-foreground mb-1">GST Rate (%)</label>
-                                            <input type="number" step="0.5" min="0" max="28"
-                                                value={editValues.gstin_rate}
-                                                onChange={e => setEditValues({ ...editValues, gstin_rate: parseFloat(e.target.value) })}
-                                                className="w-full px-3 py-2 rounded-lg bg-background border border-border text-foreground text-sm focus:border-primary focus:outline-none" />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-muted-foreground mb-1">Description</label>
-                                        <input value={editValues.description} onChange={e => setEditValues({ ...editValues, description: e.target.value })}
-                                            className="w-full px-3 py-2 rounded-lg bg-background border border-border text-foreground text-sm focus:border-primary focus:outline-none" />
-                                    </div>
-                                    <div className="flex gap-2 pt-1">
-                                        <GradientButton onClick={() => saveEdit(idx)} className="text-sm py-2">
-                                            <Save className="w-4 h-4 mr-1" /> Save
-                                        </GradientButton>
-                                        <button onClick={cancelEdit}
-                                            className="flex items-center gap-1 px-3 py-2 rounded-lg bg-secondary/50 text-muted-foreground hover:text-foreground text-sm transition-colors">
-                                            <X className="w-4 h-4" /> Cancel
-                                        </button>
-                                    </div>
-                                </div>
-                            ) : (
-                                /* View Mode */
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-4">
-                                        <span className={`px-3 py-1 rounded-full text-sm font-bold ${getRateBadgeColor(rate.gstin_rate)}`}>
-                                            {rate.gstin_rate}%
-                                        </span>
-                                        <div>
-                                            <p className="font-semibold text-foreground">{rate.category}</p>
-                                            <p className="text-xs text-muted-foreground mt-0.5">{rate.description}</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-6 text-xs text-muted-foreground">
-                                        <div className="text-center hidden md:block">
-                                            <p className="font-semibold text-foreground">{rate.cgst}%</p>
-                                            <p>CGST</p>
-                                        </div>
-                                        <div className="text-center hidden md:block">
-                                            <p className="font-semibold text-foreground">{rate.sgst}%</p>
-                                            <p>SGST</p>
-                                        </div>
-                                        <div className="text-center hidden md:block">
-                                            <p className="font-mono text-foreground">{rate.example_hsn}</p>
-                                            <p>HSN eg.</p>
-                                        </div>
-                                        <button onClick={() => startEdit(idx)}
-                                            className="p-2 rounded-lg hover:bg-primary/10 transition-colors text-primary">
-                                            <Edit2 className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    ))}
+            <div className="fresh-section">
+                <div className="fresh-section-header">
+                    <span className="fresh-section-title"><Percent size={16} /> GST Rate Slabs</span>
                 </div>
-            </GlassCard>
+                <table className="fresh-table">
+                    <thead>
+                        <tr>
+                            <th>Rate</th>
+                            <th>Category</th>
+                            <th className="num">CGST</th>
+                            <th className="num">SGST</th>
+                            <th>HSN</th>
+                            <th style={{ width: 40 }}></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {rates.map((rate, idx) => (
+                            editingIdx === idx ? (
+                                <tr key={rate.category}>
+                                    <td colSpan={6} style={{ padding: 16 }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                                                <div>
+                                                    <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--text-muted)', marginBottom: 4 }}>Category Name</label>
+                                                    <input value={editValues.category} onChange={e => setEditValues({ ...editValues, category: e.target.value })}
+                                                        style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 13 }} />
+                                                </div>
+                                                <div>
+                                                    <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--text-muted)', marginBottom: 4 }}>GST Rate (%)</label>
+                                                    <input type="number" step="0.5" min="0" max="28"
+                                                        value={editValues.gstin_rate}
+                                                        onChange={e => setEditValues({ ...editValues, gstin_rate: parseFloat(e.target.value) })}
+                                                        style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 13 }} />
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--text-muted)', marginBottom: 4 }}>Description</label>
+                                                <input value={editValues.description} onChange={e => setEditValues({ ...editValues, description: e.target.value })}
+                                                    style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 13 }} />
+                                            </div>
+                                            <div style={{ display: 'flex', gap: 8 }}>
+                                                <button onClick={() => saveEdit(idx)} className="fresh-btn primary"><Save size={14} style={{ marginRight: 4 }} /> Save</button>
+                                                <button onClick={cancelEdit} className="fresh-btn"><X size={14} style={{ marginRight: 4 }} /> Cancel</button>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ) : (
+                                <tr key={rate.category}>
+                                    <td><span className={getRateBadgeColor(rate.gstin_rate)}>{rate.gstin_rate}%</span></td>
+                                    <td>
+                                        <div style={{ fontWeight: 500 }}>{rate.category}</div>
+                                        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{rate.description}</div>
+                                    </td>
+                                    <td className="num">{rate.cgst}%</td>
+                                    <td className="num">{rate.sgst}%</td>
+                                    <td style={{ fontFamily: 'monospace', color: 'var(--text-muted)', fontSize: 13 }}>{rate.example_hsn}</td>
+                                    <td>
+                                        <button onClick={() => startEdit(idx)} className="fresh-btn" style={{ padding: '4px 8px' }}>
+                                            <Edit2 size={14} />
+                                        </button>
+                                    </td>
+                                </tr>
+                            )
+                        ))}
+                    </tbody>
+                </table>
+            </div>
 
-            {/* Info */}
-            <GlassCard className="p-4 border border-blue-500/20 bg-blue-500/5">
-                <div className="flex gap-3">
-                    <CheckCircle className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
-                    <div className="text-sm text-muted-foreground">
-                        <p className="font-medium text-blue-400 mb-1">How GST rates work</p>
-                        <p>For intra-state sales, GST is split equally as CGST + SGST. For inter-state sales, full IGST applies. Rates here apply per product category.</p>
+            <div className="fresh-section">
+                <div className="fresh-list">
+                    <div className="fresh-list-item">
+                        <CheckCircle size={18} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                        <div>
+                            <div className="fresh-list-label" style={{ fontWeight: 500, color: 'var(--text-primary)' }}>How GST rates work</div>
+                            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>For intra-state sales, GST is split equally as CGST + SGST. For inter-state sales, full IGST applies. Rates here apply per product category.</div>
+                        </div>
                     </div>
                 </div>
-            </GlassCard>
+            </div>
         </div>
     );
 };

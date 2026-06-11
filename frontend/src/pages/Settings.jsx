@@ -111,7 +111,6 @@ const Settings = () => {
     return (
         <div className="settings-page">
             <div className="settings-header">
-                <h1>Settings</h1>
                 <p className="subtitle">Manage your account and preferences</p>
             </div>
 

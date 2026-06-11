@@ -349,7 +349,6 @@ export default function Inventory() {
       {/* Header Section */}
       <div className="inventory-header">
         <div>
-          <h1 className="page-title">Inventory Management</h1>
           <p className="page-subtitle">
             {totalProducts} products • {totalAlerts} active alerts
           </p>
@@ -588,32 +587,33 @@ export default function Inventory() {
                   <AreaChart data={movementData}>
                     <defs>
                       <linearGradient id="colorQuantity" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#3B82F6" stopOpacity={0} />
+                        <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.25} />
+                        <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
                     <XAxis
                       dataKey="date"
-                      tick={{ fontSize: 12, fill: '#6B7280' }}
-                      stroke="#D1D5DB"
+                      tick={{ fontSize: 12, fill: 'var(--text-muted)' }}
+                      stroke="#525252"
                     />
                     <YAxis
-                      tick={{ fontSize: 12, fill: '#6B7280' }}
-                      stroke="#D1D5DB"
+                      tick={{ fontSize: 12, fill: 'var(--text-muted)' }}
+                      stroke="#525252"
                     />
                     <Tooltip
                       contentStyle={{
-                        background: '#FFFFFF',
-                        border: '1px solid #E5E7EB',
-                        borderRadius: '8px',
+                        background: 'var(--bg-card)',
+                        border: '1px solid rgba(245,158,11,0.2)',
+                        borderRadius: '12px',
+                        color: 'var(--text-primary)',
                       }}
                       formatter={(value) => [value, 'Quantity']}
                     />
                     <Area
                       type="monotone"
                       dataKey="quantity"
-                      stroke="#3B82F6"
+                      stroke="#f59e0b"
                       strokeWidth={2}
                       fillOpacity={1}
                       fill="url(#colorQuantity)"

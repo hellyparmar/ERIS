@@ -1,11 +1,6 @@
-/**
- * Enterprise Retail Intelligence System v3.0
- * FORECASTS PAGE - AI-Powered Demand Predictions
- */
-
 import { useState, useEffect } from 'react';
 import { API_BASE } from '../lib/api';
-import { TrendingUp, TrendingDown, Target, Brain, Zap, AlertCircle, CheckCircle, ArrowUp, ArrowDown, Info, Package, Truck } from 'lucide-react';
+import { TrendingUp, TrendingDown, Target, Brain, Zap, AlertCircle, CheckCircle, Package, Truck } from 'lucide-react';
 import {
     Chart as ChartJS,
     CategoryScale,
@@ -18,18 +13,15 @@ import {
     Filler
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
-import GlassCard from '../components/ui/GlassCard';
-import GradientButton from '../components/ui/GradientButton';
-import ActionButton from '../components/ui/ActionButton';
 import { useTheme } from '../hooks/useTheme';
-import '../modern-design.css';
+import '../styles/fresh-design.css';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
 
 const Forecasts = () => {
     const { isDark } = useTheme();
     const [timeHorizon, setTimeHorizon] = useState(30);
-    const [growthRate, setGrowthRate] = useState(0); // For What-If Analysis
+    const [growthRate, setGrowthRate] = useState(0);
     const [loading, setLoading] = useState(false);
     const [apiData, setApiData] = useState(null);
 
@@ -40,14 +32,12 @@ const Forecasts = () => {
     const fetchForecast = async () => {
         setLoading(true);
         try {
-            // Use existing /api/forecasting/forecast endpoint
             const response = await fetch(`${API_BASE}/api/forecasting/forecast/1/1?days=${timeHorizon}&growth_rate=${growthRate / 100}`, {
                 method: 'GET'
             });
             const data = await response.json();
             setApiData(data);
         } catch (error) {
-            // Mock Fallback Data
             const today = new Date();
             const mockForecast = Array.from({ length: timeHorizon }, (_, i) => {
                 const date = new Date(today);
@@ -75,7 +65,6 @@ const Forecasts = () => {
         }
     };
 
-    // Model metrics
     const modelMetrics = {
         accuracy: 94.0,
         rmse: 1.9,
@@ -104,7 +93,7 @@ const Forecasts = () => {
                     data: values,
                     borderColor: 'var(--warning)',
                     backgroundColor: 'var(--warning-soft)',
-                    borderDash: [5, 5], // Dashed line to match legend
+                    borderDash: [5, 5],
                     fill: false,
                     tension: 0.4,
                     borderWidth: 2,
@@ -115,7 +104,7 @@ const Forecasts = () => {
                     borderColor: 'rgba(214, 134, 0, 0.3)',
                     backgroundColor: 'var(--warning-soft)',
                     pointRadius: 0,
-                    fill: '+1', // Fill to next dataset
+                    fill: '+1',
                     borderWidth: 1,
                 },
                 {
@@ -164,7 +153,6 @@ const Forecasts = () => {
                     color: isDark ? '#94a3b8' : '#64748b',
                     maxTicksLimit: 8,
                     callback: function (val) {
-                        // Format date to "MMM D" e.g. "May 8"
                         const date = new Date(this.getLabelForValue(val));
                         return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
                     }
@@ -184,7 +172,6 @@ const Forecasts = () => {
             }
     }};
 
-    // Key insights
     const insights = [
         {
             icon: <TrendingUp className="text-blue-400" size={24} />,
@@ -201,7 +188,7 @@ const Forecasts = () => {
             type: 'warning'
         },
         {
-            icon: <Zap className="text-purple-400" size={24} />,
+            icon: <Zap className="text-yellow-400" size={24} />,
             title: 'High Demand Products',
             description: 'Fresh Paneer: +25% demand, Coca Cola 300ml: +18%',
             keyDrivers: ['Price Reduction (-8%)', 'High Inventory Levels (+40%)', 'Promotional Cross-sells'],
@@ -209,7 +196,6 @@ const Forecasts = () => {
         }
     ];
 
-    // Recommendations
     const recommendations = [
         {
             category: 'Stock Planning',
@@ -241,344 +227,292 @@ const Forecasts = () => {
         }
     ];
 
-    const getPriorityColor = (priority) => {
+    const priorityBadgeStyle = (priority) => {
         switch (priority) {
-            case 'Urgent': return 'bg-red-500/20 border-red-500/30 text-red-400';
-            case 'High': return 'bg-orange-500/20 border-orange-500/30 text-orange-400';
-            case 'Medium': return 'bg-yellow-500/20 border-yellow-500/30 text-yellow-400';
-            default: return 'bg-blue-500/20 border-blue-500/30 text-blue-400';
+            case 'Urgent': return { background: 'var(--danger-bg)', color: 'var(--danger-text)' };
+            case 'High': return { background: 'var(--warning-bg)', color: 'var(--warning-text)' };
+            case 'Medium': return { background: 'var(--warning-bg)', color: 'var(--warning-text)' };
+            default: return { background: 'var(--info-bg)', color: 'var(--info-text)' };
+        }
+    };
+
+    const impactBadgeStyle = (impact) => {
+        switch (impact) {
+            case 'Critical': return { background: 'var(--danger-bg)', color: 'var(--danger-text)' };
+            case 'High': return { background: 'var(--warning-bg)', color: 'var(--warning-text)' };
+            case 'Medium': return { background: 'var(--info-bg)', color: 'var(--info-text)' };
+            default: return { background: 'var(--info-bg)', color: 'var(--info-text)' };
         }
     };
 
     return (
-        <div className="min-h-screen space-y-8 p-6 animate-fade-in">
-            {/* Header */}
-            <div>
-                <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-purple bg-clip-text text-transparent mb-2">
-                    AI-Powered Forecasts
-                </h1>
-                <p className="text-muted-foreground">Machine learning demand predictions with confidence intervals</p>
+        <div className="fresh-page">
+            <div style={{ marginBottom: 32 }}>
+                <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
+                    ML-powered demand forecasting
+                </p>
             </div>
 
-            {/* Model Performance Metrics */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <GlassCard variant="gradient" className="p-6 animate-slide-up stagger-1">
-                    <div className="text-center">
-                        <Brain className="mx-auto mb-3 text-purple-400" size={32} />
-                        <p className="text-muted-foreground text-sm mb-2">Model Accuracy</p>
-                        <div className="relative w-24 h-24 mx-auto">
-                            <svg className="transform -rotate-90 w-24 h-24">
-                                <circle cx="48" cy="48" r="40" stroke="rgba(255,255,255,0.1)" strokeWidth="8" fill="none" />
-                                <circle
-                                    cx="48" cy="48" r="40"
-                                    stroke="url(#gradient)"
-                                    strokeWidth="8"
-                                    fill="none"
-                                    strokeDasharray={`${2 * Math.PI * 40}`}
-                                    strokeDashoffset={`${2 * Math.PI * 40 * (1 - modelMetrics.accuracy / 100)}`}
-                                    strokeLinecap="round"
-                                />
-                                <defs>
-                                    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                                        <stop offset="0%" stopColor="#667eea" />
-                                        <stop offset="100%" stopColor="#764ba2" />
-                                    </linearGradient>
-                                </defs>
-                            </svg>
-                            <div className="absolute inset-0 flex items-center justify-center z-10">
-                                <span className="text-2xl font-bold text-foreground">{modelMetrics.accuracy}%</span>
-                            </div>
-                        </div>
-                    </div>
-                </GlassCard>
-
-                <GlassCard variant="gradient" className="p-6 relative group overflow-visible animate-slide-up stagger-2">
-                    <div className="absolute top-4 right-4 group/info z-10">
-                        <div className="text-gray-400 opacity-50 hover:opacity-100 cursor-help">
-                            <Info size={16} />
-                        </div>
-                        <div className="invisible group-hover/info:visible absolute right-0 top-6 w-48 p-2 bg-gray-900 border border-gray-700 text-white text-xs rounded shadow-lg z-50">
-                            <strong>RMSE (Root Mean Square Error)</strong>: Lower is better. Measures the average magnitude of the error.
-                        </div>
-                    </div>
-                    <Target className="mb-3 text-blue-400" size={28} />
-                    <p className="text-gray-400 text-sm mb-2">RMSE</p>
-                    <p className="text-3xl font-bold text-gray-900 dark:text-white mb-1">{modelMetrics.rmse}K</p>
-                    <p className="text-xs text-gray-500">Root Mean Square Error</p>
-                </GlassCard>
-
-                <GlassCard variant="gradient" className="p-6 relative group overflow-visible animate-slide-up stagger-3">
-                    <div className="absolute top-4 right-4 group/info z-10">
-                        <div className="text-gray-400 opacity-50 hover:opacity-100 cursor-help">
-                            <Info size={16} />
-                        </div>
-                        <div className="invisible group-hover/info:visible absolute right-0 top-6 w-48 p-2 bg-gray-900 border border-gray-700 text-white text-xs rounded shadow-lg z-50">
-                            <strong>MAE (Mean Absolute Error)</strong>: Average absolute difference between predicted and actual values.
-                        </div>
-                    </div>
-                    <CheckCircle className="mb-3 text-green-400" size={28} />
-                    <p className="text-gray-400 text-sm mb-2">MAE</p>
-                    <p className="text-3xl font-bold text-gray-900 dark:text-white mb-1">{modelMetrics.mae}K</p>
-                    <p className="text-xs text-gray-500">Mean Absolute Error</p>
-                </GlassCard>
-
-                <GlassCard variant="gradient" className="p-6 relative group overflow-visible animate-slide-up stagger-4">
-                    <div className="absolute top-4 right-4 group/info z-10">
-                        <div className="text-gray-400 opacity-50 hover:opacity-100 cursor-help">
-                            <Info size={16} />
-                        </div>
-                        <div className="invisible group-hover/info:visible absolute right-0 top-6 w-48 p-2 bg-gray-900 border border-gray-700 text-white text-xs rounded shadow-lg z-50">
-                            <strong>MAPE</strong>: Mean Absolute Percentage Error. Accuracy as a percentage. Lower is better.
-                        </div>
-                    </div>
-                    <Zap className="mb-3 text-yellow-400" size={28} />
-                    <p className="text-gray-400 text-sm mb-2">MAPE</p>
-                    <p className="text-3xl font-bold text-gray-900 dark:text-white mb-1">{modelMetrics.mape}%</p>
-                    <p className="text-xs text-gray-500">Mean Abs Percentage Error</p>
-                </GlassCard>
+            <div className="fresh-metrics">
+                <div className="fresh-metric">
+                    <div className="fresh-metric-value">{modelMetrics.accuracy}%</div>
+                    <div className="fresh-metric-label">Model Accuracy</div>
+                </div>
+                <div className="fresh-metric">
+                    <div className="fresh-metric-value">{modelMetrics.rmse}K</div>
+                    <div className="fresh-metric-label">RMSE</div>
+                </div>
+                <div className="fresh-metric">
+                    <div className="fresh-metric-value">{modelMetrics.mae}K</div>
+                    <div className="fresh-metric-label">MAE</div>
+                </div>
+                <div className="fresh-metric">
+                    <div className="fresh-metric-value">{modelMetrics.mape}%</div>
+                    <div className="fresh-metric-label">MAPE</div>
+                </div>
             </div>
 
-            {/* Forecast Chart */}
-            <GlassCard variant="gradient" className="animate-slide-up stagger-5">
-                <div className="p-6">
-                    <div className="flex items-center justify-between mb-6">
-                        <div>
-                            <h2 className="text-xl font-bold bg-gradient-to-r from-primary to-purple bg-clip-text text-transparent mb-1">
-                                Demand Forecast with Confidence Intervals
-                            </h2>
-                            <p className="text-muted-foreground text-sm">Updated {modelMetrics.lastUpdated} • Trained on {modelMetrics.trainingData} of data</p>
-                        </div>
-                        <div className="flex gap-2">
-                            {[7, 14, 30, 90].map((days) => (
-                                <button
-                                    key={days}
-                                    onClick={() => setTimeHorizon(days)}
-                                    className={`px-4 py-2 rounded-lg transition font-medium ${timeHorizon === days
-                                        ? 'bg-blue-600 text-white'
-                                        : 'bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/20'
-                                        }`}
-                                >
-                                    {days}D
-                                </button>
-                            ))}
-                        </div>
+            <div className="fresh-section">
+                <div className="fresh-section-header">
+                    <span className="fresh-section-title">Demand Forecast with Confidence Intervals</span>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                        {[7, 14, 30, 90].map((days) => (
+                            <button
+                                key={days}
+                                onClick={() => setTimeHorizon(days)}
+                                className={`fresh-btn ${timeHorizon === days ? 'primary' : ''}`}
+                            >
+                                {days}D
+                            </button>
+                        ))}
                     </div>
+                </div>
+                <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
+                    Updated {modelMetrics.lastUpdated} &bull; Trained on {modelMetrics.trainingData} of data
+                </p>
 
-                    {/* What-If Analysis Control */}
-                    <div className="mb-6 p-4 bg-white/5 dark:bg-white/5 rounded-lg border border-gray-200 dark:border-white/10">
-                        <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center gap-2">
-                                <Zap className="text-yellow-400" size={20} />
-                                <span className="font-bold text-gray-900 dark:text-white">"What-If" Analysis Engine</span>
+                <div style={{ marginBottom: 16, padding: 16, background: 'var(--bg-muted)', borderRadius: 8, border: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <Zap className="text-yellow-400" size={20} />
+                            <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>&ldquo;What-If&rdquo; Analysis Engine</span>
+                        </div>
+                        <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Simulate market changes</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                        <span style={{ fontSize: 13, color: 'var(--text-muted)', minWidth: 100 }}>Growth Impact:</span>
+                        <input
+                            type="range"
+                            min="-50"
+                            max="50"
+                            value={growthRate}
+                            onChange={(e) => setGrowthRate(parseInt(e.target.value))}
+                            style={{ flex: 1, height: 8, background: 'var(--bg-muted)', borderRadius: 4, cursor: 'pointer' }}
+                        />
+                        <span style={{
+                            fontSize: 13, fontWeight: 700, width: 60, textAlign: 'right',
+                            color: growthRate > 0 ? 'var(--accent-green)' : growthRate < 0 ? 'var(--accent-red)' : 'var(--text-muted)'
+                        }}>
+                            {growthRate > 0 ? '+' : ''}{growthRate}%
+                        </span>
+                    </div>
+                    <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8, textAlign: 'center' }}>
+                        Adjusting this simulates price changes, marketing campaigns, or competitor actions.
+                    </p>
+                </div>
+
+                <div style={{ height: 400, position: 'relative' }}>
+                    {loading && (
+                        <div style={{
+                            position: 'absolute', inset: 0, display: 'flex', alignItems: 'center',
+                            justifyContent: 'center', background: 'rgba(0,0,0,0.5)',
+                            backdropFilter: 'blur(4px)', zIndex: 10, borderRadius: 8
+                        }}>
+                            <div style={{ color: '#fff', fontWeight: 700, animation: 'pulse 2s infinite' }}>
+                                Running Prophet Model...
                             </div>
-                            <span className="text-sm text-gray-500">Simulate market changes</span>
                         </div>
-                        <div className="flex items-center gap-4">
-                            <span className="text-sm text-gray-600 dark:text-gray-400 min-w-[100px]">Growth Impact:</span>
-                            <input
-                                type="range"
-                                min="-50"
-                                max="50"
-                                value={growthRate}
-                                onChange={(e) => setGrowthRate(parseInt(e.target.value))}
-                                className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
-                            />
-                            <span className={`text-sm font-bold w-16 text-right ${growthRate > 0 ? 'text-green-500' : growthRate < 0 ? 'text-red-500' : 'text-gray-500'}`}>
-                                {growthRate > 0 ? '+' : ''}{growthRate}%
-                            </span>
-                        </div>
-                        <p className="text-xs text-gray-400 mt-2 text-center">
-                            Adjusting this simulates price changes, marketing campaigns, or competitor actions.
-                        </p>
-                    </div>
+                    )}
+                    <Line data={forecastData} options={chartOptions} />
+                </div>
 
-                    <div style={{ height: '400px' }} className="relative">
-                        {loading && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm z-10 rounded-lg">
-                                <div className="text-white font-bold animate-pulse">Running Prophet Model...</div>
+                <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 24, fontSize: 13 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ width: 16, height: 2, background: '#60a5fa' }}></div>
+                        <span style={{ color: 'var(--text-muted)' }}>Historical</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ width: 16, height: 0, borderTop: '2px dashed #f472b6' }}></div>
+                        <span style={{ color: 'var(--text-muted)' }}>Forecast</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ width: 16, height: 16, background: 'rgba(244,114,182,0.2)', border: '1px solid rgba(244,114,182,0.3)' }}></div>
+                        <span style={{ color: 'var(--text-muted)' }}>95% Confidence</span>
+                    </div>
+                </div>
+            </div>
+
+            {apiData && apiData.impact && (
+                <div className="fresh-section">
+                    <div className="fresh-section-header">
+                        <span className="fresh-section-title">Strategic Impact Analysis</span>
+                    </div>
+                    <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
+                        AI-projected business implications based on current simulation
+                    </p>
+                    <div className="fresh-metrics">
+                        <div className="fresh-metric">
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                                <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Projected Margin</span>
+                                {growthRate >= 0 ?
+                                    <TrendingUp style={{ color: 'var(--accent-green)' }} size={20} /> :
+                                    <TrendingDown style={{ color: 'var(--accent-red)' }} size={20} />
+                                }
                             </div>
-                        )}
-                        <Line data={forecastData} options={chartOptions} />
-                    </div>
-
-                    <div className="mt-4 flex items-center justify-center gap-6 text-sm">
-                        <div className="flex items-center gap-2">
-                            <div className="w-4 h-0.5 bg-blue-400"></div>
-                            <span className="text-gray-400">Historical</span>
+                            <div className="fresh-metric-value">
+                                ₹{(apiData.impact.projected_margin / 100000).toFixed(2)} Lakhs
+                            </div>
+                            <div style={{ fontSize: 12, color: growthRate > 0 ? 'var(--accent-green)' : 'var(--text-muted)', fontWeight: 500 }}>
+                                {growthRate > 0 ? `+${growthRate}% vs Baseline` : 'Baseline Scenario'}
+                            </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <div className="w-4 h-0.5 border-t-2 border-dashed border-pink-400"></div>
-                            <span className="text-gray-400">Forecast</span>
+                        <div className="fresh-metric">
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                                <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Warehouse Space</span>
+                                <Package style={{ color: '#3b82f6' }} size={20} />
+                            </div>
+                            <div className="fresh-metric-value">
+                                {apiData.impact.warehouse_utilization.toLocaleString()} sq.ft
+                            </div>
+                            <div style={{ fontSize: 12, color: '#3b82f6', fontWeight: 500 }}>
+                                Utilization Forecast
+                            </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <div className="w-4 h-4 bg-pink-400/20 border border-pink-400/30"></div>
-                            <span className="text-gray-400">95% Confidence</span>
+                        <div className="fresh-metric">
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                                <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Logistics Risk</span>
+                                <Truck style={{
+                                    color: apiData.impact.shipping_risk.includes("High") ? 'var(--danger-text)' :
+                                        apiData.impact.shipping_risk.includes("Medium") ? 'var(--warning-text)' : 'var(--success-text)'
+                                }} size={20} />
+                            </div>
+                            <div className="fresh-metric-value" style={{
+                                color: apiData.impact.shipping_risk.includes("High") ? 'var(--danger-text)' :
+                                    apiData.impact.shipping_risk.includes("Medium") ? 'var(--warning-text)' : 'var(--success-text)'
+                            }}>
+                                {apiData.impact.shipping_risk}
+                            </div>
+                            <div style={{
+                                fontSize: 12, fontWeight: 500,
+                                color: apiData.impact.shipping_risk.includes("High") ? 'var(--danger-text)' :
+                                    apiData.impact.shipping_risk.includes("Medium") ? 'var(--warning-text)' : 'var(--success-text)'
+                            }}>
+                                Based on daily volume spikes
+                            </div>
                         </div>
                     </div>
                 </div>
-            </GlassCard>
-
-            {/* Strategic Impact Analysis (Prescriptive Analytics) */}
-            {apiData && apiData.impact && (
-                <GlassCard className="mt-8 border-t-4 border-t-purple-500">
-                    <div className="p-6">
-                        <div className="flex items-center gap-3 mb-6">
-                            <div className="p-3 bg-purple-500/10 rounded-lg">
-                                <Brain className="text-purple-500 w-6 h-6" />
-                            </div>
-                            <div>
-                                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Strategic Impact Analysis</h2>
-                                <p className="text-sm text-gray-500">AI-projected business implications based on current simulation</p>
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            {/* Margin Impact */}
-                            <div className="bg-gray-50 dark:bg-white/5 rounded-xl p-5 border border-gray-100 dark:border-white/10">
-                                <div className="flex justify-between items-start mb-2">
-                                    <span className="text-gray-500 text-sm font-medium">Projected Margin</span>
-                                    {growthRate >= 0 ?
-                                        <TrendingUp className="text-green-500 w-5 h-5" /> :
-                                        <TrendingDown className="text-red-500 w-5 h-5" />
-                                    }
-                                </div>
-                                <div className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
-                                    ₹{(apiData.impact.projected_margin / 100000).toFixed(2)} Lakhs
-                                </div>
-                                <div className="text-xs text-green-600 dark:text-green-400 font-medium">
-                                    {growthRate > 0 ? `+${growthRate}% vs Baseline` : 'Baseline Scenario'}
-                                </div>
-                            </div>
-
-                            {/* Warehousing */}
-                            <div className="bg-gray-50 dark:bg-white/5 rounded-xl p-5 border border-gray-100 dark:border-white/10">
-                                <div className="flex justify-between items-start mb-2">
-                                    <span className="text-gray-500 text-sm font-medium">Warehouse Space</span>
-                                    <Package className="text-blue-500 w-5 h-5" />
-                                </div>
-                                <div className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
-                                    {apiData.impact.warehouse_utilization.toLocaleString()} sq.ft
-                                </div>
-                                <div className="text-xs text-blue-600 dark:text-blue-400 font-medium">
-                                    Utilization Forecast
-                                </div>
-                            </div>
-
-                            {/* Shipping Risk */}
-                            <div className={`rounded-xl p-5 border ${apiData.impact.shipping_risk.includes("High") ? 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900/30' :
-                                apiData.impact.shipping_risk.includes("Medium") ? 'bg-yellow-50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-900/30' :
-                                    'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900/30'
-                                }`}>
-                                <div className="flex justify-between items-start mb-2">
-                                    <span className={`text-sm font-medium ${apiData.impact.shipping_risk.includes("High") ? 'text-red-700 dark:text-red-400' :
-                                        apiData.impact.shipping_risk.includes("Medium") ? 'text-yellow-700 dark:text-yellow-400' :
-                                            'text-green-700 dark:text-green-400'
-                                        }`}>Logistics Risk</span>
-                                    <Truck className={`w-5 h-5 ${apiData.impact.shipping_risk.includes("High") ? 'text-red-600 dark:text-red-500' :
-                                        apiData.impact.shipping_risk.includes("Medium") ? 'text-yellow-600 dark:text-yellow-500' :
-                                            'text-green-600 dark:text-green-500'
-                                        }`} />
-                                </div>
-                                <div className={`text-xl font-bold mb-1 ${apiData.impact.shipping_risk.includes("High") ? 'text-red-800 dark:text-red-300' :
-                                    apiData.impact.shipping_risk.includes("Medium") ? 'text-yellow-800 dark:text-yellow-300' :
-                                        'text-green-800 dark:text-green-300'
-                                    }`}>
-                                    {apiData.impact.shipping_risk}
-                                </div>
-                                <div className={`text-xs font-medium ${apiData.impact.shipping_risk.includes("High") ? 'text-red-700 dark:text-red-400' :
-                                    apiData.impact.shipping_risk.includes("Medium") ? 'text-yellow-700 dark:text-yellow-400' :
-                                        'text-green-700 dark:text-green-400'
-                                    }`}>
-                                    Based on daily volume spikes
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </GlassCard>
             )}
 
-            {/* Key Insights */}
-            <div>
-                <h2 className="text-2xl font-bold bg-gradient-to-r from-primary to-purple bg-clip-text text-transparent mb-4">
-                    Key Insights
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="fresh-section">
+                <div className="fresh-section-header">
+                    <span className="fresh-section-title">Key Insights</span>
+                </div>
+                <div className="fresh-list">
                     {insights.map((insight, idx) => (
-                        <div key={idx}>
-                            <GlassCard variant="gradient" className="p-6 h-full hover:shadow-glow-primary transition-all">
-                                <div className="flex items-start gap-4 h-full">
-                                    <div className="p-3 rounded-lg bg-gray-100 dark:bg-white/5 dark:bg-black/20 flex-shrink-0">
-                                        {insight.icon}
+                        <div key={idx} className="fresh-list-item" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
+                                <div style={{ padding: 12, background: 'var(--bg-muted)', borderRadius: 8, flexShrink: 0 }}>
+                                    {insight.icon}
+                                </div>
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>
+                                        {insight.title}
                                     </div>
-                                    <div className="flex-1 flex flex-col h-full">
-                                        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">{insight.title}</h3>
-                                        <p className="text-gray-400 text-sm mb-3 flex-1">{insight.description}</p>
-                                        <div className="mt-auto pt-3 border-t border-gray-200 dark:border-gray-700">
-                                            <p className="text-xs font-semibold text-gray-900 dark:text-white uppercase tracking-wider mb-2">Key Drivers (Why?)</p>
-                                            <div className="flex flex-wrap gap-2">
-                                                {insight.keyDrivers.map((driver) => (
-                                                    <span key={driver} className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800/50 text-slate-800 dark:text-slate-200 text-xs rounded-md border border-slate-300 dark:border-slate-700 font-semibold">
-                                                        {driver}
-                                                    </span>
-                                                ))}
-                                            </div>
+                                    <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 12 }}>
+                                        {insight.description}
+                                    </div>
+                                    <div style={{ paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+                                        <div style={{
+                                            fontSize: 11, fontWeight: 600, color: 'var(--text-primary)',
+                                            textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8
+                                        }}>
+                                            Key Drivers (Why?)
+                                        </div>
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                                            {insight.keyDrivers.map((driver) => (
+                                                <span key={driver} style={{
+                                                    padding: '4px 12px', background: 'var(--bg-muted)',
+                                                    color: 'var(--text-primary)', fontSize: 12,
+                                                    borderRadius: 6, border: '1px solid var(--border)', fontWeight: 600
+                                                }}>
+                                                    {driver}
+                                                </span>
+                                            ))}
                                         </div>
                                     </div>
                                 </div>
-                            </GlassCard>
+                            </div>
                         </div>
                     ))}
                 </div>
             </div>
 
-            {/* Recommendations */}
-            <GlassCard variant="gradient" className="animate-slide-up">
-                <div className="p-6">
-                    <div className="flex items-center justify-between mb-6">
-                        <h2 className="text-xl font-bold bg-gradient-to-r from-primary to-purple bg-clip-text text-transparent">
-                            AI-Powered Recommendations
-                        </h2>
-                        <button className="btn-enterprise btn-enterprise-destructive text-sm">
-                            Retrain Model
-                        </button>
-                    </div>
-
-                    <div className="space-y-4">
-                        {recommendations.map((rec, idx) => (
-                            <div
-                                key={idx}
-                                className="flex items-center justify-between p-4 bg-gray-50 dark:bg-white/5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition"
-                            >
-                                <div className="flex-1">
-                                    <div className="flex items-center gap-3 mb-2">
-                                        <span className="text-xs font-semibold text-gray-500 uppercase">{rec.category}</span>
-                                        <span className={`px-2 py-1 rounded text-xs font-semibold border ${getPriorityColor(rec.priority)}`}>
-                                            {rec.priority}
-                                        </span>
-                                    </div>
-                                    <p className="text-gray-900 dark:text-white font-medium mb-1">{rec.action}</p>
-                                    <p className="text-sm text-gray-400">Potential savings: {rec.savings}</p>
-                                </div>
-                                <div className="flex gap-3">
-                                    <button
-                                        onClick={() => { }}
-                                        className="btn-enterprise btn-enterprise-success text-sm"
-                                    >
-                                        Accept
-                                    </button>
-                                    <button
-                                        onClick={() => { }}
-                                        className="btn-enterprise btn-enterprise-destructive text-sm"
-                                    >
-                                        Dismiss
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
+            <div className="fresh-section">
+                <div className="fresh-section-header">
+                    <span className="fresh-section-title">AI-Powered Recommendations</span>
+                    <button className="fresh-btn primary">Retrain Model</button>
                 </div>
-            </GlassCard >
-        </div >
+                <table className="fresh-table">
+                    <thead>
+                        <tr>
+                            <th>Category</th>
+                            <th>Action</th>
+                            <th>Impact</th>
+                            <th>Priority</th>
+                            <th>Savings</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {recommendations.map((rec, idx) => (
+                            <tr key={idx}>
+                                <td style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-faint)', textTransform: 'uppercase' }}>
+                                    {rec.category}
+                                </td>
+                                <td>
+                                    <div style={{ fontWeight: 500, color: 'var(--text-primary)', marginBottom: 2 }}>{rec.action}</div>
+                                    <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Potential savings: {rec.savings}</div>
+                                </td>
+                                <td>
+                                    <span style={{
+                                        padding: '2px 8px', borderRadius: 4, fontSize: 12, fontWeight: 600,
+                        ...impactBadgeStyle(rec.impact)
+                                    }}>
+                                        {rec.impact}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span style={{
+                                        padding: '2px 8px', borderRadius: 4, fontSize: 12, fontWeight: 600,
+                        ...priorityBadgeStyle(rec.priority)
+                                    }}>
+                                        {rec.priority}
+                                    </span>
+                                </td>
+                                <td style={{ fontWeight: 600, color: 'var(--accent-green)' }}>{rec.savings}</td>
+                                <td>
+                                    <div style={{ display: 'flex', gap: 8 }}>
+                                        <button className="fresh-btn primary" onClick={() => {}}>Accept</button>
+                                        <button className="fresh-btn" onClick={() => {}}>Dismiss</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
     );
 };
 

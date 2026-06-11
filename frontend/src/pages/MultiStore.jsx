@@ -1,14 +1,8 @@
-/**
- * Enterprise Retail Intelligence System v3.0
- * MULTI-STORE DASHBOARD - Store comparison and network performance
- */
-
 import { useState, useMemo, useEffect } from 'react';
 import {
     Store, MapPin, TrendingUp, TrendingDown, DollarSign, Target, AlertTriangle, Star,
     ChevronDown, ChevronUp, Search
 } from 'lucide-react';
-import UnifiedCard from '../components/ui/UnifiedCard';
 import LoadingNotice from '../components/ui/LoadingNotice';
 import mockStores, { getTopPerformingStores, calculateRegionalPerformance } from '../data/storeData';
 import {
@@ -28,8 +22,8 @@ import {
     Legend,
     Filler
 } from 'chart.js';
+import '../styles/fresh-design.css';
 
-// Register ChartJS components
 ChartJS.register(
     CategoryScale,
     LinearScale,
@@ -42,13 +36,11 @@ ChartJS.register(
     Filler
 );
 
-// SortIcon component outside of render
 const SortIcon = ({ field, sortBy, sortOrder }) => {
     if (sortBy !== field) return null;
     return sortOrder === 'asc' ? <ChevronUp size={16} /> : <ChevronDown size={16} />;
 };
 
-// Mini Sparkline Component using SVG
 const MiniSparkline = ({ data, color, isPositive }) => {
     const width = 60;
     const height = 24;
@@ -56,7 +48,6 @@ const MiniSparkline = ({ data, color, isPositive }) => {
     const max = Math.max(...data);
     const range = max - min || 1;
 
-    // Generate path
     const points = data.map((val, i) => {
         const x = (i / (data.length - 1)) * width;
         const y = height - ((val - min) / range) * height;
@@ -68,12 +59,11 @@ const MiniSparkline = ({ data, color, isPositive }) => {
             <path
                 d={`M ${points}`}
                 fill="none"
-                stroke={isPositive ? '#10b981' : '#ef4444'} // Semantic Green/Red
+                stroke={isPositive ? '#10b981' : '#ef4444'}
                 strokeWidth="1.5"
                 strokeLinecap="round"
                 strokeLinejoin="round"
             />
-            {/* End dot */}
             <circle
                 cx={width}
                 cy={height - ((data[data.length - 1] - min) / range) * height}
@@ -84,6 +74,14 @@ const MiniSparkline = ({ data, color, isPositive }) => {
     );
 };
 
+const Metric = ({ value, label, icon: Icon }) => (
+    <div className="fresh-metric">
+        {Icon && <Icon size={20} className="fresh-metric-icon" />}
+        <div className="fresh-metric-value">{value}</div>
+        <div className="fresh-metric-label">{label}</div>
+    </div>
+);
+
 const MultiStore = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [stores] = useState(mockStores);
@@ -92,28 +90,23 @@ const MultiStore = () => {
     const [sortBy, setSortBy] = useState('revenue');
     const [sortOrder, setSortOrder] = useState('desc');
 
-    // Calculate metrics
     const networkMetrics = useMemo(() => getNetworkMetrics(stores), [stores]);
     const regionalPerformance = useMemo(() => calculateRegionalPerformance(stores), [stores]);
     const topStores = useMemo(() => getTopPerformingStores(stores, 5), [stores]);
     const storesNeedingAttention = useMemo(() => getStoresNeedingAttention(stores), [stores]);
 
-    // Simulating initial data load
     useEffect(() => {
         const timer = setTimeout(() => setIsLoading(false), 2000);
         return () => clearTimeout(timer);
     }, []);
 
-    // Filter and sort stores
     const filteredStores = useMemo(() => {
         let filtered = stores;
 
-        // Filter by region
         if (selectedRegion !== 'all') {
             filtered = filtered.filter(s => s.location.region === selectedRegion);
         }
 
-        // Filter by search
         if (searchQuery) {
             filtered = filtered.filter(s =>
                 s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -121,7 +114,6 @@ const MultiStore = () => {
             );
         }
 
-        // Sort
         filtered = [...filtered].sort((a, b) => {
             let aVal, bVal;
             switch (sortBy) {
@@ -161,195 +153,143 @@ const MultiStore = () => {
     };
 
     const formatCurrency = (value) => {
-        if (value >= 10000000) return `₹${(value / 10000000).toFixed(1)}Cr`;
-        if (value >= 100000) return `₹${(value / 100000).toFixed(1)}L`;
-        return `₹${(value / 1000).toFixed(0)}k`;
+        if (value >= 10000000) return `\u20B9${(value / 10000000).toFixed(1)}Cr`;
+        if (value >= 100000) return `\u20B9${(value / 100000).toFixed(1)}L`;
+        return `\u20B9${(value / 1000).toFixed(0)}k`;
     };
 
     return (
-        <div className="min-h-screen space-y-8 p-6 animate-fade-in">
-            {/* Header */}
-            <div
-            >
-                <h1 className="text-4xl font-bold text-foreground mb-2">
-                    Multi-Store Dashboard
-                </h1>
-                <p className="text-muted-foreground">
-                    Monitor and compare performance across {networkMetrics.totalStores} retail locations
+        <div className="fresh-page">
+            <div style={{ marginBottom: 32 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+                    <div className="fresh-pills">
+                        <button
+                            className={`fresh-pill ${selectedRegion === 'all' ? 'active' : ''}`}
+                            onClick={() => setSelectedRegion('all')}
+                        >
+                            All
+                        </button>
+                        {regionalPerformance.map(r => (
+                            <button
+                                key={r.region}
+                                className={`fresh-pill ${selectedRegion === r.region ? 'active' : ''}`}
+                                onClick={() => setSelectedRegion(selectedRegion === r.region ? 'all' : r.region)}
+                            >
+                                {r.region}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+                <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
+                    Network-wide performance and comparison
                 </p>
             </div>
 
             {isLoading ? <LoadingNotice message="Loading store data..." /> : (
                 <>
-                    {/* Network Overview Metrics */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                        <UnifiedCard className="p-6 animate-slide-up stagger-1">
-                            <div className="flex items-start justify-between">
-                                <div>
-                                    <p className="text-sm text-muted-foreground mb-1">Total Stores</p>
-                                    <p className="text-3xl font-bold text-foreground">{networkMetrics.totalStores}</p>
-                                    <p className="text-xs text-gray-500 dark:text-muted-foreground mt-1">
-                                        {networkMetrics.activeStores} Active
-                                    </p>
-                                </div>
-                                <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500/20 to-cyan-500/20">
-                                    <Store className="text-blue-500" size={24} />
-                                </div>
-                            </div>
-                        </UnifiedCard>
-
-                        <UnifiedCard className="p-6 animate-slide-up stagger-2">
-                            <div className="flex items-start justify-between">
-                                <div>
-                                    <p className="text-sm text-muted-foreground mb-1">Network Revenue</p>
-                                    <p className="text-3xl font-bold text-foreground">
-                                        {formatCurrency(networkMetrics.totalRevenue)}
-                                    </p>
-                                    <p className="text-xs text-gray-500 dark:text-muted-foreground mt-1">
-                                        Avg: {formatCurrency(networkMetrics.avgRevenue)}/store
-                                    </p>
-                                </div>
-                                <div className="p-3 rounded-xl bg-gradient-to-br from-green-500/20 to-emerald-500/20">
-                                    <DollarSign className="text-green-500" size={24} />
-                                </div>
-                            </div>
-                        </UnifiedCard>
-
-                        <UnifiedCard className="p-6 animate-slide-up stagger-3">
-                            <div className="flex items-start justify-between">
-                                <div>
-                                    <p className="text-sm text-muted-foreground mb-1">Avg Growth</p>
-                                    <p className="text-3xl font-bold text-foreground">
-                                        {networkMetrics.avgGrowth >= 0 ? '+' : ''}{networkMetrics.avgGrowth}%
-                                    </p>
-                                    <p className="text-xs text-gray-500 dark:text-muted-foreground mt-1">Month over month</p>
-                                </div>
-                                <div className="p-3 rounded-xl bg-gradient-to-br from-purple-500/20 to-pink-500/20">
-                                    {networkMetrics.avgGrowth >= 0 ? (
-                                        <TrendingUp className="text-success" size={24} />
-                                    ) : (
-                                        <TrendingDown className="text-danger" size={24} />
-                                    )}
-                                </div>
-                            </div>
-                        </UnifiedCard>
-
-                        <UnifiedCard className="p-6 animate-slide-up stagger-4">
-                            <div className="flex items-start justify-between">
-                                <div>
-                                    <p className="text-sm text-muted-foreground mb-1">Satisfaction</p>
-                                    <div className="flex items-center gap-2">
-                                        <p className="text-3xl font-bold text-foreground">{networkMetrics.avgSatisfaction}</p>
-                                        <Star className="text-yellow-500 fill-yellow-500" size={20} />
-                                    </div>
-                                    <p className="text-xs text-gray-500 dark:text-muted-foreground mt-1">Network average</p>
-                                </div>
-                                <div className="p-3 rounded-xl bg-gradient-to-br from-yellow-500/20 to-orange-500/20">
-                                    <Target className="text-yellow-500" size={24} />
-                                </div>
-                            </div>
-                        </UnifiedCard>
+                    <div className="fresh-metrics">
+                        <Metric value={String(networkMetrics.totalStores)} label="Total Stores" icon={Store} />
+                        <Metric value={formatCurrency(networkMetrics.totalRevenue)} label="Network Revenue" icon={DollarSign} />
+                        <Metric
+                            value={`${networkMetrics.avgGrowth >= 0 ? '+' : ''}${networkMetrics.avgGrowth}%`}
+                            label="Avg Growth"
+                            icon={networkMetrics.avgGrowth >= 0 ? TrendingUp : TrendingDown}
+                        />
+                        <Metric value={String(networkMetrics.avgSatisfaction)} label="Satisfaction" icon={Target} />
                     </div>
 
-                    {/* Regional Performance */}
-                    <UnifiedCard className="p-6 animate-slide-up stagger-1">
-                        <h2 className="text-xl font-bold bg-gradient-to-r from-primary to-purple bg-clip-text text-transparent mb-4">
-                            Regional Performance
-                        </h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                            {regionalPerformance.map((region, idx) => (
+                    <div className="fresh-section">
+                        <div className="fresh-section-header">
+                            <span className="fresh-section-title">Regional Performance</span>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+                            {regionalPerformance.map((region) => (
                                 <div
                                     key={region.region}
                                     onClick={() => setSelectedRegion(selectedRegion === region.region ? 'all' : region.region)}
-                                    className={`p-4 rounded-xl border cursor-pointer transition-all hover:scale-105 ${selectedRegion === region.region
-                                        ? 'bg-gradient-to-br from-primary/10 to-purple/10 border-primary/50 shadow-glow-primary'
-                                        : 'bg-card border-border hover:border-primary/30'
-                                        }`}
+                                    className={`p-4 rounded-xl border cursor-pointer transition-all hover:scale-105 ${
+                                        selectedRegion === region.region
+                                            ? 'bg-[var(--bg-muted)] border-[var(--text-primary)]/50'
+                                            : 'bg-[var(--bg-card)] border-[var(--border)] hover:border-[var(--text-primary)]/30'
+                                    }`}
                                 >
                                     <div className="flex items-center gap-2 mb-2">
-                                        <MapPin size={16} className="text-primary" />
-                                        <h3 className="font-semibold text-foreground">{region.region}</h3>
+                                        <MapPin size={16} className="text-[var(--text-primary)]" />
+                                        <h3 className="font-semibold text-[var(--text-primary)]">{region.region}</h3>
                                     </div>
-                                    <p className="text-2xl font-bold text-foreground">
+                                    <p className="text-2xl font-bold text-[var(--text-primary)]">
                                         {formatCurrency(region.totalRevenue)}
                                     </p>
-                                    <div className="flex items-center justify-between mt-2 text-xs text-gray-500 dark:text-muted-foreground">
+                                    <div className="flex items-center justify-between mt-2 text-xs text-[var(--text-muted)]">
                                         <span>{region.storeCount} stores</span>
-                                        <span className="text-foreground font-bold">
+                                        <span className="text-[var(--text-primary)] font-bold">
                                             {region.avgGrowth >= 0 ? '+' : ''}{region.avgGrowth}%
                                         </span>
                                     </div>
                                 </div>
                             ))}
                         </div>
-                    </UnifiedCard>
+                    </div>
 
-                    {/* Top & Bottom Performers */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        {/* Top Performers */}
-                        <UnifiedCard className="p-6 animate-slide-up stagger-2">
-                            <div className="flex items-center gap-2 mb-4">
-                                <TrendingUp className="text-success" size={20} />
-                                <h2 className="text-xl font-bold text-foreground">Top Performers</h2>
+                        <div className="fresh-section">
+                            <div className="fresh-section-header">
+                                <TrendingUp size={18} style={{ color: 'var(--success)' }} />
+                                <span className="fresh-section-title">Top Performers</span>
                             </div>
-                            <div className="space-y-3">
+                            <div className="fresh-list">
                                 {topStores.map((store, idx) => (
-                                    <div key={store.id} className="flex items-center justify-between p-3 rounded-lg bg-success/5 border border-success/20">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-yellow-500 to-orange-500 flex items-center justify-center text-white font-bold text-sm">
+                                    <div key={store.id} className="fresh-list-item">
+                                        <div className="fresh-list-left">
+                                            <span className="fresh-badge yellow" style={{ width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 12 }}>
                                                 #{idx + 1}
-                                            </div>
+                                            </span>
                                             <div>
-                                                <p className="font-semibold text-foreground">{store.name}</p>
-                                                <p className="text-xs text-gray-500 dark:text-muted-foreground">{store.location.city}</p>
+                                                <span className="fresh-list-label">{store.name}</span>
+                                                <span style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)' }}>{store.location.city}</span>
                                             </div>
                                         </div>
-                                        <div className="text-right">
-                                            <p className="font-bold text-foreground">{formatCurrency(store.performance.monthlyRevenue)}</p>
-                                            <p className="text-xs text-foreground font-semibold">{store.metrics.salesGrowth >= 0 ? '+' : ''}{store.metrics.salesGrowth}%</p>
+                                        <div className="fresh-list-right">
+                                            <span className="fresh-list-value">{formatCurrency(store.performance.monthlyRevenue)}</span>
+                                            <span style={{ fontSize: 11, color: 'var(--text-primary)', fontWeight: 600 }}>{store.metrics.salesGrowth >= 0 ? '+' : ''}{store.metrics.salesGrowth}%</span>
                                         </div>
                                     </div>
                                 ))}
                             </div>
-                        </UnifiedCard>
+                        </div>
 
-                        {/* Needs Attention */}
-                        <UnifiedCard className="p-6 animate-slide-up stagger-3">
-                            <div className="flex items-center gap-2 mb-4">
-                                <AlertTriangle className="text-warning" size={20} />
-                                <h2 className="text-xl font-bold text-foreground">Needs Attention</h2>
+                        <div className="fresh-section">
+                            <div className="fresh-section-header">
+                                <AlertTriangle size={18} style={{ color: 'var(--warning)' }} />
+                                <span className="fresh-section-title">Needs Attention</span>
                             </div>
-                            <div className="space-y-3">
+                            <div className="fresh-list">
                                 {storesNeedingAttention.slice(0, 5).map((store) => (
-                                    <div key={store.id} className="flex items-center justify-between p-3 rounded-lg bg-warning/5 border border-warning/20">
+                                    <div key={store.id} className="fresh-list-item">
                                         <div>
-                                            <p className="font-semibold text-foreground">{store.name}</p>
-                                            <div className="flex flex-wrap gap-1 mt-1">
+                                            <span className="fresh-list-label">{store.name}</span>
+                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
                                                 {store.issues.map((issue, idx) => (
-                                                    <span key={idx} className="text-xs px-2 py-0.5 rounded-full bg-warning/20 text-warning">
-                                                        {issue}
-                                                    </span>
+                                                    <span key={idx} className="fresh-badge yellow">{issue}</span>
                                                 ))}
                                             </div>
                                         </div>
-                                        <div className="text-right">
-                                            <p className="font-bold text-foreground">{formatCurrency(store.performance.monthlyRevenue)}</p>
-                                            <p className="text-xs text-foreground font-semibold">{store.metrics.salesGrowth}%</p>
+                                        <div className="fresh-list-right">
+                                            <span className="fresh-list-value">{formatCurrency(store.performance.monthlyRevenue)}</span>
+                                            <span style={{ fontSize: 11, color: 'var(--text-primary)', fontWeight: 600 }}>{store.metrics.salesGrowth}%</span>
                                         </div>
                                     </div>
                                 ))}
                             </div>
-                        </UnifiedCard>
+                        </div>
                     </div>
 
-                    {/* Store Analytics Charts */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        {/* Store Performance Trends */}
-                        <UnifiedCard className="p-6 animate-slide-up stagger-1">
-                            <h2 className="text-xl font-bold bg-gradient-to-r from-primary to-purple bg-clip-text text-transparent mb-4">
-                                Top Store Performance Trends
-                            </h2>
-                            <div className="h-64">
+                        <div className="fresh-section">
+                            <div className="fresh-section-header">
+                                <span className="fresh-section-title">Top Store Performance Trends</span>
+                            </div>
+                            <div style={{ height: 256 }}>
                                 <Line
                                     data={{
                                         labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
@@ -381,16 +321,16 @@ const MultiStore = () => {
                                             legend: {
                                                 position: 'top',
                                                 labels: {
-                                                    color: '#9ca3af',
+                                                    color: 'var(--text-muted)',
                                                     padding: 10,
                                                     font: { size: 11 }
                                                 }
                                             },
                                             tooltip: {
-                                                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                                                backgroundColor: 'var(--bg-card)',
                                                 padding: 12,
-                                                titleColor: '#fff',
-                                                bodyColor: '#fff',
+                                                titleColor: 'var(--text-primary)',
+                                                bodyColor: 'var(--text-secondary)',
                                                 callbacks: {
                                                     label: (context) => {
                                                         const value = context.parsed.y;
@@ -401,13 +341,13 @@ const MultiStore = () => {
                                         },
                                         scales: {
                                             x: {
-                                                grid: { color: 'rgba(255, 255, 255, 0.1)' },
-                                                ticks: { color: '#9ca3af' }
+                                                grid: { color: 'rgba(255,255,255,0.04)' },
+                                                ticks: { color: 'var(--text-muted)' }
                                             },
                                             y: {
-                                                grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                                                grid: { color: 'rgba(255,255,255,0.04)' },
                                                 ticks: {
-                                                    color: '#9ca3af',
+                                                    color: 'var(--text-muted)',
                                                     callback: (value) => formatCurrency(value)
                                                 }
                                             }
@@ -415,14 +355,13 @@ const MultiStore = () => {
                                     }}
                                 />
                             </div>
-                        </UnifiedCard>
+                        </div>
 
-                        {/* Store Type Distribution */}
-                        <UnifiedCard className="p-6 animate-slide-up stagger-2">
-                            <h2 className="text-xl font-bold bg-gradient-to-r from-primary to-purple bg-clip-text text-transparent mb-4">
-                                Revenue by Store Type
-                            </h2>
-                            <div className="h-64">
+                        <div className="fresh-section">
+                            <div className="fresh-section-header">
+                                <span className="fresh-section-title">Revenue by Store Type</span>
+                            </div>
+                            <div style={{ height: 256 }}>
                                 <Bar
                                     data={{
                                         labels: ['Flagship', 'Standard', 'Express', 'Outlet'],
@@ -448,10 +387,10 @@ const MultiStore = () => {
                                         plugins: {
                                             legend: { display: false },
                                             tooltip: {
-                                                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                                                backgroundColor: 'var(--bg-card)',
                                                 padding: 12,
-                                                titleColor: '#fff',
-                                                bodyColor: '#fff',
+                                                titleColor: 'var(--text-primary)',
+                                                bodyColor: 'var(--text-secondary)',
                                                 callbacks: {
                                                     label: (context) => {
                                                         const value = context.parsed.y;
@@ -480,149 +419,142 @@ const MultiStore = () => {
                                     }}
                                 />
                             </div>
-                        </UnifiedCard>
+                        </div>
                     </div>
 
-                    {/* Store Comparison Table */}
-                    <UnifiedCard className="p-6">
-                        <div className="flex items-center justify-between mb-6">
-                            <h2 className="text-xl font-bold bg-gradient-to-r from-primary to-purple bg-clip-text text-transparent">
+                    <div className="fresh-section">
+                        <div className="fresh-section-header">
+                            <span className="fresh-section-title">
                                 Store Comparison
                                 {selectedRegion !== 'all' && (
-                                    <span className="ml-2 text-sm font-normal text-muted-foreground">
+                                    <span style={{ marginLeft: 8, fontSize: 13, fontWeight: 400, color: 'var(--text-muted)' }}>
                                         ({selectedRegion})
                                     </span>
                                 )}
-                            </h2>
-                            <div className="flex items-center gap-4">
-                                {selectedRegion !== 'all' && (
-                                    <button
-                                        onClick={() => setSelectedRegion('all')}
-                                        className="px-4 py-2 rounded-lg bg-primary/20 text-primary text-sm font-medium hover:bg-primary/30 transition-colors"
-                                    >
-                                        Clear Filter
-                                    </button>
-                                )}
-                                <div className="relative">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
-                                    <input
-                                        type="text"
-                                        placeholder="Search stores..."
-                                        value={searchQuery}
-                                        onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="pl-10 pr-4 py-2 rounded-lg bg-card border border-border text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                                    />
-                                </div>
+                            </span>
+                            <div style={{ position: 'relative' }}>
+                                <Search className="absolute" style={{ left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} size={18} />
+                                <input
+                                    type="text"
+                                    placeholder="Search stores..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    style={{
+                                        paddingLeft: 36,
+                                        paddingRight: 16,
+                                        paddingTop: 8,
+                                        paddingBottom: 8,
+                                        borderRadius: 8,
+                                        background: 'var(--bg-card)',
+                                        border: '1px solid var(--border)',
+                                        color: 'var(--text-primary)',
+                                        fontSize: 13,
+                                        outline: 'none',
+                                        width: 200
+                                    }}
+                                />
                             </div>
                         </div>
-
-                        <div className="overflow-x-auto">
-                            <table className="w-full">
-                                <thead>
-                                    <tr className="border-b border-border">
-                                        <th
-                                            onClick={() => handleSort('name')}
-                                            className="text-left py-3 px-4 text-muted-foreground font-light text-sm uppercase tracking-wider cursor-pointer hover:text-foreground transition-colors"
-                                        >
-                                            <div className="flex items-center gap-2">
-                                                Store <SortIcon field="name" sortBy={sortBy} sortOrder={sortOrder} />
+                        <table className="fresh-table">
+                            <thead>
+                                <tr>
+                                    <th
+                                        onClick={() => handleSort('name')}
+                                        style={{ cursor: 'pointer', textAlign: 'left' }}
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            Store <SortIcon field="name" sortBy={sortBy} sortOrder={sortOrder} />
+                                        </div>
+                                    </th>
+                                    <th style={{ textAlign: 'center' }}>Trend</th>
+                                    <th style={{ textAlign: 'center' }}>Type</th>
+                                    <th style={{ textAlign: 'center' }}>Location</th>
+                                    <th
+                                        onClick={() => handleSort('revenue')}
+                                        className="num"
+                                        style={{ cursor: 'pointer' }}
+                                    >
+                                        <div className="flex items-center justify-end gap-2">
+                                            Revenue <SortIcon field="revenue" sortBy={sortBy} sortOrder={sortOrder} />
+                                        </div>
+                                    </th>
+                                    <th
+                                        onClick={() => handleSort('growth')}
+                                        className="num"
+                                        style={{ cursor: 'pointer' }}
+                                    >
+                                        <div className="flex items-center justify-end gap-2">
+                                            Growth <SortIcon field="growth" sortBy={sortBy} sortOrder={sortOrder} />
+                                        </div>
+                                    </th>
+                                    <th
+                                        onClick={() => handleSort('satisfaction')}
+                                        className="num"
+                                        style={{ cursor: 'pointer' }}
+                                    >
+                                        <div className="flex items-center justify-end gap-2">
+                                            Rating <SortIcon field="satisfaction" sortBy={sortBy} sortOrder={sortOrder} />
+                                        </div>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {filteredStores.map((store) => (
+                                    <tr key={store.id}>
+                                        <td>
+                                            <div>
+                                                <p className="font-semibold text-[var(--text-primary)]">{store.name}</p>
+                                                <p className="text-xs text-[var(--text-muted)]">{store.id}</p>
                                             </div>
-                                        </th>
-                                        <th className="text-center py-3 px-4 text-muted-foreground font-light text-sm uppercase tracking-wider">
-                                            Trend
-                                        </th>
-                                        <th className="text-center py-3 px-4 text-muted-foreground font-light text-sm uppercase tracking-wider">
-                                            Type
-                                        </th>
-                                        <th className="text-center py-3 px-4 text-muted-foreground font-semibold text-sm uppercase tracking-wider">
-                                            Location
-                                        </th>
-                                        <th
-                                            onClick={() => handleSort('revenue')}
-                                            className="text-right py-3 px-4 text-muted-foreground font-semibold text-sm uppercase tracking-wider cursor-pointer hover:text-foreground transition-colors"
-                                        >
-                                            <div className="flex items-center justify-end gap-2">
-                                                Revenue <SortIcon field="revenue" sortBy={sortBy} sortOrder={sortOrder} />
+                                        </td>
+                                        <td style={{ textAlign: 'center' }}>
+                                            <MiniSparkline
+                                                data={Array.from({ length: 10 }, () => 500 + Math.random() * 500)}
+                                                isPositive={store.metrics.salesGrowth >= 0}
+                                            />
+                                        </td>
+                                        <td style={{ textAlign: 'center' }}>
+                                            {(() => {
+                                                const badgeStyle = {
+                                                    Flagship: { bg: 'rgba(250, 204, 21, 0.2)', color: '#facc15' },
+                                                    Standard: { bg: 'rgba(96, 165, 250, 0.2)', color: '#93c5fd' },
+                                                    Express: { bg: 'rgba(74, 222, 128, 0.2)', color: '#4ade80' },
+                                                    Outlet: { bg: 'rgba(192, 132, 252, 0.2)', color: '#c084fc' }
+                                                }[store.type] || { bg: 'rgba(255,255,255,0.1)', color: 'var(--text-primary)' };
+                                                return (
+                                                    <span className="fresh-badge" style={{ background: badgeStyle.bg, color: badgeStyle.color }}>
+                                                        {store.type}
+                                                    </span>
+                                                );
+                                            })()}
+                                        </td>
+                                        <td style={{ textAlign: 'center' }}>
+                                            <p className="text-sm text-[var(--text-primary)]">{store.location.city}</p>
+                                            <p className="text-xs text-[var(--text-muted)]">{store.location.region}</p>
+                                        </td>
+                                        <td className="num" style={{ fontWeight: 600 }}>
+                                            {formatCurrency(store.performance.monthlyRevenue)}
+                                        </td>
+                                        <td className="num" style={{ fontWeight: 600 }}>
+                                            {store.metrics.salesGrowth >= 0 ? '+' : ''}{store.metrics.salesGrowth}%
+                                        </td>
+                                        <td className="num">
+                                            <div className="flex items-center justify-end gap-1">
+                                                <Star className="text-yellow-500 fill-yellow-500" size={14} />
+                                                <span className="font-semibold text-[var(--text-primary)]">{store.metrics.customerSatisfaction}</span>
                                             </div>
-                                        </th>
-                                        <th
-                                            onClick={() => handleSort('growth')}
-                                            className="text-right py-3 px-4 text-muted-foreground font-semibold text-sm uppercase tracking-wider cursor-pointer hover:text-foreground transition-colors"
-                                        >
-                                            <div className="flex items-center justify-end gap-2">
-                                                Growth <SortIcon field="growth" sortBy={sortBy} sortOrder={sortOrder} />
-                                            </div>
-                                        </th>
-                                        <th
-                                            onClick={() => handleSort('satisfaction')}
-                                            className="text-right py-3 px-4 text-muted-foreground font-semibold text-sm uppercase tracking-wider cursor-pointer hover:text-foreground transition-colors"
-                                        >
-                                            <div className="flex items-center justify-end gap-2">
-                                                Rating <SortIcon field="satisfaction" sortBy={sortBy} sortOrder={sortOrder} />
-                                            </div>
-                                        </th>
+                                        </td>
                                     </tr>
-                                </thead>
-                                <tbody>
-                                    {filteredStores.map((store, idx) => (
-                                        <motion.tr
-                                            key={store.id}
-                                            className="border-b border-border/50 hover:bg-gradient-to-r hover:from-primary/5 hover:to-purple/5 transition-all"
-                                        >
-                                            <td className="py-3 px-4">
-                                                <div>
-                                                    <p className="font-semibold text-foreground">{store.name}</p>
-                                                    <p className="text-xs text-muted-foreground">{store.id}</p>
-                                                </div>
-                                            </td>
-                                            <td className="py-3 px-4 flex justify-center">
-                                                {/* Mock Sparkline Data - In real app, this comes from API */}
-                                                <MiniSparkline
-                                                    data={Array.from({ length: 10 }, () => 500 + Math.random() * 500)}
-                                                    isPositive={store.metrics.salesGrowth >= 0}
-                                                />
-                                            </td>
-                                            <td className="py-3 px-4 text-center">
-                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${store.type === 'Flagship' ? 'bg-yellow-500/20 text-yellow-800 dark:text-yellow-300' :
-                                                    store.type === 'Standard' ? 'bg-blue-500/20 text-blue-600 dark:text-blue-400' :
-                                                        store.type === 'Express' ? 'bg-green-500/20 text-green-600 dark:text-green-400' :
-                                                            'bg-purple-500/20 text-purple-600 dark:text-purple-400'
-                                                    }`}>
-                                                    {store.type}
-                                                </span>
-                                            </td>
-                                            <td className="py-3 px-4 text-center">
-                                                <p className="text-sm text-foreground">{store.location.city}</p>
-                                                <p className="text-xs text-muted-foreground">{store.location.region}</p>
-                                            </td>
-                                            <td className="py-3 px-4 text-right">
-                                                <p className="font-bold text-foreground">
-                                                    {formatCurrency(store.performance.monthlyRevenue)}
-                                                </p>
-                                            </td>
-                                            <td className="py-3 px-4 text-right">
-                                                <span className="font-semibold text-foreground">
-                                                    {store.metrics.salesGrowth >= 0 ? '+' : ''}{store.metrics.salesGrowth}%
-                                                </span>
-                                            </td>
-                                            <td className="py-3 px-4 text-right">
-                                                <div className="flex items-center justify-end gap-1">
-                                                    <Star className="text-yellow-500 fill-yellow-500" size={14} />
-                                                    <span className="font-semibold text-foreground">{store.metrics.customerSatisfaction}</span>
-                                                </div>
-                                            </td>
-                                        </motion.tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                                ))}
+                            </tbody>
+                        </table>
 
                         {filteredStores.length === 0 && (
-                            <div className="text-center py-12 text-muted-foreground">
+                            <div className="text-center py-12 text-[var(--text-muted)]">
                                 No stores found matching your criteria
                             </div>
                         )}
-                    </UnifiedCard>
+                    </div>
                 </>
             )}
         </div>

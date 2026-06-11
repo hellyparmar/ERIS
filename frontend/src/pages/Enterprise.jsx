@@ -24,7 +24,7 @@ import mockStores from '../data/storeData';
 
 const Enterprise = () => {
     const { t } = useLanguage();
-    const { addToast } = useToast();
+    const { showToast: addToast } = useToast();
     const [selectedRegion, setSelectedRegion] = useState('All Regions');
 
     const [stores, setStores] = useState([]);
@@ -87,7 +87,6 @@ const Enterprise = () => {
             {/* Page Header */}
             <div className="flex flex-col md:flex-row justify-between items-end gap-4">
                 <div>
-                    <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent mb-2">Enterprise Overview</h1>
                     <p className="text-muted-foreground">Real-time performance across {stores.length} locations</p>
                 </div>
 

@@ -3,18 +3,19 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Search, Plus, Eye, Edit2, Trash2, X } from 'lucide-react';
 import axios from 'axios';
 import LoadingSkeleton from '../components/ui/LoadingSkeleton';
+import '../styles/fresh-design.css';
 
 const API_BASE = 'http://localhost:8000/api/v1';
 
 // Contact Type Badge
 const ContactTypeBadge = ({ type }) => {
   const colors = {
-    supplier: 'bg-blue-100 text-blue-800',
-    distributor: 'bg-purple-100 text-purple-800',
-    logistics: 'bg-orange-100 text-orange-800',
+    supplier: 'fresh-badge green',
+    distributor: 'fresh-badge yellow',
+    logistics: 'fresh-badge',
   };
   return (
-    <span className={`px-2 py-1 rounded-full text-xs font-medium ${colors[type?.toLowerCase()] || 'bg-gray-100 text-gray-800'}`}>
+    <span className={colors[type?.toLowerCase()] || 'fresh-badge'}>
       {type}
     </span>
   );
@@ -22,17 +23,17 @@ const ContactTypeBadge = ({ type }) => {
 
 // Category Chips
 const CategoryChips = ({ categories }) => {
-  if (!categories || categories.length === 0) return <span className="text-gray-400">—</span>;
+  if (!categories || categories.length === 0) return <span style={{ color: 'var(--text-muted)' }}>—</span>;
   const displayed = categories.slice(0, 2);
   const remaining = categories.length - 2;
   return (
-    <div className="flex gap-1 flex-wrap">
+    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
       {displayed.map((cat, i) => (
-        <span key={i} className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
+        <span key={i} className="fresh-badge" style={{ fontSize: 11 }}>
           {cat}
         </span>
       ))}
-      {remaining > 0 && <span className="text-xs text-gray-500">+{remaining}</span>}
+      {remaining > 0 && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>+{remaining}</span>}
     </div>
   );
 };
@@ -44,10 +45,10 @@ const ViewContactDrawer = ({ contact, onClose, invoices }) => {
   const contactInvoices = invoices?.slice(0, 5) || [];
 
   return (
-    <div className="fixed right-0 top-0 h-full w-96 bg-white shadow-lg z-50 overflow-auto">
+    <div className="fixed right-0 top-0 h-full w-96 bg-white shadow-sm z-50 overflow-auto">
       <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center">
         <h2 className="text-lg font-bold">Contact Details</h2>
-        <button onClick={onClose} className="hover:bg-gray-100 p-1 rounded">
+        <button onClick={onClose} className="hover:bg-[var(--bg-muted)] p-1 rounded">
           <X size={20} />
         </button>
       </div>
@@ -55,43 +56,43 @@ const ViewContactDrawer = ({ contact, onClose, invoices }) => {
       <div className="p-6 space-y-6">
         {/* Contact Information */}
         <div>
-          <h3 className="font-bold text-gray-900 mb-4">{contact.company_name}</h3>
+          <h3 className="font-bold text-[var(--text-primary)] mb-4">{contact.company_name}</h3>
           <div className="space-y-3 text-sm">
             <div>
-              <label className="text-gray-500">Contact Person</label>
-              <p className="text-gray-900">{contact.contact_person || '—'}</p>
+              <label className="text-[var(--text-muted)]">Contact Person</label>
+              <p className="text-[var(--text-primary)]">{contact.contact_person || '—'}</p>
             </div>
             <div>
-              <label className="text-gray-500">Type</label>
+              <label className="text-[var(--text-muted)]">Type</label>
               <p className="mt-1">
                 <ContactTypeBadge type={contact.contact_type} />
               </p>
             </div>
             <div>
-              <label className="text-gray-500">Phone</label>
+              <label className="text-[var(--text-muted)]">Phone</label>
               <p className="text-blue-600">
                 <a href={`tel:${contact.phone}`}>{contact.phone || '—'}</a>
               </p>
             </div>
             <div>
-              <label className="text-gray-500">Email</label>
+              <label className="text-[var(--text-muted)]">Email</label>
               <p className="text-blue-600">
                 <a href={`mailto:${contact.email}`}>{contact.email || '—'}</a>
               </p>
             </div>
             <div>
-              <label className="text-gray-500">City</label>
-              <p className="text-gray-900">{contact.city || '—'}</p>
+              <label className="text-[var(--text-muted)]">City</label>
+              <p className="text-[var(--text-primary)]">{contact.city || '—'}</p>
             </div>
             <div>
-              <label className="text-gray-500">GST Number</label>
-              <p className="font-mono text-gray-900">{contact.gst_number || '—'}</p>
+              <label className="text-[var(--text-muted)]">GST Number</label>
+              <p className="font-mono text-[var(--text-primary)]">{contact.gst_number || '—'}</p>
             </div>
             <div>
-              <label className="text-gray-500">Categories</label>
+              <label className="text-[var(--text-muted)]">Categories</label>
               <div className="mt-2 flex flex-wrap gap-1">
                 {contact.categories?.map((cat, i) => (
-                  <span key={i} className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
+                  <span key={i} className="fresh-badge" style={{ fontSize: 11 }}>
                     {cat}
                   </span>
                 ))}
@@ -102,23 +103,23 @@ const ViewContactDrawer = ({ contact, onClose, invoices }) => {
 
         {/* Invoice History */}
         <div className="border-t pt-4">
-          <h4 className="font-bold text-gray-900 mb-3">Recent Invoices</h4>
+          <h4 className="font-bold text-[var(--text-primary)] mb-3">Recent Invoices</h4>
           {contactInvoices.length === 0 ? (
-            <p className="text-sm text-gray-500">No invoices</p>
+            <p className="text-sm text-[var(--text-muted)]">No invoices</p>
           ) : (
-            <div className="space-y-2">
+            <div className="fresh-list">
               {contactInvoices.map((inv) => (
-                <div key={inv.id} className="flex justify-between items-center text-sm p-2 bg-gray-50 rounded">
+                <div key={inv.id} className="fresh-list-item" style={{ justifyContent: 'space-between' }}>
                   <div>
-                    <p className="font-mono text-gray-900">{inv.invoice_number}</p>
-                    <p className="text-gray-500">{new Date(inv.issue_date).toLocaleDateString()}</p>
+                    <p className="font-mono" style={{ color: 'var(--text-primary)', fontSize: 13 }}>{inv.invoice_number}</p>
+                    <p style={{ color: 'var(--text-muted)', fontSize: 12 }}>{new Date(inv.issue_date).toLocaleDateString()}</p>
                   </div>
-                  <div className="text-right">
-                    <p className="font-medium">₹{(inv.total || 0).toLocaleString('en-IN')}</p>
-                    <span className={`text-xs px-2 py-1 rounded-full ${
-                      inv.status === 'paid' ? 'bg-green-100 text-green-800' :
-                      inv.status === 'pending' ? 'bg-amber-100 text-amber-800' :
-                      'bg-red-100 text-red-800'
+                  <div style={{ textAlign: 'right' }}>
+                    <p style={{ fontWeight: 600, fontSize: 13 }}>₹{(inv.total || 0).toLocaleString('en-IN')}</p>
+                    <span className={`fresh-badge ${
+                      inv.status === 'paid' ? 'green' :
+                      inv.status === 'pending' ? 'yellow' :
+                      'red'
                     }`}>
                       {inv.status}
                     </span>
@@ -173,42 +174,42 @@ const ContactFormDrawer = ({ contact, onClose, onSuccess }) => {
   };
 
   return (
-    <div className="fixed right-0 top-0 h-full w-96 bg-white shadow-lg z-50 overflow-auto">
+    <div className="fixed right-0 top-0 h-full w-96 bg-white shadow-sm z-50 overflow-auto">
       <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center">
         <h2 className="text-lg font-bold">{contact ? 'Edit Contact' : 'Add Contact'}</h2>
-        <button onClick={onClose} className="hover:bg-gray-100 p-1 rounded">
+        <button onClick={onClose} className="hover:bg-[var(--bg-muted)] p-1 rounded">
           <X size={20} />
         </button>
       </div>
 
       <form onSubmit={handleSubmit} className="p-6 space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Company Name *</label>
+          <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Company Name *</label>
           <input
             type="text"
             value={formData.company_name || ''}
             onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            className="w-full px-3 py-2 border border-[var(--border-color)] rounded-lg"
             required
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Contact Person</label>
+          <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Contact Person</label>
           <input
             type="text"
             value={formData.contact_person || ''}
             onChange={(e) => setFormData({ ...formData, contact_person: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            className="w-full px-3 py-2 border border-[var(--border-color)] rounded-lg"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Type *</label>
+          <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Type *</label>
           <select
             value={formData.contact_type || ''}
             onChange={(e) => setFormData({ ...formData, contact_type: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            className="w-full px-3 py-2 border border-[var(--border-color)] rounded-lg"
             required
           >
             <option value="">Select Type</option>
@@ -219,44 +220,44 @@ const ContactFormDrawer = ({ contact, onClose, onSuccess }) => {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+          <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Phone</label>
           <input
             type="tel"
             value={formData.phone || ''}
             onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            className="w-full px-3 py-2 border border-[var(--border-color)] rounded-lg"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+          <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Email</label>
           <input
             type="email"
             value={formData.email || ''}
             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            className="w-full px-3 py-2 border border-[var(--border-color)] rounded-lg"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+          <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">City</label>
           <input
             type="text"
             value={formData.city || ''}
             onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            className="w-full px-3 py-2 border border-[var(--border-color)] rounded-lg"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">GST Number</label>
+          <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">GST Number</label>
           <input
             type="text"
             value={formData.gst_number || ''}
             onChange={(e) => setFormData({ ...formData, gst_number: e.target.value?.toUpperCase() })}
             placeholder="15-character GST (e.g., 18AAPCT1234K1Z5)"
             className={`w-full px-3 py-2 border rounded-lg font-mono ${
-              errors.gst_number ? 'border-red-500' : 'border-gray-300'
+              errors.gst_number ? 'border-red-500' : 'border-[var(--border-color)]'
             }`}
           />
           {errors.gst_number && <p className="text-red-600 text-xs mt-1">{errors.gst_number}</p>}
@@ -266,14 +267,14 @@ const ContactFormDrawer = ({ contact, onClose, onSuccess }) => {
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+            className="fresh-btn"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={mutation.isPending}
-            className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            className="fresh-btn primary"
           >
             {mutation.isPending ? 'Saving...' : 'Save'}
           </button>
@@ -348,7 +349,7 @@ export default function Contacts() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6">
+      <div className="min-h-screen flex items-center justify-center bg-[var(--bg-muted)] p-6">
         <div className="w-full max-w-5xl space-y-3">
           <LoadingSkeleton variant="table-row" count={8} className="w-full" />
         </div>
@@ -357,50 +358,51 @@ export default function Contacts() {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Contacts</h1>
-        <p className="text-gray-500">Manage suppliers, distributors, and logistics partners</p>
+    <div className="fresh-page">
+      <div style={{ marginBottom: 32 }}>
+        <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>Business contacts and vendor directory</p>
       </div>
 
-      {/* Controls */}
-      <div className="flex gap-4 flex-wrap">
-        <div className="flex-1 min-w-64 flex items-center gap-2 bg-white border border-gray-300 rounded-lg px-3 py-2">
-          <Search size={18} className="text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search by name, phone, email..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="flex-1 outline-none"
-          />
+      {/* Controls + Table */}
+      <div className="fresh-section">
+        <div className="fresh-section-header">
+          <span className="fresh-section-title">All Contacts</span>
+          <button
+            onClick={() => setEditingContact({})}
+            className="fresh-btn primary"
+            style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+          >
+            <Plus size={18} />
+            Add Contact
+          </button>
         </div>
 
-        <select
-          value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value)}
-          className="px-4 py-2 border border-gray-300 rounded-lg bg-white"
-        >
-          <option value="All">All Types</option>
-          <option value="Supplier">Supplier</option>
-          <option value="Distributor">Distributor</option>
-          <option value="Logistics">Logistics</option>
-        </select>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
+          <div style={{ flex: 1, minWidth: 240, display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', border: '1px solid var(--border-color)', borderRadius: 8 }}>
+            <Search size={18} style={{ color: 'var(--text-muted)' }} />
+            <input
+              type="text"
+              placeholder="Search by name, phone, email..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              style={{ flex: 1, outline: 'none', border: 'none', background: 'transparent', fontSize: 13 }}
+            />
+          </div>
 
-        <button
-          onClick={() => setEditingContact({})}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-        >
-          <Plus size={18} />
-          Add Contact
-        </button>
-      </div>
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+            style={{ padding: '6px 12px', border: '1px solid var(--border-color)', borderRadius: 8, background: 'transparent', fontSize: 13, cursor: 'pointer' }}
+          >
+            <option value="All">All Types</option>
+            <option value="Supplier">Supplier</option>
+            <option value="Distributor">Distributor</option>
+            <option value="Logistics">Logistics</option>
+          </select>
+        </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto md:overflow-x-visible">
-          <table className="w-full min-w-max">
-          <thead className="bg-gray-50 border-b border-gray-200">
+        <table className="fresh-table">
+          <thead>
             <tr>
               {[
                 { key: 'company_name', label: 'Company' },
@@ -414,69 +416,65 @@ export default function Contacts() {
                 <th
                   key={col.key}
                   onClick={() => handleSort(col.key)}
-                  className="px-6 py-3 text-left text-xs font-bold text-gray-700 bg-gray-50 cursor-pointer hover:bg-gray-100"
+                  style={{ cursor: 'pointer' }}
                 >
                   {col.label}
                   {sortConfig.key === col.key && (
-                    <span className="ml-1">{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>
+                    <span style={{ marginLeft: 4 }}>{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>
                   )}
                 </th>
               ))}
-              <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 bg-gray-50">
-                Actions
-              </th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {filtered.map(contact => (
-              <tr key={contact.id} className="border-b border-gray-200 hover:bg-gray-50">
-                <td className="px-6 py-4">
+              <tr key={contact.id}>
+                <td>
                   <div>
-                    <p className="font-bold text-gray-900">{contact.company_name}</p>
-                    <p className="text-sm text-gray-500">{contact.city}</p>
+                    <p style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{contact.company_name}</p>
+                    <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>{contact.city}</p>
                   </div>
                 </td>
-                <td className="px-6 py-4 text-gray-900">{contact.contact_person || '—'}</td>
-                <td className="px-6 py-4">
+                <td style={{ color: 'var(--text-primary)' }}>{contact.contact_person || '—'}</td>
+                <td>
                   {contact.phone ? (
-                    <a href={`tel:${contact.phone}`} className="text-blue-600 hover:underline">
+                    <a href={`tel:${contact.phone}`} style={{ color: 'var(--accent)', textDecoration: 'none' }}>
                       {contact.phone}
                     </a>
-                  ) : (
-                    '—'
-                  )}
+                  ) : '—'}
                 </td>
-                <td className="px-6 py-4">
+                <td>
                   {contact.email ? (
-                    <a href={`mailto:${contact.email}`} className="text-blue-600 hover:underline">
+                    <a href={`mailto:${contact.email}`} style={{ color: 'var(--accent)', textDecoration: 'none' }}>
                       {contact.email}
                     </a>
-                  ) : (
-                    '—'
-                  )}
+                  ) : '—'}
                 </td>
-                <td className="px-6 py-4 font-mono text-sm text-gray-900">
+                <td style={{ fontFamily: 'monospace', fontSize: 13, color: 'var(--text-primary)' }}>
                   {contact.gst_number || '—'}
                 </td>
-                <td className="px-6 py-4">
+                <td>
                   <ContactTypeBadge type={contact.contact_type} />
                 </td>
-                <td className="px-6 py-4">
+                <td>
                   <CategoryChips categories={contact.categories} />
                 </td>
-                <td className="px-6 py-4">
-                  <div className="flex gap-2">
+                <td>
+                  <div style={{ display: 'flex', gap: 4 }}>
                     <button
                       onClick={() => setViewingContact(contact)}
-                      className="p-2 text-blue-600 hover:bg-blue-50 rounded"
+                      className="fresh-btn"
                       title="View"
+                      style={{ padding: '4px 8px' }}
                     >
                       <Eye size={16} />
                     </button>
                     <button
                       onClick={() => setEditingContact(contact)}
-                      className="p-2 text-amber-600 hover:bg-amber-50 rounded"
+                      className="fresh-btn"
                       title="Edit"
+                      style={{ padding: '4px 8px' }}
                     >
                       <Edit2 size={16} />
                     </button>
@@ -486,8 +484,9 @@ export default function Contacts() {
                           deleteContactMutation.mutate(contact.id);
                         }
                       }}
-                      className="p-2 text-red-600 hover:bg-red-50 rounded"
+                      className="fresh-btn"
                       title="Delete"
+                      style={{ padding: '4px 8px', color: 'var(--error)' }}
                     >
                       <Trash2 size={16} />
                     </button>
@@ -497,7 +496,6 @@ export default function Contacts() {
             ))}
           </tbody>
         </table>
-        </div>
       </div>
 
       {/* Drawers */}
