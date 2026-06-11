@@ -1,5 +1,11 @@
-import './badge.css';
+import { Badge as MasterBadge } from './index';
 
-export default function Badge({ label, variant = 'neutral' }) {
-  return <span className={`badge badge-${variant}`}>{label}</span>;
+export default function Badge({ children, label, variant = 'neutral', ...props }) {
+  return (
+    <MasterBadge variant={variant} {...props}>
+      {children || label}
+    </MasterBadge>
+  );
 }
+
+export { MasterBadge as Badge };

@@ -1,0 +1,659 @@
+/* ══════════════════════════════════════════════════════════
+   ERIS UI Component Library Stylesheet
+   Highly Premium & Consistent Components
+   ══════════════════════════════════════════════════════════ */
+
+/* ── ANIMATIONS ── */
+@keyframes eris-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes eris-scale-in {
+  from { opacity: 0; transform: scale(0.95) translateY(10px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes eris-slide-in-right {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+
+@keyframes eris-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes eris-shimmer {
+  0% { background-position: -200px 0; }
+  100% { background-position: 200px 0; }
+}
+
+@keyframes eris-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(0.97); }
+}
+
+/* ── UTILITIES ── */
+.eris-transition {
+  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── 1. BUTTONS ── */
+.eris-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: var(--font);
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  outline: none;
+  white-space: nowrap;
+  position: relative;
+  overflow: hidden;
+}
+
+.eris-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* Button Variants */
+.eris-btn--primary {
+  background: linear-gradient(135deg, #8B5CF6 0%, #06B6D4 100%);
+  color: #FFFFFF;
+  border: none;
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.25);
+}
+
+.eris-btn--primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(139, 92, 246, 0.4);
+}
+
+.eris-btn--primary:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.eris-btn--secondary {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-xs);
+}
+
+.eris-btn--secondary:hover:not(:disabled) {
+  background: var(--bg-muted);
+  border-color: var(--text-muted);
+}
+
+.eris-btn--danger {
+  background: linear-gradient(135deg, #EF4444 0%, #B91C1C 100%);
+  color: #FFFFFF;
+  border: none;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25);
+}
+
+.eris-btn--danger:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
+}
+
+.eris-btn--ghost {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid transparent;
+}
+
+.eris-btn--ghost:hover:not(:disabled) {
+  background: var(--bg-muted);
+  color: var(--text-primary);
+}
+
+/* Button Sizes */
+.eris-btn--sm {
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+.eris-btn--md {
+  padding: 10px 18px;
+  font-size: 14px;
+}
+
+.eris-btn--lg {
+  padding: 14px 24px;
+  font-size: 16px;
+}
+
+/* Spinner inside button */
+.eris-btn__spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: eris-spin 0.6s linear infinite;
+}
+
+/* ── 2. INPUTS ── */
+.eris-input-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.eris-input-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.eris-input-container {
+  display: flex;
+  align-items: center;
+  position: relative;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0 12px;
+  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.eris-input-container:focus-within {
+  border-color: #8B5CF6;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15), inset 0 0 0 1px #8B5CF6;
+}
+
+.eris-input {
+  width: 100%;
+  padding: 10px 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-family: var(--font);
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.eris-input:disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.eris-input-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.eris-input-icon--left {
+  margin-right: 8px;
+}
+
+.eris-input-icon--right {
+  margin-left: 8px;
+}
+
+.eris-input-clear {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.eris-input-clear:hover {
+  background: var(--bg-muted);
+  color: var(--text-primary);
+}
+
+/* Input states */
+.eris-input-container--valid {
+  border-color: var(--accent-green) !important;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15) !important;
+}
+
+.eris-input-container--invalid {
+  border-color: var(--accent-red) !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15) !important;
+}
+
+.eris-input-container--disabled {
+  background: var(--bg-muted) !important;
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.eris-input-helper {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.eris-input-error {
+  font-size: 12px;
+  color: var(--accent-red);
+  font-weight: 500;
+}
+
+/* ── 3. DROPDOWNS & SELECTS ── */
+.eris-select-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.eris-select-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 14px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 200ms ease;
+  outline: none;
+}
+
+.eris-select-trigger:focus {
+  border-color: #8B5CF6;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15);
+}
+
+.eris-select-trigger__chevron {
+  transition: transform 200ms ease;
+  color: var(--text-muted);
+}
+
+.eris-select-trigger__chevron--open {
+  transform: rotate(180deg);
+}
+
+.eris-select-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 100%;
+  background: #13141A;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  z-index: 100;
+  max-height: 250px;
+  overflow-y: auto;
+  padding: 6px;
+  animation: eris-scale-in 150ms ease-out;
+}
+
+.eris-select-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.eris-select-option:hover {
+  background: var(--bg-muted);
+  color: var(--text-primary);
+}
+
+.eris-select-option--selected {
+  background: rgba(139, 92, 246, 0.15) !important;
+  color: #8B5CF6 !important;
+  font-weight: 600;
+}
+
+/* ── 4. BADGES ── */
+.eris-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 9999px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  animation: eris-scale-in 200ms ease-out;
+  border: 1px solid transparent;
+}
+
+.eris-badge--sm { padding: 2px 8px; font-size: 10px; }
+.eris-badge--md { padding: 4px 12px; font-size: 11px; }
+.eris-badge--lg { padding: 6px 16px; font-size: 12px; }
+
+/* Badge Variants */
+.eris-badge--success { background: rgba(16, 185, 129, 0.1); color: var(--accent-green); border-color: rgba(16, 185, 129, 0.2); }
+.eris-badge--warning { background: rgba(245, 158, 11, 0.1); color: var(--accent-amber); border-color: rgba(245, 158, 11, 0.2); }
+.eris-badge--error   { background: rgba(239, 68, 68, 0.1);   color: var(--accent-red);   border-color: rgba(239, 68, 68, 0.2); }
+.eris-badge--info    { background: rgba(59, 130, 246, 0.1);  color: #3B82F6;            border-color: rgba(59, 130, 246, 0.2); }
+.eris-badge--neutral { background: var(--bg-muted);          color: var(--text-secondary); border-color: var(--border); }
+
+.eris-badge__close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 1px;
+  border-radius: 50%;
+  color: currentColor;
+  opacity: 0.7;
+}
+
+.eris-badge__close:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* ── 5. MODALS & DIALOGS ── */
+.eris-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(12px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: eris-fade-in 200ms ease-out;
+}
+
+.eris-modal {
+  background: #13141A;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 520px;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  animation: eris-scale-in 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  display: flex;
+  flex-direction: column;
+}
+
+.eris-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.eris-modal__title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.eris-modal__close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 50%;
+  transition: all 150ms;
+}
+
+.eris-modal__close:hover {
+  background: var(--bg-muted);
+  color: var(--text-primary);
+}
+
+.eris-modal__body {
+  padding: 24px;
+  overflow-y: auto;
+}
+
+.eris-modal__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 24px;
+  background: var(--bg-muted);
+  border-top: 1px solid var(--border);
+}
+
+/* ── 6. CARDS ── */
+.eris-card {
+  background: #13141A;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 24px;
+  transition: all 250ms ease;
+  box-shadow: var(--shadow-sm);
+  position: relative;
+}
+
+.eris-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+  border-color: #8B5CF6;
+}
+
+.eris-card--elevated {
+  box-shadow: var(--shadow-md);
+}
+
+.eris-card--bordered {
+  border-left: 4px solid #8B5CF6;
+}
+
+/* ── 7. TABLES ── */
+.eris-table-container {
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+.eris-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 13.5px;
+}
+
+.eris-table__th {
+  position: sticky;
+  top: 0;
+  background: #13141A;
+  backdrop-filter: blur(10px);
+  z-index: 10;
+  padding: 12px 18px;
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+  transition: color 150ms ease;
+}
+
+.eris-table__th:hover {
+  color: var(--text-primary);
+}
+
+.eris-table__tr {
+  border-bottom: 1px solid var(--border);
+  transition: all 200ms ease;
+}
+
+.eris-table__tr:hover {
+  background: var(--bg-muted);
+  border-left: 3px solid #8B5CF6;
+}
+
+.eris-table__td {
+  padding: 14px 18px;
+  color: var(--text-primary);
+  vertical-align: middle;
+}
+
+/* ── 8. SEARCH BARS ── */
+.eris-search-bar {
+  display: flex;
+  align-items: center;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0 14px;
+  width: 100%;
+  transition: all 200ms ease;
+}
+
+.eris-search-bar:focus-within {
+  border-color: #8B5CF6;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15);
+  transform: scale(1.01);
+}
+
+/* ── 9. AVATARS ── */
+.eris-avatar {
+  border-radius: 50%;
+  object-fit: cover;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: #FFFFFF;
+  position: relative;
+  cursor: pointer;
+  transition: transform 200ms ease;
+}
+
+.eris-avatar:hover {
+  transform: scale(1.08);
+}
+
+.eris-avatar--xs { width: 24px; height: 24px; font-size: 10px; }
+.eris-avatar--sm { width: 32px; height: 32px; font-size: 12px; }
+.eris-avatar--md { width: 40px; height: 40px; font-size: 14px; }
+.eris-avatar--lg { width: 48px; height: 48px; font-size: 16px; }
+.eris-avatar--xl { width: 64px; height: 64px; font-size: 20px; }
+
+.eris-avatar__status {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid #13141A;
+}
+
+.eris-avatar__status--online  { background: var(--accent-green); }
+.eris-avatar__status--offline { background: var(--text-muted); }
+
+/* ── 11. TOOLTIPS ── */
+.eris-tooltip-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.eris-tooltip {
+  position: absolute;
+  bottom: 120%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(19, 20, 26, 0.9);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  border-radius: 6px;
+  color: #FFFFFF;
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: all 150ms ease;
+  z-index: 100;
+}
+
+.eris-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 5px;
+  border-style: solid;
+  border-color: rgba(19, 20, 26, 0.9) transparent transparent transparent;
+}
+
+.eris-tooltip-wrapper:hover .eris-tooltip {
+  opacity: 1;
+  bottom: 130%;
+}
+
+/* ── 12. LOADING SHIMMERS ── */
+.eris-shimmer {
+  background: linear-gradient(90deg, var(--bg-muted) 25%, var(--bg-card) 50%, var(--bg-muted) 75%);
+  background-size: 200% 100%;
+  animation: eris-shimmer 1.5s infinite linear;
+}
+
+/* ── 13. EMPTY STATE ── */
+.eris-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.eris-empty-state__icon {
+  margin-bottom: 16px;
+  color: var(--text-muted);
+}
+
+.eris-empty-state__title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+
+.eris-empty-state__subtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+  max-width: 320px;
+  margin-bottom: 20px;
+}
+
+/* ── 14. ERROR STATES ── */
+.eris-error-banner {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 8px;
+  padding: 12px 16px;
+  color: var(--accent-red);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13.5px;
+  animation: eris-scale-in 200ms ease-out;
+}
