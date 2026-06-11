@@ -1,13 +1,65 @@
-import { Card as MasterCard } from './index';
+import React from 'react';
+import PropTypes from 'prop-types';
+import '../../styles/eris-components.css';
 
-export default function Card({ children, className = '', variant = 'base', ...props }) {
-  // Map variant name to visual match
-  const v = variant === 'glass' ? 'base' : variant === 'default' ? 'base' : variant;
+/**
+ * Card Component - Structured content containers
+ * Variants: base, elevated, bordered
+ */
+export const Card = ({
+  children,
+  variant = 'base',
+  title,
+  titleRight,
+  style = {},
+  className = '',
+  padding = 'var(--space-6)',
+  onClick,
+  ...props
+}) => {
+  const cardClass = [
+    'eris-card',
+    variant === 'elevated' ? 'eris-card--elevated' : '',
+    variant === 'bordered' ? 'eris-card--bordered' : '',
+    onClick ? 'cursor-pointer hover:shadow-lg' : '',
+    className
+  ].filter(Boolean).join(' ');
+
   return (
-    <MasterCard variant={v} className={className} {...props}>
+    <div
+      onClick={onClick}
+      className={cardClass}
+      style={{
+        padding,
+        transition: 'all var(--duration-normal) cubic-bezier(0.4, 0, 0.2, 1)',
+        ...style
+      }}
+      {...props}
+    >
+      {(title || titleRight) && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
+          {title && (
+            <h3 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+              {title}
+            </h3>
+          )}
+          {titleRight && <div>{titleRight}</div>}
+        </div>
+      )}
       {children}
-    </MasterCard>
+    </div>
   );
-}
+};
 
-export { MasterCard as Card };
+Card.propTypes = {
+  children: PropTypes.node.isRequired,
+  variant: PropTypes.oneOf(['base', 'elevated', 'bordered']),
+  title: PropTypes.string,
+  titleRight: PropTypes.node,
+  style: PropTypes.object,
+  className: PropTypes.string,
+  padding: PropTypes.string,
+  onClick: PropTypes.func,
+};
+
+export default Card;
