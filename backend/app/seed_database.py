@@ -21,6 +21,7 @@ from app.models.customers import Customer
 from app.models.employee_models import Employee, EmployeeRole
 from app.models.models_v6 import Supplier, Product, Sale, SaleItem
 from app.models.inventory import Inventory
+from app.models.business_contact import BusinessContact, ContactType
 from app.models.external_factors_models import EconomicIndicatorHistory
 
 logger = logging.getLogger(__name__)
@@ -369,6 +370,72 @@ async def generate_historical_data(session: AsyncSession) -> Dict:
             })
         if supp_data:
             await session.execute(pg_or_sqlite_insert(session, Supplier).values(supp_data).on_conflict_do_nothing())
+        await session.commit()
+        
+        # Business Contacts
+        contacts_seed = [
+            {
+                "contact_id": uuid.UUID("a1111111-1111-1111-1111-111111111111"),
+                "company_name": "AgroFresh Supplies Ltd",
+                "contact_person": "Vikram Desai",
+                "phone": "+919876500001",
+                "gst_number": "27AABCA1234A1Z5",
+                "address": "Plot 45, APMC Market, Vashi",
+                "city": "Mumbai",
+                "contact_type": ContactType.supplier,
+                "product_categories": ["Vegetables", "Dairy", "Grains"],
+                "is_active": True
+            },
+            {
+                "contact_id": uuid.UUID("b2222222-2222-2222-2222-222222222222"),
+                "company_name": "SpiceRoute Logistics Hub",
+                "contact_person": "Pooja Sharma",
+                "phone": "+919876500002",
+                "gst_number": "07AAACB5678B1Z2",
+                "address": "Warehouse 12, Okhla Industrial Area",
+                "city": "Delhi",
+                "contact_type": ContactType.logistics,
+                "product_categories": ["Cold Storage", "Freight"],
+                "is_active": True
+            },
+            {
+                "contact_id": uuid.UUID("c3333333-3333-3333-3333-333333333333"),
+                "company_name": "Deccan Beverages & Syrups",
+                "contact_person": "Karthik Reddy",
+                "phone": "+919876500003",
+                "gst_number": "29AACCD9012C1Z8",
+                "address": "88 Industrial Layout, Peenya",
+                "city": "Bangalore",
+                "contact_type": ContactType.distributor,
+                "product_categories": ["Beverages", "Syrups", "Spices"],
+                "is_active": True
+            },
+            {
+                "contact_id": uuid.UUID("d4444444-4444-4444-4444-444444444444"),
+                "company_name": "Coastal Seafood & Poultry",
+                "contact_person": "Muthu Raman",
+                "phone": "+919876500004",
+                "gst_number": "33AABCP3456D1Z1",
+                "address": "Harbor Wharf Rd, Royapuram",
+                "city": "Chennai",
+                "contact_type": ContactType.supplier,
+                "product_categories": ["Meat", "Poultry", "Seafood"],
+                "is_active": True
+            },
+            {
+                "contact_id": uuid.UUID("e5555555-5555-5555-5555-555555555555"),
+                "company_name": "Rajputana Spices & Flour Mills",
+                "contact_person": "Raghuvir Singh",
+                "phone": "+919876500005",
+                "gst_number": "08AAECR7890E1Z4",
+                "address": "RIICO Industrial Area, Mansarovar",
+                "city": "Jaipur",
+                "contact_type": ContactType.distributor,
+                "product_categories": ["Flour", "Dry Masalas", "Oils"],
+                "is_active": True
+            }
+        ]
+        await session.execute(pg_or_sqlite_insert(session, BusinessContact).values(contacts_seed).on_conflict_do_nothing())
         await session.commit()
         
         # Products
