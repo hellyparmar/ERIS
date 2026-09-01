@@ -1,0 +1,28 @@
+.text-primary   { color: var(--text-primary) !important; }
+.text-secondary { color: var(--text-secondary) !important; }
+.text-muted     { color: var(--text-muted) !important; }
+.bg-card        { background: var(--bg-card) !important; }
+.bg-muted       { background: var(--bg-muted) !important; }
+
+.notification-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 20px; height: 20px; border-radius: var(--r-full);
+  background: var(--accent-red); color: #fff; font-size: 12px; font-weight: 700;
+}
+
+.status-pill {
+  display: inline-block; padding: 4px 12px; border-radius: var(--r-full);
+  font-size: 12px; font-weight: 500; white-space: nowrap;
+}
+.status-success { background: var(--success-bg); color: var(--success-text); }
+.status-warning { background: var(--warning-bg); color: var(--warning-text); }
+.status-error   { background: var(--danger-bg);  color: var(--danger-text); }
+.status-info    { background: var(--info-bg);     color: var(--info-text); }
+
+.badge-success  { background: var(--success-bg); color: var(--success-text); }
+.badge-danger   { background: var(--danger-bg);  color: var(--danger-text); }
+.badge-neutral  { background: var(--bg-muted);   color: var(--text-secondary); }
+
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+.skeleton-card { background: var(--bg-muted); border-radius: 1rem; animation: pulse 1.6s ease-in-out infinite; }
+.skeleton-line { height: 1rem; border-radius: 999px; background: var(--bg-muted); animation: pulse 1.6s ease-in-out infinite; }

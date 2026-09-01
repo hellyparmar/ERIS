@@ -1,0 +1,16 @@
+# Pre-commit configuration for ERIS project
+repos:
+  - repo: local
+    hooks:
+      - id: py-compile-check
+        name: Python Syntax Verification (py_compile)
+        entry: python scripts/verify_backend.py
+        language: system
+        types: [python]
+        pass_filenames: false
+      - id: model-architecture-check
+        name: SQLAlchemy Single Model Architecture Test
+        entry: python backend/tests/test_architectural_integrity.py
+        language: system
+        types: [python]
+        pass_filenames: false

@@ -1,0 +1,12 @@
+[32m[2026-07-08T16:02:52.842656] INFO     logging_config.setup_logging:121 - Logging configured for development environment[0m
+[32m[2026-07-08T16:02:52.843813] INFO     main.<module>:133 - CORS configured[0m
+[32m[2026-07-08T16:02:52.843865] INFO     main.<module>:137 - Rate limiting middleware enabled[0m
+[32m[2026-07-08T16:02:52.843885] INFO     main.<module>:140 - Request ID tracking enabled[0m
+[36m[2026-07-08T16:02:53.509023] DEBUG    __init__.wrapper:342 - matplotlib data path: /home/petpooja/.local/lib/python3.10/site-packages/matplotlib/mpl-data[0m
+[36m[2026-07-08T16:02:53.517039] DEBUG    __init__.wrapper:342 - CONFIGDIR=/home/petpooja/.config/matplotlib[0m
+[36m[2026-07-08T16:02:53.518990] DEBUG    __init__.<module>:1560 - interactive is False[0m
+[36m[2026-07-08T16:02:53.519233] DEBUG    __init__.<module>:1561 - platform is linux[0m
+[36m[2026-07-08T16:02:53.548144] DEBUG    __init__.wrapper:342 - CACHEDIR=/home/petpooja/.cache/matplotlib[0m
+[36m[2026-07-08T16:02:53.553350] DEBUG    font_manager._load_fontmanager:1635 - Using fontManager instance from /home/petpooja/.cache/matplotlib/fontlist-v390.json[0m
+[31m[2026-07-08T16:02:53.797004] ERROR    plot.<module>:40 - Importing plotly failed. Interactive plots will not work.[0m
+[36m[2026-07-08T16:02:55.817527] DEBUG    pyplot.switch_backend:496 - Loaded backend gtk4agg version 4.6.9.[0m

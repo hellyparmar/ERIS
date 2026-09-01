@@ -1,0 +1,13 @@
+
+@import './styles/design-system.css';
+@import './styles/eris-components.css';
+@import './styles/globals.css';
+@import './styles/tokens.css';
+@import './styles/base.css';
+/* deprecated — kept until all 27 pages use new patterns */
+@import './styles/components.css';
+/* new pattern system */
+@import './styles/patterns.css';
+@import './styles/states.css';
+
+html, body, #root { width: 100%; min-height: 100vh; }
