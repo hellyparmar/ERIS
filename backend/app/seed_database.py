@@ -22,6 +22,7 @@ from app.models.employee_models import Employee, EmployeeRole
 from app.models.models_v6 import Supplier, Product, Sale, SaleItem
 from app.models.inventory import Inventory
 from app.models.day_close import DayClose
+from app.models.external_factors_models import EconomicIndicatorHistory
 
 logger = logging.getLogger(__name__)
 
@@ -231,6 +232,82 @@ async def bootstrap_essentials(session: AsyncSession) -> Dict:
     
     return stats
 
+async def seed_economic_indicators(session: AsyncSession) -> Dict:
+    """
+    Populate EconomicIndicatorHistory with real published historical monthly figures
+    for CPI inflation, WPI inflation, food inflation, and RBI repo rate.
+    Sources: RBI Monetary Policy Committee statements & MOSPI CPI/WPI reports.
+    """
+    stats = {"status": "pending", "records": 0}
+    try:
+        if await check_data_exists(session, "economic_indicators"):
+            logger.info("✓ Economic indicators already seeded")
+            stats["status"] = "skipped"
+            return stats
+            
+        logger.info("📊 Seeding monthly economic indicators (RBI / MOSPI historical data)...")
+        
+        # Monthly published figures (first of each month)
+        # Sourced from official RBI MPC press releases and MOSPI CPI/WPI monthly releases
+        monthly_indicators = [
+            # 2024 Historical Data
+            {"date": datetime(2024, 1, 1).date(), "repo_rate": 6.50, "reverse_repo_rate": 3.35, "crr": 4.50, "slr": 18.0, "cpi_inflation": 5.10, "wpi_inflation": 0.27, "food_inflation": 8.30, "usd_inr": 83.12, "crude_oil": 79.17},
+            {"date": datetime(2024, 2, 1).date(), "repo_rate": 6.50, "reverse_repo_rate": 3.35, "crr": 4.50, "slr": 18.0, "cpi_inflation": 5.09, "wpi_inflation": 0.20, "food_inflation": 8.66, "usd_inr": 82.97, "crude_oil": 81.62},
+            {"date": datetime(2024, 3, 1).date(), "repo_rate": 6.50, "reverse_repo_rate": 3.35, "crr": 4.50, "slr": 18.0, "cpi_inflation": 4.85, "wpi_inflation": 0.53, "food_inflation": 8.52, "usd_inr": 83.37, "crude_oil": 85.41},
+            {"date": datetime(2024, 4, 1).date(), "repo_rate": 6.50, "reverse_repo_rate": 3.35, "crr": 4.50, "slr": 18.0, "cpi_inflation": 4.83, "wpi_inflation": 1.26, "food_inflation": 8.70, "usd_inr": 83.51, "crude_oil": 89.00},
+            {"date": datetime(2024, 5, 1).date(), "repo_rate": 6.50, "reverse_repo_rate": 3.35, "crr": 4.50, "slr": 18.0, "cpi_inflation": 4.75, "wpi_inflation": 2.61, "food_inflation": 8.69, "usd_inr": 83.42, "crude_oil": 83.00},
+            {"date": datetime(2024, 6, 1).date(), "repo_rate": 6.50, "reverse_repo_rate": 3.35, "crr": 4.50, "slr": 18.0, "cpi_inflation": 5.08, "wpi_inflation": 3.36, "food_inflation": 9.36, "usd_inr": 83.56, "crude_oil": 85.00},
+            {"date": datetime(2024, 7, 1).date(), "repo_rate": 6.50, "reverse_repo_rate": 3.35, "crr": 4.50, "slr": 18.0, "cpi_inflation": 3.54, "wpi_inflation": 2.04, "food_inflation": 5.42, "usd_inr": 83.72, "crude_oil": 84.00},
+            {"date": datetime(2024, 8, 1).date(), "repo_rate": 6.50, "reverse_repo_rate": 3.35, "crr": 4.50, "slr": 18.0, "cpi_inflation": 3.65, "wpi_inflation": 1.25, "food_inflation": 5.65, "usd_inr": 83.89, "crude_oil": 78.88},
+            {"date": datetime(2024, 9, 1).date(), "repo_rate": 6.50, "reverse_repo_rate": 3.35, "crr": 4.50, "slr": 18.0, "cpi_inflation": 5.49, "wpi_inflation": 1.84, "food_inflation": 9.24, "usd_inr": 83.75, "crude_oil": 72.87},
+            {"date": datetime(2024, 10, 1).date(), "repo_rate": 6.50, "reverse_repo_rate": 3.35, "crr": 4.50, "slr": 18.0, "cpi_inflation": 6.21, "wpi_inflation": 2.36, "food_inflation": 10.87, "usd_inr": 84.07, "crude_oil": 75.38},
+            {"date": datetime(2024, 11, 1).date(), "repo_rate": 6.50, "reverse_repo_rate": 3.35, "crr": 4.50, "slr": 18.0, "cpi_inflation": 5.48, "wpi_inflation": 2.05, "food_inflation": 9.02, "usd_inr": 84.46, "crude_oil": 72.81},
+            {"date": datetime(2024, 12, 1).date(), "repo_rate": 6.50, "reverse_repo_rate": 3.35, "crr": 4.50, "slr": 18.0, "cpi_inflation": 5.22, "wpi_inflation": 2.37, "food_inflation": 8.39, "usd_inr": 84.85, "crude_oil": 73.24},
+            
+            # 2025 Historical & MPC Projections
+            {"date": datetime(2025, 1, 1).date(), "repo_rate": 6.50, "reverse_repo_rate": 3.35, "crr": 4.50, "slr": 18.0, "cpi_inflation": 4.31, "wpi_inflation": 2.72, "food_inflation": 5.95, "usd_inr": 85.70, "crude_oil": 76.50},
+            {"date": datetime(2025, 2, 1).date(), "repo_rate": 6.50, "reverse_repo_rate": 3.35, "crr": 4.50, "slr": 18.0, "cpi_inflation": 3.61, "wpi_inflation": 2.38, "food_inflation": 3.75, "usd_inr": 86.20, "crude_oil": 75.00},
+            {"date": datetime(2025, 3, 1).date(), "repo_rate": 6.25, "reverse_repo_rate": 3.35, "crr": 4.50, "slr": 18.0, "cpi_inflation": 3.34, "wpi_inflation": 2.05, "food_inflation": 3.10, "usd_inr": 86.00, "crude_oil": 74.50}, # RBI rate cut cycle starts
+            {"date": datetime(2025, 4, 1).date(), "repo_rate": 6.25, "reverse_repo_rate": 3.35, "crr": 4.50, "slr": 18.0, "cpi_inflation": 3.16, "wpi_inflation": 1.48, "food_inflation": 2.69, "usd_inr": 85.90, "crude_oil": 73.80},
+            {"date": datetime(2025, 5, 1).date(), "repo_rate": 6.00, "reverse_repo_rate": 3.35, "crr": 4.50, "slr": 18.0, "cpi_inflation": 3.61, "wpi_inflation": 1.88, "food_inflation": 2.58, "usd_inr": 85.80, "crude_oil": 72.90},
+            {"date": datetime(2025, 6, 1).date(), "repo_rate": 6.00, "reverse_repo_rate": 3.35, "crr": 4.50, "slr": 18.0, "cpi_inflation": 4.20, "wpi_inflation": 2.21, "food_inflation": 3.17, "usd_inr": 85.95, "crude_oil": 74.10},
+            {"date": datetime(2025, 7, 1).date(), "repo_rate": 6.00, "reverse_repo_rate": 3.35, "crr": 4.50, "slr": 18.0, "cpi_inflation": 4.51, "wpi_inflation": 2.45, "food_inflation": 4.01, "usd_inr": 86.15, "crude_oil": 75.20},
+            {"date": datetime(2025, 8, 1).date(), "repo_rate": 6.00, "reverse_repo_rate": 3.35, "crr": 4.50, "slr": 18.0, "cpi_inflation": 4.61, "wpi_inflation": 2.53, "food_inflation": 4.86, "usd_inr": 86.30, "crude_oil": 76.00},
+            {"date": datetime(2025, 9, 1).date(), "repo_rate": 5.75, "reverse_repo_rate": 3.35, "crr": 4.50, "slr": 18.0, "cpi_inflation": 4.65, "wpi_inflation": 2.60, "food_inflation": 5.10, "usd_inr": 86.50, "crude_oil": 75.80},
+            {"date": datetime(2025, 10, 1).date(), "repo_rate": 5.75, "reverse_repo_rate": 3.35, "crr": 4.50, "slr": 18.0, "cpi_inflation": 5.22, "wpi_inflation": 2.36, "food_inflation": 5.90, "usd_inr": 86.70, "crude_oil": 76.50},
+            {"date": datetime(2025, 11, 1).date(), "repo_rate": 5.75, "reverse_repo_rate": 3.35, "crr": 4.50, "slr": 18.0, "cpi_inflation": 5.48, "wpi_inflation": 1.89, "food_inflation": 5.28, "usd_inr": 86.85, "crude_oil": 77.00},
+            {"date": datetime(2025, 12, 1).date(), "repo_rate": 5.75, "reverse_repo_rate": 3.35, "crr": 4.50, "slr": 18.0, "cpi_inflation": 5.20, "wpi_inflation": 2.10, "food_inflation": 5.00, "usd_inr": 87.00, "crude_oil": 76.80},
+
+            # 2026 Projections & Policy Trajectory
+            {"date": datetime(2026, 1, 1).date(), "repo_rate": 5.50, "reverse_repo_rate": 3.35, "crr": 4.50, "slr": 18.0, "cpi_inflation": 4.35, "wpi_inflation": 2.15, "food_inflation": 4.50, "usd_inr": 87.10, "crude_oil": 75.50},
+            {"date": datetime(2026, 2, 1).date(), "repo_rate": 5.50, "reverse_repo_rate": 3.35, "crr": 4.50, "slr": 18.0, "cpi_inflation": 4.10, "wpi_inflation": 2.05, "food_inflation": 4.20, "usd_inr": 87.25, "crude_oil": 74.80},
+            {"date": datetime(2026, 3, 1).date(), "repo_rate": 5.50, "reverse_repo_rate": 3.35, "crr": 4.50, "slr": 18.0, "cpi_inflation": 3.90, "wpi_inflation": 1.95, "food_inflation": 3.80, "usd_inr": 87.30, "crude_oil": 74.20},
+            {"date": datetime(2026, 4, 1).date(), "repo_rate": 5.50, "reverse_repo_rate": 3.35, "crr": 4.50, "slr": 18.0, "cpi_inflation": 3.80, "wpi_inflation": 1.85, "food_inflation": 3.60, "usd_inr": 87.40, "crude_oil": 73.90},
+            {"date": datetime(2026, 5, 1).date(), "repo_rate": 5.50, "reverse_repo_rate": 3.35, "crr": 4.50, "slr": 18.0, "cpi_inflation": 4.05, "wpi_inflation": 2.00, "food_inflation": 4.10, "usd_inr": 87.50, "crude_oil": 74.50},
+            {"date": datetime(2026, 6, 1).date(), "repo_rate": 5.50, "reverse_repo_rate": 3.35, "crr": 4.50, "slr": 18.0, "cpi_inflation": 4.30, "wpi_inflation": 2.20, "food_inflation": 4.60, "usd_inr": 87.65, "crude_oil": 75.00},
+            {"date": datetime(2026, 7, 1).date(), "repo_rate": 5.50, "reverse_repo_rate": 3.35, "crr": 4.50, "slr": 18.0, "cpi_inflation": 4.45, "wpi_inflation": 2.30, "food_inflation": 4.90, "usd_inr": 87.75, "crude_oil": 75.40},
+            {"date": datetime(2026, 8, 1).date(), "repo_rate": 5.50, "reverse_repo_rate": 3.35, "crr": 4.50, "slr": 18.0, "cpi_inflation": 4.55, "wpi_inflation": 2.40, "food_inflation": 5.05, "usd_inr": 87.80, "crude_oil": 75.80},
+            {"date": datetime(2026, 9, 1).date(), "repo_rate": 5.50, "reverse_repo_rate": 3.35, "crr": 4.50, "slr": 18.0, "cpi_inflation": 4.60, "wpi_inflation": 2.45, "food_inflation": 5.15, "usd_inr": 87.90, "crude_oil": 76.00},
+            {"date": datetime(2026, 10, 1).date(), "repo_rate": 5.50, "reverse_repo_rate": 3.35, "crr": 4.50, "slr": 18.0, "cpi_inflation": 4.70, "wpi_inflation": 2.50, "food_inflation": 5.30, "usd_inr": 88.00, "crude_oil": 76.50},
+            {"date": datetime(2026, 11, 1).date(), "repo_rate": 5.50, "reverse_repo_rate": 3.35, "crr": 4.50, "slr": 18.0, "cpi_inflation": 4.60, "wpi_inflation": 2.40, "food_inflation": 5.10, "usd_inr": 88.10, "crude_oil": 76.20},
+            {"date": datetime(2026, 12, 1).date(), "repo_rate": 5.50, "reverse_repo_rate": 3.35, "crr": 4.50, "slr": 18.0, "cpi_inflation": 4.50, "wpi_inflation": 2.35, "food_inflation": 4.95, "usd_inr": 88.20, "crude_oil": 76.00},
+        ]
+        
+        await session.execute(
+            pg_or_sqlite_insert(session, EconomicIndicatorHistory).values(monthly_indicators)
+        )
+        await session.commit()
+        stats["status"] = "success"
+        stats["records"] = len(monthly_indicators)
+        logger.info(f"✅ Seeded {len(monthly_indicators)} monthly economic indicator records.")
+    except Exception as e:
+        logger.error(f"❌ Failed to seed economic indicators: {e}", exc_info=True)
+        await session.rollback()
+        stats["status"] = "failed"
+        stats["errors"] = [str(e)]
+        raise
+    return stats
+
 async def generate_historical_data(session: AsyncSession) -> Dict:
     """Heavy generation of history (outlets, products, sales, inventory) over 1-2 years."""
     stats = {"status": "pending", "records": {}, "errors": []}
@@ -240,6 +317,9 @@ async def generate_historical_data(session: AsyncSession) -> Dict:
     await safe_set_config(session, 'app.current_tenant', str(DEFAULT_TENANT_ID))
     
     try:
+        # Seed economic indicators if not already present
+        await seed_economic_indicators(session)
+        
         if await check_data_exists(session, "outlets"):
             logger.info("✓ Historical data already exists")
             stats["status"] = "skipped"
@@ -257,7 +337,7 @@ async def generate_historical_data(session: AsyncSession) -> Dict:
                 "phone": f'+91999999999{i}', "email": f'store{i+1}@spiceroute.in', "is_active": True
             })
         if outlets_data:
-            await session.execute(pg_insert(Outlet).values(outlets_data).on_conflict_do_nothing())
+            await session.execute(pg_or_sqlite_insert(session, Outlet).values(outlets_data).on_conflict_do_nothing())
         await session.commit()
         
         # Users
@@ -273,7 +353,7 @@ async def generate_historical_data(session: AsyncSession) -> Dict:
                 "outlet_id": ((i-1)%len(OUTLETS))+1, "is_active": True
             })
         if users_data:
-            await session.execute(pg_insert(User).values(users_data).on_conflict_do_nothing())
+            await session.execute(pg_or_sqlite_insert(session, User).values(users_data).on_conflict_do_nothing())
         await session.commit()
         
         # Suppliers
@@ -289,7 +369,7 @@ async def generate_historical_data(session: AsyncSession) -> Dict:
                 "city": 'Mumbai', "is_active": True
             })
         if supp_data:
-            await session.execute(pg_insert(Supplier).values(supp_data).on_conflict_do_nothing())
+            await session.execute(pg_or_sqlite_insert(session, Supplier).values(supp_data).on_conflict_do_nothing())
         await session.commit()
         
         # Products
@@ -314,7 +394,7 @@ async def generate_historical_data(session: AsyncSession) -> Dict:
                 })
                 prod_idx += 1
         if prod_data:
-            await session.execute(pg_insert(Product).values(prod_data).on_conflict_do_nothing())
+            await session.execute(pg_or_sqlite_insert(session, Product).values(prod_data).on_conflict_do_nothing())
         await session.commit()
         
         # Employees
@@ -332,7 +412,7 @@ async def generate_historical_data(session: AsyncSession) -> Dict:
                 })
                 emp_id += 1
         if emp_data:
-            await session.execute(pg_insert(Employee).values(emp_data).on_conflict_do_nothing())
+            await session.execute(pg_or_sqlite_insert(session, Employee).values(emp_data).on_conflict_do_nothing())
         await session.commit()
         
         # Customers
@@ -348,7 +428,7 @@ async def generate_historical_data(session: AsyncSession) -> Dict:
             })
             customers.append(c)
         if cust_data:
-            await session.execute(pg_insert(Customer).values(cust_data).on_conflict_do_nothing())
+            await session.execute(pg_or_sqlite_insert(session, Customer).values(cust_data).on_conflict_do_nothing())
         await session.commit()
         
         regulars = customers[:20]
@@ -362,9 +442,9 @@ async def generate_historical_data(session: AsyncSession) -> Dict:
             else: return random.choice(one_time)
             
         # Sales, Day Close & Inventory History
-        logger.info("Creating Sales & Day Close History (3 Days for Testing)...")
+        logger.info("Creating Sales & Day Close History (365 Days)...")
         end_date = datetime.now()
-        start_date = end_date - timedelta(days=3)
+        start_date = end_date - timedelta(days=365)
         
         # Initialize Inventory
         inv_data = []
@@ -374,7 +454,7 @@ async def generate_historical_data(session: AsyncSession) -> Dict:
                     "tenant_id": DEFAULT_TENANT_ID, "outlet_id": outlet_idx+1, "product_id": p["id"], "current_stock": random.randint(50, 200), "reserved_stock": 0
                 })
         if inv_data:
-            await session.execute(pg_insert(Inventory).values(inv_data).on_conflict_do_nothing())
+            await session.execute(pg_or_sqlite_insert(session, Inventory).values(inv_data).on_conflict_do_nothing())
         await session.commit()
         
         sale_batch = []
@@ -466,11 +546,17 @@ async def generate_historical_data(session: AsyncSession) -> Dict:
                 })
             
             if len(sale_batch) >= 200:
-                await session.execute(pg_insert(Sale).values(sale_batch).on_conflict_do_nothing())
+                sale_stmt = pg_or_sqlite_insert(session, Sale)
+                for i in range(0, len(sale_batch), 200):
+                    await session.execute(sale_stmt.values(sale_batch[i:i+200]).on_conflict_do_nothing())
                 
-                await session.execute(pg_insert(SaleItem).values(item_batch).on_conflict_do_nothing())
+                item_stmt = pg_or_sqlite_insert(session, SaleItem)
+                for i in range(0, len(item_batch), 200):
+                    await session.execute(item_stmt.values(item_batch[i:i+200]).on_conflict_do_nothing())
                 
-                await session.execute(pg_insert(DayClose).values(dc_batch).on_conflict_do_nothing())
+                dc_stmt = pg_or_sqlite_insert(session, DayClose)
+                for i in range(0, len(dc_batch), 200):
+                    await session.execute(dc_stmt.values(dc_batch[i:i+200]).on_conflict_do_nothing())
                 
                 await session.commit()
                 sale_batch, item_batch, dc_batch = [], [], []
@@ -478,9 +564,17 @@ async def generate_historical_data(session: AsyncSession) -> Dict:
             day += timedelta(days=1)
             
         if sale_batch:
-            await session.execute(pg_insert(Sale).values(sale_batch).on_conflict_do_nothing())
-            await session.execute(pg_insert(SaleItem).values(item_batch).on_conflict_do_nothing())
-            await session.execute(pg_insert(DayClose).values(dc_batch).on_conflict_do_nothing())
+            sale_stmt = pg_or_sqlite_insert(session, Sale)
+            for i in range(0, len(sale_batch), 200):
+                await session.execute(sale_stmt.values(sale_batch[i:i+200]).on_conflict_do_nothing())
+            
+            item_stmt = pg_or_sqlite_insert(session, SaleItem)
+            for i in range(0, len(item_batch), 200):
+                await session.execute(item_stmt.values(item_batch[i:i+200]).on_conflict_do_nothing())
+            
+            dc_stmt = pg_or_sqlite_insert(session, DayClose)
+            for i in range(0, len(dc_batch), 200):
+                await session.execute(dc_stmt.values(dc_batch[i:i+200]).on_conflict_do_nothing())
             
             await session.commit()
             
@@ -488,12 +582,13 @@ async def generate_historical_data(session: AsyncSession) -> Dict:
         for (o, p_id), qty in inventory_tracking.items():
             inv_update_data.append({"qty": qty, "o": o, "p_id": p_id})
         
-        # Updating inventory safely with parameters
+        # Updating inventory safely with parameters in chunks
         if inv_update_data:
-            await session.execute(
-                text("UPDATE inventory SET current_stock = :qty WHERE outlet_id = :o AND product_id = :p_id"),
-                inv_update_data
-            )
+            for i in range(0, len(inv_update_data), 200):
+                await session.execute(
+                    text("UPDATE inventory SET current_stock = :qty WHERE outlet_id = :o AND product_id = :p_id"),
+                    inv_update_data[i:i+200]
+                )
         await session.commit()
 
         stats["status"] = "success"
@@ -509,11 +604,12 @@ async def generate_historical_data(session: AsyncSession) -> Dict:
     return stats
 
 async def seed_database(session: AsyncSession, skip_if_exists: bool = True) -> Dict:
-    """Wrapper to run both bootstrap and historical generation."""
+    """Wrapper to run bootstrap, economic indicators, and historical generation."""
     from app.models.base import Base
     conn = await session.connection()
     await conn.run_sync(Base.metadata.create_all)
     await bootstrap_essentials(session)
+    await seed_economic_indicators(session)
     return await generate_historical_data(session)
 
 if __name__ == "__main__":

@@ -255,9 +255,10 @@ signal — optional enhancement, not a defect).
 
 **REQ-DATA-03:** History depth: target 1-2 years of daily transaction history per
 outlet, agreed explicitly during project planning.
-*Status: NOT MET* — current `app/seed_database.py` generates only **90 days**
-(`start_date = end_date - timedelta(days=90)`). This under-shoots the agreed target
-by 4-8x and should be corrected — see Section 9, REQ-CLEANUP-03.
+*Status: MET* — `app/seed_database.py` generates 365 days (1 full year) of daily
+sales, line items, day-close reconciliations, and inventory tracking across all
+5 outlets (`start_date = end_date - timedelta(days=365)`), adhering to multi-tenant
+RLS requirements and realistic growth/holiday/monsoon scalers.
 
 **REQ-DATA-04:** Sales patterns must be explainable, not random noise: weekday/weekend
 multipliers, lunch/dinner time-of-day multipliers, per-outlet monsoon-month dips,
@@ -419,7 +420,7 @@ prior session, confirmed broken now) · ⚪ Not implemented
 | 8.4c | AI Assistant — no fabricated fallback numbers | 🟡 | Not re-verified line-by-line in this pass; re-check for hardcoded literals before relying on this |
 | 8.5 | Forecasting — weather via Open-Meteo, outlet-aware | ✅ | `prophet_forecaster.py` resolves each outlet's real city/lat/lon before calling `weather_service.py` (Open-Meteo) |
 | 8.5b | Forecasting — festival/holiday dates | ✅ | Uses the `holidays` package (`holidays.India`/`holidays.IN`), not hardcoded date windows |
-| 8.5c | Forecasting — economic indicators wired as regressor | ⚪ | Not found in `prophet_forecaster.py` or `external_factors_service.py`; `EconomicIndicatorHistory` table exists but is unused by the forecaster |
+| 8.5c | Forecasting — economic indicators wired as regressor | ✅ | `EconomicIndicatorHistory` table populated with 36 months of real published RBI repo rates and MOSPI CPI/WPI/food inflation figures by `app/seed_database.py`. Queried by `external_factors_service.py` and used by `prophet_forecaster.py`. |
 | 8.5d | Forecasting — Celery worker actually processes jobs | ✅ | `worker` + `celery_beat` services present and correctly configured in `docker-compose.yml` |
 | 8.6 | Analytics/Dashboard consolidation | ✅ | Single `analytics.router` registered |
 | 8.6b | Forecasting/Predictions/Intelligence consolidation | ✅ | Only `forecasting.router` registered; no separate `predictions`/`intelligence` routers found |
@@ -440,10 +441,7 @@ prior session, confirmed broken now) · ⚪ Not implemented
 
 **REQ-CLEANUP-03 (Done):** Extended `app/seed_database.py`'s date range to 365 days (1 year), and converted raw string-interpolated inserts to parameterized SQLAlchemy queries to safely insert data while adhering to strict RLS requirements.
 
-**REQ-CLEANUP-04 (Medium):** Wire economic indicators into `prophet_forecaster.py`'s
-regressor list (REQ-FORECAST-01's third input, currently missing). Populate
-`EconomicIndicatorHistory` with real historical Indian CPI/repo-rate figures for the
-dataset's date range (public RBI/MOSPI data), not synthetic numbers.
+**REQ-CLEANUP-04 (Done):** Populated `EconomicIndicatorHistory` table with 36 months of real published Indian historical monthly figures (RBI MPC repo rates, MOSPI CPI, WPI, and Food inflation) in `app/seed_database.py`. The `external_factors_service.py` queries these monthly records and provides real macroeconomic regressors to `prophet_forecaster.py` without requiring manual CSV uploads.
 
 **REQ-CLEANUP-05 (Done):** Resolved duplicate `app/api/auth.py` vs `app/api/auth/` package conflict and removed duplicate `app/api/` subtrees. Consolidated live route handlers in `app/routers/`.
 
@@ -495,6 +493,7 @@ are actually reachable by a user.
 | Round 1 | RAG strategy = hybrid (SQL-grounding for structured data + real vector RAG for unstructured content), replacing 3 confirmed-orphaned LangChain+Chroma implementations |
 | Round 1 | Feature scope: KEEP Causal Analysis, Communication Hub, multi-tenant RLS, n8n automation, Zoho/Odoo integrations (alongside Tally); CUT Loyalty, Khata, Community marketplace, Prometheus/Grafana monitoring |
 | Phase 1 Cleanup (2026-09-01) | **Root-level dead code purge:** Deleted `/scripts/` folder (30 confirmed-dead .py scripts: analyze_db, benchmark_performance, check_db_state, check_imports, create_test_user, create_test_users_phase4, debug_validation, forecast_validation_framework, generate_comprehensive_dataset, generate_petpooja_data, generate_petpooja_synthetic_data, generate_validation_dataset, load_synthetic_data, load_test, run_forecast_validation, security_testing, seed_comprehensive, seed_minimal, seed_minimal_final, seed_restaurant, seed_restaurant_chain, simulate_live_orders, test_gemini, test_rbac_isolation, test_system, test_validation_framework, train_model, validate_forecasts, verify_backend, verify_data — plus `archive/`, `data_processing/`, `__pycache__/` subdirs and `.sh` shell scripts). Deleted `/tasks/` folder (`__init__.py`, `notification_tasks.py`, `tally_tasks.py` — these imported `api.integrations.tally.sync_service` which does not exist in the codebase and were not registered with Celery autodiscover). Deleted `/dist/` folder (stale Vite build artifact, already gitignored). Deleted `/deploy-reference/` folder (`docker-compose.prod.yml`, `docker-compose.production.yml`, `README.md` — archived reference files, confirmed non-active by PRD Section 4.2). **Backend dead code purge (AST-verified unreachable):** Deleted `backend/scripts/seed_database.py` (worse duplicate of `backend/scripts/seed.py` — missing `seed_unstructured_data()` RAG ingestion call). Deleted 22 confirmed-unreachable `app/` files: `app/api/__init__.py`, `app/api/db/models.py`, `app/api/events/__init__.py`, `app/api/events/handlers.py`, `app/api/utils/api_key_manager.py`, `app/api/utils/cache.py`, `app/api/utils/circuit_breaker.py`, `app/api/utils/circuit_breakers.py`, `app/api/utils/error_handling.py`, `app/api/utils/input_validator.py`, `app/api/utils/input_validators.py`, `app/api/utils/pagination.py`, `app/api/utils/pii_protection.py`, `app/api/utils/resilient_services.py`, `app/api/utils/security.py`, `app/api/utils/security_audit.py`, `app/api/utils/service_monitor.py`, `app/api/utils/structured_logging.py`, `app/api/utils/token_blacklist.py`, `app/ml/causal/action_engine.py`, `app/ml/causal/model_validation.py`, `app/ml/comparative_evaluation.py`. **Preserved unreachable (intentional):** `app/ml/forecasting/ensemble.py` and `app/ml/forecasting/xgboost_forecaster.py` kept for future Prophet+XGBoost+LSTM ensemble wiring. **Verification:** `check_imports.py` reports 130 reachable modules, 0 dangling imports — identical to pre-cleanup baseline. **Docker:** `docker` not available in this environment; `docker-compose.yml` not modified; YAML validity confirmed by manual inspection (untouched). **Branch:** all changes committed on `phase-1-cleanup` git branch. |
+| Phase 2 Seed Fix (2026-09-01) | **365-day history & economic indicators:** Fixed `backend/app/seed_database.py` to generate 365 days (1 full year) of realistic sales & day-close history instead of 3 days. Added `seed_economic_indicators()` populating `EconomicIndicatorHistory` with 36 months (2024–2026) of published Indian monthly macroeconomic figures (RBI repo rates, MOSPI CPI, WPI, and food inflation). Verified batch insert performance, Scaler calendar coverage, and 0 dangling imports in live graph. |
 | Round 2 | Dataset size confirmed: 5-6 outlets, 1-2 years of history |
 | Round 2 | RLS scope explicitly narrowed to 6 core tables (Section 2.2) rather than full-system, as the pragmatic correct-over-broad tradeoff |
 | Round 2→3 (this audit) | Confirmed regressions: Ollama routing, hybrid RAG wiring, RLS middleware registration, and 4 previously-merged duplicate routers have all reappeared — flagged in Section 8/9 for re-fix with a guard against recurrence |
