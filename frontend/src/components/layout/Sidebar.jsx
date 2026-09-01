@@ -24,7 +24,7 @@ const routeRoleMap = {
   '/gst-invoice': ['super_admin', 'superadmin'],
   '/gst-rates': ['super_admin', 'superadmin'],
   '/suppliers': ['super_admin', 'superadmin'],
-  '/contacts': ['super_admin', 'superadmin'],
+  '/contacts': ['super_admin', 'superadmin', 'area_manager', 'outlet_manager', 'manager'],
   '/employees': ['super_admin', 'superadmin'],
   '/causal-analysis': ['super_admin', 'superadmin', 'area_manager'],
   '/communication': ['super_admin', 'superadmin', 'area_manager', 'outlet_manager', 'manager'],
