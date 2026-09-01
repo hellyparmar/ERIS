@@ -103,6 +103,8 @@ reverses this)
 | Feature | Decision | Reason |
 |---|---|---|
 | Point-of-Sale (POS) terminal / till hardware sync | Removed | ERIS is a pure BI & retail analytics platform; retailers use their own POS |
+| Shopify / WooCommerce integrations | Explicitly descoped | No backend connector or router exists; out of scope for Indian QSR chain focus |
+| Tally integration | Removed | Legacy connector was a broken stub; removed in favor of real Odoo & Zoho Books integrations |
 | Loyalty program | Cut | Not core to stated goals; adds scope without proving the core thesis |
 | Khata / credit ledger | Cut | Same as above |
 | Community / inter-business marketplace | Cut | Out of scope for a single-chain intelligence system |
@@ -380,17 +382,10 @@ Location: `app/routers/causal_analysis.py`, `app/services/causal_analysis.py`.
 ### 7.11 Communication Hub (kept, optional-tier feature)
 **REQ-COMMS-01:** Thread-based internal messaging (send, list, mark-read).
 Location: `app/routers/messages.py`, `app/services/message_service.py`.
-**Gap:** no frontend page exists for this feature yet (Section 9).
-
-### 7.12 Integrations (kept, optional-tier)
-**REQ-INTEG-01:** Tally integration (consolidated to one implementation), Zoho and
-Odoo integrations (kept per project-owner decision, may require real sandbox
-credentials to fully test), n8n workflow automation (kept; webhook receiver exists,
-n8n itself is not yet in docker-compose — gap, Section 9), Petpooja menu
-import/integration (kept, matches internship context).
-Location: `app/routers/tally_integration.py`, `app/api/integrations/zoho_*.py`,
-`app/api/integrations/odoo_connector.py`, `app/routers/webhooks.py`,
-`app/routers/petpooja.py`, `petpooja_menu.py`, `backend/n8n_workflows/`.
+### 7.12 Integrations (Odoo ERP & Zoho Books)
+**REQ-INTEG-01:** Connectors for Odoo ERP (XML-RPC) and Zoho Books (OAuth/REST) with real connection testing, Fernet encrypted-at-rest credential storage (`OdooConfig` in `app/models/odoo_config.py`, `IntegrationToken` in `app/models/integration_token_model.py`), and real test/save/disconnect API endpoints. (Note: full live synchronization requires user-provided third-party sandbox credentials). Shopify/WooCommerce descoped; legacy Tally stub removed.
+Location: `app/routers/integrations.py`, `app/api/integrations/odoo_connector.py`, `app/api/integrations/zoho_client.py`, `app/api/integrations/zoho_auth.py`, `app/api/utils/encryption.py`.
+Frontend: `/integrations` (`frontend/src/pages/Integrations.jsx`).
 
 ### 7.13 Reports & Export
 **REQ-REPORT-01:** One consolidated reports/export/data-import domain (not three
@@ -500,6 +495,7 @@ are actually reachable by a user.
 | Phase 3 Security & Correctness (2026-09-01) | **RLS Celery context, GST consolidation & Outlet-scoping:** (1) `run_prophet_forecast` updated to accept `tenant_id` and execute in `get_db_sync(tenant_id=tenant_id)` context; `get_db()` and `get_db_sync()` in `database.py` updated to fail-closed on PostgreSQL session init failure. (2) Removed duplicate `calculate_gst()` from `invoice_service.py`; canonical `gst_calculator.py` is the single source of truth. (3) Enforced outlet authorization across all 9 routers (`sales`, `customers`, `forecasting`, `causal_analysis`, `suppliers`, `employees`, `outlets`, `gst_billing`, `alerts`). Added multi-outlet cross-isolation tests in `test_data_isolation.py`. |
 | POS Removal & BI Repositioning (2026-09-01) | **Repositioned ERIS as pure retail BI & monitoring platform:** Removed the point-of-sale terminal concept entirely. Deleted POS routers/services (`pos_auth.py`, `pos_sales.py`, `pos_override.py`, `pos_dayclose.py`, `pos_service.py`, `thermal_printer.py`, `jwt_auth.py`). Removed `DayClose` model, dropped `day_close` table via Alembic migration `99999999999d`, and removed nightly register reconciliation scheduler check. Cleaned frontend UI removing `/day-close` page, `usePOSAuth` hook, and `/pos` & `/day-close` navigation links. Reframed seed data logs/comments to imported historical sales from retailer POS. Verified 0 dangling imports and successful frontend build. |
 | Business Contacts Page (2026-09-01) | **Built Business Contacts management UI:** Created `frontend/src/pages/Contacts.jsx` backed by `BusinessContact` model (`models/business_contact.py`) and `/api/v1/contacts/` CRUD endpoints. Added search, filtering by contact type (`supplier`, `distributor`, `logistics`) and active status, KPI summary cards, and create/edit/deactivate modals. Seeded realistic `BusinessContact` records in `seed_database.py`. Registered `/contacts` route in `App.jsx` and navigation in `Sidebar.jsx`. Verified 0 dangling imports and successful production build. |
+| Integrations Overhaul & Tally Purge (2026-09-01) | **Real Odoo & Zoho Books connectors + mock removal:** Rewrote `frontend/src/pages/Integrations.jsx` to eliminate all mock `Math.random()` simulation, client-side timeouts, and unbacked Shopify/WooCommerce catalogue entries. Connected "Test Connection" and "Save Configuration" directly to backend endpoints (`/api/v1/integrations/odoo/*` and `/api/v1/integrations/zoho/*`). Implemented encrypted-at-rest API key persistence via Fernet (`app.api.utils.encryption`) in `OdooConfig` and `IntegrationToken`. Deleted dead legacy Tally files (`tally_sync_service.py`, `tally_integration.py`), cleaned registry, and cleaned `Settings.jsx`. Verified with 5 backend unit tests and clean production build. |
 | Round 2 | Dataset size confirmed: 5-6 outlets, 1-2 years of history |
 | Round 2 | RLS scope explicitly narrowed to 6 core tables (Section 2.2) rather than full-system, as the pragmatic correct-over-broad tradeoff |
 | Round 2→3 (this audit) | Confirmed regressions: Ollama routing, hybrid RAG wiring, RLS middleware registration, and 4 previously-merged duplicate routers have all reappeared — flagged in Section 8/9 for re-fix with a guard against recurrence |
