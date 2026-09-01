@@ -85,18 +85,6 @@ const Settings = () => {
         },
     });
 
-    const tallyStatusQuery = useQuery({
-        queryKey: ['tally-status'],
-        queryFn: () => api.get('/api/v1/integrations/tally/status').then(r => r.data),
-        refetchInterval: 30000,
-    });
-
-    const syncTallyMutation = useMutation({
-        mutationFn: (data) => api.post('/api/v1/integrations/tally/sync-invoices', data),
-        onSuccess: (response) => showToast(`Sync complete: ${response.data.message}`, 'success'),
-        onError: (error) => showToast(`Sync failed: ${error.response?.data?.detail || 'Unknown error'}`, 'error'),
-    });
-
     const handleProfileChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
@@ -125,7 +113,6 @@ const Settings = () => {
         { id: 'security', label: 'Security', icon: <Lock size={14} /> },
         { id: 'notifications', label: 'Notifications', icon: <Bell size={14} /> },
         { id: 'preferences', label: 'Preferences', icon: <Shield size={14} /> },
-        { id: 'integrations', label: 'Integrations', icon: <Database size={14} /> },
         { id: 'database', label: 'Database', icon: <Database size={14} /> },
     ];
 
@@ -285,68 +272,6 @@ const Settings = () => {
                                         <button className="action-btn" style={{ color: 'var(--c-critical)' }}><Trash2 size={13} style={{ marginRight: 6 }} /> Delete Account</button>
                                         <button className="action-btn"><LogOut size={13} style={{ marginRight: 6 }} /> Logout</button>
                                     </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {activeTab === 'integrations' && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                                <div className="zone-label">System Integrations</div>
-
-                                <div style={{ padding: '16px', background: 'var(--c-canvas)', border: '1px solid var(--c-border)' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
-                                        <div style={{ display: 'flex', gap: 12 }}>
-                                            <Database size={20} style={{ color: 'var(--c-brown)', marginTop: 2 }} />
-                                            <div>
-                                                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--c-dark)' }}>Tally ERP Integration</div>
-                                                <p style={{ fontSize: 11, color: 'var(--c-ink-muted)', margin: '2px 0 0 0' }}>Sync invoices with Tally accounting software</p>
-                                            </div>
-                                        </div>
-                                        {tallyStatusQuery.isLoading ? (
-                                            <div className="badge neutral">Checking...</div>
-                                        ) : tallyStatusQuery.data?.connected ? (
-                                            <div className="badge active">Connected</div>
-                                        ) : (
-                                            <div className="badge critical">Disconnected</div>
-                                        )}
-                                    </div>
-
-                                    {tallyStatusQuery.data?.connected && (
-                                        <>
-                                            <p style={{ color: 'var(--c-sage)', fontSize: 12, margin: '0 0 12px 0' }}>
-                                                ✓ Connected to Tally at {tallyStatusQuery.data.tally_host}:{tallyStatusQuery.data.tally_port}
-                                            </p>
-                                            <button className="action-btn primary"
-                                                onClick={() => syncTallyMutation.mutate({ invoices: [] })}
-                                                disabled={syncTallyMutation.isPending}>
-                                                {syncTallyMutation.isPending ? (
-                                                    'Syncing...'
-                                                ) : (
-                                                    <><Download size={13} style={{ marginRight: 6 }} /> Sync Invoices</>
-                                                )}
-                                            </button>
-                                        </>
-                                    )}
-
-                                    {tallyStatusQuery.data && !tallyStatusQuery.data.connected && (
-                                        <>
-                                            <p style={{ color: 'var(--c-critical)', fontSize: 12, margin: '0 0 12px 0' }}>
-                                                ✗ {tallyStatusQuery.data.message}
-                                            </p>
-                                            <div style={{ background: 'var(--c-canvas-raised)', border: '1px solid var(--c-border)', padding: 12, marginBottom: 12 }}>
-                                                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--c-dark)', marginBottom: 6 }}>How to connect:</div>
-                                                <ol style={{ fontSize: 11, color: 'var(--c-ink-muted)', paddingLeft: 16, margin: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                                    <li>Ensure Tally ERP is running on your local machine</li>
-                                                    <li>Tally's web server should be listening on {tallyStatusQuery.data.tally_host}:{tallyStatusQuery.data.tally_port}</li>
-                                                    <li>Check firewall settings to allow local connections</li>
-                                                    <li>Refresh this page to check status again</li>
-                                                </ol>
-                                            </div>
-                                            <button className="action-btn" onClick={() => tallyStatusQuery.refetch()}>
-                                                Retry Connection
-                                            </button>
-                                        </>
-                                    )}
                                 </div>
                             </div>
                         )}

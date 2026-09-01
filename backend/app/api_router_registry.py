@@ -9,7 +9,7 @@ from app.routers import (
 from app.routers.inventory import categories_router
 from app.routers import (
     alerts, employees, enterprise,
-    messages, suppliers, tally_integration, reports_data,
+    messages, suppliers, reports_data,
     contacts, outlets, user_settings
 )
 
@@ -56,7 +56,6 @@ api_router.include_router(main_health.router, tags=["Health"])
 # INTEGRATIONS & THIRD-PARTY
 # -----------------------
 api_router.include_router(main_integrations.router, tags=["Integrations"])
-api_router.include_router(tally_integration.router, tags=["Tally Integration"])
 
 # -----------------------
 # OPERATIONS & OTHERS

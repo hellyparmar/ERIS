@@ -40,7 +40,7 @@ class ZohoOAuthError(Exception):
 class ZohoAuthService:
     """Handles Zoho Books OAuth authentication"""
 
-    def __init__(self, db: Session):
+    def __init__(self, db: Optional[Session] = None):
         self.db = db
         self.client = httpx.AsyncClient()
 
