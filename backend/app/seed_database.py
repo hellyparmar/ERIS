@@ -21,7 +21,6 @@ from app.models.customers import Customer
 from app.models.employee_models import Employee, EmployeeRole
 from app.models.models_v6 import Supplier, Product, Sale, SaleItem
 from app.models.inventory import Inventory
-from app.models.day_close import DayClose
 from app.models.external_factors_models import EconomicIndicatorHistory
 
 logger = logging.getLogger(__name__)
@@ -441,8 +440,8 @@ async def generate_historical_data(session: AsyncSession) -> Dict:
             elif r < 0.6: return random.choice(occasional)
             else: return random.choice(one_time)
             
-        # Sales, Day Close & Inventory History
-        logger.info("Creating Sales & Day Close History (365 Days)...")
+        # Historical Sales & Inventory (Imported from Retailer POS System)
+        logger.info("Importing Historical Sales History (365 Days)...")
         end_date = datetime.now()
         start_date = end_date - timedelta(days=365)
         
@@ -459,7 +458,6 @@ async def generate_historical_data(session: AsyncSession) -> Dict:
         
         sale_batch = []
         item_batch = []
-        dc_batch = []
         inventory_tracking = { (o+1, p["id"]): random.randint(50, 200) for o in range(len(OUTLETS)) for p in products }
         
         global_sale_id = 1
@@ -531,19 +529,6 @@ async def generate_historical_data(session: AsyncSession) -> Dict:
                         "payment_method": pay_method, "sale_number": f"INV-{uuid.uuid4().hex[:8].upper()}", "payment_status": "paid",
                         "status": "completed"
                     })
-                
-                opening_float = 5000.0
-                expected_cash = opening_float + daily_cash
-                physical_cash = expected_cash + random.choices([0.0, -50.0, 50.0, -100.0], weights=[0.9, 0.04, 0.04, 0.02])[0]
-                variance = physical_cash - expected_cash
-                recon_status = 'MATCHED' if variance == 0 else ('SHORTAGE' if variance < 0 else 'OVERAGE')
-                
-                dc_batch.append({
-                    "outlet_id": outlet_id, "date": datetime.strptime(date_str, "%Y-%m-%d").date(),
-                    "opening_float": opening_float, "closing_float": physical_cash, "expected_cash": expected_cash,
-                    "physical_cash": physical_cash, "variance": variance, "reconciliation_status": recon_status,
-                    "opened_by": 1, "opened_at": day.replace(hour=8, minute=0, tzinfo=timezone.utc), "closed_at": day.replace(hour=23, minute=30, tzinfo=timezone.utc)
-                })
             
             if len(sale_batch) >= 200:
                 sale_stmt = pg_or_sqlite_insert(session, Sale)
@@ -554,12 +539,8 @@ async def generate_historical_data(session: AsyncSession) -> Dict:
                 for i in range(0, len(item_batch), 200):
                     await session.execute(item_stmt.values(item_batch[i:i+200]).on_conflict_do_nothing())
                 
-                dc_stmt = pg_or_sqlite_insert(session, DayClose)
-                for i in range(0, len(dc_batch), 200):
-                    await session.execute(dc_stmt.values(dc_batch[i:i+200]).on_conflict_do_nothing())
-                
                 await session.commit()
-                sale_batch, item_batch, dc_batch = [], [], []
+                sale_batch, item_batch = [], []
                 
             day += timedelta(days=1)
             
@@ -571,10 +552,6 @@ async def generate_historical_data(session: AsyncSession) -> Dict:
             item_stmt = pg_or_sqlite_insert(session, SaleItem)
             for i in range(0, len(item_batch), 200):
                 await session.execute(item_stmt.values(item_batch[i:i+200]).on_conflict_do_nothing())
-            
-            dc_stmt = pg_or_sqlite_insert(session, DayClose)
-            for i in range(0, len(dc_batch), 200):
-                await session.execute(dc_stmt.values(dc_batch[i:i+200]).on_conflict_do_nothing())
             
             await session.commit()
             

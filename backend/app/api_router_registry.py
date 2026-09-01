@@ -1,10 +1,10 @@
 from fastapi import APIRouter
 
 from app.routers import (
-    admin, analytics, auth, pos_auth, causal_analysis,
+    admin, analytics, auth, causal_analysis,
     customers, forecasting, gst_billing,
     health as main_health, integrations as main_integrations, inventory, models, notifications,
-    pos_dayclose, pos_override, pos_sales, sales, webhooks, ai_assistant as ai_assistant_routes
+    sales, webhooks, ai_assistant as ai_assistant_routes
 )
 from app.routers.inventory import categories_router
 from app.routers import (
@@ -19,7 +19,6 @@ api_router = APIRouter()
 # AUTHENTICATION
 # -----------------------
 api_router.include_router(auth.router, tags=["Authentication"])
-api_router.include_router(pos_auth.router, tags=["POS Authentication"])
 
 # -----------------------
 # CORE DOMAINS (Consolidated)
@@ -32,13 +31,10 @@ api_router.include_router(gst_billing.router, tags=["GST"])
 api_router.include_router(notifications.router, tags=["Notifications"])
 
 # -----------------------
-# INVENTORY & POS
+# INVENTORY
 # -----------------------
 api_router.include_router(inventory.router, tags=["Inventory"])
 api_router.include_router(categories_router, tags=["Categories"])
-api_router.include_router(pos_sales.router, tags=["POS Sales"])
-api_router.include_router(pos_override.router, tags=["POS Manager Override"])
-api_router.include_router(pos_dayclose.router, tags=["Cash Register Management"])
 
 # -----------------------
 # BILLING & INVOICING

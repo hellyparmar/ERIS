@@ -2,7 +2,6 @@
 
 from .base import Base
 from .users import User, UserRoleEnum as UserRole, Role, UserOutletAccess
-from .day_close import DayClose
 from .organization import Organization
 from .outlet import Outlet
 from .customers import Customer
@@ -32,7 +31,6 @@ __all__ = [
     "Base",
     "User", "UserRole", "Role", "UserOutletAccess",
     "Outlet",
-    "DayClose",
     "Customer",
     "Product",
     "Inventory",
