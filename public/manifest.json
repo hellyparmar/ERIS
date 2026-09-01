@@ -1,0 +1,103 @@
+{
+    "short_name": "R-DIOS",
+    "name": "Retail Decision Intelligence Operating System",
+    "description": "AI-powered retail analytics and intelligence platform for Indian retailers",
+    "icons": [
+        {
+            "src": "favicon.ico",
+            "sizes": "64x64 32x32 24x24 16x16",
+            "type": "image/x-icon"
+        },
+        {
+            "src": "logo192.png",
+            "type": "image/png",
+            "sizes": "192x192",
+            "purpose": "any"
+        },
+        {
+            "src": "logo512.png",
+            "type": "image/png",
+            "sizes": "512x512",
+            "purpose": "any"
+        },
+        {
+            "src": "logo192-maskable.png",
+            "type": "image/png",
+            "sizes": "192x192",
+            "purpose": "maskable"
+        },
+        {
+            "src": "logo512-maskable.png",
+            "type": "image/png",
+            "sizes": "512x512",
+            "purpose": "maskable"
+        }
+    ],
+    "start_url": "/",
+    "display": "standalone",
+    "theme_color": "#1976d2",
+    "background_color": "#ffffff",
+    "orientation": "portrait-primary",
+    "scope": "/",
+    "categories": [
+        "business",
+        "finance",
+        "productivity"
+    ],
+    "screenshots": [
+        {
+            "src": "screenshots/dashboard.png",
+            "type": "image/png",
+            "sizes": "1280x720",
+            "label": "Dashboard View"
+        },
+        {
+            "src": "screenshots/pos.png",
+            "type": "image/png",
+            "sizes": "1280x720",
+            "label": "Point of Sale"
+        }
+    ],
+    "shortcuts": [
+        {
+            "name": "New Sale",
+            "short_name": "Sale",
+            "description": "Create a new sale",
+            "url": "/pos?action=new",
+            "icons": [
+                {
+                    "src": "/icons/sale.png",
+                    "sizes": "192x192"
+                }
+            ]
+        },
+        {
+            "name": "Dashboard",
+            "short_name": "Dashboard",
+            "description": "View analytics dashboard",
+            "url": "/dashboard",
+            "icons": [
+                {
+                    "src": "/icons/dashboard.png",
+                    "sizes": "192x192"
+                }
+            ]
+        },
+        {
+            "name": "Inventory",
+            "short_name": "Inventory",
+            "description": "Manage inventory",
+            "url": "/inventory",
+            "icons": [
+                {
+                    "src": "/icons/inventory.png",
+                    "sizes": "192x192"
+                }
+            ]
+        }
+    ],
+    "related_applications": [],
+    "prefer_related_applications": false,
+    "lang": "en-IN",
+    "dir": "ltr"
+}

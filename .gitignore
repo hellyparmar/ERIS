@@ -1,0 +1,168 @@
+# ═══════════════════════════════════════════════════════════════
+# ENTERPRISE RETAIL INTELLIGENCE SYSTEM - GITIGNORE
+# ═══════════════════════════════════════════════════════════════
+
+# ─────────────────────────────────────────────────────────────────
+# 🔐 SENSITIVE FILES - NEVER COMMIT
+# ─────────────────────────────────────────────────────────────────
+
+# Environment variables (ALWAYS local-only)
+.env
+.env.local
+.env.*.local
+.env.*.production
+.env.development
+.env.staging
+.env.production
+backend/.env
+frontend/.env
+
+# API Keys, tokens, and credentials
+*.key
+*.pem
+*.p12
+.token
+.tokens
+secrets/
+
+# AWS, GCP, Azure credentials
+.aws/
+.gcp/
+.azure/
+
+# Database backups & local SQLite files
+*.sql
+*.dump
+*.backup
+*.db
+*.sqlite
+*.sqlite3
+backups/
+db_backups/
+rdios_backup_*.sql
+
+# ─────────────────────────────────────────────────────────────────
+# 📦 DEPENDENCIES & CACHE
+# ─────────────────────────────────────────────────────────────────
+
+# Node.js
+node_modules/
+npm-debug.log*
+npm-error.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Python
+__pycache__/
+*.pyc
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.venv/
+venv/
+ENV/
+.pytest_cache/
+.ruff_cache/
+tests/reports/
+backend/tests/reports/
+chroma_db/
+chromadb/
+.coverage
+htmlcov/
+
+# Poetry
+poetry.lock
+
+# ─────────────────────────────────────────────────────────────────
+# 🏗️ BUILD & COMPILED OUTPUT
+# ─────────────────────────────────────────────────────────────────
+
+# Frontend builds
+dist/
+dist-new/
+build/
+.next/
+out/
+
+# Backend builds
+.egg-info/
+
+# ─────────────────────────────────────────────────────────────────
+# 📝 IDE & EDITOR FILES
+# ─────────────────────────────────────────────────────────────────
+
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.AppleDouble
+.LSOverride
+*.sublime-project
+*.sublime-workspace
+
+# ─────────────────────────────────────────────────────────────────
+# 📊 LOGS & MONITORING
+# ─────────────────────────────────────────────────────────────────
+
+logs/
+*.log
+*.log.*
+prometheus/
+grafana/
+loki/
+
+# ─────────────────────────────────────────────────────────────────
+# 🗂️ TEMPORARY & TEST FILES
+# ─────────────────────────────────────────────────────────────────
+
+temp/
+tmp/
+*.tmp
+*.tar.xz
+*.tar.gz
+scratch-*.js
+scratch-*.py
+test_*.pdf
+test_*.csv
+test_*.xlsx
+.tmp/
+validation_results/
+find_zero_bug.js
+
+# ─────────────────────────────────────────────────────────────────
+# 🐳 DOCKER & COMPOSE
+# ─────────────────────────────────────────────────────────────────
+
+.dockerignore
+docker-compose.override.yml
+
+# ─────────────────────────────────────────────────────────────────
+# 📦 DATABASES & UPLOADS
+# ─────────────────────────────────────────────────────────────────
+
+*.db
+*.sqlite
+*.sqlite3
+uploads/
+
+# ─────────────────────────────────────────────────────────────────
+# 🚀 DEPLOYMENT
+# ─────────────────────────────────────────────────────────────────
+
+deployment_versions/*
+*.tar.gz
+*.zip
+
+# ─────────────────────────────────────────────────────────────────
+# ✅ EXCEPTIONS (track these files)
+# ─────────────────────────────────────────────────────────────────
+
+!.env.example
+!.env.*.example
+!.gitkeep
+Thumbs.db

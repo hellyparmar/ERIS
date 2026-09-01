@@ -1,0 +1,117 @@
+/* Skeleton shimmer */
+.shimmer-active {
+  background: linear-gradient(90deg, var(--c-strip) 25%, var(--c-muted) 50%, var(--c-strip) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+@keyframes blink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+.skeleton-strip {
+  width: 100%;
+  height: 80px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.skeleton-strip > div {
+  height: 100%;
+  border-right: 1px solid var(--c-border);
+  background: linear-gradient(90deg, var(--c-strip) 25%, var(--c-muted) 50%, var(--c-strip) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+.skeleton-strip > div:last-child {
+  border-right: none;
+}
+
+.skeleton-chart {
+  height: 120px;
+  width: 100%;
+  background: linear-gradient(90deg, var(--c-strip) 25%, var(--c-muted) 50%, var(--c-strip) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+.skeleton-row {
+  height: 36px;
+  width: 100%;
+  background: linear-gradient(90deg, var(--c-strip) 25%, var(--c-muted) 50%, var(--c-strip) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  margin-bottom: 1px;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 56px 32px;
+  color: var(--c-ink-muted);
+}
+
+.empty-state-title {
+  font-family: var(--f-display);
+  font-size: 16px;
+  color: var(--c-dark);
+  margin-top: 0;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.empty-state-message {
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+.empty-state-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: var(--c-dark);
+  border: 1px solid var(--c-dark);
+  border-radius: var(--radius);
+  font-size: 11px;
+  color: #F3E4C9;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+}
+
+.empty-state-cta:hover {
+  background: var(--c-brown);
+  border-color: var(--c-brown);
+}
+
+.error-panel {
+  border-left: 3px solid var(--c-critical);
+  background: var(--c-canvas-raised);
+  padding: 18px;
+  border-radius: var(--radius);
+}
