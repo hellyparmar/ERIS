@@ -42,39 +42,6 @@ class InvoiceService(OutletIsolatedService):
 
         return f"INV-{today.strftime('%Y%m%d')}-{int(existing_count) + 1:04d}"
 
-    def calculate_gst(
-        self,
-        amount: Decimal,
-        gst_rate: Decimal,
-        inter_state: bool = False
-    ) -> Dict[str, Any]:
-        """Calculate GST breakdown from a taxable amount."""
-        taxable_amount = Decimal(amount).quantize(Decimal("0.01"))
-        gst_rate = Decimal(gst_rate).quantize(Decimal("0.01"))
-
-        total_tax = (taxable_amount * gst_rate / Decimal("100")).quantize(Decimal("0.01"))
-        if inter_state:
-            return {
-                "taxable_amount": taxable_amount,
-                "cgst_amount": Decimal("0.00"),
-                "sgst_amount": Decimal("0.00"),
-                "igst_amount": total_tax,
-                "total_amount": (taxable_amount + total_tax).quantize(Decimal("0.01")),
-                "tax_rate": gst_rate,
-                "gst_type": "IGST",
-            }
-
-        half_tax = (total_tax / Decimal("2")).quantize(Decimal("0.01"))
-        return {
-            "taxable_amount": taxable_amount,
-            "cgst_amount": half_tax,
-            "sgst_amount": half_tax,
-            "igst_amount": Decimal("0.00"),
-            "total_amount": (taxable_amount + total_tax).quantize(Decimal("0.01")),
-            "tax_rate": gst_rate,
-            "gst_type": "CGST+SGST",
-        }
-
     def create_invoice_from_sale(self, sale_id: Any, payment_terms_days: int = 30) -> Invoice:
         """Create a new invoice record from an existing sale."""
         sale = self.db.query(SaleTransaction).filter(SaleTransaction.id == sale_id).first()

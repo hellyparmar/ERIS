@@ -109,7 +109,8 @@ def _get_outlet_with_access_check(outlet_id: int, current_user: User, db: Sessio
     if not outlet:
         raise HTTPException(status_code=404, detail="Outlet not found")
 
-    if current_user.role not in ["super_admin", "area_manager"] and current_user.outlet_id != outlet_id:
+    from app.core.data_isolation import require_outlet_access
+    if not require_outlet_access(current_user, outlet_id):
         raise HTTPException(status_code=403, detail="Access denied to this outlet")
 
     return outlet
@@ -184,6 +185,7 @@ def _save_forecast_result(
 
 @router.get("/sales", response_model=ForecastResponse)
 async def get_sales_forecast(
+    request: Request,
     outlet_id: int = Query(..., description="Outlet ID"),
     horizon: int = Query(7, description="Forecast horizon in days (7,14,30)"),
     model: ModelType = Query(ModelType.PROPHET, description="Forecasting model (prophet, ensemble; lstm requires PyTorch)"),
@@ -215,8 +217,16 @@ async def get_sales_forecast(
             message="Forecast retrieved from cache"
         )
 
+    tenant_id = None
+    if request and hasattr(request.state, "tenant_context") and request.state.tenant_context:
+        tenant_id = str(request.state.tenant_context.tenant_id)
+    elif hasattr(current_user, "organization") and current_user.organization and getattr(current_user.organization, "tenant_id", None):
+        tenant_id = str(current_user.organization.tenant_id)
+    elif hasattr(current_user, "tenant_id") and getattr(current_user, "tenant_id", None):
+        tenant_id = str(current_user.tenant_id)
+
     if model == ModelType.PROPHET:
-        task = run_prophet_forecast.apply_async(args=[outlet_id, product_id, horizon])
+        task = run_prophet_forecast.apply_async(args=[outlet_id, product_id, horizon, tenant_id])
     elif model == ModelType.LSTM:
         task = run_lstm_forecast.apply_async(args=[outlet_id, product_id, horizon])
     else:
@@ -338,7 +348,8 @@ async def retrain_models(
     db: Session = Depends(get_db),
 ) -> ForecastResponse:
     """Retrain forecasting models with latest data."""
-    if current_user.role == "outlet_manager" and current_user.outlet_id != outlet_id:
+    from app.core.data_isolation import require_outlet_access
+    if not require_outlet_access(current_user, outlet_id):
         raise HTTPException(status_code=403, detail="Cannot retrain models for another outlet")
 
     task = retrain_forecast_models.apply_async(args=[outlet_id])

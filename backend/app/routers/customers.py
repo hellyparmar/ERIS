@@ -10,6 +10,8 @@ from typing import Optional
 from decimal import Decimal
 
 from app.database import get_db
+from app.api.deps import get_current_active_user, get_outlet_scope
+from app.models.users import User
 from app.services.customer_service import CustomerService
 router = APIRouter(prefix="/customers", tags=["customers"])
 
@@ -160,11 +162,11 @@ async def delete_customer(customer_id: int, db: Session = Depends(get_db)):
 @router.get("/{customer_id}/purchase-history")
 async def get_purchase_history(
     customer_id: int,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Retrieve the transaction history for a specific customer."""
+    """Retrieve the transaction history for a specific customer scoped to user's accessible outlets."""
     try:
-        # Import models inside to avoid circular imports if any
         from app.models.customers import Customer
         from app.models.models_v6 import Sale
         from sqlalchemy import select
@@ -176,8 +178,13 @@ async def get_purchase_history(
         if not customer:
             raise HTTPException(status_code=404, detail="Customer not found")
             
+        allowed_outlets = get_outlet_scope(current_user, db)
+        stmt = select(Sale).where(Sale.customer_id == customer_id)
+        if allowed_outlets:
+            stmt = stmt.where(Sale.outlet_id.in_(allowed_outlets))
+            
         sales = db.execute(
-            select(Sale).where(Sale.customer_id == customer_id).order_by(Sale.created_at.desc())
+            stmt.order_by(Sale.created_at.desc())
         ).scalars().all()
         
         history = []

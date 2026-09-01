@@ -57,13 +57,21 @@ async def get_accessible_outlet_ids(
 ) -> List[int]:
     """
     Dependency that returns the list of outlet IDs the current user is allowed to access.
-    - super_admin: Returns all outlet IDs in the system.
+    - super_admin / admin: Returns all outlet IDs in the system.
     - area_manager: Returns IDs of all outlets assigned to them in user_outlet_access.
-    - outlet_manager: Returns ID of the single assigned outlet.
+    - outlet_manager / manager / staff: Returns ID(s) of assigned outlet(s).
     """
-    role_name = current_user.role.name if current_user.role else ""
+    role_name = ""
+    if hasattr(current_user, 'role') and current_user.role:
+        role_name = getattr(current_user.role, 'name', '')
+        if not isinstance(role_name, str) and hasattr(current_user.role, 'value'):
+            role_name = current_user.role.value
+    if not role_name and hasattr(current_user, 'role_id') and current_user.role_id:
+        role_name = str(current_user.role_id)
+    if isinstance(role_name, str):
+        role_name = role_name.lower().replace(' ', '_')
     
-    if role_name == "super_admin":
+    if role_name in ("super_admin", "admin", "superadmin", "1"):
         result = await db.execute(select(Outlet.id))
         return [row[0] for row in result.fetchall()]
         
@@ -75,35 +83,48 @@ async def get_accessible_outlet_ids(
         )
         return [row[0] for row in result.fetchall()]
         
-    elif role_name == "outlet_manager":
-        if current_user.outlet_id:
-            return [current_user.outlet_id]
+    elif role_name in ("outlet_manager", "manager", "staff", "2", "3"):
         if hasattr(current_user, 'outlet_access') and current_user.outlet_access:
             return [access.outlet_id for access in current_user.outlet_access]
+        if getattr(current_user, 'outlet_id', None):
+            return [current_user.outlet_id]
         result = await db.execute(
-            select(UserOutletAccess.outlet_id).where(UserOutletAccess.user_id == current_user.id).limit(1)
+            select(UserOutletAccess.outlet_id).where(UserOutletAccess.user_id == current_user.id)
         )
-        row = result.fetchone()
-        if row:
-            return [row[0]]
-        return []
+        rows = [row[0] for row in result.fetchall()]
+        return rows if rows else []
         
     return []
 
 def get_outlet_scope(current_user: User, db: Session) -> List[int]:
-    role_name = current_user.role.name if current_user.role else ""
+    """
+    Synchronous helper that returns the list of outlet IDs the current user is allowed to access.
+    """
+    role_name = ""
+    if hasattr(current_user, 'role') and current_user.role:
+        role_name = getattr(current_user.role, 'name', '')
+        if not isinstance(role_name, str) and hasattr(current_user.role, 'value'):
+            role_name = current_user.role.value
+    if not role_name and hasattr(current_user, 'role_id') and current_user.role_id:
+        role_name = str(current_user.role_id)
+    if isinstance(role_name, str):
+        role_name = role_name.lower().replace(' ', '_')
     
-    if role_name == "super_admin":
+    if role_name in ("super_admin", "admin", "superadmin", "1"):
         outlets = db.query(Outlet).all()
         return [o.id for o in outlets]
     elif role_name == "area_manager":
         access_records = db.query(UserOutletAccess).filter(UserOutletAccess.user_id == current_user.id).all()
-        return [access.outlet_id for access in access_records]
-    elif role_name == "outlet_manager":
+        if access_records:
+            return [access.outlet_id for access in access_records]
+        if getattr(current_user, 'outlet_id', None):
+            return [current_user.outlet_id]
+        return []
+    elif role_name in ("outlet_manager", "manager", "staff", "2", "3"):
         access_records = db.query(UserOutletAccess).filter(UserOutletAccess.user_id == current_user.id).all()
         if access_records:
-            return [access_records[0].outlet_id]
-        if current_user.outlet_id:
+            return [access.outlet_id for access in access_records]
+        if getattr(current_user, 'outlet_id', None):
             return [current_user.outlet_id]
         return []
     return []

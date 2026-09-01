@@ -3,13 +3,13 @@ Outlets Management API Router
 """
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Optional, Union
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, select
-from uuid import UUID
 
 from app.database import get_db
+from app.models.sales import SaleTransaction
 from app.models.models_v6 import Sale, Product
 from app.models.users import User
 from app.models.outlet import Outlet
@@ -17,7 +17,7 @@ from app.models.alert import Alert
 from app.models.inventory import Inventory
 from app.models.employee_models import Employee
 from app.api.deps import get_current_active_user
-from app.core.data_isolation import OutletDataAccess
+from app.core.data_isolation import OutletDataAccess, require_outlet_access
 
 router = APIRouter(prefix="/outlets", tags=["outlets"])
 
@@ -29,22 +29,20 @@ async def list_outlets(
     db: AsyncSession = Depends(get_db)
 ) -> Any:
     allowed_outlet_ids = OutletDataAccess.get_allowed_outlet_ids(current_user)
-    if not allowed_outlet_ids:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No outlets accessible"
-        )
-
-    result = await db.execute(
-        select(
-            Outlet.outlet_id,
-            Outlet.name,
-            Outlet.city,
-            Outlet.address,
-            Outlet.manager_name,
-            Outlet.is_active
-        ).where(Outlet.outlet_id.in_(allowed_outlet_ids))
+    stmt = select(
+        Outlet.id,
+        Outlet.name,
+        Outlet.city,
+        Outlet.address,
+        Outlet.phone,
+        Outlet.is_active
     )
+    if allowed_outlet_ids is not None:
+        if not allowed_outlet_ids:
+            return []
+        stmt = stmt.where(Outlet.id.in_(allowed_outlet_ids))
+
+    result = await db.execute(stmt)
     rows = result.fetchall()
 
     return [{
@@ -52,14 +50,14 @@ async def list_outlets(
         "name": r[1],
         "city": r[2],
         "address": r[3],
-        "manager_name": r[4],
+        "phone": r[4],
         "is_active": r[5]
     } for r in rows]
 
 
 @router.get("/{outlet_id}")
 async def get_outlet_details(
-    outlet_id: UUID,
+    outlet_id: int,
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ) -> Any:
@@ -67,13 +65,13 @@ async def get_outlet_details(
     Get outlet details with performance summary.
     Revenue this month, active alerts, employee count, top product.
     """
-    if not OutletDataAccess.can_access_outlet(outlet_id, current_user, db):
+    if not require_outlet_access(current_user, outlet_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied to this outlet"
         )
 
-    result = await db.execute(select(Outlet).where(Outlet.outlet_id == outlet_id))
+    result = await db.execute(select(Outlet).where(Outlet.id == outlet_id))
     outlet = result.scalar_one_or_none()
     if not outlet:
         raise HTTPException(status_code=404, detail="Outlet not found")
@@ -83,9 +81,9 @@ async def get_outlet_details(
 
     # Revenue this month
     rev_result = await db.execute(
-        select(func.sum(Sale.total_amount)).where(
-            Sale.outlet_id == outlet_id,
-            Sale.sale_date >= month_start
+        select(func.sum(SaleTransaction.total_amount)).where(
+            SaleTransaction.outlet_id == outlet_id,
+            func.date(SaleTransaction.transaction_at) >= month_start
         )
     )
     revenue = rev_result.scalar() or 0
@@ -101,8 +99,8 @@ async def get_outlet_details(
 
     # Employee count
     emp_result = await db.execute(
-        select(func.count(Employee.employee_id)).where(
-            Employee.outlet_id == outlet_id,
+        select(func.count(Employee.id)).where(
+            Employee.store_id == outlet_id,
             Employee.is_active == True
         )
     )
@@ -112,22 +110,22 @@ async def get_outlet_details(
     top_prod_result = await db.execute(
         select(
             Product.name,
-            func.sum(Sale.quantity).label("qty")
-        ).join(Sale, Product.product_id == Sale.product_id).where(
-            Sale.outlet_id == outlet_id,
-            Sale.sale_date >= month_start
-        ).group_by(Product.product_id, Product.name).order_by(
-            func.sum(Sale.quantity).desc()
+            func.sum(SaleTransaction.quantity).label("qty")
+        ).join(SaleTransaction, Product.id == SaleTransaction.product_id).where(
+            SaleTransaction.outlet_id == outlet_id,
+            func.date(SaleTransaction.transaction_at) >= month_start
+        ).group_by(Product.id, Product.name).order_by(
+            func.sum(SaleTransaction.quantity).desc()
         )
     )
     top_product = top_prod_result.first()
 
     return {
-        "id": outlet.outlet_id,
+        "id": outlet.id,
         "name": outlet.name,
         "city": outlet.city,
         "address": outlet.address,
-        "manager_name": outlet.manager_name,
+        "phone": outlet.phone,
         "is_active": outlet.is_active,
         "performance": {
             "revenue_this_month": float(revenue),
@@ -140,37 +138,41 @@ async def get_outlet_details(
 
 @router.put("/{outlet_id}")
 async def update_outlet(
-    outlet_id: UUID,
+    outlet_id: int,
     name: Optional[str] = None,
-    manager_name: Optional[str] = None,
     address: Optional[str] = None,
+    phone: Optional[str] = None,
+    city: Optional[str] = None,
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ) -> Any:
-    """Update outlet info. Superadmin only."""
-    if current_user.role != "super_admin":
+    """Update outlet info. Superadmin/Admin only."""
+    role_name = getattr(current_user.role, 'name', str(current_user.role or '')).lower()
+    if role_name not in ["super_admin", "admin", "superadmin"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only superadmin can update outlets"
         )
 
-    result = await db.execute(select(Outlet).where(Outlet.outlet_id == outlet_id))
+    result = await db.execute(select(Outlet).where(Outlet.id == outlet_id))
     outlet = result.scalar_one_or_none()
     if not outlet:
         raise HTTPException(status_code=404, detail="Outlet not found")
 
     if name:
         outlet.name = name
-    if manager_name:
-        outlet.manager_name = manager_name
     if address:
         outlet.address = address
+    if phone:
+        outlet.phone = phone
+    if city:
+        outlet.city = city
 
     await db.commit()
     await db.refresh(outlet)
 
     return {
-        "id": outlet.outlet_id,
+        "id": outlet.id,
         "name": outlet.name,
         "message": "Outlet updated successfully"
     }
@@ -178,15 +180,14 @@ async def update_outlet(
 
 @router.get("/{outlet_id}/compare")
 async def compare_outlet_performance(
-    outlet_id: UUID,
+    outlet_id: int,
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ) -> Any:
     """
     Returns this outlet's performance vs system average for current month.
-    Metrics: revenue, transactions, avg_basket_size, low_stock_rate.
     """
-    if not OutletDataAccess.can_access_outlet(outlet_id, current_user, db):
+    if not require_outlet_access(current_user, outlet_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied to this outlet"
@@ -197,16 +198,18 @@ async def compare_outlet_performance(
 
     # Outlet revenue
     r = await db.execute(
-        select(func.sum(Sale.total_amount)).where(
-            Sale.outlet_id == outlet_id, Sale.sale_date >= month_start
+        select(func.sum(SaleTransaction.total_amount)).where(
+            SaleTransaction.outlet_id == outlet_id,
+            func.date(SaleTransaction.transaction_at) >= month_start
         )
     )
     outlet_revenue = r.scalar() or 0
 
     # Outlet transactions
     r = await db.execute(
-        select(func.count(Sale.sale_id)).where(
-            Sale.outlet_id == outlet_id, Sale.sale_date >= month_start
+        select(func.count(SaleTransaction.id)).where(
+            SaleTransaction.outlet_id == outlet_id,
+            func.date(SaleTransaction.transaction_at) >= month_start
         )
     )
     outlet_transactions = r.scalar() or 0
@@ -215,8 +218,8 @@ async def compare_outlet_performance(
 
     # Outlet low stock
     r = await db.execute(
-        select(func.count(Inventory.inventory_id)).join(
-            Product, Inventory.product_id == Product.product_id
+        select(func.count(Inventory.id)).join(
+            Product, Inventory.product_id == Product.id
         ).where(
             Inventory.outlet_id == outlet_id,
             Inventory.current_stock <= Product.reorder_level
@@ -226,26 +229,26 @@ async def compare_outlet_performance(
 
     # System total revenue
     r = await db.execute(
-        select(func.sum(Sale.total_amount)).where(Sale.sale_date >= month_start)
+        select(func.sum(SaleTransaction.total_amount)).where(func.date(SaleTransaction.transaction_at) >= month_start)
     )
     all_revenue = r.scalar() or 0
 
     # System total transactions
     r = await db.execute(
-        select(func.count(Sale.sale_id)).where(Sale.sale_date >= month_start)
+        select(func.count(SaleTransaction.id)).where(func.date(SaleTransaction.transaction_at) >= month_start)
     )
     all_transactions = r.scalar() or 0
 
     system_avg_basket = (float(all_revenue) / int(all_transactions)) if all_transactions > 0 else 0
 
     # Outlet count
-    r = await db.execute(select(func.count(Outlet.outlet_id)))
+    r = await db.execute(select(func.count(Outlet.id)))
     outlet_count = r.scalar() or 1
 
     # System low stock total
     r = await db.execute(
-        select(func.count(Inventory.inventory_id)).join(
-            Product, Inventory.product_id == Product.product_id
+        select(func.count(Inventory.id)).join(
+            Product, Inventory.product_id == Product.id
         ).where(Inventory.current_stock <= Product.reorder_level)
     )
     system_total_low_stock = r.scalar() or 0
@@ -278,12 +281,13 @@ async def create_outlet(
     name: str,
     city: str,
     address: str,
-    manager_name: str,
+    phone: Optional[str] = None,
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ) -> Any:
     """Create new outlet. Superadmin only."""
-    if current_user.role != "super_admin":
+    role_name = getattr(current_user.role, 'name', str(current_user.role or '')).lower()
+    if role_name not in ["super_admin", "admin", "superadmin"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only superadmin can create outlets"
@@ -293,7 +297,7 @@ async def create_outlet(
         name=name,
         city=city,
         address=address,
-        manager_name=manager_name,
+        phone=phone,
         is_active=True
     )
     db.add(new_outlet)
@@ -301,29 +305,30 @@ async def create_outlet(
     await db.refresh(new_outlet)
 
     return {
-        "id": new_outlet.outlet_id,
+        "id": new_outlet.id,
         "name": new_outlet.name,
         "city": new_outlet.city,
         "address": new_outlet.address,
-        "manager_name": new_outlet.manager_name,
+        "phone": new_outlet.phone,
         "message": "Outlet created successfully"
     }
 
 
 @router.delete("/{outlet_id}")
 async def delete_outlet(
-    outlet_id: UUID,
+    outlet_id: int,
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ) -> Any:
     """Delete outlet. Superadmin only."""
-    if current_user.role != "super_admin":
+    role_name = getattr(current_user.role, 'name', str(current_user.role or '')).lower()
+    if role_name not in ["super_admin", "admin", "superadmin"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only superadmin can delete outlets"
         )
 
-    result = await db.execute(select(Outlet).where(Outlet.outlet_id == outlet_id))
+    result = await db.execute(select(Outlet).where(Outlet.id == outlet_id))
     outlet = result.scalar_one_or_none()
     if not outlet:
         raise HTTPException(status_code=404, detail="Outlet not found")
