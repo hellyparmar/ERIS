@@ -1,0 +1,159 @@
+/* ── Sidebar ── */
+.sidebar-nav { flex: 1; overflow-y: auto; padding: var(--sp-4); }
+.sidebar-section { margin-bottom: var(--sp-6); }
+.sidebar-section-title {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.1em; color: var(--text-faint);
+  padding: 0 var(--sp-3); margin-bottom: var(--sp-2);
+}
+.sidebar-link {
+  display: flex; align-items: center; gap: var(--sp-3);
+  padding: 8px 12px; border-radius: var(--r-md);
+  font-size: var(--text-sm); font-weight: 500;
+  color: var(--text-secondary); text-decoration: none;
+  transition: all 0.12s ease;
+}
+.sidebar-link:hover { background: var(--surface-hover); color: var(--text-primary); }
+.sidebar-link.active {
+  background: var(--accent-dim); color: var(--accent); font-weight: 600;
+}
+.sidebar-link-icon { width: 18px; height: 18px; flex-shrink: 0; }
+.sidebar-footer {
+  padding: var(--sp-4); border-top: 1px solid var(--border);
+}
+.sidebar-user {
+  display: flex; align-items: center; gap: var(--sp-3);
+  padding: var(--sp-2); border-radius: var(--r-md);
+}
+.sidebar-user-avatar {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: var(--accent-dim); color: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  font-size: var(--text-sm); font-weight: 700;
+}
+.sidebar-user-info { flex: 1; min-width: 0; }
+.sidebar-user-name { font-size: var(--text-sm); font-weight: 600; color: var(--text-primary); }
+.sidebar-user-role { font-size: 11px; color: var(--text-muted); }
+
+/* ── Header ── */
+.header-inner {
+  display: flex; align-items: center; height: 100%; padding: 0 var(--sp-6);
+}
+.header-left { display: flex; align-items: center; gap: var(--sp-4); }
+.header-title { font-size: var(--text-base); font-weight: 600; color: var(--text-primary); }
+.header-center { flex: 1; padding: 0 var(--sp-8); }
+.header-search {
+  max-width: 400px; position: relative;
+}
+.header-search input {
+  width: 100%; padding: 8px 14px 8px 36px; min-height: 36px;
+  border: 1px solid var(--border); border-radius: var(--r-lg);
+  background: var(--surface-alt); color: var(--text-primary);
+  font-size: var(--text-sm); outline: none;
+}
+.header-search input:focus { border-color: var(--accent); }
+.header-search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-faint); }
+.header-right { display: flex; align-items: center; gap: var(--sp-2); }
+.header-btn {
+  width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
+  border-radius: var(--r-md); border: none; background: transparent;
+  color: var(--text-muted); cursor: pointer; transition: all 0.12s;
+}
+.header-btn:hover { background: var(--surface-hover); color: var(--text-primary); }
+.header-notif-dot {
+  position: absolute; top: 6px; right: 6px;
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent); box-shadow: 0 0 6px var(--accent-glow);
+}
+
+/* ── Page Header ── */
+.page-header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  margin-bottom: var(--sp-8);
+}
+.page-header-actions { display: flex; align-items: center; gap: var(--sp-3); }
+
+/* ── Metric Strip ── */
+.metric-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-8);
+}
+.metric-block {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  padding: var(--sp-5);
+}
+.metric-block-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+.metric-block-value { font-family: var(--font-mono); font-size: var(--text-xl); font-weight: 700; color: var(--text-primary); margin-top: var(--sp-1); }
+.metric-block-delta { font-size: var(--text-sm); font-weight: 600; margin-top: var(--sp-1); }
+
+/* ── Chart Container ── */
+.chart-wrap { width: 100%; }
+.chart-tooltip {
+  background: var(--elevated) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--r-lg) !important;
+  padding: var(--sp-3) var(--sp-4) !important;
+  font-size: var(--text-sm) !important;
+  box-shadow: var(--shadow-lg) !important;
+}
+
+/* ── KPI Card (legacy compat) ── */
+.kpi-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  padding: var(--sp-5);
+  display: flex; flex-direction: column; gap: var(--sp-2);
+}
+
+/* ── Status Bar ── */
+.status-bar {
+  display: flex; gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  margin-bottom: var(--sp-6);
+}
+.status-bar-item {
+  display: flex; align-items: center; gap: var(--sp-2);
+  font-size: var(--text-sm); color: var(--text-secondary);
+}
+.status-bar-item strong { color: var(--text-primary); font-weight: 600; }
+
+/* ── Progress Bar (inline) ── */
+.progress-bar {
+  height: 6px; background: var(--border); border-radius: 3px; overflow: hidden;
+}
+.progress-fill {
+  height: 100%; background: var(--accent); border-radius: 3px;
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.progress-fill.green { background: var(--green); }
+.progress-fill.red { background: var(--red); }
+
+/* ── Hover Reveal ── */
+.hover-reveal { position: relative; }
+.hover-reveal-detail {
+  opacity: 0; transition: opacity 0.15s; pointer-events: none;
+}
+.hover-reveal:hover .hover-reveal-detail { opacity: 1; pointer-events: auto; }
+
+/* @deprecated — Atelier migration: do not use in new pages. Remove after all 27 pages migrated. */
+.glass-card {}
+
+/* @deprecated — Atelier migration: do not use in new pages. Remove after all 27 pages migrated. */
+.stat-card {}
+
+/* @deprecated — Atelier migration: do not use in new pages. Remove after all 27 pages migrated. */
+.unified-card {}
+
+/* @deprecated — Atelier migration: do not use in new pages. Remove after all 27 pages migrated. */
+.metric-card {}
+
+/* @deprecated — Atelier migration: do not use in new pages. Remove after all 27 pages migrated. */
+.gradient-button {}

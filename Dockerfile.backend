@@ -1,0 +1,61 @@
+# ==========================================
+# ERIS BACKEND - PRODUCTION DOCKERFILE
+# ==========================================
+
+# Stage 1: Build dependencies
+FROM python:3.11-slim as builder
+
+WORKDIR /build
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV PIP_RETRIES=20
+ENV PIP_TIMEOUT=1000
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends gcc libpq-dev build-essential && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY backend/requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip
+RUN pip wheel --no-cache-dir --no-deps --default-timeout=1000 --wheel-dir /build/wheels -r requirements.txt
+
+# Stage 2: Runtime
+FROM python:3.11-slim
+
+ENV PIP_RETRIES=20
+ENV PIP_TIMEOUT=1000
+
+WORKDIR /app
+
+# Install runtime dependencies (libpq for postgres)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends libpq-dev curl && \
+    rm -rf /var/lib/apt/lists/*
+
+# Security: Create non-root user with home directory for caching
+RUN groupadd -r erisuser && useradd -r -g erisuser -m -d /home/erisuser erisuser
+
+# Copy wheels from builder
+COPY --from=builder /build/wheels /wheels
+RUN pip install --no-cache-dir --upgrade pip
+RUN pip install --no-cache-dir --default-timeout=1000 /wheels/*
+
+# Copy Application Code (Ensure correct context)
+COPY backend/ /app/
+COPY alembic/ /app/alembic/
+COPY alembic.ini /app/
+
+# Fix permissions
+RUN chown -R erisuser:erisuser /app
+
+# Environment defaults
+ENV ENVIRONMENT=production
+ENV PORT=8000
+
+USER erisuser
+
+EXPOSE 8000
+
+# Use Gunicorn with Uvicorn workers for production stability
+CMD ["gunicorn", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "app.main:app", "--bind", "0.0.0.0:8000", "--access-logfile", "-", "--error-logfile", "-"]
