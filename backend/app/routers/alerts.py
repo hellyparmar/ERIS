@@ -1,15 +1,13 @@
-"""
-Alerts Router - System Alerts and Notifications
-Generates alerts from inventory, sales, and system events
-"""
-
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, select
 from typing import Optional
 from datetime import datetime
 from app.database import get_db
 from app.models import Alert, Inventory, Product, AlertSeverity
+from app.models.users import User
+from app.api.deps import get_current_active_user, get_outlet_scope
+from app.core.data_isolation import require_outlet_access
 
 router = APIRouter(prefix="/alerts", tags=["Alerts"])
 
@@ -18,34 +16,44 @@ async def get_alerts(
     severity: Optional[str] = Query(None, pattern="^(critical|warning|info)$"),
     category: Optional[str] = None,
     unread_only: bool = False,
+    outlet_id: Optional[int] = Query(None),
     page: int = Query(default=1, ge=1),
     per_page: int = Query(default=50, ge=1, le=100),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Get system alerts based on inventory levels - PAGINATED TO PREVENT CRASHES
-    
-    CRASH FIXES APPLIED:
-    - Added proper page/per_page pagination (was just limit before)
-    - Returns pagination metadata (total, total_pages, current_page)
-    - Frontend can now request specific pages instead of all alerts at once
-    - Memory-safe: max 100 alerts per page, prevents loading all 7914+ alerts
-    """
+    """Get system alerts based on inventory levels with outlet scoping"""
     from sqlalchemy import text
     from datetime import datetime
+    
+    allowed_outlets = get_outlet_scope(current_user, db)
+    outlet_clause = ""
+    params = {}
+    if allowed_outlets:
+        if outlet_id:
+            if not require_outlet_access(current_user, outlet_id):
+                raise HTTPException(status_code=403, detail="Access denied to this outlet")
+            outlet_clause = " AND i.outlet_id = :outlet_id "
+            params["outlet_id"] = outlet_id
+        else:
+            outlet_clause = f" AND i.outlet_id IN ({','.join(str(oid) for oid in allowed_outlets)}) "
+    elif outlet_id:
+        outlet_clause = " AND i.outlet_id = :outlet_id "
+        params["outlet_id"] = outlet_id
     
     # Generate alerts from inventory data using raw SQL
     alerts_data = []
     
-    # 1. Out of stock alerts (CRITICAL) - FIXED: Added LIMIT to prevent memory crash
-    out_of_stock_sql = """
+    # 1. Out of stock alerts (CRITICAL)
+    out_of_stock_sql = f"""
         SELECT i.id, i.name, i.sku, i.product_id, p.category, i.current_stock, i.reorder_point
         FROM inventory i
         JOIN products p ON i.product_id = p.id
-        WHERE i.stock_status = 'out_of_stock'
+        WHERE i.stock_status = 'out_of_stock' {outlet_clause}
         LIMIT 5000
     """
     
-    out_of_stock = db.execute(text(out_of_stock_sql)).fetchall()
+    out_of_stock = db.execute(text(out_of_stock_sql), params).fetchall()
     for row in out_of_stock:
         alerts_data.append({
             'severity': 'critical',
@@ -58,16 +66,16 @@ async def get_alerts(
             'is_acknowledged': False
         })
     
-    # 2. Low stock alerts (WARNING) - FIXED: Added LIMIT to prevent memory crash
-    low_stock_sql = """
+    # 2. Low stock alerts (WARNING)
+    low_stock_sql = f"""
         SELECT i.id, i.name, i.sku, i.product_id, p.category, i.current_stock, i.reorder_point, i.max_stock
         FROM inventory i
         JOIN products p ON i.product_id = p.id
-        WHERE i.stock_status = 'low'
+        WHERE i.stock_status = 'low' {outlet_clause}
         LIMIT 5000
     """
     
-    low_stock = db.execute(text(low_stock_sql)).fetchall()
+    low_stock = db.execute(text(low_stock_sql), params).fetchall()
     for row in low_stock:
         alerts_data.append({
             'severity': 'warning',
@@ -81,15 +89,15 @@ async def get_alerts(
         })
     
     # 3. High stock alerts (INFO) - sample only
-    high_stock_sql = """
+    high_stock_sql = f"""
         SELECT i.id, i.name, i.sku, i.product_id, p.category, i.current_stock
         FROM inventory i
         JOIN products p ON i.product_id = p.id
-        WHERE i.stock_status = 'high'
+        WHERE i.stock_status = 'high' {outlet_clause}
         LIMIT 10
     """
     
-    high_stock = db.execute(text(high_stock_sql)).fetchall()
+    high_stock = db.execute(text(high_stock_sql), params).fetchall()
     for row in high_stock:
         alerts_data.append({
             'severity': 'info',
@@ -155,15 +163,22 @@ async def get_alerts(
     }
 
 @router.patch("/{alert_id}/acknowledge")
-async def acknowledge_alert(alert_id: int, db: Session = Depends(get_db)):
+async def acknowledge_alert(
+    alert_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
     """Mark an alert as acknowledged"""
     result = await db.execute(select(Alert).where(Alert.id == alert_id))
     alert = result.scalar_one_or_none()
     if not alert:
         return {"success": False, "error": "Alert not found"}
+    if getattr(alert, 'outlet_id', None) and not require_outlet_access(current_user, alert.outlet_id):
+        raise HTTPException(status_code=403, detail="Access denied to this alert")
     
     alert.is_acknowledged = True
     alert.acknowledged_at = datetime.now()
+    alert.acknowledged_by = current_user.id
     db.commit()
     
     return {"success": True, "message": "Alert acknowledged"}

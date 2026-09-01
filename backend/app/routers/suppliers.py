@@ -107,17 +107,20 @@ async def get_supplier_performance(supplier_id: int, db: Session = Depends(get_d
 async def create_purchase_order(
     supplier_id: int,
     data: PurchaseOrderCreate,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """Create a purchase order for a supplier"""
     try:
-        svc = SupplierService(db)
+        svc = SupplierService(db, current_user)
         payload = data.dict()
         payload["supplier_id"] = supplier_id
         po = svc.create_purchase_order(payload)
         return {"success": True, "data": svc._po_dict(po), "message": f"Purchase order {po.po_number} created"}
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
