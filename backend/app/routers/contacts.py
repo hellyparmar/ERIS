@@ -23,6 +23,7 @@ router = APIRouter(prefix="/contacts", tags=["contacts"])
 
 
 @router.get("/", response_model=BusinessContactListResponse)
+@router.get("", response_model=BusinessContactListResponse)
 async def list_contacts(
     search: Optional[str] = None,
     contact_type: Optional[str] = None,
@@ -35,7 +36,7 @@ async def list_contacts(
 ) -> Any:
     """
     Paginated list of business contacts with search and filtering.
-    Search by company name, contact person, email, or phone.
+    Search by company name, contact person, or phone.
     """
     # Build query
     stmt = select(BusinessContact)
@@ -46,7 +47,6 @@ async def list_contacts(
             or_(
                 BusinessContact.company_name.ilike(f"%{search}%"),
                 BusinessContact.contact_person.ilike(f"%{search}%"),
-                BusinessContact.email.ilike(f"%{search}%"),
                 BusinessContact.phone.ilike(f"%{search}%")
             )
         )
@@ -67,7 +67,6 @@ async def list_contacts(
         count_stmt = count_stmt.where(or_(
             BusinessContact.company_name.ilike(f"%{search}%"),
             BusinessContact.contact_person.ilike(f"%{search}%"),
-            BusinessContact.email.ilike(f"%{search}%"),
             BusinessContact.phone.ilike(f"%{search}%")
         ))
     
@@ -82,10 +81,10 @@ async def list_contacts(
     
     result = await db.execute(count_stmt)
     total = result.scalar_one()
-    total_pages = (total + per_page - 1) // per_page
+    total_pages = (total + per_page - 1) // per_page if total > 0 else 1
 
-    # Apply pagination
-    stmt = stmt.offset((page - 1) * per_page).limit(per_page)
+    # Apply pagination and sorting
+    stmt = stmt.order_by(BusinessContact.created_at.desc()).offset((page - 1) * per_page).limit(per_page)
     result = await db.execute(stmt)
     contacts = result.scalars().all()
 
@@ -94,29 +93,45 @@ async def list_contacts(
         per_page=per_page,
         total=total,
         total_pages=total_pages,
-        items=[BusinessContactResponse.from_orm(contact) for contact in contacts]
+        items=[
+            BusinessContactResponse(
+                contact_id=contact.contact_id,
+                company_name=contact.company_name,
+                contact_person=contact.contact_person,
+                phone=contact.phone,
+                gst_number=contact.gst_number,
+                address=contact.address,
+                city=contact.city,
+                contact_type=contact.contact_type.value if hasattr(contact.contact_type, 'value') else str(contact.contact_type),
+                product_categories=contact.product_categories or [],
+                is_active=contact.is_active,
+                created_at=contact.created_at,
+                updated_at=contact.updated_at
+            )
+            for contact in contacts
+        ]
     )
 
 
 @router.post("/", response_model=BusinessContactResponse)
+@router.post("", response_model=BusinessContactResponse)
 async def create_contact(
     contact_data: BusinessContactCreate,
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ) -> Any:
     """Create new business contact"""
-    # Check for duplicate email
-    result = await db.execute(select(BusinessContact).where(BusinessContact.email == contact_data.email))
+    # Check for duplicate phone
+    result = await db.execute(select(BusinessContact).where(BusinessContact.phone == contact_data.phone))
     existing = result.scalar_one_or_none()
     if existing:
-        raise HTTPException(status_code=400, detail="Contact with this email already exists")
+        raise HTTPException(status_code=400, detail="Contact with this phone number already exists")
 
     # Create contact
     contact = BusinessContact(
         company_name=contact_data.company_name,
         contact_person=contact_data.contact_person,
         phone=contact_data.phone,
-        email=contact_data.email,
         gst_number=contact_data.gst_number,
         address=contact_data.address,
         city=contact_data.city,
@@ -128,7 +143,20 @@ async def create_contact(
     await db.commit()
     await db.refresh(contact)
 
-    return BusinessContactResponse.from_orm(contact)
+    return BusinessContactResponse(
+        contact_id=contact.contact_id,
+        company_name=contact.company_name,
+        contact_person=contact.contact_person,
+        phone=contact.phone,
+        gst_number=contact.gst_number,
+        address=contact.address,
+        city=contact.city,
+        contact_type=contact.contact_type.value if hasattr(contact.contact_type, 'value') else str(contact.contact_type),
+        product_categories=contact.product_categories or [],
+        is_active=contact.is_active,
+        created_at=contact.created_at,
+        updated_at=contact.updated_at
+    )
 
 
 @router.get("/{contact_id}", response_model=BusinessContactResponse)
@@ -148,7 +176,7 @@ async def get_contact(
     # Get invoice history summary
     result = await db.execute(
         select(
-            func.count(Invoice.invoice_id).label("total_invoices"),
+            func.count(Invoice.id).label("total_invoices"),
             func.sum(Invoice.total_amount).label("total_amount"),
             func.sum(
                 case(
@@ -180,16 +208,20 @@ async def get_contact(
     )
     last_invoice = result.scalar_one_or_none()
 
-    response = BusinessContactResponse.from_orm(contact)
-    response.invoice_history = InvoiceHistorySummary(
-        total_invoices=invoice_stats.total_invoices or 0,
-        total_amount=float(invoice_stats.total_amount or 0),
-        paid_amount=float(invoice_stats.paid_amount or 0),
-        pending_amount=float(invoice_stats.pending_amount or 0),
-        overdue_amount=float(invoice_stats.overdue_amount or 0),
-        last_invoice_date=last_invoice if last_invoice else None
+    response = BusinessContactResponse(
+        contact_id=contact.contact_id,
+        company_name=contact.company_name,
+        contact_person=contact.contact_person,
+        phone=contact.phone,
+        gst_number=contact.gst_number,
+        address=contact.address,
+        city=contact.city,
+        contact_type=contact.contact_type.value if hasattr(contact.contact_type, 'value') else str(contact.contact_type),
+        product_categories=contact.product_categories or [],
+        is_active=contact.is_active,
+        created_at=contact.created_at,
+        updated_at=contact.updated_at
     )
-
     return response
 
 
@@ -206,12 +238,12 @@ async def update_contact(
     if not contact:
         raise HTTPException(status_code=404, detail="Contact not found")
 
-    # Check for duplicate email if email is being updated
-    if contact_data.email and contact_data.email != contact.email:
-        result = await db.execute(select(BusinessContact).where(BusinessContact.email == contact_data.email))
+    # Check for duplicate phone if phone is being updated
+    if contact_data.phone and contact_data.phone != contact.phone:
+        result = await db.execute(select(BusinessContact).where(BusinessContact.phone == contact_data.phone))
         existing = result.scalar_one_or_none()
         if existing:
-            raise HTTPException(status_code=400, detail="Contact with this email already exists")
+            raise HTTPException(status_code=400, detail="Contact with this phone number already exists")
 
     # Update fields
     update_data = contact_data.dict(exclude_unset=True)
@@ -223,7 +255,20 @@ async def update_contact(
     await db.commit()
     await db.refresh(contact)
 
-    return BusinessContactResponse.from_orm(contact)
+    return BusinessContactResponse(
+        contact_id=contact.contact_id,
+        company_name=contact.company_name,
+        contact_person=contact.contact_person,
+        phone=contact.phone,
+        gst_number=contact.gst_number,
+        address=contact.address,
+        city=contact.city,
+        contact_type=contact.contact_type.value if hasattr(contact.contact_type, 'value') else str(contact.contact_type),
+        product_categories=contact.product_categories or [],
+        is_active=contact.is_active,
+        created_at=contact.created_at,
+        updated_at=contact.updated_at
+    )
 
 
 @router.delete("/{contact_id}")
@@ -232,7 +277,7 @@ async def delete_contact(
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ) -> Any:
-    """Soft delete a contact"""
+    """Soft delete / deactivate a contact"""
     result = await db.execute(select(BusinessContact).where(BusinessContact.contact_id == contact_id))
     contact = result.scalar_one_or_none()
     if not contact:
@@ -244,6 +289,6 @@ async def delete_contact(
     await db.commit()
 
     return {
-        "contact_id": contact_id,
+        "contact_id": str(contact_id),
         "message": "Contact deactivated successfully"
     }

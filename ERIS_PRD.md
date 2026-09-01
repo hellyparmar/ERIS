@@ -397,10 +397,12 @@ Location: `app/routers/tally_integration.py`, `app/api/integrations/zoho_*.py`,
 separate overlapping routers). Location: `app/api/routers/reports.py`, `export.py`,
 `data.py` (consolidation status: see Section 9).
 
-### 7.14 Employees, Suppliers, Outlets
+### 7.14 Employees, Suppliers, Contacts, Outlets
 **REQ-OPS-01:** Standard CRUD + role/shift modeling for employees, supplier +
-purchase-order management, and outlet management (with lat/lon for weather).
-Location: `app/api/routers/employees.py`, `suppliers.py`, `app/api/outlets.py`.
+purchase-order management, business contact directory (suppliers, distributors, logistics),
+and outlet management (with lat/lon for weather).
+Location: `app/api/routers/employees.py`, `suppliers.py`, `contacts.py`, `app/api/outlets.py`.
+Frontend: `/employees`, `/suppliers`, `/contacts`, `/outlets`.
 
 ---
 
@@ -425,11 +427,12 @@ prior session, confirmed broken now) · ⚪ Not implemented
 | 8.6 | Analytics/Dashboard consolidation | ✅ | Single `analytics.router` registered |
 | 8.6b | Forecasting/Predictions/Intelligence consolidation | ✅ | Only `forecasting.router` registered; no separate `predictions`/`intelligence` routers found |
 | 8.7 | Multi-tenant RLS & Celery Isolation | ✅ | `RLSMiddleware` registered. `get_db()` and `get_db_sync()` fail-closed on tenant session init errors. `run_prophet_forecast` task takes `tenant_id` and sets session variable. Outlet scoping enforced across all routers (`sales`, `customers`, `forecasting`, `causal_analysis`, `suppliers`, `employees`, `outlets`, `gst_billing`, `alerts`). |
-| 8.8 | Dataset — realistic multi-outlet generator | ✅ | `app/seed_database.py` is the single canonical dataset generator & seeder (1 year of history, multi-tenant RLS, weather/monsoon/holiday scaling). |
+| 8.8 | Dataset — realistic multi-outlet generator | ✅ | `app/seed_database.py` is the single canonical dataset generator & seeder (1 year of history, multi-tenant RLS, weather/monsoon/holiday scaling, business contacts). |
 | 8.9 | Dataset — vector-store content for RAG | 🟡 | `app/seed_rag.py` populates `hybrid_rag.py` vector store; chromadb dependency is optional and degrades gracefully. |
 | 8.10 | Dead-code purge (Phase 1 + 6) | ✅ | Complete dead-code purge executed. All confirmed-dead files purged. `check_imports.py` reports 0 dangling imports. 130 reachable modules, 5 intentionally-unreachable files remaining. |
-| 8.11 | Causal Analysis / Communication Hub frontend pages | ⚪ | Backend endpoints exist and are registered; `frontend/src/pages/` still has the same 20 files with no page for either feature |
-| 8.12 | n8n as an actual running service | ⚪ | Webhook receiver + one workflow JSON exist; no `n8n` service in `docker-compose.yml` |
+| 8.11 | Business Contacts frontend page | ✅ | Built `frontend/src/pages/Contacts.jsx` backed by `BusinessContact` model and `/api/v1/contacts/` CRUD endpoints. Added to router and navigation. |
+| 8.12 | Causal Analysis / Communication Hub frontend pages | ⚪ | Backend endpoints exist and are registered; `frontend/src/pages/` still has the same 20 files with no page for either feature |
+| 8.13 | n8n as an actual running service | ⚪ | Webhook receiver + one workflow JSON exist; no `n8n` service in `docker-compose.yml` |
 
 ---
 
@@ -496,6 +499,7 @@ are actually reachable by a user.
 | Phase 2 Seed Fix (2026-09-01) | **365-day history & economic indicators:** Fixed `backend/app/seed_database.py` to generate 365 days (1 full year) of realistic sales & day-close history instead of 3 days. Added `seed_economic_indicators()` populating `EconomicIndicatorHistory` with 36 months (2024–2026) of published Indian monthly macroeconomic figures (RBI repo rates, MOSPI CPI, WPI, and food inflation). Verified batch insert performance, Scaler calendar coverage, and 0 dangling imports in live graph. |
 | Phase 3 Security & Correctness (2026-09-01) | **RLS Celery context, GST consolidation & Outlet-scoping:** (1) `run_prophet_forecast` updated to accept `tenant_id` and execute in `get_db_sync(tenant_id=tenant_id)` context; `get_db()` and `get_db_sync()` in `database.py` updated to fail-closed on PostgreSQL session init failure. (2) Removed duplicate `calculate_gst()` from `invoice_service.py`; canonical `gst_calculator.py` is the single source of truth. (3) Enforced outlet authorization across all 9 routers (`sales`, `customers`, `forecasting`, `causal_analysis`, `suppliers`, `employees`, `outlets`, `gst_billing`, `alerts`). Added multi-outlet cross-isolation tests in `test_data_isolation.py`. |
 | POS Removal & BI Repositioning (2026-09-01) | **Repositioned ERIS as pure retail BI & monitoring platform:** Removed the point-of-sale terminal concept entirely. Deleted POS routers/services (`pos_auth.py`, `pos_sales.py`, `pos_override.py`, `pos_dayclose.py`, `pos_service.py`, `thermal_printer.py`, `jwt_auth.py`). Removed `DayClose` model, dropped `day_close` table via Alembic migration `99999999999d`, and removed nightly register reconciliation scheduler check. Cleaned frontend UI removing `/day-close` page, `usePOSAuth` hook, and `/pos` & `/day-close` navigation links. Reframed seed data logs/comments to imported historical sales from retailer POS. Verified 0 dangling imports and successful frontend build. |
+| Business Contacts Page (2026-09-01) | **Built Business Contacts management UI:** Created `frontend/src/pages/Contacts.jsx` backed by `BusinessContact` model (`models/business_contact.py`) and `/api/v1/contacts/` CRUD endpoints. Added search, filtering by contact type (`supplier`, `distributor`, `logistics`) and active status, KPI summary cards, and create/edit/deactivate modals. Seeded realistic `BusinessContact` records in `seed_database.py`. Registered `/contacts` route in `App.jsx` and navigation in `Sidebar.jsx`. Verified 0 dangling imports and successful production build. |
 | Round 2 | Dataset size confirmed: 5-6 outlets, 1-2 years of history |
 | Round 2 | RLS scope explicitly narrowed to 6 core tables (Section 2.2) rather than full-system, as the pragmatic correct-over-broad tradeoff |
 | Round 2→3 (this audit) | Confirmed regressions: Ollama routing, hybrid RAG wiring, RLS middleware registration, and 4 previously-merged duplicate routers have all reappeared — flagged in Section 8/9 for re-fix with a guard against recurrence |

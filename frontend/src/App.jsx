@@ -29,6 +29,7 @@ const CustomerInsights = lazy(() => import('./pages/CustomerInsights.jsx'));
 const Settings = lazy(() => import('./pages/Settings.jsx'));
 const Employees = lazy(() => import('./pages/Employees.jsx'));
 const Suppliers = lazy(() => import('./pages/Suppliers.jsx'));
+const Contacts = lazy(() => import('./pages/Contacts.jsx'));
 const Sales = lazy(() => import('./pages/Sales.jsx'));
 const GSTInvoice = lazy(() => import('./pages/GSTInvoice.jsx'));
 
@@ -70,6 +71,7 @@ function AppLayout() {
             <Route path="/settings" element={<ProtectedRoute roles={ALL_ROLES}><Settings /></ProtectedRoute>} />
             <Route path="/employees" element={<ProtectedRoute roles={SUPER_ONLY}><Employees /></ProtectedRoute>} />
             <Route path="/suppliers" element={<ProtectedRoute roles={SUPER_ONLY}><Suppliers /></ProtectedRoute>} />
+            <Route path="/contacts" element={<ProtectedRoute roles={ALL_ROLES}><Contacts /></ProtectedRoute>} />
             <Route path="/sales" element={<ProtectedRoute roles={ALL_ROLES}><Sales /></ProtectedRoute>} />
             <Route path="/gst-invoice" element={<ProtectedRoute roles={ALL_ROLES}><GSTInvoice /></ProtectedRoute>} />
 
