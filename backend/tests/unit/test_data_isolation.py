@@ -135,6 +135,69 @@ class TestOutletDataAccess(unittest.TestCase):
         outlets = asyncio.run(get_accessible_outlet_ids(outlet_user, mock_db))
         self.assertEqual(outlets, [9])
 
+    def test_sync_get_outlet_scope(self):
+        """Test the synchronous get_outlet_scope helper"""
+        mock_db = MagicMock()
+        
+        # super_admin
+        admin_user = Mock()
+        admin_user.role = Mock(name="role", value="super_admin")
+        admin_user.role.name = "super_admin"
+        o1 = Mock(id=1); o2 = Mock(id=2)
+        mock_db.query.return_value.all.return_value = [o1, o2]
+        self.assertEqual(get_outlet_scope(admin_user, mock_db), [1, 2])
+        
+        # outlet_manager with direct outlet_id
+        mgr_user = Mock()
+        mgr_user.role = Mock(name="role", value="outlet_manager")
+        mgr_user.role.name = "outlet_manager"
+        mgr_user.id = 101
+        mgr_user.outlet_id = 1
+        mock_db.query.return_value.filter.return_value.all.return_value = []
+        self.assertEqual(get_outlet_scope(mgr_user, mock_db), [1])
+
+    def test_cross_outlet_manager_isolation(self):
+        """
+        Concrete assertion that outlet_manager A assigned to Outlet 1 CANNOT
+        access Outlet 2, and outlet_manager B assigned to Outlet 2 CANNOT access Outlet 1.
+        """
+        outlet_1_id = 10
+        outlet_2_id = 20
+
+        # Manager A -> Outlet 1
+        manager_a = Mock()
+        manager_a.id = 1
+        manager_a.role = UserRoleEnum.outlet_manager
+        manager_a.outlet_id = outlet_1_id
+        acc_a = Mock(spec=UserOutletAccess)
+        acc_a.outlet_id = outlet_1_id
+        manager_a.outlet_access = [acc_a]
+
+        # Manager B -> Outlet 2
+        manager_b = Mock()
+        manager_b.id = 2
+        manager_b.role = UserRoleEnum.outlet_manager
+        manager_b.outlet_id = outlet_2_id
+        acc_b = Mock(spec=UserOutletAccess)
+        acc_b.outlet_id = outlet_2_id
+        manager_b.outlet_access = [acc_b]
+
+        # 1. require_outlet_access check
+        self.assertTrue(require_outlet_access(manager_a, outlet_1_id))
+        self.assertFalse(require_outlet_access(manager_a, outlet_2_id))
+
+        self.assertTrue(require_outlet_access(manager_b, outlet_2_id))
+        self.assertFalse(require_outlet_access(manager_b, outlet_1_id))
+
+        # 2. OutletDataAccess allowed IDs check
+        allowed_a = OutletDataAccess.get_allowed_outlet_ids(manager_a)
+        allowed_b = OutletDataAccess.get_allowed_outlet_ids(manager_b)
+
+        self.assertEqual(allowed_a, [outlet_1_id])
+        self.assertEqual(allowed_b, [outlet_2_id])
+        self.assertNotIn(outlet_2_id, allowed_a)
+        self.assertNotIn(outlet_1_id, allowed_b)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -484,6 +484,11 @@ async def get_sale(
     sale = result.scalar_one_or_none()
     if not sale:
         raise HTTPException(status_code=404, detail="Sale not found")
+        
+    outlet_id = getattr(sale, 'outlet_id', None) or getattr(sale, 'store_id', None)
+    if outlet_id and not require_outlet_access(current_user, outlet_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to this outlet")
+        
     return sale
 
 @router.post("/", response_model=SaleResponse, status_code=status.HTTP_201_CREATED)
@@ -495,6 +500,10 @@ async def create_sale(
     """
     Record a new sales transaction and decrement inventory levels.
     """
+    outlet_id = getattr(sale_in, 'store_id', None)
+    if outlet_id and not require_outlet_access(current_user, outlet_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to this outlet")
+
     from datetime import timezone
     total_amount = Decimal(0)
     sale_items = []

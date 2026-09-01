@@ -29,13 +29,16 @@ class EmployeeService(OutletIsolatedService):
         return f"EMP{seq:04d}"
 
     def create_employee(self, data: dict) -> Employee:
+        store_id = data.get("store_id")
+        if store_id is not None:
+            self.validate_outlet_access(store_id)
         emp = Employee(
             employee_id=self._generate_employee_id(),
             name=data["name"],
             phone=data["phone"],
             email=data.get("email"),
             role=EmployeeRole[data.get("role", "SALES_ASSOCIATE").upper()],
-            store_id=data.get("store_id"),
+            store_id=store_id,
             hire_date=data.get("hire_date", date.today()),
             salary=Decimal(str(data["salary"])) if data.get("salary") else None,
             salary_type=data.get("salary_type", "monthly"),
@@ -49,10 +52,13 @@ class EmployeeService(OutletIsolatedService):
         return emp
 
     def get_employee(self, employee_id: int) -> Optional[Employee]:
-        return self.db.query(Employee).filter(
+        emp = self.db.query(Employee).filter(
             Employee.id == employee_id,
             Employee.is_active == True
         ).first()
+        if emp and emp.store_id is not None:
+            self.validate_outlet_access(emp.store_id)
+        return emp
 
     def list_employees(
         self,
@@ -63,7 +69,9 @@ class EmployeeService(OutletIsolatedService):
         limit: int = 20
     ) -> dict:
         query = self.db.query(Employee).filter(Employee.is_active == is_active)
+        query = self.apply_outlet_filter(query, outlet_column='store_id')
         if store_id:
+            self.validate_outlet_access(store_id)
             query = query.filter(Employee.store_id == store_id)
         if role:
             query = query.filter(Employee.role == EmployeeRole[role.upper()])
@@ -76,6 +84,10 @@ class EmployeeService(OutletIsolatedService):
         emp = self.db.query(Employee).filter(Employee.id == employee_id).first()
         if not emp:
             return None
+        if emp.store_id is not None:
+            self.validate_outlet_access(emp.store_id)
+        if "store_id" in data and data["store_id"] is not None:
+            self.validate_outlet_access(data["store_id"])
 
         field_map = {
             "name", "phone", "email", "store_id", "salary",
@@ -101,6 +113,8 @@ class EmployeeService(OutletIsolatedService):
         emp = self.db.query(Employee).filter(Employee.id == employee_id).first()
         if not emp:
             return False
+        if emp.store_id is not None:
+            self.validate_outlet_access(emp.store_id)
         emp.is_active = False
         self.db.commit()
         return True
@@ -185,7 +199,8 @@ class EmployeeService(OutletIsolatedService):
         store_id: Optional[int] = None,
         limit: int = 100
     ) -> List[dict]:
-        query = self.db.query(Attendance)
+        query = self.db.query(Attendance).join(Employee, Employee.id == Attendance.employee_id)
+        query = self.apply_outlet_filter(query, outlet_column='store_id')
 
         if employee_id:
             query = query.filter(Attendance.employee_id == employee_id)
@@ -194,13 +209,17 @@ class EmployeeService(OutletIsolatedService):
         if end_date:
             query = query.filter(Attendance.date <= end_date)
         if store_id:
-            query = query.join(Employee, Employee.id == Attendance.employee_id)\
-                .filter(Employee.store_id == store_id)
+            self.validate_outlet_access(store_id)
+            query = query.filter(Employee.store_id == store_id)
 
         records = query.order_by(Attendance.date.desc()).limit(limit).all()
         return [r.to_dict() for r in records]
 
     def mark_attendance(self, employee_id: int, att_date: date, status: str, notes: str = None) -> Attendance:
+        emp = self.db.query(Employee).filter(Employee.id == employee_id).first()
+        if emp and emp.store_id is not None:
+            self.validate_outlet_access(emp.store_id)
+
         existing = self.db.query(Attendance).filter(
             Attendance.employee_id == employee_id,
             Attendance.date == att_date
@@ -231,7 +250,9 @@ class EmployeeService(OutletIsolatedService):
         """Get a summary of all employee attendance statuses for today."""
         today = date.today()
         query = self.db.query(Employee).filter(Employee.is_active == True)
+        query = self.apply_outlet_filter(query, outlet_column='store_id')
         if store_id:
+            self.validate_outlet_access(store_id)
             query = query.filter(Employee.store_id == store_id)
         employees = query.all()
 
@@ -270,6 +291,8 @@ class EmployeeService(OutletIsolatedService):
         emp = self.db.query(Employee).filter(Employee.id == employee_id).first()
         if not emp:
             raise ValueError(f"Employee {employee_id} not found")
+        if emp.store_id is not None:
+            self.validate_outlet_access(emp.store_id)
 
         # Attendance data for the month
         start = date(year, month, 1)
@@ -338,7 +361,9 @@ class EmployeeService(OutletIsolatedService):
         year = year or today.year
 
         emp_query = self.db.query(Employee).filter(Employee.is_active == True)
+        emp_query = self.apply_outlet_filter(emp_query, outlet_column='store_id')
         if store_id:
+            self.validate_outlet_access(store_id)
             emp_query = emp_query.filter(Employee.store_id == store_id)
         employees = emp_query.all()
 

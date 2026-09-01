@@ -19,6 +19,8 @@ from sqlalchemy import text
 
 from app.database import get_db
 from app.core.security import get_current_user
+from app.api.deps import get_outlet_scope
+from app.core.data_isolation import require_outlet_access
 from app.models.users import User
 from app.models import Invoice as InvoiceModel, Bill
 
@@ -138,16 +140,19 @@ async def calculate_gst(
     current_user: User = Depends(get_current_user),
 ):
     rate = get_rate_for_category(req.category)
-    total = Decimal(str(req.amount)) * Decimal(str(rate)) / Decimal("100")
-    half = total / 2
+    result = GSTCalculator.calculate_forward_tax(
+        taxable_value=req.amount,
+        gst_rate=rate,
+        is_interstate=req.is_interstate,
+    )
     return {
-        "base_amount": round(req.amount, 2),
+        "base_amount": float(result.taxable_value),
         "gst_rate_percent": f"{rate}%",
-        "cgst_amount": round(float(half), 2) if not req.is_interstate else 0.0,
-        "sgst_amount": round(float(half), 2) if not req.is_interstate else 0.0,
-        "igst_amount": round(float(total), 2) if req.is_interstate else 0.0,
-        "total_gst": round(float(total), 2),
-        "total_with_gst": round(req.amount + float(total), 2),
+        "cgst_amount": float(result.cgst_amount),
+        "sgst_amount": float(result.sgst_amount),
+        "igst_amount": float(result.igst_amount),
+        "total_gst": float(result.total_tax_amount),
+        "total_with_gst": float(result.grand_total),
     }
 
 @router.post("/calculate-tax")
@@ -405,11 +410,24 @@ async def list_invoices(
     status: Optional[str] = Query(None),
     payment_status: Optional[str] = Query(None),
     customer_id: Optional[int] = Query(None),
+    outlet_id: Optional[int] = Query(None),
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    allowed_outlets = get_outlet_scope(current_user, db)
     query = db.query(InvoiceModel)
+    if allowed_outlets:
+        if outlet_id:
+            if not require_outlet_access(current_user, outlet_id):
+                raise HTTPException(status_code=403, detail="Access denied to this outlet")
+            query = query.filter(InvoiceModel.outlet_id == outlet_id)
+        else:
+            query = query.filter(InvoiceModel.outlet_id.in_(allowed_outlets))
+    elif outlet_id:
+        query = query.filter(InvoiceModel.outlet_id == outlet_id)
+
     if status:
         query = query.filter(InvoiceModel.status == status)
     if payment_status:
@@ -431,10 +449,17 @@ async def list_invoices(
     }}
 
 @router.get("/invoices/{invoice_id}")
-async def get_invoice(invoice_id: int, db: Session = Depends(get_db)):
+async def get_invoice(
+    invoice_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     inv = db.query(InvoiceModel).filter(InvoiceModel.id == invoice_id).first()
     if not inv:
         raise HTTPException(404, "Invoice not found")
+    if getattr(inv, 'outlet_id', None) and not require_outlet_access(current_user, inv.outlet_id):
+        raise HTTPException(status_code=403, detail="Access denied to this invoice")
+
     items = [{"product_name": li.product_name, "quantity": li.quantity, "unit_price": li.unit_price, "line_total": li.line_total, "gst_amount": li.gst_amount} for li in inv.line_items]
     payments = [{"payment_date": p.payment_date.isoformat() if p.payment_date else None, "amount": p.amount_paid, "method": p.payment_method} for p in inv.payments]
     taxes = [{"tax_name": t.tax_name, "tax_rate": t.tax_rate, "tax_amount": t.tax_amount} for t in inv.taxes]

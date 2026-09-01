@@ -80,12 +80,13 @@ def get_sync_session():
     """Get synchronous session - only use for sync-only contexts (tasks, CLI, etc.)"""
     return SessionLocal()
 
-from fastapi import Request
+from fastapi import Request, HTTPException
 
 async def get_db(request: Request = None):
     """
     Async dependency for FastAPI endpoints.
     Provides an AsyncSession with proper error handling and RLS context.
+    Fails closed if setting the tenant context fails on PostgreSQL.
     """
     async_session = AsyncSessionLocal()
     try:
@@ -97,8 +98,17 @@ async def get_db(request: Request = None):
                     text("SELECT set_config('app.current_tenant', :tenant, false), set_config('app.current_tenant_id', :tenant, false)"),
                     {"tenant": str(context.tenant_id)}
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                # Check if sqlite (e.g. unit test environment without postgres set_config)
+                bind = async_session.bind
+                if bind and hasattr(bind, 'dialect') and bind.dialect.name == "sqlite":
+                    logger.debug("Skipping PostgreSQL set_config on SQLite session")
+                else:
+                    logger.error(f"Failed to set tenant context for tenant {context.tenant_id}: {e}")
+                    raise HTTPException(
+                        status_code=500,
+                        detail="Failed to initialize tenant security context"
+                    )
         yield async_session
     except Exception as e:
         await async_session.rollback()
@@ -126,6 +136,7 @@ def get_db_sync(tenant_id=None):
     Get synchronous database session for sync-only operations.
     WARNING: Do NOT use this with async/await code - causes greenlet errors!
     Only use in sync tasks, migrations, or CLI operations.
+    Fails closed if setting the tenant context fails on PostgreSQL.
     """
     db = None
     try:
@@ -134,8 +145,13 @@ def get_db_sync(tenant_id=None):
             from sqlalchemy import text
             try:
                 db.execute(text("SELECT set_config('app.current_tenant_id', :tenant_id, false)"), {"tenant_id": str(tenant_id)})
-            except Exception:
-                pass
+            except Exception as e:
+                bind = db.bind
+                if bind and hasattr(bind, 'dialect') and bind.dialect.name == "sqlite":
+                    logger.debug("Skipping PostgreSQL set_config on SQLite sync session")
+                else:
+                    logger.error(f"Failed to set tenant context in sync session for tenant {tenant_id}: {e}")
+                    raise
         yield db
         db.commit()
     except Exception as e:

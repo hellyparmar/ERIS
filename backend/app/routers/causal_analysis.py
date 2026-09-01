@@ -16,8 +16,10 @@ from datetime import datetime, timedelta, date
 import logging
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text
 from app.database import get_db
+from app.api.deps import get_current_active_user
+from app.models.users import User
+from app.core.data_isolation import require_outlet_access
 
 # Assuming causal_engine exists
 try:
@@ -133,30 +135,29 @@ class DriverAnalysisResponse(BaseModel):
     model_r_squared: float
 
 
+def _check_causal_outlet_access(outlet_identifier: Any, current_user: User) -> None:
+    try:
+        clean_id = int(str(outlet_identifier).replace("outlet_", "").replace("outlet-", ""))
+    except (ValueError, TypeError):
+        clean_id = outlet_identifier
+    if not require_outlet_access(current_user, clean_id):
+        raise HTTPException(status_code=403, detail="Access denied to this outlet")
+
+
 # ============================================================================
 # Endpoints
 # ============================================================================
 
 @router.post("/estimate-effect", response_model=TreatmentEffectResponse)
-async def estimate_treatment_effect(request: TreatmentEffectRequest, db: AsyncSession = Depends(get_db)):
+async def estimate_treatment_effect(
+    request: TreatmentEffectRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
     """
     Estimate causal effect of treatment (holiday, promotion, etc.)
-    
-    Args:
-        request: Treatment effect request
-    
-    Returns:
-        Causal effect estimate with confidence interval
-    
-    Example:
-        {
-            "outlet_id": "outlet_1",
-            "treatment_type": "holiday",
-            "treatment_dates": ["2026-03-08", "2026-03-09"],
-            "metric": "sales",
-            "method": "matching"
-        }
     """
+    _check_causal_outlet_access(request.outlet_id, current_user)
     if causal_analyzer is None:
         raise HTTPException(status_code=503, detail="Causal analyzer not initialized")
     
@@ -216,22 +217,13 @@ async def get_holiday_impact(
     outlet_id: str = Query(...),
     year: int = Query(...),
     metric: str = Query("sales"),
+    current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
     """
     Analyze impact of holidays on sales
-    
-    Args:
-        outlet_id: Outlet identifier
-        year: Year to analyze
-        metric: Metric to analyze (sales, revenue, orders)
-    
-    Returns:
-        Holiday impact breakdown
-    
-    Example:
-        /causal/holiday-impact?outlet_id=outlet_1&year=2025&metric=sales
     """
+    _check_causal_outlet_access(outlet_id, current_user)
     if causal_analyzer is None:
         raise HTTPException(status_code=503, detail="Causal analyzer not initialized")
     
@@ -266,25 +258,15 @@ async def get_holiday_impact(
 
 
 @router.post("/counterfactual", response_model=CounterfactualResponse)
-async def analyze_counterfactual(request: CounterfactualRequest, db: AsyncSession = Depends(get_db)):
+async def analyze_counterfactual(
+    request: CounterfactualRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
     """
     What-if scenario analysis: Predict outcomes under different conditions
-    
-    Args:
-        request: Counterfactual request with scenario
-    
-    Returns:
-        Predicted metric and impact estimates
-    
-    Example:
-        {
-            "outlet_id": "outlet_1",
-            "product_id": "coffee",
-            "scenario": {"promotion": True, "weather": "rainy"},
-            "date_range": {"start": "2026-03-01", "end": "2026-03-31"},
-            "metric": "sales"
-        }
     """
+    _check_causal_outlet_access(request.outlet_id, current_user)
     if causal_analyzer is None:
         raise HTTPException(status_code=503, detail="Causal analyzer not initialized")
     
@@ -344,10 +326,13 @@ async def get_sales_drivers(
     product_id: Optional[str] = Query(None),
     period_days: int = Query(30),
     top_k: int = Query(10),
+    current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
     """
     Identify key drivers of sales for outlet/product
+    """
+    _check_causal_outlet_access(outlet_id, current_user)
     
     Args:
         outlet_id: Outlet identifier
