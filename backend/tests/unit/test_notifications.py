@@ -9,7 +9,6 @@ from unittest.mock import Mock, MagicMock
 from app.models.notification import Notification, NotificationTypeEnum
 from app.models.users import User, Role, UserOutletAccess
 from app.models.outlet import Outlet
-from app.models.day_close import DayClose
 from app.models.inventory import Inventory
 from app.models.models_v6 import Product
 

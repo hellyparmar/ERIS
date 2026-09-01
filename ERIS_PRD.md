@@ -31,11 +31,13 @@ acceptance criterion. Treat unmet acceptance criteria as bugs, not opinions.
 
 ## 1. Project Overview
 
-**What ERIS is:** a single-tenant-first, multi-tenant-capable back-office platform for
-a multi-outlet Indian restaurant/QSR chain, covering POS sales, inventory, GST-compliant
-billing, supplier/employee management, an AI chat assistant grounded in the business's
-own data, and demand forecasting that accounts for weather, public holidays/festivals,
-and macroeconomic conditions.
+**What ERIS is:** a single-tenant-first, multi-tenant-capable business intelligence and
+monitoring platform for a multi-outlet Indian restaurant/QSR chain that already has sales
+data (e.g. imported or synced from an existing POS system like Petpooja). ERIS is NOT a
+live point-of-sale terminal at a till; it covers sales analytics and record management,
+inventory, GST-compliant billing, supplier/employee management, an AI chat assistant
+grounded in the business's own data, and demand forecasting that accounts for weather,
+public holidays/festivals, and macroeconomic conditions.
 
 **Origin & context:** built as a student internship project (Petpooja internship, an
 Indian restaurant POS/billing company), using only free/open-source tools and
@@ -47,7 +49,7 @@ instruction from the project owner):** an Indian multi-outlet QSR/restaurant cha
 fictionally named "Spice Route" per the current seed data (`app/seed_database.py`).
 This choice was made deliberately because:
 - it matches the Petpooja internship framing
-- the existing schema already models POS day-close, GST at restaurant rates, and
+- the existing schema models restaurant sales, GST at restaurant rates, and
   multi-outlet operations
 - weather/festivals/economic conditions plausibly and explainably drive restaurant
   demand, which is central to the forecasting goal
@@ -100,6 +102,7 @@ reverses this)
 
 | Feature | Decision | Reason |
 |---|---|---|
+| Point-of-Sale (POS) terminal / till hardware sync | Removed | ERIS is a pure BI & retail analytics platform; retailers use their own POS |
 | Loyalty program | Cut | Not core to stated goals; adds scope without proving the core thesis |
 | Khata / credit ledger | Cut | Same as above |
 | Community / inter-business marketplace | Cut | Out of scope for a single-chain intelligence system |
@@ -122,9 +125,9 @@ undertaking better done correctly on a limited surface than broadly and unreliab
 
 | Persona | Needs |
 |---|---|
-| Outlet Manager | Daily sales visibility, day-close/cash reconciliation, inventory alerts, staff scheduling |
-| Chain Owner/Admin | Cross-outlet analytics, forecasting, GST compliance, causal insight into demand swings |
-| Cashier/POS staff | Fast POS sale entry, PIN-based quick login, offline-tolerant sync |
+| Outlet Manager | Daily sales visibility, inventory tracking and alerts, staff scheduling, local store metrics |
+| Area Manager | Multi-outlet operational oversight, store comparisons, regional stock and staffing balance |
+| Chain Owner / Admin | Cross-outlet analytics, demand forecasting, GST compliance, causal insight into demand swings, financial reporting |
 | (Future) Accountant | GST filing exports, Tally/Zoho sync |
 
 ---
@@ -141,7 +144,7 @@ undertaking better done correctly on a limited surface than broadly and unreliab
 | Cache/Queue broker | Redis | |
 | Async task queue | Celery (worker + beat) | Module path: `app.api.celery_app:celery_app` |
 | Migrations | Alembic | `alembic/versions/` |
-| Auth | JWT (`python-jose`, `PyJWT`), `passlib`/`bcrypt` | Two-flow: manager password login + cashier PIN login |
+| Auth | JWT (`python-jose`, `PyJWT`), `passlib`/`bcrypt` | Role-based email/username + password login for managers, area managers, admins |
 | LLM inference (primary) | Ollama (local, free) | via `OLLAMA_BASE_URL` |
 | LLM inference (fallback) | Groq, OpenRouter (free-tier) | Gemini/OpenAI/Anthropic SDKs present in requirements but not part of the required fallback chain — see REQ-AI-02 |
 | Vector store | ChromaDB (local, free) | `chroma_db/` |
@@ -299,15 +302,12 @@ status verdicts are consolidated in Section 8 to avoid duplication — this sect
 the "what should be true" spec; Section 8 is the "what is actually true right now" audit.
 
 ### 7.1 Auth
-**REQ-AUTH-01:** Single, unified JWT-based auth flow supporting both manager
-password login (longer-lived token) and cashier PIN login (shift-length token).
-Location: `app/routers/auth.py`, `app/routers/pos_auth.py`, `app/api/auth/`.
+**REQ-AUTH-01:** Unified JWT-based auth flow supporting role-based password login (admin, manager, analyst) with refresh and session restore.
+Location: `app/routers/auth.py`, `app/api/auth/`.
 
-### 7.2 Sales & POS
-**REQ-SALES-01:** Unified sales domain covering sale CRUD, analytics, and POS-specific
-flows (sale entry, manager override, day-close/cash reconciliation, offline sync).
-Location: `app/routers/sales.py`, `pos_sales.py`, `pos_override.py`, `pos_dayclose.py`,
-`pos_offline_sync.py`.
+### 7.2 Sales
+**REQ-SALES-01:** Unified sales domain covering sales CRUD, manual sales record entry, transaction history, and multi-outlet sales analytics (viewing and managing imported POS sales data, not a live POS till terminal).
+Location: `app/routers/sales.py`.
 
 ### 7.3 Inventory
 **REQ-INV-01:** Unified inventory domain covering stock levels, reorder control, and
@@ -495,6 +495,7 @@ are actually reachable by a user.
 | Phase 1 Cleanup (2026-09-01) | **Root-level dead code purge:** Deleted `/scripts/` folder (30 confirmed-dead .py scripts: analyze_db, benchmark_performance, check_db_state, check_imports, create_test_user, create_test_users_phase4, debug_validation, forecast_validation_framework, generate_comprehensive_dataset, generate_petpooja_data, generate_petpooja_synthetic_data, generate_validation_dataset, load_synthetic_data, load_test, run_forecast_validation, security_testing, seed_comprehensive, seed_minimal, seed_minimal_final, seed_restaurant, seed_restaurant_chain, simulate_live_orders, test_gemini, test_rbac_isolation, test_system, test_validation_framework, train_model, validate_forecasts, verify_backend, verify_data — plus `archive/`, `data_processing/`, `__pycache__/` subdirs and `.sh` shell scripts). Deleted `/tasks/` folder (`__init__.py`, `notification_tasks.py`, `tally_tasks.py` — these imported `api.integrations.tally.sync_service` which does not exist in the codebase and were not registered with Celery autodiscover). Deleted `/dist/` folder (stale Vite build artifact, already gitignored). Deleted `/deploy-reference/` folder (`docker-compose.prod.yml`, `docker-compose.production.yml`, `README.md` — archived reference files, confirmed non-active by PRD Section 4.2). **Backend dead code purge (AST-verified unreachable):** Deleted `backend/scripts/seed_database.py` (worse duplicate of `backend/scripts/seed.py` — missing `seed_unstructured_data()` RAG ingestion call). Deleted 22 confirmed-unreachable `app/` files: `app/api/__init__.py`, `app/api/db/models.py`, `app/api/events/__init__.py`, `app/api/events/handlers.py`, `app/api/utils/api_key_manager.py`, `app/api/utils/cache.py`, `app/api/utils/circuit_breaker.py`, `app/api/utils/circuit_breakers.py`, `app/api/utils/error_handling.py`, `app/api/utils/input_validator.py`, `app/api/utils/input_validators.py`, `app/api/utils/pagination.py`, `app/api/utils/pii_protection.py`, `app/api/utils/resilient_services.py`, `app/api/utils/security.py`, `app/api/utils/security_audit.py`, `app/api/utils/service_monitor.py`, `app/api/utils/structured_logging.py`, `app/api/utils/token_blacklist.py`, `app/ml/causal/action_engine.py`, `app/ml/causal/model_validation.py`, `app/ml/comparative_evaluation.py`. **Preserved unreachable (intentional):** `app/ml/forecasting/ensemble.py` and `app/ml/forecasting/xgboost_forecaster.py` kept for future Prophet+XGBoost+LSTM ensemble wiring. **Verification:** `check_imports.py` reports 130 reachable modules, 0 dangling imports — identical to pre-cleanup baseline. **Docker:** `docker` not available in this environment; `docker-compose.yml` not modified; YAML validity confirmed by manual inspection (untouched). **Branch:** all changes committed on `phase-1-cleanup` git branch. |
 | Phase 2 Seed Fix (2026-09-01) | **365-day history & economic indicators:** Fixed `backend/app/seed_database.py` to generate 365 days (1 full year) of realistic sales & day-close history instead of 3 days. Added `seed_economic_indicators()` populating `EconomicIndicatorHistory` with 36 months (2024–2026) of published Indian monthly macroeconomic figures (RBI repo rates, MOSPI CPI, WPI, and food inflation). Verified batch insert performance, Scaler calendar coverage, and 0 dangling imports in live graph. |
 | Phase 3 Security & Correctness (2026-09-01) | **RLS Celery context, GST consolidation & Outlet-scoping:** (1) `run_prophet_forecast` updated to accept `tenant_id` and execute in `get_db_sync(tenant_id=tenant_id)` context; `get_db()` and `get_db_sync()` in `database.py` updated to fail-closed on PostgreSQL session init failure. (2) Removed duplicate `calculate_gst()` from `invoice_service.py`; canonical `gst_calculator.py` is the single source of truth. (3) Enforced outlet authorization across all 9 routers (`sales`, `customers`, `forecasting`, `causal_analysis`, `suppliers`, `employees`, `outlets`, `gst_billing`, `alerts`). Added multi-outlet cross-isolation tests in `test_data_isolation.py`. |
+| POS Removal & BI Repositioning (2026-09-01) | **Repositioned ERIS as pure retail BI & monitoring platform:** Removed the point-of-sale terminal concept entirely. Deleted POS routers/services (`pos_auth.py`, `pos_sales.py`, `pos_override.py`, `pos_dayclose.py`, `pos_service.py`, `thermal_printer.py`, `jwt_auth.py`). Removed `DayClose` model, dropped `day_close` table via Alembic migration `99999999999d`, and removed nightly register reconciliation scheduler check. Cleaned frontend UI removing `/day-close` page, `usePOSAuth` hook, and `/pos` & `/day-close` navigation links. Reframed seed data logs/comments to imported historical sales from retailer POS. Verified 0 dangling imports and successful frontend build. |
 | Round 2 | Dataset size confirmed: 5-6 outlets, 1-2 years of history |
 | Round 2 | RLS scope explicitly narrowed to 6 core tables (Section 2.2) rather than full-system, as the pragmatic correct-over-broad tradeoff |
 | Round 2→3 (this audit) | Confirmed regressions: Ollama routing, hybrid RAG wiring, RLS middleware registration, and 4 previously-merged duplicate routers have all reappeared — flagged in Section 8/9 for re-fix with a guard against recurrence |

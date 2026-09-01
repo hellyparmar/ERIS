@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { Bell, Search } from 'lucide-react';
 
 const pageTitleMap = {
-  '/': 'Dashboard', '/dashboard': 'Dashboard', '/pos': 'POS Terminal',
+  '/': 'Dashboard', '/dashboard': 'Dashboard',
   '/sales': 'Sales', '/inventory': 'Inventory',
   '/invoices': 'Invoices', '/analytics': 'Analytics',
   '/forecasts': 'Forecasts', '/ai-assistant': 'AI Assistant',
@@ -13,7 +13,7 @@ const pageTitleMap = {
   '/team': 'Team', '/contacts': 'Contacts',
   '/tax-compliance': 'Tax Compliance', '/gst-invoice': 'GST Invoice',
   '/gst-rates': 'GST Rates', '/integrations': 'Integrations',
-  '/settings': 'Settings', '/day-close': 'Day Close',
+  '/settings': 'Settings',
   '/outlets': 'Outlets',
 };
 

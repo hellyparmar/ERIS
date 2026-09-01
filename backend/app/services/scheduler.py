@@ -132,72 +132,6 @@ def check_low_stock_job():
     finally:
         db.close()
 
-def check_day_close_job():
-    """
-    Checks if a DayClose record exists for the current day for each outlet.
-    If not, generates a 'day_close_reminder' notification for the managers assigned to that outlet.
-    """
-    logger.info("📅 Checking Day Close records for all outlets...")
-    db = SessionLocal()
-    try:
-        from app.models.outlet import Outlet
-        from app.models.day_close import DayClose
-        from app.models.users import User, UserOutletAccess, Role
-        from app.models.notification import Notification, NotificationTypeEnum
-        
-        today = datetime.now().date()
-        outlets = db.query(Outlet).filter(Outlet.is_active == True).all()
-        
-        for outlet in outlets:
-            # Check if a DayClose record exists for today
-            day_close_exists = db.query(DayClose).filter(
-                DayClose.outlet_id == outlet.id,
-                DayClose.date == today,
-                DayClose.closed_at.isnot(None)
-            ).first()
-            
-            if not day_close_exists:
-                # Find users who have access to this outlet and are managers
-                access_users = db.query(User).join(
-                    UserOutletAccess, User.id == UserOutletAccess.user_id
-                ).join(
-                    Role, User.role_id == Role.id
-                ).filter(
-                    UserOutletAccess.outlet_id == outlet.id,
-                    Role.name.in_(['outlet_manager', 'area_manager'])
-                ).all()
-
-                for user in access_users:
-                    # Check if notification already exists to avoid duplication
-                    existing_notif = db.query(Notification).filter(
-                        Notification.user_id == user.id,
-                        Notification.outlet_id == outlet.id,
-                        Notification.type == NotificationTypeEnum.day_close_reminder,
-                        Notification.link == "/invoices",
-                        Notification.is_read == False,
-                        Notification.created_at >= datetime.combine(today, datetime.min.time())
-                    ).first()
-
-                    if not existing_notif:
-                        notif = Notification(
-                            user_id=user.id,
-                            outlet_id=outlet.id,
-                            type=NotificationTypeEnum.day_close_reminder,
-                            title="Day Close Reminder",
-                            message=f"Reminder: Day Close has not been completed for outlet '{outlet.name}' today.",
-                            is_read=False,
-                            link="/invoices",
-                            created_at=datetime.now()
-                        )
-                        db.add(notif)
-        db.commit()
-        logger.info("✅ Finished checking Day Close records and generated reminders.")
-    except Exception as e:
-        logger.error(f"❌ Day Close Reminder Job Failed: {e}")
-        db.rollback()
-    finally:
-        db.close()
-
 def start_scheduler():
     """Initialize and start the background scheduler"""
     scheduler = BackgroundScheduler()
@@ -219,17 +153,6 @@ def start_scheduler():
         minute=0,
         id='daily_sales_report',
         name='Daily Sales Report',
-        replace_existing=True
-    )
-
-    # Add Daily Day Close Reminder Job (at 10:00 PM)
-    scheduler.add_job(
-        check_day_close_job,
-        trigger='cron',
-        hour=22,
-        minute=0,
-        id='day_close_reminder_job',
-        name='Daily Day Close Reminder',
         replace_existing=True
     )
 

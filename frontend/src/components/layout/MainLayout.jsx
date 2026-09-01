@@ -4,7 +4,7 @@ import Header from './Header';
 import Sidebar from './Sidebar';
 import BottomNav from './BottomNav';
 
-const hideHeaderPaths = ['/pos', '/login', '/signup'];
+const hideHeaderPaths = ['/login', '/signup'];
 
 const MainLayout = ({ children }) => {
   const location = useLocation();

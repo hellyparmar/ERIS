@@ -200,7 +200,7 @@ async def init_db():
     try:
         from app.models import (  # noqa
             User, Outlet, Product, Inventory, SaleTransaction,
-            Supplier, PurchaseOrder, Invoice, Alert, Forecast, ChatMessage, DayClose
+            Supplier, PurchaseOrder, Invoice, Alert, Forecast, ChatMessage
         )
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)

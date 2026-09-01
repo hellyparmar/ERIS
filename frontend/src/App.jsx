@@ -21,7 +21,6 @@ const Inventory = lazy(() => import('./pages/Inventory.jsx'));
 const Customers = lazy(() => import('./pages/Customers.jsx'));
 const Forecasts = lazy(() => import('./pages/Forecasts.jsx'));
 const Alerts = lazy(() => import('./pages/Alerts.jsx'));
-const DayClose = lazy(() => import('./pages/DayClose.jsx'));
 const AIAssistant = lazy(() => import('./pages/AIAssistant.jsx'));
 const Integrations = lazy(() => import('./pages/Integrations.jsx'));
 const TaxCompliance = lazy(() => import('./pages/TaxCompliance.jsx'));
@@ -63,7 +62,6 @@ function AppLayout() {
             <Route path="/customers" element={<ProtectedRoute roles={ALL_ROLES}><Customers /></ProtectedRoute>} />
             <Route path="/forecasts" element={<ProtectedRoute roles={ALL_ROLES}><Forecasts /></ProtectedRoute>} />
             <Route path="/alerts" element={<ProtectedRoute roles={ALL_ROLES}><Alerts /></ProtectedRoute>} />
-            <Route path="/day-close" element={<ProtectedRoute roles={ALL_ROLES}><DayClose /></ProtectedRoute>} />
             <Route path="/ai-assistant" element={<ProtectedRoute roles={ALL_ROLES}><AIAssistant /></ProtectedRoute>} />
             <Route path="/tax-compliance" element={<ProtectedRoute roles={SUPER_ONLY}><TaxCompliance /></ProtectedRoute>} />
             <Route path="/integrations" element={<ProtectedRoute roles={SUPER_ONLY}><Integrations /></ProtectedRoute>} />
