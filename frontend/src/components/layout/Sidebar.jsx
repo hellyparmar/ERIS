@@ -5,7 +5,6 @@ import { useAuth } from '../../contexts/AuthContext';
 
 const routeRoleMap = {
   '/dashboard': ['super_admin', 'superadmin', 'area_manager', 'outlet_manager', 'manager'],
-  '/pos': ['super_admin', 'superadmin', 'area_manager', 'outlet_manager', 'manager'],
   '/sales': ['super_admin', 'superadmin', 'area_manager', 'outlet_manager', 'manager'],
   '/inventory': ['super_admin', 'superadmin', 'area_manager', 'outlet_manager', 'manager'],
   '/invoices': ['super_admin', 'superadmin', 'area_manager', 'outlet_manager', 'manager'],
@@ -14,7 +13,6 @@ const routeRoleMap = {
   '/customers': ['super_admin', 'superadmin', 'area_manager', 'outlet_manager', 'manager'],
   '/forecasts': ['super_admin', 'superadmin', 'area_manager', 'outlet_manager', 'manager'],
   '/settings': ['super_admin', 'superadmin', 'area_manager', 'outlet_manager', 'manager'],
-  '/day-close': ['super_admin', 'superadmin', 'area_manager', 'outlet_manager', 'manager'],
   '/analytics': ['super_admin', 'superadmin', 'area_manager'],
   '/multi-store': ['super_admin', 'superadmin', 'area_manager'],
   '/outlets': ['super_admin', 'superadmin', 'area_manager'],
@@ -53,7 +51,6 @@ export default function Sidebar({ open = false, onClose = () => {}, collapsed = 
       title: 'Operations',
       items: [
         { label: 'Dashboard',  path: '/dashboard',  icon: LayoutDashboard },
-        { label: 'POS',        path: '/pos',         icon: ShoppingCart },
         { label: 'Sales',      path: '/sales',       icon: TrendingUp },
         { label: 'Inventory',  path: '/inventory',   icon: Package },
         { label: 'Invoices',   path: '/invoices',    icon: FileText },

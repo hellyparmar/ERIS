@@ -4,9 +4,9 @@ import { LayoutDashboard, ShoppingCart, TrendingUp, Package, Bell, MoreHorizonta
 
 const mainItems = [
   { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-  { label: 'POS',       path: '/pos',        icon: ShoppingCart },
   { label: 'Sales',     path: '/sales',      icon: TrendingUp },
   { label: 'Inventory', path: '/inventory',  icon: Package },
+  { label: 'Forecasts', path: '/forecasts',  icon: BarChart3 },
   { label: 'Alerts',    path: '/alerts',     icon: Bell },
 ];
 
