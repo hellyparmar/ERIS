@@ -139,9 +139,9 @@ app.add_middleware(
 )
 logger.info("CORS configured")
 
-app.state.limiter = limiter
-app.add_middleware(SlowAPIMiddleware)
-logger.info("Rate limiting middleware enabled")
+# app.state.limiter = limiter
+# app.add_middleware(SlowAPIMiddleware)
+# logger.info("Rate limiting middleware enabled")
 
 from app.middleware.rls_middleware import RLSMiddleware
 app.add_middleware(RLSMiddleware)

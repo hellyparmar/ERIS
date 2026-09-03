@@ -27,7 +27,8 @@ class OutletIsolatedService(Generic[T]):
         self.db = db
         self.current_user = current_user
         if current_user:
-            self.allowed_outlet_ids = OutletDataAccess.get_allowed_outlet_ids(current_user)
+            from app.api.deps import get_outlet_scope
+            self.allowed_outlet_ids = get_outlet_scope(current_user, db)
         else:
             self.allowed_outlet_ids = None
 
@@ -44,39 +45,39 @@ class OutletIsolatedService(Generic[T]):
         """
         if not self.current_user:
             return query
-        return OutletDataAccess.apply_outlet_filter(query, self.current_user, outlet_column)
+        if self.allowed_outlet_ids is None:
+            return query # super_admin
+        model_class = query.column_descriptions[0]['type']
+        column = getattr(model_class, outlet_column)
+        return query.filter(column.in_(self.allowed_outlet_ids))
 
     def apply_outlet_filter_select(self, stmt: select, outlet_column: str = 'outlet_id'):
         """
-        Apply outlet filtering to a select statement.
-
-        Args:
-            stmt: The select statement to filter
-            outlet_column: Name of the outlet_id column
-
-        Returns:
-            Filtered select statement
+        Apply outlet filtering to a SQLAlchemy 2.0 select statement.
         """
         if not self.current_user:
             return stmt
-        return OutletDataAccess.apply_outlet_filter_select(stmt, self.current_user, outlet_column)
+        if self.allowed_outlet_ids is None:
+            return stmt
+        
+        model_class = stmt.column_descriptions[0]['type']
+        column = getattr(model_class, outlet_column)
+        return stmt.where(column.in_(self.allowed_outlet_ids))
 
     def can_access_outlet(self, outlet_id: Optional[int] = None) -> bool:
         """
-        Check if current user can access a specific outlet.
-
-        Args:
-            outlet_id: Outlet ID to check (None for any outlet)
-
-        Returns:
-            True if user has access
+        Check if the current user can access a specific outlet.
+        If no outlet_id is provided, returns False (must specify what to check against).
         """
+        if not self.current_user:
+            return False
+            
+        if not outlet_id:
+            return False
+            
         if self.allowed_outlet_ids is None:
-            return True  # Admin can access all outlets
-
-        if outlet_id is None:
-            return len(self.allowed_outlet_ids) > 0
-
+            return True # Super admin has access to everything
+            
         return outlet_id in self.allowed_outlet_ids
 
     def get_allowed_outlets(self) -> Optional[List[int]]:

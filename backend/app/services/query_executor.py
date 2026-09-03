@@ -34,8 +34,12 @@ class QueryExecutor:
                 "postgresql+psycopg://eris_admin:JnCSXvJLgIY7V8KtUd2TT26QXkbgvuwv@localhost:5434/eris_production"
             )
 
-        if not db_url.startswith("postgresql"):
-            raise ValueError("QueryExecutor requires a PostgreSQL DATABASE_URL")
+        if not (db_url.startswith("postgresql") or db_url.startswith("sqlite")):
+            raise ValueError("QueryExecutor requires a PostgreSQL or SQLite DATABASE_URL")
+            
+        # create_engine is synchronous, so strip +aiosqlite if present
+        if db_url.startswith("sqlite+aiosqlite"):
+            db_url = db_url.replace("sqlite+aiosqlite", "sqlite")
 
         self.db_url = db_url
         self.engine: Engine = create_engine(
