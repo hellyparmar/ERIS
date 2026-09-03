@@ -29,7 +29,7 @@ from datetime import timezone
 router = APIRouter(prefix="/analytics", tags=["Analytics/Dashboard"])
 
 @router.get("/metrics", response_model=MetricData)
-@limiter.limit("20/minute")
+@limiter.limit("1000/minute")
 async def get_metrics(
     request: Request, 
     db: Session = Depends(get_db),
@@ -87,7 +87,7 @@ async def get_metrics(
     }
 
 @router.get("/alerts", response_model=AlertsResponse)
-@limiter.limit("20/minute")
+@limiter.limit("1000/minute")
 async def get_alerts(
     request: Request,
     severity: str = Query("all", enum=["all", "critical", "warning", "info"]),
@@ -123,7 +123,7 @@ async def get_alerts(
     }
 
 @router.get("/chart-data", response_model=ChartDataResponse)
-@limiter.limit("20/minute")
+@limiter.limit("1000/minute")
 async def get_chart_data(
     request: Request,
     days: int = Query(30, ge=1, le=365),

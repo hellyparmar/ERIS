@@ -9,53 +9,45 @@ class EnsembleForecaster:
         self,
         prophet_pred: np.ndarray,
         xgb_pred: np.ndarray,
-        weights: List[float] = [0.6, 0.4]
+        lstm_pred: np.ndarray,
+        weights: List[float] = [0.4, 0.3, 0.3]
     ) -> np.ndarray:
-        if len(prophet_pred) != len(xgb_pred):
+        if not (len(prophet_pred) == len(xgb_pred) == len(lstm_pred)):
             raise ValueError("Prediction arrays must have the same length")
 
-        if len(weights) != 2 or sum(weights) <= 0:
-            raise ValueError("Weights must be two positive values")
+        if len(weights) != 3 or sum(weights) <= 0:
+            raise ValueError("Weights must be three positive values")
 
         weights = np.array(weights, dtype=float)
         weights = weights / weights.sum()
-        combined = weights[0] * prophet_pred + weights[1] * xgb_pred
+        combined = weights[0] * prophet_pred + weights[1] * xgb_pred + weights[2] * lstm_pred
         combined = np.clip(combined, 0, None)
         return combined
 
-    def select_best_model(
-        self,
-        prophet_metrics: Dict[str, float],
-        xgb_metrics: Dict[str, float]
-    ) -> str:
-        # Prefer lower MAPE, then RMSE
-        p_score = prophet_metrics.get("mape", float("inf")) * 0.7 + prophet_metrics.get("rmse", float("inf")) * 0.3
-        x_score = xgb_metrics.get("mape", float("inf")) * 0.7 + xgb_metrics.get("rmse", float("inf")) * 0.3
-
-        if p_score <= x_score:
-            return "prophet"
-        return "xgboost"
-
     def adaptive_weighting(
         self,
-        recent_performance: List[Dict[str, float]]
+        metrics: Dict[str, Dict[str, float]]
     ) -> List[float]:
-        """Adjust weights based on recent performance metrics."""
-        if not recent_performance:
-            return [0.6, 0.4]
+        """Calculate weights based on validation MAPE (inverse-error weighting)."""
+        if not metrics:
+            return [0.4, 0.3, 0.3]
 
-        weight_prophet = 0.0
-        weight_xgb = 0.0
-        for item in recent_performance:
-            p = item.get("prophet", {})
-            x = item.get("xgboost", {})
-            pv = 1.0 / (p.get("mape", 1e6) + 1e-9)
-            xv = 1.0 / (x.get("mape", 1e6) + 1e-9)
-            weight_prophet += pv
-            weight_xgb += xv
+        p = metrics.get("prophet", {})
+        x = metrics.get("xgboost", {})
+        l = metrics.get("lstm", {})
 
-        total = weight_prophet + weight_xgb
+        # Use 1e6 for missing or failed models
+        p_mape = p.get("mape")
+        x_mape = x.get("mape")
+        l_mape = l.get("mape")
+
+        # If a model failed to generate a valid MAPE (e.g. PyTorch not available), assign near zero weight
+        pv = 1.0 / (p_mape + 1e-9) if p_mape is not None and not np.isnan(p_mape) else 0.0
+        xv = 1.0 / (x_mape + 1e-9) if x_mape is not None and not np.isnan(x_mape) else 0.0
+        lv = 1.0 / (l_mape + 1e-9) if l_mape is not None and not np.isnan(l_mape) else 0.0
+
+        total = pv + xv + lv
         if total == 0:
-            return [0.6, 0.4]
+            return [0.4, 0.3, 0.3]
 
-        return [float(weight_prophet / total), float(weight_xgb / total)]
+        return [float(pv / total), float(xv / total), float(lv / total)]

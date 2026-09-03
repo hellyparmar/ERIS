@@ -32,13 +32,13 @@ def detect_revenue_anomalies(
     try:
         rows = db.execute(text("""
             SELECT
-                DATE(transaction_date) as day,
+                DATE(sale_date) as day,
                 SUM(total_amount) as daily_revenue
             FROM sales
-            WHERE transaction_date >= :cutoff
+            WHERE sale_date >= :cutoff AND outlet_id = :outlet_id
             GROUP BY day
             ORDER BY day ASC
-        """), {"cutoff": cutoff}).fetchall()
+        """), {"cutoff": cutoff, "outlet_id": store_id}).fetchall()
     except Exception:
         # Fallback: use invoices table if sales unavailable
         try:
@@ -116,17 +116,17 @@ def detect_product_anomalies(
     try:
         rows = db.execute(text("""
             SELECT
-                p.id, p.name, p.category,
+                p.id, p.name, p.category_id,
                 SUM(si.quantity) as total_qty,
                 COUNT(DISTINCT s.id) as num_transactions,
                 AVG(si.quantity) as avg_qty_per_txn
             FROM sale_items si
             JOIN products p ON p.id = si.product_id
             JOIN sales s ON s.id = si.sale_id
-            WHERE s.transaction_date >= :cutoff
-            GROUP BY p.id, p.name, p.category
+            WHERE s.sale_date >= :cutoff AND s.outlet_id = :outlet_id
+            GROUP BY p.id, p.name, p.category_id
             ORDER BY total_qty DESC
-        """), {"cutoff": cutoff}).fetchall()
+        """), {"cutoff": cutoff, "outlet_id": store_id}).fetchall()
     except Exception as e:
         logger.warning(f"Product anomaly detection error: {e}")
         return []

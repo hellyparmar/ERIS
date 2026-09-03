@@ -29,7 +29,7 @@ class Alert(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     outlet_id: Mapped[int] = mapped_column(Integer, ForeignKey("outlets.id"), nullable=False)
-    product_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("products.id"), nullable=True)
+    product_id: Mapped[int] = mapped_column(Integer, ForeignKey("products.id"), nullable=True)
     alert_type: Mapped[AlertType] = mapped_column(Enum(AlertType), nullable=False)
     severity: Mapped[AlertSeverity] = mapped_column(Enum(AlertSeverity), nullable=False)
     message: Mapped[str] = mapped_column(Text, nullable=False)

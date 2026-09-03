@@ -10,7 +10,7 @@ from app.routers.inventory import categories_router
 from app.routers import (
     alerts, employees, enterprise,
     messages, suppliers, reports_data,
-    contacts, outlets, user_settings
+    contacts, outlets, user_settings, audit
 )
 
 api_router = APIRouter()
@@ -19,6 +19,7 @@ api_router = APIRouter()
 # AUTHENTICATION
 # -----------------------
 api_router.include_router(auth.router, tags=["Authentication"])
+api_router.include_router(audit.router, tags=["Audit"])
 
 # -----------------------
 # CORE DOMAINS (Consolidated)

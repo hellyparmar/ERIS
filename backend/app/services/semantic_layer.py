@@ -26,13 +26,13 @@ BUSINESS_DEFINITIONS = {
     "revenue": "SUM(total_amount)",
     "total_revenue": "SUM(total_amount)",
     "sales": "SUM(total_amount)",
-    "net_revenue": "SUM(total_amount - COALESCE(tax, 0) - COALESCE(discount, 0))",
+    "net_revenue": "SUM(total_amount - COALESCE(tax_amount, 0) - COALESCE(discount_amount, 0))",
     "gross_revenue": "SUM(total_amount)",
     
     # Volume Metrics
     "orders": "COUNT(DISTINCT id)",
     "order_count": "COUNT(DISTINCT id)",
-    "transactions": "COUNT(DISTINCT transaction_id)",
+    "transactions": "COUNT(DISTINCT id)",
     "units_sold": "SUM(quantity)",
     "quantity": "SUM(quantity)",
     
@@ -42,13 +42,13 @@ BUSINESS_DEFINITIONS = {
     "average_price": "ROUND(AVG(unit_price), 2)",
     
     # Time-based
-    "today": "DATE(transaction_date) = DATE('now')",
-    "yesterday": "DATE(transaction_date) = DATE('now', '-1 day')",
-    "this_week": "transaction_date >= DATE('now', '-7 days')",
-    "last_week": "transaction_date >= DATE('now', '-14 days') AND transaction_date < DATE('now', '-7 days')",
-    "this_month": "strftime('%Y-%m', transaction_date) = strftime('%Y-%m', 'now')",
-    "last_month": "strftime('%Y-%m', transaction_date) = strftime('%Y-%m', 'now', '-1 month')",
-    "this_year": "strftime('%Y', transaction_date) = strftime('%Y', 'now')",
+    "today": "DATE(sale_date) = DATE('now')",
+    "yesterday": "DATE(sale_date) = DATE('now', '-1 day')",
+    "this_week": "sale_date >= DATE('now', '-7 days')",
+    "last_week": "sale_date >= DATE('now', '-14 days') AND sale_date < DATE('now', '-7 days')",
+    "this_month": "strftime('%Y-%m', sale_date) = strftime('%Y-%m', 'now')",
+    "last_month": "strftime('%Y-%m', sale_date) = strftime('%Y-%m', 'now', '-1 month')",
+    "this_year": "strftime('%Y', sale_date) = strftime('%Y', 'now')",
     
     # Customer Metrics
     "unique_customers": "COUNT(DISTINCT customer_id)",
@@ -56,10 +56,10 @@ BUSINESS_DEFINITIONS = {
     "repeat_customers": "COUNT(DISTINCT customer_id) FILTER (WHERE customer_id IN (SELECT customer_id FROM sales GROUP BY customer_id HAVING COUNT(*) > 1))",
 
     # Inventory Metrics
-    "dead_stock": "stock > 0 AND id NOT IN (SELECT product_id FROM sales WHERE transaction_date >= DATE('now', '-90 days'))",
-    "stock_turnover": "SUM(quantity) / AVG(stock)",
-    "days_inventory_outstanding": "(AVG(stock) / SUM(quantity)) * 365",
-    "stock_value": "SUM(stock * cost)",
+    "dead_stock": "current_stock > 0 AND id NOT IN (SELECT product_id FROM sale_items JOIN sales ON sale_items.sale_id = sales.id WHERE sales.sale_date >= DATE('now', '-90 days'))",
+    "stock_turnover": "SUM(quantity) / AVG(current_stock)",
+    "days_inventory_outstanding": "(AVG(current_stock) / SUM(quantity)) * 365",
+    "stock_value": "SUM(current_stock * cost_price)",
 }
 
 # ============================================================================
@@ -95,21 +95,30 @@ CATEGORY_MAPPING = {
 
 SCHEMA_DESCRIPTIONS = {
     "sales": {
-        "description": "Transaction-level sales data. Each row is a product sold in a transaction.",
+        "description": "Transaction-level sales data.",
         "columns": {
             "id": "INTEGER PRIMARY KEY - Unique sale record ID",
-            "transaction_id": "VARCHAR(100) - Transaction identifier (groups items in same order)",
-            "product_id": "INTEGER - Foreign key to products table",
+            "sale_number": "VARCHAR(100) - Transaction identifier",
+            "outlet_id": "INTEGER - Store location identifier",
             "customer_id": "INTEGER - Foreign key to customers table (nullable)",
-            "store_id": "INTEGER - Store location identifier",
-            "transaction_date": "DATETIME - When the sale occurred",
-            "quantity": "INTEGER - Number of units sold",
-            "unit_price": "DECIMAL(12,2) - Price per unit",
-            "discount": "DECIMAL(12,2) - Discount applied (nullable)",
-            "tax": "DECIMAL(12,2) - Tax amount (nullable)",
+            "sale_date": "DATETIME - When the sale occurred",
+            "subtotal": "DECIMAL(12,2)",
+            "discount_amount": "DECIMAL(12,2) - Discount applied (nullable)",
+            "tax_amount": "DECIMAL(12,2) - Tax amount (nullable)",
             "total_amount": "DECIMAL(12,2) - Final amount charged",
             "payment_method": "VARCHAR(50) - cash/card/upi/credit",
             "payment_status": "VARCHAR(7) - paid/pending",
+        }
+    },
+    "sale_items": {
+        "description": "Individual items within a sale.",
+        "columns": {
+            "id": "INTEGER PRIMARY KEY",
+            "sale_id": "INTEGER - Foreign key to sales",
+            "product_id": "INTEGER - Foreign key to products",
+            "quantity": "INTEGER - Units sold",
+            "unit_price": "DECIMAL(10,2) - Price per unit",
+            "line_total": "DECIMAL(12,2)"
         }
     },
     "products": {
@@ -118,10 +127,11 @@ SCHEMA_DESCRIPTIONS = {
             "id": "INTEGER PRIMARY KEY - Unique product ID",
             "name": "VARCHAR(255) - Product name",
             "sku": "VARCHAR(100) - Stock keeping unit",
-            "category": "VARCHAR(100) - Product category",
-            "price": "DECIMAL(12,2) - List price",
-            "cost": "DECIMAL(12,2) - Cost price (for margin calculation)",
-            "stock": "INTEGER - Current stock quantity",
+            "category_id": "INTEGER - Product category",
+            "selling_price": "DECIMAL(12,2) - List price",
+            "cost_price": "DECIMAL(12,2) - Cost price (for margin calculation)",
+            "current_stock": "INTEGER - Current stock quantity",
+            "reorder_level": "INTEGER - Reorder threshold"
         }
     },
     "customers": {
@@ -139,9 +149,16 @@ SCHEMA_DESCRIPTIONS = {
         "columns": {
             "id": "INTEGER PRIMARY KEY",
             "product_id": "INTEGER - Foreign key to products",
-            "location": "VARCHAR(100) - Warehouse/store location",
-            "quantity": "INTEGER - Current stock",
-            "reorder_point": "INTEGER - Minimum before reorder alert",
+            "outlet_id": "INTEGER - Store location",
+            "current_stock": "INTEGER - Current stock",
+        }
+    },
+    "suppliers": {
+        "description": "Suppliers and vendors.",
+        "columns": {
+            "id": "INTEGER PRIMARY KEY",
+            "name": "VARCHAR - Supplier name",
+            "outstanding_payable": "DECIMAL - Amount owed to supplier"
         }
     }
 }
@@ -155,9 +172,10 @@ QUERY_TEMPLATES = {
     "top_products_by_revenue": {
         "pattern": r"top\s*(\d+)?\s*products?\s*(by\s+)?(revenue|sales)",
         "sql": """
-            SELECT p.name, SUM(s.total_amount) as revenue, SUM(s.quantity) as units
-            FROM sales s
-            JOIN products p ON s.product_id = p.id
+            SELECT p.name, SUM(si.line_total) as revenue, SUM(si.quantity) as units
+            FROM sale_items si
+            JOIN sales s ON si.sale_id = s.id
+            JOIN products p ON si.product_id = p.id
             WHERE {date_filter}
             GROUP BY p.id, p.name
             ORDER BY revenue DESC
@@ -173,20 +191,20 @@ QUERY_TEMPLATES = {
                    COUNT(DISTINCT id) as order_count,
                    ROUND(SUM(total_amount) / COUNT(DISTINCT id), 2) as avg_order_value
             FROM sales
-            WHERE {date_filter}
-        """,
+            WHERE created_at >= date('now', '-30 days')
+            """,
         "defaults": {}
     },
     
     "daily_sales_trend": {
         "pattern": r"(daily|day\s*wise)\s*(sales|revenue)\s*(trend)?",
         "sql": """
-            SELECT DATE(transaction_date) as date,
+            SELECT DATE(sale_date) as date,
                    SUM(total_amount) as revenue,
                    COUNT(DISTINCT id) as orders
             FROM sales
-            WHERE transaction_date >= DATE('now', '-30 days')
-            GROUP BY DATE(transaction_date)
+            WHERE sale_date >= DATE('now', '-30 days')
+            GROUP BY DATE(sale_date)
             ORDER BY date
         """,
         "defaults": {}
@@ -195,60 +213,109 @@ QUERY_TEMPLATES = {
     "top_customers": {
         "pattern": r"top\s*(\d+)?\s*customers?\s*(by\s+)?(revenue|spend|value)",
         "sql": """
-            SELECT c.name, c.email, SUM(s.total_amount) as total_spend,
-                   COUNT(DISTINCT s.transaction_id) as order_count
+            SELECT c.first_name || ' ' || c.last_name as name, c.email, SUM(s.total_amount) as total_spend,
+                   COUNT(DISTINCT s.id) as order_count
             FROM sales s
             JOIN customers c ON s.customer_id = c.id
-            WHERE {date_filter}
-            GROUP BY c.id, c.name, c.email
+            WHERE 1=1
+            GROUP BY c.id, c.first_name, c.last_name, c.email
             ORDER BY total_spend DESC
-            LIMIT {limit}
-        """,
+            LIMIT 3
+            """,
         "defaults": {"limit": 10, "date_filter": "1=1"}
     },
     
     "low_stock_products": {
         "pattern": r"low\s*stock|out\s*of\s*stock|reorder|inventory\s*alert",
         "sql": """
-            SELECT p.name, p.sku, i.quantity as current_stock, i.reorder_point
-            FROM inventory i
-            JOIN products p ON i.product_id = p.id
-            WHERE i.quantity <= i.reorder_point
-            ORDER BY (i.quantity - i.reorder_point)
+            SELECT p.name, p.sku, p.current_stock, p.reorder_level
+            FROM products p
+            WHERE p.current_stock <= p.reorder_level
+            ORDER BY (p.current_stock - p.reorder_level)
         """,
         "defaults": {}
     },
     
-    "category_performance": {
-        "pattern": r"(category|categories)\s*(performance|sales|revenue|breakdown)",
-        "sql": """
-            SELECT p.category, SUM(s.total_amount) as revenue,
-                   SUM(s.quantity) as units_sold,
-                   COUNT(DISTINCT s.id) as transactions
-            FROM sales s
-            JOIN products p ON s.product_id = p.id
-            WHERE {date_filter}
-            GROUP BY p.category
-            ORDER BY revenue DESC
-        """,
-        "defaults": {"date_filter": "1=1"}
-    },
-
     "dead_stock_analysis": {
         "pattern": r"(dead|stagnant|slow\s*moving)\s*(stock|inventory|products|items)",
         "sql": """
-            SELECT p.name, p.sku, p.category, i.quantity as stock_on_hand, (i.quantity * p.cost) as tied_capital
-            FROM inventory i
-            JOIN products p ON i.product_id = p.id
-            WHERE i.quantity > 0 
-            AND i.product_id NOT IN (
-                SELECT product_id FROM sales 
-                WHERE transaction_date >= DATE('now', '-90 days')
+            SELECT p.name, p.sku, p.current_stock as stock_on_hand, (p.current_stock * p.cost_price) as tied_capital
+            FROM products p
+            WHERE p.current_stock > 0 
+            AND p.id NOT IN (
+                SELECT si.product_id FROM sale_items si
+                JOIN sales s ON si.sale_id = s.id 
+                WHERE s.sale_date >= DATE('now', '-90 days')
             )
             ORDER BY tied_capital DESC
             LIMIT {limit}
         """,
         "defaults": {"limit": 20}
+    },
+    
+    "compare_revenue_periods": {
+        "pattern": r"compare\s+this\s+month\s+to\s+last\s+month",
+        "sql": """
+            SELECT 
+                SUM(CASE WHEN strftime('%Y-%m', sale_date) = strftime('%Y-%m', 'now') THEN total_amount ELSE 0 END) as this_month_revenue,
+                SUM(CASE WHEN strftime('%Y-%m', sale_date) = strftime('%Y-%m', 'now', '-1 month') THEN total_amount ELSE 0 END) as last_month_revenue
+            FROM sales
+            WHERE sale_date >= DATE('now', '-60 days')
+        """,
+        "defaults": {}
+    },
+
+    "underperforming_outlets": {
+        "pattern": r"(which|what)\s+(outlet|store)s?\s+(is|are)\s+underperforming",
+        "sql": """
+            SELECT outlet_id, SUM(total_amount) as total_revenue
+            FROM sales
+            WHERE sale_date >= DATE('now', '-30 days')
+            GROUP BY outlet_id
+            ORDER BY total_revenue ASC
+            LIMIT 3
+        """,
+        "defaults": {}
+    },
+
+    "slowest_inventory": {
+        "pattern": r"slowest\s*moving\s*inventory|slowest\s*moving\s*item",
+        "sql": """
+            SELECT p.name, p.current_stock, COALESCE(SUM(si.quantity), 0) as units_sold_last_90_days
+            FROM products p
+            LEFT JOIN sale_items si ON p.id = si.product_id
+            LEFT JOIN sales s ON si.sale_id = s.id AND s.sale_date >= DATE('now', '-90 days')
+            WHERE p.current_stock > 0
+            GROUP BY p.id, p.name, p.current_stock
+            ORDER BY units_sold_last_90_days ASC, p.current_stock DESC
+            LIMIT 5
+        """,
+        "defaults": {}
+    },
+
+    "supplier_debt": {
+        "pattern": r"(which|what)\s+supplier\s+do\s+i\s+owe\s+(the\s+)?most\s+to|supplier\s+debt",
+        "sql": """
+            SELECT name as supplier_name, outstanding_payable
+            FROM suppliers
+            WHERE outstanding_payable > 0
+            ORDER BY outstanding_payable DESC
+            LIMIT 5
+        """,
+        "defaults": {}
+    },
+
+    "aov_trend": {
+        "pattern": r"average\s+order\s+value\s+trend|aov\s+trend",
+        "sql": """
+            SELECT strftime('%Y-%m', sale_date) as month,
+                   ROUND(SUM(total_amount) / COUNT(DISTINCT id), 2) as average_order_value
+            FROM sales
+            WHERE sale_date >= DATE('now', '-6 months')
+            GROUP BY strftime('%Y-%m', sale_date)
+            ORDER BY month ASC
+        """,
+        "defaults": {}
     }
 }
 
@@ -297,7 +364,7 @@ VALIDATION_RULES = [
     {
         "name": "check_table_exists",
         "pattern": r"FROM\s+(\w+)",
-        "allowed_tables": ["sales", "products", "customers", "inventory", "invoices", "alerts", "sale_items", "users"],
+        "allowed_tables": ["sales", "products", "customers", "inventory", "invoices", "alerts", "sale_items", "users", "suppliers", "product_categories"],
         "message": "Unknown table referenced",
         "severity": "error"
     }
@@ -384,11 +451,11 @@ class SemanticLayer:
         parts.extend([
             "",
             "## Important SQL Rules:",
-            "1. Only use tables: sales, products, customers, inventory",
+            "1. Only use tables: sales, products, customers, inventory, sale_items, suppliers",
             "2. Always specify columns explicitly (no SELECT *)",
             "3. Use DATE() for date comparisons",
-            "4. Use COALESCE for nullable columns (tax, discount)",
-            "5. For date columns, use 'transaction_date' not 'date'",
+            "4. Use COALESCE for nullable columns (tax_amount, discount_amount)",
+            "5. For date columns, use 'sale_date' not 'date'",
             "6. Join products table when you need product names",
             "7. IF generating results, replace raw category names with their English translations defined above.",
             "",
@@ -416,13 +483,13 @@ class SemanticLayer:
                         value = int(limit_match.group(1)) if limit_match else default_value
                     elif key == 'date_filter':
                         if 'last month' in query_lower:
-                            value = "strftime('%Y-%m', transaction_date) = strftime('%Y-%m', 'now', '-1 month')"
+                            value = "strftime('%Y-%m', sale_date) = strftime('%Y-%m', 'now', '-1 month')"
                         elif 'last week' in query_lower:
-                            value = "transaction_date >= DATE('now', '-7 days')"
+                            value = "sale_date >= DATE('now', '-7 days')"
                         elif 'this month' in query_lower:
-                            value = "strftime('%Y-%m', transaction_date) = strftime('%Y-%m', 'now')"
+                            value = "strftime('%Y-%m', sale_date) = strftime('%Y-%m', 'now')"
                         elif 'this year' in query_lower:
-                            value = "strftime('%Y', transaction_date) = strftime('%Y', 'now')"
+                            value = "strftime('%Y', sale_date) = strftime('%Y', 'now')"
                         else:
                             value = default_value
                     else:
@@ -481,7 +548,7 @@ class SemanticLayer:
         
         # Check if uses known tables
         tables_found = re.findall(r'FROM\s+(\w+)', generated_sql, re.IGNORECASE)
-        known_tables = {'sales', 'products', 'customers', 'inventory'}
+        known_tables = {'sales', 'products', 'customers', 'inventory', 'sale_items', 'suppliers'}
         if all(t.lower() in known_tables for t in tables_found):
             score += 5
             reasons.append("Uses verified tables")
