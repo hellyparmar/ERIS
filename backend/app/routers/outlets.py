@@ -16,7 +16,7 @@ from app.models.outlet import Outlet
 from app.models.alert import Alert
 from app.models.inventory import Inventory
 from app.models.employee_models import Employee
-from app.api.deps import get_current_active_user
+from app.api.deps import get_current_active_user, get_accessible_outlet_ids
 from app.core.data_isolation import OutletDataAccess, require_outlet_access
 
 router = APIRouter(prefix="/outlets", tags=["outlets"])
@@ -28,7 +28,7 @@ async def list_outlets(
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ) -> Any:
-    allowed_outlet_ids = OutletDataAccess.get_allowed_outlet_ids(current_user)
+    allowed_outlet_ids = await get_accessible_outlet_ids(current_user, db)
     stmt = select(
         Outlet.id,
         Outlet.name,
@@ -37,7 +37,7 @@ async def list_outlets(
         Outlet.phone,
         Outlet.is_active
     )
-    if allowed_outlet_ids is not None:
+    if allowed_outlet_ids:
         if not allowed_outlet_ids:
             return []
         stmt = stmt.where(Outlet.id.in_(allowed_outlet_ids))
@@ -65,7 +65,8 @@ async def get_outlet_details(
     Get outlet details with performance summary.
     Revenue this month, active alerts, employee count, top product.
     """
-    if not require_outlet_access(current_user, outlet_id):
+    allowed_outlet_ids = await get_accessible_outlet_ids(current_user, db)
+    if allowed_outlet_ids and outlet_id not in allowed_outlet_ids:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied to this outlet"
@@ -187,7 +188,8 @@ async def compare_outlet_performance(
     """
     Returns this outlet's performance vs system average for current month.
     """
-    if not require_outlet_access(current_user, outlet_id):
+    allowed_outlet_ids = await get_accessible_outlet_ids(current_user, db)
+    if allowed_outlet_ids and outlet_id not in allowed_outlet_ids:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied to this outlet"

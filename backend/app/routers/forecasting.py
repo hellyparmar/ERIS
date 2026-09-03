@@ -9,7 +9,7 @@ from typing import List, Optional, Dict, Any
 
 import numpy as np
 from celery.result import AsyncResult
-from fastapi import APIRouter, Depends, Query, HTTPException, status
+from fastapi import APIRouter, Depends, Query, HTTPException, status, Request
 from pydantic import BaseModel
 from sqlalchemy import select, and_
 from sqlalchemy.orm import Session
@@ -40,12 +40,12 @@ class DummyTask:
         return {"predicted_values": [0.0]}
 
 try:
-    from app.tasks.forecasting_tasks import run_prophet_forecast
+    from app.tasks.forecasting_tasks import run_ensemble_forecast
 except ImportError:
-    run_prophet_forecast = DummyTask()
-    
+    run_ensemble_forecast = DummyTask()
+
+run_prophet_forecast = DummyTask()
 run_lstm_forecast = DummyTask()
-run_ensemble_forecast = DummyTask()
 retrain_forecast_models = DummyTask()
 
 router = APIRouter(prefix="/forecasting", tags=["Forecasting"])
@@ -225,12 +225,7 @@ async def get_sales_forecast(
     elif hasattr(current_user, "tenant_id") and getattr(current_user, "tenant_id", None):
         tenant_id = str(current_user.tenant_id)
 
-    if model == ModelType.PROPHET:
-        task = run_prophet_forecast.apply_async(args=[outlet_id, product_id, horizon, tenant_id])
-    elif model == ModelType.LSTM:
-        task = run_lstm_forecast.apply_async(args=[outlet_id, product_id, horizon])
-    else:
-        task = run_ensemble_forecast.apply_async(args=[outlet_id, product_id, horizon])
+    task = run_ensemble_forecast.apply_async(args=[outlet_id, product_id, horizon, tenant_id])
 
     return ForecastResponse(
         task_id=task.id,
@@ -416,6 +411,7 @@ async def get_forecast_accuracy(
 async def get_forecast_task_status(
     task_id: str,
     current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ) -> TaskStatusResponse:
     """Check the status of a forecasting task."""
     result = AsyncResult(task_id, app=celery_app)
@@ -437,7 +433,67 @@ async def get_forecast_task_status(
     )
 
     if result.ready():
-        response.result = result.result if state == "SUCCESS" else str(result.result)
+        if state == "SUCCESS" and isinstance(result.result, dict):
+            # Fetch the actual forecast data from the database
+            outlet_id = result.result.get("outlet_id")
+            product_id = result.result.get("product_id")
+            
+            if outlet_id is not None:
+                # Get the latest forecasts for this outlet/product combination
+                records = db.query(ForecastResult).filter(
+                    ForecastResult.outlet_id == outlet_id,
+                    ForecastResult.product_id == product_id
+                ).order_by(ForecastResult.created_at.desc()).limit(10).all()
+                
+                models_data = {}
+                metrics_data = {}
+                for rec in records:
+                    if rec.model_type not in models_data:
+                        try:
+                            models_data[rec.model_type] = json.loads(rec.forecast_json)
+                        except:
+                            models_data[rec.model_type] = []
+                        metrics_data[rec.model_type] = {
+                            "mape": rec.mape,
+                            "rmse": rec.rmse,
+                            "mae": rec.mae,
+                        }
+                
+                # Format into a merged array for the frontend Recharts
+                merged_forecasts = []
+                # Use ensemble as the base for dates
+                ensemble_data = models_data.get("ensemble", [])
+                
+                for i, row in enumerate(ensemble_data):
+                    date_val = row.get("date")
+                    merged_point = {
+                        "date": date_val,
+                        "forecast": row.get("forecast"),
+                        "lower_bound": row.get("lower_bound"),
+                        "upper_bound": row.get("upper_bound"),
+                        "isHistorical": False
+                    }
+                    
+                    if "prophet" in models_data and i < len(models_data["prophet"]):
+                        merged_point["prophet"] = models_data["prophet"][i].get("forecast")
+                        merged_point["prophetLower"] = models_data["prophet"][i].get("lower_bound")
+                        merged_point["prophetUpper"] = models_data["prophet"][i].get("upper_bound")
+                    if "xgboost" in models_data and i < len(models_data["xgboost"]):
+                        merged_point["xgboost"] = models_data["xgboost"][i].get("forecast")
+                    if "lstm" in models_data and i < len(models_data["lstm"]):
+                        merged_point["lstm"] = models_data["lstm"][i].get("forecast")
+                        
+                    merged_forecasts.append(merged_point)
+
+                response.result = {
+                    "task_result": result.result,
+                    "forecasts": merged_forecasts,
+                    "metrics": metrics_data
+                }
+            else:
+                response.result = result.result
+        else:
+            response.result = str(result.result)
 
     return response
 

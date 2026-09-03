@@ -356,8 +356,14 @@ async def get_gstr3b(
 # INVOICES (B2B invoicing module)
 # ════════════════════════════════════════════
 
+from app.services.audit_service import log_audit_action_sync
+
 @router.post("/invoices")
-async def create_invoice(req: CreateInvoiceRequest, db: Session = Depends(get_db)):
+async def create_invoice(
+    req: CreateInvoiceRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     from app.models import InvoiceLineItem, InvoiceTax
 
     inv_count = db.execute(text("SELECT COUNT(*) FROM invoices WHERE DATE(invoice_date) = DATE('now')")).scalar() or 0
@@ -403,6 +409,14 @@ async def create_invoice(req: CreateInvoiceRequest, db: Session = Depends(get_db
 
     db.commit()
     db.refresh(inv)
+    
+    log_audit_action_sync(
+        db=db,
+        action="create_invoice",
+        performed_by=current_user.id,
+        context={"invoice_id": inv.id, "invoice_number": inv.invoice_number, "total_amount": float(inv.total_amount)}
+    )
+    
     return {"success": True, "data": {"invoice_id": inv.id, "invoice_number": inv.invoice_number, "status": inv.status, "total_amount": inv.total_amount}}
 
 @router.get("/invoices")
@@ -562,7 +576,11 @@ async def get_hsn_summary(invoice_id: UUID, db: Session = Depends(get_db)):
 # ════════════════════════════════════════════
 
 @router.post("/bills")
-async def create_bill(req: CreateBillRequest, db: Session = Depends(get_db)):
+async def create_bill(
+    req: CreateBillRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     result = BillService.create_bill(
         bill_number=req.bill_number, vendor_name=req.vendor_name,
         bill_date=req.bill_date, subtotal=req.subtotal,
@@ -573,6 +591,13 @@ async def create_bill(req: CreateBillRequest, db: Session = Depends(get_db)):
     )
     if not result["success"]:
         raise HTTPException(400, result["error"])
+        
+    log_audit_action_sync(
+        db=db,
+        action="create_bill",
+        performed_by=current_user.id,
+        context={"bill_id": result["data"]["bill_id"], "bill_number": req.bill_number, "total_amount": req.total_amount}
+    )
     return result
 
 @router.get("/bills")
