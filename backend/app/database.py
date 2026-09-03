@@ -163,10 +163,28 @@ def get_db_sync(tenant_id=None):
         if db:
             db.close()
 
-def get_db_sync_dependency():
+def get_db_sync_dependency(request: Request = None):
     """Dependency for synchronous FastAPI endpoints"""
     db = get_sync_session()
     try:
+        if request and hasattr(request.state, "tenant_context") and request.state.tenant_context:
+            context = request.state.tenant_context
+            try:
+                from sqlalchemy import text
+                db.execute(
+                    text("SELECT set_config('app.current_tenant', :tenant, false), set_config('app.current_tenant_id', :tenant, false)"),
+                    {"tenant": str(context.tenant_id)}
+                )
+            except Exception as e:
+                bind = db.bind
+                if bind and hasattr(bind, 'dialect') and bind.dialect.name == "sqlite":
+                    logger.debug("Skipping PostgreSQL set_config on SQLite sync session")
+                else:
+                    logger.error(f"Failed to set tenant context for tenant {context.tenant_id}: {e}")
+                    raise HTTPException(
+                        status_code=500,
+                        detail="Failed to initialize tenant security context"
+                    )
         yield db
     finally:
         db.close()

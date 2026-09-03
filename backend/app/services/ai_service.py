@@ -313,124 +313,15 @@ class AIService:
             else:
                 raise Exception(f"Ollama Error: {response.text}")
         except Exception as e:
-             # If Ollama fails, return a simulated offline response
-             return {
-                 "text": "Offline Mode: AI Service is unreachable. (Ollama connection failed)",
-                 "action": None,
-                 "provider": "Offline"
-             }
+            raise Exception(f"Ollama connection failed: {e}")
 
     async def _call_mock_provider(self, message: str, system_prompt: str, history: list) -> Dict[str, Any]:
         """
-        Simulates AI responses using ACTUAL DATABASE DATA for demo purposes.
+        Strict fallback that raises an exception when no LLMs are configured.
+        Delegates error messaging to the try-catch block in generate_response
+        per REQ-AI-02 to explicitly state unavailability without fabricating data.
         """
-        lower_msg = message.lower()
-        
-        try:
-            async with AsyncSessionLocal() as session:
-                # 1. Greetings
-                if any(w in lower_msg for w in ['hello', 'hi', 'hey', 'namaste']):
-                    total_orders = await session.scalar(text("SELECT COUNT(*) FROM sales")) or 0
-                    return {
-                        "text": f"Hello! I am ERIS AI Assistant. I'm running in **Demo Mode** with actual data from {total_orders:,} orders. Ask me about:\n\n- 'What is the total revenue?'\n- 'Show me low stock items'\n- 'What are the top selling products?'",
-                        "action": None,
-                        "provider": "Demo Mode (Real Data)"
-                    }
-                    
-                # 2. Revenue Queries - USE ACTUAL DATA
-                if 'revenue' in lower_msg or 'sales' in lower_msg:
-                    total_revenue = float(await session.scalar(text("SELECT COALESCE(SUM(total_amount), 0) FROM sales")))
-                    total_orders = await session.scalar(text("SELECT COUNT(*) FROM sales")) or 0
-                    avg_order = total_revenue / total_orders if total_orders else 0
-                    
-                    # Get top categories from products based on sales
-                    top_cats_res = await session.execute(text("SELECT c.name, SUM(si.quantity) as q FROM sale_items si JOIN products p ON si.product_id = p.id LEFT JOIN categories c ON p.category_id = c.id GROUP BY c.name ORDER BY q DESC LIMIT 3"))
-                    cat_list = [f"{i+1}. {row[0].title() if row[0] else 'Uncategorized'}: {row[1]:,} items sold" for i, row in enumerate(top_cats_res)]
-                    top_cat_text = "\n".join(cat_list)
-                    
-                    return {
-                        "text": f"📊 **Revenue Analysis** (from {total_orders:,} actual orders):\n\n**Total Revenue:** ₹{total_revenue:,.2f} (₹{total_revenue/10000000:.2f} Crore)\n**Total Orders:** {total_orders:,}\n**Average Order Value:** ₹{avg_order:,.2f}\n\n**Top 3 Categories:**\n{top_cat_text}\n\nWould you like a detailed breakdown by month or category?",
-                        "action": None,
-                        "provider": "Demo Mode (Real Data)"
-                    }
-                    
-                # 3. Low Stock Queries - USE ACTUAL DATA
-                if 'low' in lower_msg and 'stock' in lower_msg:
-                    low_stock_res = await session.execute(text("SELECT p.name, i.current_stock FROM inventory i JOIN products p ON i.product_id = p.id WHERE i.current_stock < 50 LIMIT 5"))
-                    low_stock_rows = low_stock_res.fetchall()
-                    low_count = await session.scalar(text("SELECT COUNT(*) FROM inventory WHERE current_stock < 50")) or 0
-                    
-                    items_text = "\n".join([f"{i+1}. **{r[0]}**: {r[1]} units" for i, r in enumerate(low_stock_rows)])
-                    
-                    action_json = '{"type": "navigate", "data": {"page": "/inventory"}}'
-                    msg = f"🚨 **Low Stock Analysis**\n\nFound **{low_count:,} items** running low (below 50 units).\n\n**Sample Items:**\n{items_text}\n\n**Recommendation:** Restock these items to prevent stockouts.\n\n<<ACTION>>{action_json}<<END_ACTION>>"
-                    
-                    return {
-                        "text": msg,
-                        "action": {"type": "navigate", "data": {"page": "/inventory"}},
-                        "provider": "Demo Mode (Real Data)"
-                    }
-                
-                # 4. Top Products/Selling - USE ACTUAL DATA
-                if any(phrase in lower_msg for phrase in ['top product', 'top selling', 'best seller', 'popular', 'categories']):
-                    top_cats_res = await session.execute(text("SELECT c.name, SUM(si.quantity) as q FROM sale_items si JOIN products p ON si.product_id = p.id LEFT JOIN categories c ON p.category_id = c.id GROUP BY c.name ORDER BY q DESC LIMIT 5"))
-                    products_text = "\n".join([f"{i+1}. **{row[0].title() if row[0] else 'Uncategorized'}**: {row[1]:,} items sold" for i, row in enumerate(top_cats_res)])
-                    
-                    return {
-                        "text": f"🏆 **Top 5 Product Categories** (by sales volume):\n\n{products_text}\n\nThese categories represent the highest volume in our catalog. Would you like sales performance for these categories?",
-                        "action": None,
-                        "provider": "Demo Mode (Real Data)"
-                    }
-                
-                # 5. Inventory/Stock General
-                if 'stock' in lower_msg or 'inventory' in lower_msg:
-                    total_products = await session.scalar(text("SELECT COUNT(*) FROM products")) or 0
-                    low_stock = await session.scalar(text("SELECT COUNT(*) FROM inventory WHERE current_stock < 50")) or 0
-                    
-                    return {
-                        "text": f"📦 **Inventory Status**\n\n**Total Products:** {total_products:,}\n**Low Stock Items:** {low_stock:,} (below 50 units)\n\nInventory health is **moderate**. Recommend reviewing low stock items.",
-                        "action": None,
-                        "provider": "Demo Mode (Real Data)"
-                    }
-                
-                # 6. Customer Queries
-                if 'customer' in lower_msg or 'credit' in lower_msg:
-                    total_customers = await session.scalar(text("SELECT COUNT(*) FROM customers")) or 0
-                    
-                    msg = f"👥 **Customer Insights**\n\n**Total Customers:** {total_customers:,}\n"
-                    
-                    # Preferences
-                    sms = await session.scalar(text("SELECT COUNT(*) FROM customers WHERE allow_sms = true")) or 0
-                    calls = await session.scalar(text("SELECT COUNT(*) FROM customers WHERE allow_calls = true")) or 0
-                    
-                    max_pref_count = max(sms, calls)
-                    if max_pref_count > 0:
-                        if max_pref_count == sms: max_pref = "SMS"
-                        else: max_pref = "Calls"
-                        pct = (max_pref_count / total_customers) * 100 if total_customers else 0
-                        msg += f"\nMost customers prefer {max_pref} communication ({pct:.1f}%)."
-                        
-                    return {
-                        "text": msg,
-                        "action": None,
-                        "provider": "Demo Mode (Real Data)"
-                    }
-                
-                # 7. General Fallback
-                total_orders = await session.scalar(text("SELECT COUNT(*) FROM sales")) or 0
-                fallback_msg = f"I understand you're asking about **\"{message}\"**.\n\nI'm running in **Demo Mode** with access to {total_orders:,} real orders. Try asking:\n- \"What is the total revenue?\"\n- \"Show me low stock items\"\n- \"What are the top selling products?\"\n- \"How many customers have credit?\""
-                return {
-                    "text": fallback_msg,
-                    "action": None,
-                    "provider": "Demo Mode (Real Data)"
-                }
-        except Exception as e:
-            logger.error(f"Mock provider DB failure: {e}")
-            return {
-                "text": "I don't have access to current data right now.",
-                "action": None,
-                "provider": "Mock (Unavailable)"
-            }
+        raise Exception("No AI providers configured or available.")
 
     def get_provider_status(self) -> Dict[str, bool]:
         """
