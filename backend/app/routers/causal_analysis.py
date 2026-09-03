@@ -17,9 +17,8 @@ import logging
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
-from app.api.deps import get_current_active_user
+from app.api.deps import get_current_active_user, get_outlet_scope
 from app.models.users import User
-from app.core.data_isolation import require_outlet_access
 
 # Assuming causal_engine exists
 try:
@@ -135,12 +134,13 @@ class DriverAnalysisResponse(BaseModel):
     model_r_squared: float
 
 
-def _check_causal_outlet_access(outlet_identifier: Any, current_user: User) -> None:
+async def _check_causal_outlet_access(outlet_identifier: Any, current_user: User, db: AsyncSession) -> None:
     try:
         clean_id = int(str(outlet_identifier).replace("outlet_", "").replace("outlet-", ""))
     except (ValueError, TypeError):
         clean_id = outlet_identifier
-    if not require_outlet_access(current_user, clean_id):
+    allowed_outlets = await get_outlet_scope(current_user, db)
+    if allowed_outlets and int(clean_id) not in allowed_outlets:
         raise HTTPException(status_code=403, detail="Access denied to this outlet")
 
 
@@ -157,7 +157,7 @@ async def estimate_treatment_effect(
     """
     Estimate causal effect of treatment (holiday, promotion, etc.)
     """
-    _check_causal_outlet_access(request.outlet_id, current_user)
+    await _check_causal_outlet_access(request.outlet_id, current_user, db)
     if causal_analyzer is None:
         raise HTTPException(status_code=503, detail="Causal analyzer not initialized")
     
@@ -223,7 +223,7 @@ async def get_holiday_impact(
     """
     Analyze impact of holidays on sales
     """
-    _check_causal_outlet_access(outlet_id, current_user)
+    await _check_causal_outlet_access(outlet_id, current_user, db)
     if causal_analyzer is None:
         raise HTTPException(status_code=503, detail="Causal analyzer not initialized")
     
@@ -266,7 +266,7 @@ async def analyze_counterfactual(
     """
     What-if scenario analysis: Predict outcomes under different conditions
     """
-    _check_causal_outlet_access(request.outlet_id, current_user)
+    await _check_causal_outlet_access(request.outlet_id, current_user, db)
     if causal_analyzer is None:
         raise HTTPException(status_code=503, detail="Causal analyzer not initialized")
     
@@ -331,8 +331,6 @@ async def get_sales_drivers(
 ):
     """
     Identify key drivers of sales for outlet/product
-    """
-    _check_causal_outlet_access(outlet_id, current_user)
     
     Args:
         outlet_id: Outlet identifier
@@ -346,6 +344,7 @@ async def get_sales_drivers(
     Example:
         /causal/drivers?outlet_id=outlet_1&product_id=coffee&period_days=30&top_k=10
     """
+    await _check_causal_outlet_access(outlet_id, current_user, db)
     if causal_analyzer is None:
         raise HTTPException(status_code=503, detail="Causal analyzer not initialized")
     

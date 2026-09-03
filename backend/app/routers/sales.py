@@ -24,7 +24,7 @@ from app.models.users import User
 from app.models.outlet import Outlet
 from app.models.sales import SaleTransaction
 from app.models.models_v6 import Product
-from app.api.deps import get_current_active_user
+from app.api.deps import get_current_active_user, get_accessible_outlet_ids
 from app.core.data_isolation import OutletDataAccess, require_outlet_access
 
 router = APIRouter(prefix="/sales", tags=["sales"])
@@ -47,7 +47,7 @@ async def list_sales(
     Get paginated sales transactions with filtering.
     Date format: YYYY-MM-DD
     """
-    allowed_outlet_ids = OutletDataAccess.get_allowed_outlet_ids(current_user)
+    allowed_outlet_ids = await get_accessible_outlet_ids(current_user, db)
     if not allowed_outlet_ids:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -55,7 +55,7 @@ async def list_sales(
         )
 
     if outlet_id:
-        if not require_outlet_access(current_user, outlet_id):
+        if allowed_outlet_ids and outlet_id not in allowed_outlet_ids:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access denied to this outlet"
@@ -149,7 +149,7 @@ async def get_sales_summary(
     Get sales summary with comparison to previous period.
     Period: daily, weekly, monthly
     """
-    allowed_outlet_ids = OutletDataAccess.get_allowed_outlet_ids(current_user)
+    allowed_outlet_ids = await get_accessible_outlet_ids(current_user, db)
     if not allowed_outlet_ids:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -157,7 +157,7 @@ async def get_sales_summary(
         )
 
     if outlet_id:
-        if not require_outlet_access(current_user, outlet_id):
+        if allowed_outlet_ids and outlet_id not in allowed_outlet_ids:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access denied to this outlet"
@@ -252,7 +252,7 @@ async def get_sales_by_product(
     Get revenue and quantity sold grouped by product.
     Period: 7d, 30d, 90d, 365d
     """
-    allowed_outlet_ids = OutletDataAccess.get_allowed_outlet_ids(current_user)
+    allowed_outlet_ids = await get_accessible_outlet_ids(current_user, db)
     if not allowed_outlet_ids:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -260,7 +260,7 @@ async def get_sales_by_product(
         )
 
     if outlet_id:
-        if not require_outlet_access(current_user, outlet_id):
+        if allowed_outlet_ids and outlet_id not in allowed_outlet_ids:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access denied to this outlet"
@@ -328,7 +328,7 @@ async def get_sales_by_payment_method(
     Get sales breakdown by payment method.
     Returns: cash, card, upi, other with percentages
     """
-    allowed_outlet_ids = OutletDataAccess.get_allowed_outlet_ids(current_user)
+    allowed_outlet_ids = await get_accessible_outlet_ids(current_user, db)
     if not allowed_outlet_ids:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -336,7 +336,7 @@ async def get_sales_by_payment_method(
         )
 
     if outlet_id:
-        if not require_outlet_access(current_user, outlet_id):
+        if allowed_outlet_ids and outlet_id not in allowed_outlet_ids:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access denied to this outlet"
@@ -394,7 +394,7 @@ async def export_sales(
     Export sales data as CSV.
     Same filtering options as GET /
     """
-    allowed_outlet_ids = OutletDataAccess.get_allowed_outlet_ids(current_user)
+    allowed_outlet_ids = await get_accessible_outlet_ids(current_user, db)
     if not allowed_outlet_ids:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -402,7 +402,7 @@ async def export_sales(
         )
 
     if outlet_id:
-        if not require_outlet_access(current_user, outlet_id):
+        if allowed_outlet_ids and outlet_id not in allowed_outlet_ids:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access denied to this outlet"
@@ -486,10 +486,13 @@ async def get_sale(
         raise HTTPException(status_code=404, detail="Sale not found")
         
     outlet_id = getattr(sale, 'outlet_id', None) or getattr(sale, 'store_id', None)
-    if outlet_id and not require_outlet_access(current_user, outlet_id):
+    allowed_outlet_ids = await get_accessible_outlet_ids(current_user, db)
+    if outlet_id and allowed_outlet_ids and outlet_id not in allowed_outlet_ids:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to this outlet")
         
     return sale
+
+from app.services.audit_service import log_audit_action
 
 @router.post("/", response_model=SaleResponse, status_code=status.HTTP_201_CREATED)
 async def create_sale(
@@ -501,7 +504,8 @@ async def create_sale(
     Record a new sales transaction and decrement inventory levels.
     """
     outlet_id = getattr(sale_in, 'store_id', None)
-    if outlet_id and not require_outlet_access(current_user, outlet_id):
+    allowed_outlet_ids = await get_accessible_outlet_ids(current_user, db)
+    if outlet_id and allowed_outlet_ids and outlet_id not in allowed_outlet_ids:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to this outlet")
 
     from datetime import timezone
@@ -553,4 +557,12 @@ async def create_sale(
     db.add(new_sale)
     await db.commit()
     await db.refresh(new_sale)
+    
+    await log_audit_action(
+        db=db,
+        action="create_sale",
+        performed_by=current_user.id,
+        context={"transaction_id": new_sale.transaction_id, "total_amount": float(new_sale.total_amount)}
+    )
+    
     return new_sale

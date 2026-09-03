@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from typing import Optional
 from datetime import date
 
-from app.database import get_db
+from app.database import get_db_sync_dependency as get_db
 from app.api.deps import get_current_active_user
 from app.models.users import User
 from app.services.employee_service import EmployeeService
@@ -16,6 +16,7 @@ from app.schemas.employee import (
     EmployeeCreate, EmployeeUpdate, ClockInRequest, ClockOutRequest, AttendanceMarkRequest,
     LeaveRequestCreate, LeaveApprovalRequest
 )
+from app.services.audit_service import log_audit_action_sync
 
 router = APIRouter(prefix="/employees", tags=["employees"])
 
@@ -32,6 +33,12 @@ async def create_employee(
     try:
         svc = EmployeeService(db, current_user)
         emp = svc.create_employee(data.dict())
+        log_audit_action_sync(
+            db=db,
+            action="create_employee",
+            performed_by=current_user.id,
+            context={"employee_id": emp.employee_id, "name": emp.name}
+        )
         return {"success": True, "data": emp.to_dict(), "message": "Employee created successfully"}
     except HTTPException:
         raise

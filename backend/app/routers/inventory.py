@@ -196,6 +196,8 @@ async def stock_movement(
         logger.error(f"Error fetching stock movement: {e}")
         raise HTTPException(status_code=500, detail="Failed to fetch stock movement")
 
+from app.services.audit_service import log_audit_action
+
 @router.put("/{inventory_id}")
 async def update_inventory(
     inventory_id: str,
@@ -222,6 +224,13 @@ async def update_inventory(
             item.last_restocked_at = func.now()
 
         await db.commit()
+        
+        await log_audit_action(
+            db=db,
+            action="update_inventory",
+            performed_by=current_user.id,
+            context={"inventory_id": str(inventory_id), "new_quantity": body.quantity}
+        )
 
         return {"message": "Stock updated successfully", "id": inventory_id}
     except HTTPException:
