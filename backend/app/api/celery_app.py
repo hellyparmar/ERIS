@@ -37,45 +37,6 @@ celery_app.conf.update(
     # Worker settings
     worker_prefetch_multiplier=4,
     worker_max_tasks_per_child=1000,  # Restart after 1000 tasks (prevent memory leaks)
-    
-    # Scheduled tasks (Celery Beat)
-    beat_schedule={
-        # Daily tasks
-        'sync-external-factors-daily': {
-            'task': 'app.tasks.external_factors.sync_daily_factors',
-            'schedule': crontab(hour=1, minute=0),  # 1 AM daily
-        },
-        'mark-overdue-invoices': {
-            'task': 'app.tasks.invoices.mark_overdue_invoices',
-            'schedule': crontab(hour=0, minute=30),  # 12:30 AM daily
-        },
-        'send-payment-reminders': {
-            'task': 'app.tasks.invoices.send_payment_reminders',
-            'schedule': crontab(hour=10, minute=0),  # 10 AM daily
-        },
-        
-        # Weekly tasks
-        'generate-weekly-reports': {
-            'task': 'app.tasks.reports.generate_weekly_summary',
-            'schedule': crontab(hour=8, minute=0, day_of_week=1),  # Monday 8 AM
-        },
-        'cleanup-old-cache': {
-            'task': 'app.tasks.maintenance.cleanup_cache',
-            'schedule': crontab(hour=3, minute=0, day_of_week=0),  # Sunday 3 AM
-        },
-        
-        # Hourly tasks
-        'sync-weather-data': {
-            'task': 'app.tasks.external_factors.sync_weather',
-            'schedule': crontab(minute=0),  # Every hour
-        },
-        
-        # Alert monitoring (every 15 minutes)
-        'run-alert-engine': {
-            'task': 'app.tasks.alerts.run_alert_engine',
-            'schedule': crontab(minute='*/15'),  # Every 15 minutes
-        },
-    }
 )
 
 # Auto-discover tasks in tasks module
