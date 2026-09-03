@@ -2,10 +2,10 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from app.database import get_db
-from app.core.security import decode_token
+from ..database import get_db
+from .security import decode_token
 from sqlalchemy.orm import selectinload
-from app.models.users import User
+from ..models.users import User
 
 oauth2 = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
@@ -18,13 +18,13 @@ async def get_current_user(token: str = Depends(oauth2), db: AsyncSession = Depe
     payload = decode_token(token)
     if not payload:
         raise exc
-    email = payload.get("sub")
-    if not email:
+    username = payload.get("sub")
+    if not username:
         raise exc
     result = await db.execute(
         select(User)
         .options(selectinload(User.role), selectinload(User.outlet_access))
-        .where(User.email == email, User.is_active == True)
+        .where(User.username == username, User.is_active == True)
     )
     user = result.scalar_one_or_none()
     if not user:
