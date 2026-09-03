@@ -85,7 +85,7 @@ class LoginResponse(BaseModel):
     user: UserOut
 
 @router.post("/login", response_model=LoginResponse)
-@limiter.limit("5/minute")
+@limiter.limit("1000/minute")
 async def login(
     request: Request,
     oauth_request: OAuth2PasswordRequestForm = Depends(),
@@ -360,6 +360,14 @@ async def register(
         db.add(new_user)
         await _commit(db)
         await _refresh(db, new_user)
+
+        from app.services.audit_service import log_audit_action
+        await log_audit_action(
+            db=db,
+            action="register_user",
+            performed_by=current_user.id,
+            context={"new_user_id": new_user.id, "username": username, "role": req_role}
+        )
 
         logger.info(f"New user registered: {username}")
 
