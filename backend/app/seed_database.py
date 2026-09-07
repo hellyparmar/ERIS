@@ -357,16 +357,22 @@ async def generate_historical_data(session: AsyncSession) -> Dict:
         await session.commit()
         
         # Suppliers
-        suppliers = ["Metro Cash & Carry", "Udaan", "Local Mandi", "FreshProduce India"]
+        suppliers = [
+            ("Metro Cash & Carry", 125450.00),
+            ("Udaan", 84200.00),
+            ("Local Mandi", 42150.00),
+            ("FreshProduce India", 15800.00)
+        ]
         supp_ids = []
         supp_data = []
-        for i, supp in enumerate(suppliers):
+        for i, (supp, payable) in enumerate(suppliers):
             s_id = i + 1
             supp_ids.append(s_id)
             supp_data.append({
                 "id": s_id, "organization_id": 1,
                 "name": supp, "phone": f'+91888888888{i}',
-                "city": 'Mumbai', "is_active": True
+                "city": 'Mumbai', "is_active": True,
+                "outstanding_payable": payable
             })
         if supp_data:
             await session.execute(pg_or_sqlite_insert(session, Supplier).values(supp_data).on_conflict_do_nothing())

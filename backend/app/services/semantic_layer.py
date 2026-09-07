@@ -160,6 +160,15 @@ SCHEMA_DESCRIPTIONS = {
             "name": "VARCHAR - Supplier name",
             "outstanding_payable": "DECIMAL - Amount owed to supplier"
         }
+    },
+    "outlets": {
+        "description": "Store locations / retail branches.",
+        "columns": {
+            "id": "INTEGER PRIMARY KEY",
+            "name": "VARCHAR - Outlet name",
+            "code": "VARCHAR - Outlet code",
+            "city": "VARCHAR - Outlet city"
+        }
     }
 }
 
@@ -191,9 +200,9 @@ QUERY_TEMPLATES = {
                    COUNT(DISTINCT id) as order_count,
                    ROUND(SUM(total_amount) / COUNT(DISTINCT id), 2) as avg_order_value
             FROM sales
-            WHERE created_at >= date('now', '-30 days')
-            """,
-        "defaults": {}
+            WHERE {date_filter}
+        """,
+        "defaults": {"date_filter": "sale_date >= DATE('now', '-30 days')"}
     },
     
     "daily_sales_trend": {
@@ -220,9 +229,9 @@ QUERY_TEMPLATES = {
             WHERE 1=1
             GROUP BY c.id, c.first_name, c.last_name, c.email
             ORDER BY total_spend DESC
-            LIMIT 3
-            """,
-        "defaults": {"limit": 10, "date_filter": "1=1"}
+            LIMIT {limit}
+        """,
+        "defaults": {"limit": 3}
     },
     
     "low_stock_products": {
@@ -254,24 +263,30 @@ QUERY_TEMPLATES = {
     },
     
     "compare_revenue_periods": {
-        "pattern": r"compare\s+this\s+month\s+to\s+last\s+month",
+        "pattern": r"compare\s+this\s+month\s+to\s+last\s+month|this\s+month\s+vs\s+last\s+month",
         "sql": """
             SELECT 
-                SUM(CASE WHEN strftime('%Y-%m', sale_date) = strftime('%Y-%m', 'now') THEN total_amount ELSE 0 END) as this_month_revenue,
-                SUM(CASE WHEN strftime('%Y-%m', sale_date) = strftime('%Y-%m', 'now', '-1 month') THEN total_amount ELSE 0 END) as last_month_revenue
+                ROUND(SUM(CASE WHEN strftime('%Y-%m', sale_date) = strftime('%Y-%m', 'now') THEN total_amount ELSE 0 END), 2) as this_month_revenue,
+                ROUND(SUM(CASE WHEN strftime('%Y-%m', sale_date) = strftime('%Y-%m', 'now', '-1 month') THEN total_amount ELSE 0 END), 2) as last_month_revenue,
+                COUNT(CASE WHEN strftime('%Y-%m', sale_date) = strftime('%Y-%m', 'now') THEN 1 END) as this_month_orders,
+                COUNT(CASE WHEN strftime('%Y-%m', sale_date) = strftime('%Y-%m', 'now', '-1 month') THEN 1 END) as last_month_orders
             FROM sales
-            WHERE sale_date >= DATE('now', '-60 days')
+            WHERE sale_date >= DATE('now', '-65 days')
         """,
         "defaults": {}
     },
 
     "underperforming_outlets": {
-        "pattern": r"(which|what)\s+(outlet|store)s?\s+(is|are)\s+underperforming",
+        "pattern": r"(which|what)\s+(outlet|store)s?\s+(is|are)\s+underperforming|underperforming\s+(outlet|store)s?",
         "sql": """
-            SELECT outlet_id, SUM(total_amount) as total_revenue
-            FROM sales
-            WHERE sale_date >= DATE('now', '-30 days')
-            GROUP BY outlet_id
+            SELECT o.id as outlet_id, o.name as outlet_name,
+                   ROUND(SUM(s.total_amount), 2) as total_revenue,
+                   COUNT(DISTINCT s.id) as order_count,
+                   ROUND(AVG(s.total_amount), 2) as avg_order_value
+            FROM outlets o
+            JOIN sales s ON s.outlet_id = o.id
+            WHERE s.sale_date >= DATE('now', '-30 days')
+            GROUP BY o.id, o.name
             ORDER BY total_revenue ASC
             LIMIT 3
         """,
@@ -279,26 +294,26 @@ QUERY_TEMPLATES = {
     },
 
     "slowest_inventory": {
-        "pattern": r"slowest\s*moving\s*inventory|slowest\s*moving\s*item",
+        "pattern": r"slowest[- ]?moving\s*(inventory|product|item)s?|what('?s| is)\s+(my\s+)?slowest[- ]?moving",
         "sql": """
-            SELECT p.name, p.current_stock, COALESCE(SUM(si.quantity), 0) as units_sold_last_90_days
+            SELECT p.id as product_id, p.name as product_name, p.sku, p.current_stock,
+                   COALESCE(SUM(si.quantity), 0) as units_sold_last_90_days
             FROM products p
             LEFT JOIN sale_items si ON p.id = si.product_id
             LEFT JOIN sales s ON si.sale_id = s.id AND s.sale_date >= DATE('now', '-90 days')
             WHERE p.current_stock > 0
-            GROUP BY p.id, p.name, p.current_stock
+            GROUP BY p.id, p.name, p.sku, p.current_stock
             ORDER BY units_sold_last_90_days ASC, p.current_stock DESC
-            LIMIT 5
+            LIMIT {limit}
         """,
-        "defaults": {}
+        "defaults": {"limit": 5}
     },
 
     "supplier_debt": {
-        "pattern": r"(which|what)\s+supplier\s+do\s+i\s+owe\s+(the\s+)?most\s+to|supplier\s+debt",
+        "pattern": r"(which|what)\s+supplier\s+do\s+i\s+owe\s+(the\s+)?most\s+to|supplier\s+debt|who\s+do\s+i\s+owe\s+(the\s+)?most\s+to",
         "sql": """
-            SELECT name as supplier_name, outstanding_payable
+            SELECT id, name as supplier_name, outstanding_payable, phone, contact_person
             FROM suppliers
-            WHERE outstanding_payable > 0
             ORDER BY outstanding_payable DESC
             LIMIT 5
         """,
@@ -306,10 +321,12 @@ QUERY_TEMPLATES = {
     },
 
     "aov_trend": {
-        "pattern": r"average\s+order\s+value\s+trend|aov\s+trend",
+        "pattern": r"average\s+order\s+value\s+trend|aov\s+trend|what('?s| is)\s+(my\s+)?average\s+order\s+value\s+trend",
         "sql": """
             SELECT strftime('%Y-%m', sale_date) as month,
-                   ROUND(SUM(total_amount) / COUNT(DISTINCT id), 2) as average_order_value
+                   ROUND(SUM(total_amount) / COUNT(DISTINCT id), 2) as average_order_value,
+                   COUNT(DISTINCT id) as order_count,
+                   ROUND(SUM(total_amount), 2) as total_revenue
             FROM sales
             WHERE sale_date >= DATE('now', '-6 months')
             GROUP BY strftime('%Y-%m', sale_date)
@@ -364,7 +381,7 @@ VALIDATION_RULES = [
     {
         "name": "check_table_exists",
         "pattern": r"FROM\s+(\w+)",
-        "allowed_tables": ["sales", "products", "customers", "inventory", "invoices", "alerts", "sale_items", "users", "suppliers", "product_categories"],
+        "allowed_tables": ["sales", "products", "customers", "inventory", "invoices", "alerts", "sale_items", "users", "suppliers", "product_categories", "outlets"],
         "message": "Unknown table referenced",
         "severity": "error"
     }
@@ -548,7 +565,7 @@ class SemanticLayer:
         
         # Check if uses known tables
         tables_found = re.findall(r'FROM\s+(\w+)', generated_sql, re.IGNORECASE)
-        known_tables = {'sales', 'products', 'customers', 'inventory', 'sale_items', 'suppliers'}
+        known_tables = {'sales', 'products', 'customers', 'inventory', 'sale_items', 'suppliers', 'outlets'}
         if all(t.lower() in known_tables for t in tables_found):
             score += 5
             reasons.append("Uses verified tables")
