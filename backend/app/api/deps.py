@@ -62,10 +62,14 @@ async def get_accessible_outlet_ids(
     - outlet_manager / manager / staff: Returns ID(s) of assigned outlet(s).
     """
     role_name = ""
-    if hasattr(current_user, 'role') and current_user.role:
-        role_name = getattr(current_user.role, 'name', '')
-        if not isinstance(role_name, str) and hasattr(current_user.role, 'value'):
-            role_name = current_user.role.value
+    try:
+        if hasattr(current_user, 'role') and current_user.role:
+            role_name = getattr(current_user.role, 'name', '')
+            if not isinstance(role_name, str) and hasattr(current_user.role, 'value'):
+                role_name = current_user.role.value
+    except Exception:
+        pass
+
     if not role_name and hasattr(current_user, 'role_id') and current_user.role_id:
         role_name = str(current_user.role_id)
     if isinstance(role_name, str):
@@ -76,8 +80,11 @@ async def get_accessible_outlet_ids(
         return [row[0] for row in result.fetchall()]
         
     elif role_name == "area_manager":
-        if hasattr(current_user, 'outlet_access') and current_user.outlet_access:
-            return [access.outlet_id for access in current_user.outlet_access]
+        try:
+            if hasattr(current_user, 'outlet_access') and current_user.outlet_access:
+                return [access.outlet_id for access in current_user.outlet_access]
+        except Exception:
+            pass
         result = await db.execute(
             select(UserOutletAccess.outlet_id).where(UserOutletAccess.user_id == current_user.id)
         )

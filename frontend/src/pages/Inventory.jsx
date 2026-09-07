@@ -186,6 +186,19 @@ export default function Inventory() {
     return filtered;
   }, [inventoryData, searchQuery, selectedCategory, selectedOutlet, showLowStockOnly, isSuperAdmin, userOutletId]);
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 15;
+
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedCategory, selectedOutlet, showLowStockOnly]);
+
+  const totalPages = Math.ceil(filteredInventory.length / pageSize) || 1;
+  const paginatedInventory = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredInventory.slice(start, start + pageSize);
+  }, [filteredInventory, currentPage, pageSize]);
+
   const totalProducts = filteredInventory.length;
   const lowStockCount = filteredInventory.filter(item => (item.quantity ?? item.current_stock) < (item.reorder_level ?? item.product?.reorder_point)).length;
 
@@ -385,7 +398,7 @@ export default function Inventory() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredInventory.map((item, idx) => {
+                  {paginatedInventory.map((item, idx) => {
                     const currentStock = item.quantity ?? item.current_stock;
                     const reorderLevel = item.reorder_level ?? item.product?.reorder_point;
                     const isLowStock = currentStock < reorderLevel;
@@ -469,6 +482,33 @@ export default function Inventory() {
                   })}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {totalPages > 1 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', padding: '0 4px' }}>
+              <div style={{ fontSize: '12px', color: 'var(--c-ink-muted)' }}>
+                Showing {Math.min((currentPage - 1) * pageSize + 1, filteredInventory.length)}–{Math.min(currentPage * pageSize, filteredInventory.length)} of {filteredInventory.length} items
+              </div>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <button 
+                  className="action-btn" 
+                  disabled={currentPage <= 1} 
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                >
+                  Prev
+                </button>
+                <span style={{ fontSize: '12px', padding: '0 8px', color: 'var(--c-ink)' }}>
+                  {currentPage} / {totalPages}
+                </span>
+                <button 
+                  className="action-btn" 
+                  disabled={currentPage >= totalPages} 
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                >
+                  Next
+                </button>
+              </div>
             </div>
           )}
         </div>

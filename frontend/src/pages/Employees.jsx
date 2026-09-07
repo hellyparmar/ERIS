@@ -37,7 +37,7 @@ const Employees = () => {
 
     const { data: employeesData, isLoading } = useQuery({
         queryKey: ['employees'],
-        queryFn: () => api.get('/api/v1/employees').then(r => r.data.items || []),
+        queryFn: () => api.get('/api/v1/employees').then(r => r.data?.items || r.data?.employees || (Array.isArray(r.data) ? r.data : [])),
     });
 
     // Mutation: Save employee (add or edit)

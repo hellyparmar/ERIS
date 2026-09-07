@@ -116,7 +116,8 @@ const Forecasts = () => {
 
             try {
                 const { data: inventoryData } = await api.get('/api/v1/inventory');
-                const uniqueProducts = [...new Map(inventoryData.map(i => [i.product.id, i.product])).values()];
+                const items = Array.isArray(inventoryData) ? inventoryData : (inventoryData?.items || []);
+                const uniqueProducts = [...new Map(items.map(i => [i.product?.id || i.id, i.product || i])).values()];
                 if (uniqueProducts && uniqueProducts.length > 0) setProducts(uniqueProducts);
             } catch (e) {
                 console.warn('Could not fetch products, using fallbacks');
