@@ -429,7 +429,7 @@ prior session, confirmed broken now) · ⚪ Not implemented
 | 8.10 | Dead-code purge (Phase 1 + 6) | ✅ | Complete dead-code purge executed. All confirmed-dead files purged. `check_imports.py` reports 0 dangling imports. 130 reachable modules, 5 intentionally-unreachable files remaining. |
 | 8.11 | Business Contacts frontend page | ✅ | Built `frontend/src/pages/Contacts.jsx` backed by `BusinessContact` model and `/api/v1/contacts/` CRUD endpoints. Added to router and navigation. |
 | 8.12 | Alerts & Notifications | ✅ | Removed dead Celery Beat scheduling. Fixed `scheduler.py` to write real `Alert` records. Hooked up anomaly detection for sales anomalies. Rewrote `/list` endpoint to properly serve alerts from DB to frontend. |
-| 8.13 | Causal Analysis / Communication Hub frontend pages | ⚪ | Backend endpoints exist and are registered; `frontend/src/pages/` still has the same 20 files with no page for either feature |
+| 8.13 | Causal Analysis / Communication Hub frontend pages | ✅ | Both frontend pages built and fully wired: `frontend/src/pages/CausalAnalysis.jsx` (`/causal-analysis`, backed by `/api/v1/causal/summary/{outlet_id}`) and `frontend/src/pages/CommunicationHub.jsx` (`/communication`, backed by `/api/v1/messages/inbox`). Registered in `App.jsx` with role-based protection and linked in `Sidebar.jsx` navigation. |
 | 8.14 | n8n as an actual running service | ⚪ | Webhook receiver + one workflow JSON exist; `n8n` service exists in `docker-compose.yml` but might need more configuration validation. |
 
 ---
@@ -446,9 +446,7 @@ prior session, confirmed broken now) · ⚪ Not implemented
 
 **REQ-CLEANUP-05 (Done):** Resolved duplicate `app/api/auth.py` vs `app/api/auth/` package conflict and removed duplicate `app/api/` subtrees. Consolidated live route handlers in `app/routers/`.
 
-**REQ-CLEANUP-06 (Medium):** Build frontend pages for Causal Analysis and
-Communication Hub (REQ-CAUSAL-01, REQ-COMMS-01 gaps) so these kept backend features
-are actually reachable by a user.
+**REQ-CLEANUP-06 (Done):** Built and wired frontend pages for Causal Analysis (`CausalAnalysis.jsx` at `/causal-analysis`) and Communication Hub (`CommunicationHub.jsx` at `/communication`) with role-based routing in `App.jsx` and icons/links in `Sidebar.jsx`. Both features are fully reachable by users in navigation.
 
 **REQ-CLEANUP-07 (Done):** Added `check_imports.py` to `backend/scripts/` to statically trace all reachable imports from `app.main` and verify 0 dangling imports.
 
