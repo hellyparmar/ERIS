@@ -19,8 +19,8 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession
     )
     try:
         payload = decode_token(token)
-        email = payload.get("sub")
-        if email is None:
+        username = payload.get("sub")
+        if username is None:
             raise credentials_exception
     except:
         raise credentials_exception
@@ -28,7 +28,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession
     result = await db.execute(
         select(User)
         .options(selectinload(User.role), selectinload(User.outlet_access))
-        .where(User.email == email)
+        .where(User.username == username)
     )
     user = result.scalar_one_or_none()
     if user is None:
