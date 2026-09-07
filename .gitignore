@@ -73,6 +73,12 @@ chromadb/
 .coverage
 htmlcov/
 
+# ML model artifacts (trained weights - regenerated automatically, never commit)
+*.pkl
+*.joblib
+backend/models/*.pkl
+backend/models/*.joblib
+
 # Poetry
 poetry.lock
 
