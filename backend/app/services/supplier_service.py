@@ -64,7 +64,7 @@ class SupplierService(OutletIsolatedService):
             query = query.filter(
                 (Supplier.name.ilike(f"%{search}%")) |
                 (Supplier.contact_person.ilike(f"%{search}%")) |
-                (Supplier.email.ilike(f"%{search}%"))
+                (Supplier.phone.ilike(f"%{search}%"))
             )
         if city:
             query = query.filter(Supplier.city.ilike(f"%{city}%"))
@@ -77,9 +77,9 @@ class SupplierService(OutletIsolatedService):
         supplier = self.db.query(Supplier).filter(Supplier.id == supplier_id).first()
         if not supplier:
             return None
-        for key in ["name", "contact_person", "email", "phone", "gst_number",
+        for key in ["name", "contact_person", "phone", "gst_number",
                     "address", "city", "state", "payment_terms_days", "is_active"]:
-            if key in data and data[key] is not None:
+            if key in data and data[key] is not None and hasattr(supplier, key):
                 setattr(supplier, key, data[key])
         self.db.commit()
         self.db.refresh(supplier)
@@ -96,17 +96,20 @@ class SupplierService(OutletIsolatedService):
     def _supplier_dict(self, s: Supplier) -> dict:
         return {
             "id": s.id,
-            "supplier_code": s.supplier_code,
+            "supplier_code": getattr(s, "supplier_code", f"SUP{s.id:04d}"),
             "name": s.name,
             "contact_person": s.contact_person,
-            "email": s.email,
+            "email": getattr(s, "email", None),
             "phone": s.phone,
             "gst_number": s.gst_number,
             "address": s.address,
             "city": s.city,
             "state": s.state,
-            "country": s.country,
+            "country": getattr(s, "country", "India"),
             "payment_terms_days": s.payment_terms_days,
+            "outstanding_payable": float(getattr(s, "outstanding_payable", 0.0) or 0.0),
+            "quality_rating": float(getattr(s, "quality_rating", 5.0) or 5.0),
+            "on_time_delivery_rate": float(getattr(s, "on_time_delivery_rate", 100.0) or 100.0),
             "is_active": s.is_active,
             "created_at": s.created_at.isoformat() if s.created_at else None,
         }
@@ -220,8 +223,8 @@ class SupplierService(OutletIsolatedService):
     ) -> dict:
         query = self.db.query(PurchaseOrder)
         
-        # Apply outlet filtering
-        if self.allowed_outlet_ids is not None:
+        # Apply outlet filtering if supported by schema
+        if hasattr(PurchaseOrder, "outlet_id") and self.allowed_outlet_ids is not None:
             query = query.filter(PurchaseOrder.outlet_id.in_(self.allowed_outlet_ids))
         
         if supplier_id:
@@ -236,8 +239,8 @@ class SupplierService(OutletIsolatedService):
     def get_purchase_order(self, po_id: int) -> Optional[PurchaseOrder]:
         query = self.db.query(PurchaseOrder).filter(PurchaseOrder.id == po_id)
         
-        # Apply outlet filtering
-        if self.allowed_outlet_ids is not None:
+        # Apply outlet filtering if supported by schema
+        if hasattr(PurchaseOrder, "outlet_id") and self.allowed_outlet_ids is not None:
             query = query.filter(PurchaseOrder.outlet_id.in_(self.allowed_outlet_ids))
         
         return query.first()
@@ -248,7 +251,7 @@ class SupplierService(OutletIsolatedService):
             raise ValueError(f"Purchase order {po_id} not found")
         
         # Check outlet access
-        if not self.can_access_outlet(po.outlet_id):
+        if hasattr(po, "outlet_id") and not self.can_access_outlet(po.outlet_id):
             raise ValueError(f"Access denied to outlet {po.outlet_id}")
         
         po.status = status
@@ -265,7 +268,7 @@ class SupplierService(OutletIsolatedService):
             raise ValueError(f"Purchase order {po_id} not found")
         
         # Check outlet access
-        if not self.can_access_outlet(po.outlet_id):
+        if hasattr(po, "outlet_id") and not self.can_access_outlet(po.outlet_id):
             raise ValueError(f"Access denied to outlet {po.outlet_id}")
 
         received_map = {r["product_id"]: r["quantity_received"] for r in received_items}

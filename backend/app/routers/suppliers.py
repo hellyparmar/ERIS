@@ -30,19 +30,31 @@ async def create_supplier(data: SupplierCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("")
 @router.get("/")
 async def list_suppliers(
     search: Optional[str] = Query(None),
     city: Optional[str] = Query(None),
     is_active: bool = Query(True),
     page: int = Query(1, ge=1),
-    limit: int = Query(20, ge=1, le=100),
+    per_page: Optional[int] = Query(None, ge=1, le=100),
+    limit: Optional[int] = Query(None, ge=1, le=100),
     db: Session = Depends(get_db)
 ):
-    """List all suppliers with optional filters"""
+    """List all suppliers with optional filters and pagination"""
     try:
         svc = SupplierService(db)
-        return svc.list_suppliers(search=search, city=city, is_active=is_active, page=page, limit=limit)
+        search_val = search if isinstance(search, str) else None
+        city_val = city if isinstance(city, str) else None
+        is_active_val = is_active if isinstance(is_active, bool) else True
+        page_num = page if isinstance(page, int) else 1
+        effective_limit = (per_page if isinstance(per_page, int) else None) or (limit if isinstance(limit, int) else None) or 20
+        res = svc.list_suppliers(search=search_val, city=city_val, is_active=is_active_val, page=page_num, limit=effective_limit)
+        res["per_page"] = effective_limit
+        res["limit"] = effective_limit
+        res["total_pages"] = (res.get("total", 0) + effective_limit - 1) // effective_limit if effective_limit > 0 else 1
+        res["suppliers"] = res.get("items", [])
+        return res
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -129,14 +141,23 @@ async def create_purchase_order(
 async def list_all_purchase_orders(
     status: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
-    limit: int = Query(20, ge=1, le=100),
+    per_page: Optional[int] = Query(None, ge=1, le=100),
+    limit: Optional[int] = Query(None, ge=1, le=100),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """List all purchase orders across all suppliers"""
     try:
         svc = SupplierService(db, current_user)
-        return svc.list_purchase_orders(status=status, page=page, limit=limit)
+        status_val = status if isinstance(status, str) else None
+        page_num = page if isinstance(page, int) else 1
+        effective_limit = (per_page if isinstance(per_page, int) else None) or (limit if isinstance(limit, int) else None) or 20
+        res = svc.list_purchase_orders(status=status_val, page=page_num, limit=effective_limit)
+        res["per_page"] = effective_limit
+        res["limit"] = effective_limit
+        res["total_pages"] = (res.get("total", 0) + effective_limit - 1) // effective_limit if effective_limit > 0 else 1
+        res["purchase_orders"] = res.get("items", [])
+        return res
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

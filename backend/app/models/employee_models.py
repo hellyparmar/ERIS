@@ -71,21 +71,56 @@ class Employee(Base):
     performance_metrics = relationship("PerformanceMetric", back_populates="employee", cascade="all, delete-orphan")
     leave_requests = relationship("LeaveRequest", back_populates="employee", cascade="all, delete-orphan")
 
+    @property
+    def store_id(self):
+        return self.outlet_id
+
+    @store_id.setter
+    def store_id(self, val):
+        self.outlet_id = val
+
+    @property
+    def name(self):
+        return f"{self.first_name or ''} {self.last_name or ''}".strip() or "Employee"
+
+    @property
+    def employee_id(self):
+        return f"EMP{self.id:04d}"
+
+    @property
+    def role(self):
+        return self.position
+
+    @property
+    def salary(self):
+        return self.base_salary
+
+    @property
+    def hire_date(self):
+        return self.joining_date
+
     def to_dict(self):
         return {
             "id": self.id,
             "employee_id": self.employee_id,
             "name": self.name,
+            "first_name": self.first_name,
+            "last_name": self.last_name,
+            "email": self.email,
             "phone": self.phone,
-            "role": self.role.value if self.role else None,
+            "role": getattr(self.role, 'value', self.role) if self.role else self.position,
+            "position": self.position,
+            "department": self.department,
             "outlet_id": self.outlet_id,
-            "hire_date": self.hire_date.isoformat() if self.hire_date else None,
+            "store_id": self.outlet_id,
+            "hire_date": self.joining_date.isoformat() if self.joining_date else None,
+            "joining_date": self.joining_date.isoformat() if self.joining_date else None,
             "is_active": self.is_active,
-            "salary": float(self.salary) if self.salary else None,
-            "salary_type": self.salary_type,
-            "address": self.address,
-            "emergency_contact_name": self.emergency_contact_name,
-            "emergency_contact_phone": self.emergency_contact_phone,
+            "salary": float(self.base_salary) if self.base_salary else None,
+            "salary_type": getattr(self, 'salary_type', 'monthly'),
+            "address": getattr(self, 'address', None),
+            "emergency_contact_name": getattr(self, 'emergency_contact_name', None),
+            "emergency_contact_phone": getattr(self, 'emergency_contact_phone', None),
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
 

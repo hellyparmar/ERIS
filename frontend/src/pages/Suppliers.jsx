@@ -17,13 +17,13 @@ const Suppliers = () => {
 
     const { data: suppliersList, isLoading: isLoadingSuppliers } = useQuery({
         queryKey: ['suppliers'],
-        queryFn: () => api.get('/api/v1/suppliers/').then(r => r.data?.data?.suppliers || r.data?.data?.items || r.data?.suppliers || r.data?.data || [])
+        queryFn: () => api.get('/api/v1/suppliers/').then(r => r.data?.items || r.data?.suppliers || r.data?.data?.suppliers || r.data?.data?.items || r.data?.data || [])
     });
     const suppliers = Array.isArray(suppliersList) ? suppliersList : [];
 
     const { data: purchaseOrdersList, isLoading: isLoadingPOs } = useQuery({
         queryKey: ['purchase-orders'],
-        queryFn: () => api.get('/api/v1/suppliers/purchase-orders/all').then(r => r.data?.data?.items || r.data?.data || r.data?.purchase_orders || r.data || [])
+        queryFn: () => api.get('/api/v1/suppliers/purchase-orders/all').then(r => r.data?.items || r.data?.purchase_orders || r.data?.data?.items || r.data?.data || r.data || [])
     });
     const purchaseOrders = Array.isArray(purchaseOrdersList) ? purchaseOrdersList : [];
 

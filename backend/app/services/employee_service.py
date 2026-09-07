@@ -69,15 +69,20 @@ class EmployeeService(OutletIsolatedService):
         limit: int = 20
     ) -> dict:
         query = self.db.query(Employee).filter(Employee.is_active == is_active)
-        query = self.apply_outlet_filter(query, outlet_column='store_id')
+        outlet_col = 'outlet_id' if hasattr(Employee, 'outlet_id') else 'store_id'
+        query = self.apply_outlet_filter(query, outlet_column=outlet_col)
         if store_id:
             self.validate_outlet_access(store_id)
-            query = query.filter(Employee.store_id == store_id)
+            query = query.filter((Employee.outlet_id == store_id) if hasattr(Employee, 'outlet_id') else (Employee.store_id == store_id))
         if role:
-            query = query.filter(Employee.role == EmployeeRole[role.upper()])
+            if hasattr(Employee, 'position'):
+                query = query.filter(Employee.position.ilike(f"%{role}%"))
+            elif hasattr(Employee, 'role'):
+                query = query.filter(Employee.role == EmployeeRole[role.upper()])
 
         total = query.count()
-        employees = query.order_by(Employee.name).offset((page - 1) * limit).limit(limit).all()
+        order_col = Employee.first_name if hasattr(Employee, 'first_name') else Employee.id
+        employees = query.order_by(order_col).offset((page - 1) * limit).limit(limit).all()
         return {"items": [e.to_dict() for e in employees], "total": total, "page": page}
 
     def update_employee(self, employee_id: int, data: dict) -> Optional[Employee]:

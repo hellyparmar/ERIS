@@ -46,20 +46,32 @@ async def create_employee(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("")
 @router.get("/")
 async def list_employees(
     store_id: Optional[int] = Query(None),
     role: Optional[str] = Query(None),
     is_active: bool = Query(True),
     page: int = Query(1, ge=1),
-    limit: int = Query(20, ge=1, le=100),
+    per_page: Optional[int] = Query(None, ge=1, le=100),
+    limit: Optional[int] = Query(None, ge=1, le=100),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """List all employees with optional filters"""
+    """List all employees with optional filters and pagination"""
     try:
         svc = EmployeeService(db, current_user)
-        return svc.list_employees(store_id=store_id, role=role, is_active=is_active, page=page, limit=limit)
+        store_id_val = store_id if isinstance(store_id, int) else None
+        role_val = role if isinstance(role, str) else None
+        is_active_val = is_active if isinstance(is_active, bool) else True
+        page_num = page if isinstance(page, int) else 1
+        effective_limit = (per_page if isinstance(per_page, int) else None) or (limit if isinstance(limit, int) else None) or 20
+        res = svc.list_employees(store_id=store_id_val, role=role_val, is_active=is_active_val, page=page_num, limit=effective_limit)
+        res["per_page"] = effective_limit
+        res["limit"] = effective_limit
+        res["total_pages"] = (res.get("total", 0) + effective_limit - 1) // effective_limit if effective_limit > 0 else 1
+        res["employees"] = res.get("items", [])
+        return res
     except HTTPException:
         raise
     except Exception as e:
