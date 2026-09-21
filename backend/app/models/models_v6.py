@@ -10,7 +10,7 @@ from sqlalchemy import (
     Column, Integer, BigInteger, String, Text, Boolean, Date, ForeignKey, DECIMAL, CheckConstraint, UniqueConstraint, Index
 )
 from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMP, ENUM
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, synonym
 from sqlalchemy.sql import func
 
 from app.models.base import Base
@@ -166,33 +166,10 @@ class Sale(Base):
     payments = relationship("Payment", back_populates="sale")
 
     # Backward-compatibility aliases for legacy SaleTransaction queries
-    @property
-    def transaction_at(self):
-        return self.sale_date
-
-    @transaction_at.setter
-    def transaction_at(self, val):
-        self.sale_date = val
-
-    @property
-    def transaction_date(self):
-        return self.sale_date
-
-    @property
-    def cashier_id(self):
-        return self.user_id
-
-    @cashier_id.setter
-    def cashier_id(self, val):
-        self.user_id = val
-
-    @property
-    def store_id(self):
-        return self.outlet_id
-
-    @store_id.setter
-    def store_id(self, val):
-        self.outlet_id = val
+    transaction_at = synonym("sale_date")
+    transaction_date = synonym("sale_date")
+    cashier_id = synonym("user_id")
+    store_id = synonym("outlet_id")
 
     @property
     def gst_amount(self):

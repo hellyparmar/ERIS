@@ -70,16 +70,18 @@ def get_database_url() -> str:
         )
         raise RuntimeError(error_msg)
     
-    # Validate format (should start with postgresql:// or postgresql+asyncpg://)
-    if not database_url.startswith(("postgresql://", "postgresql+asyncpg://")):
-        raise RuntimeError(
-            f"Invalid DATABASE_URL format. Must start with 'postgresql://' or "
-            f"'postgresql+asyncpg://', got: {database_url[:50]}..."
-        )
-    
-    # Convert asyncpg to psycopg2 for migrations (must be synchronous)
+    # Convert async dialects to sync for migrations (must be synchronous)
     if 'postgresql+asyncpg://' in database_url:
         database_url = database_url.replace('postgresql+asyncpg://', 'postgresql://')
+    elif 'sqlite+aiosqlite:///' in database_url:
+        database_url = database_url.replace('sqlite+aiosqlite:///', 'sqlite:///')
+
+    # Validate format (should start with postgresql://, postgresql+asyncpg://, or sqlite:///)
+    if not database_url.startswith(("postgresql://", "postgresql+asyncpg://", "sqlite:///")):
+        raise RuntimeError(
+            f"Invalid DATABASE_URL format. Must start with 'postgresql://', "
+            f"'postgresql+asyncpg://', or 'sqlite:///', got: {database_url[:50]}..."
+        )
     
     return database_url
 

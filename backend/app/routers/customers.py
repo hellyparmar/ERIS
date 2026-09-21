@@ -162,6 +162,8 @@ async def delete_customer(customer_id: int, db: Session = Depends(get_db)):
 @router.get("/{customer_id}/purchase-history")
 async def get_purchase_history(
     customer_id: int,
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=1, le=100),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
@@ -169,7 +171,7 @@ async def get_purchase_history(
     try:
         from app.models.customers import Customer
         from app.models.models_v6 import Sale
-        from sqlalchemy import select
+        from sqlalchemy import select, func
         
         customer = db.execute(
             select(Customer).where(Customer.id == customer_id)
@@ -183,8 +185,11 @@ async def get_purchase_history(
         if allowed_outlets:
             stmt = stmt.where(Sale.outlet_id.in_(allowed_outlets))
             
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        total = db.execute(count_stmt).scalar() or 0
+
         sales = db.execute(
-            stmt.order_by(Sale.created_at.desc())
+            stmt.order_by(Sale.created_at.desc()).offset((page - 1) * per_page).limit(per_page)
         ).scalars().all()
         
         history = []
@@ -198,7 +203,13 @@ async def get_purchase_history(
             
         return {
             "success": True,
-            "data": history
+            "data": history,
+            "pagination": {
+                "page": page,
+                "per_page": per_page,
+                "total": total,
+                "total_pages": (total + per_page - 1) // per_page
+            }
         }
     except HTTPException:
         raise

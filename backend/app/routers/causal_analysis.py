@@ -17,7 +17,7 @@ import logging
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
-from app.api.deps import get_current_active_user, get_outlet_scope
+from app.api.deps import get_current_active_user, get_accessible_outlet_ids
 from app.models.users import User
 
 # Assuming causal_engine exists
@@ -139,7 +139,7 @@ async def _check_causal_outlet_access(outlet_identifier: Any, current_user: User
         clean_id = int(str(outlet_identifier).replace("outlet_", "").replace("outlet-", ""))
     except (ValueError, TypeError):
         clean_id = outlet_identifier
-    allowed_outlets = await get_outlet_scope(current_user, db)
+    allowed_outlets = await get_accessible_outlet_ids(current_user, db)
     if allowed_outlets and int(clean_id) not in allowed_outlets:
         raise HTTPException(status_code=403, detail="Access denied to this outlet")
 
