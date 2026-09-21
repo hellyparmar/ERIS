@@ -138,9 +138,11 @@ SCHEMA_DESCRIPTIONS = {
         "description": "Customer profiles with contact info.",
         "columns": {
             "id": "INTEGER PRIMARY KEY - Unique customer ID",
-            "name": "VARCHAR(255) - Customer name",
-            "email": "VARCHAR(255) - Email address",
+            "first_name": "VARCHAR(100) - Customer first name",
+            "last_name": "VARCHAR(100) - Customer last name (concatenate with first_name for full name)",
+            "email": "VARCHAR(120) - Email address",
             "phone": "VARCHAR(20) - Phone number",
+            "customer_type": "VARCHAR(50) - Customer classification",
             "created_at": "DATETIME - Registration date",
         }
     },
