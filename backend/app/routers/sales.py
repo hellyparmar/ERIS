@@ -68,22 +68,24 @@ async def list_sales(
     stmt = select(
         SaleTransaction.id,
         SaleTransaction.outlet_id,
-        SaleTransaction.product_id,
-        SaleTransaction.quantity,
-        SaleTransaction.unit_price,
+        SaleItem.product_id,
+        SaleItem.quantity,
+        SaleItem.unit_price,
         SaleTransaction.total_amount,
         SaleTransaction.payment_method,
         SaleTransaction.transaction_at,
         Product.name,
         Product.category,
         Outlet.name.label("outlet_name")
-    ).join(Product, SaleTransaction.product_id == Product.id).join(
+    ).join(SaleItem, SaleItem.sale_id == SaleTransaction.id).join(
+        Product, SaleItem.product_id == Product.id
+    ).join(
         Outlet, SaleTransaction.outlet_id == Outlet.id
     ).where(SaleTransaction.outlet_id.in_(outlets_filter))
 
     # Apply filters
     if product_id:
-        stmt = stmt.where(SaleTransaction.product_id == product_id)
+        stmt = stmt.where(SaleItem.product_id == product_id)
     if category:
         stmt = stmt.where(Product.category == category)
     if payment_method:
@@ -276,10 +278,12 @@ async def get_sales_by_product(
         Product.id,
         Product.name,
         Product.category,
-        func.sum(SaleTransaction.quantity).label("qty_sold"),
-        func.sum(SaleTransaction.total_amount).label("revenue"),
+        func.sum(SaleItem.quantity).label("qty_sold"),
+        func.sum(SaleItem.line_total).label("revenue"),
         func.count(SaleTransaction.id).label("transactions")
-    ).join(SaleTransaction, Product.id == SaleTransaction.product_id).where(
+    ).join(SaleItem, Product.id == SaleItem.product_id).join(
+        SaleTransaction, SaleTransaction.id == SaleItem.sale_id
+    ).where(
         SaleTransaction.outlet_id.in_(outlets_filter),
         func.date(SaleTransaction.transaction_at) >= start_date
     )
@@ -414,21 +418,23 @@ async def export_sales(
     stmt = select(
         SaleTransaction.id,
         SaleTransaction.outlet_id,
-        SaleTransaction.product_id,
-        SaleTransaction.quantity,
-        SaleTransaction.unit_price,
+        SaleItem.product_id,
+        SaleItem.quantity,
+        SaleItem.unit_price,
         SaleTransaction.total_amount,
         SaleTransaction.payment_method,
         SaleTransaction.transaction_at,
         Product.name,
         Product.category,
         Outlet.name.label("outlet_name")
-    ).join(Product, SaleTransaction.product_id == Product.id).join(
+    ).join(SaleItem, SaleItem.sale_id == SaleTransaction.id).join(
+        Product, SaleItem.product_id == Product.id
+    ).join(
         Outlet, SaleTransaction.outlet_id == Outlet.id
     ).where(SaleTransaction.outlet_id.in_(outlets_filter))
 
     if product_id:
-        stmt = stmt.where(SaleTransaction.product_id == product_id)
+        stmt = stmt.where(SaleItem.product_id == product_id)
     if category:
         stmt = stmt.where(Product.category == category)
     if payment_method:

@@ -665,15 +665,32 @@ async def payment_summary(days: int = Query(90, ge=7, le=365), db: Session = Dep
     return {"success": True, "data": {"summary": summary, "total_invoiced": round(total_value, 2), "total_collected": round(total_collected, 2), "collection_rate": round(total_collected / total_value * 100, 2) if total_value > 0 else 0}}
 
 @router.get("/analytics/overdue-invoices")
-async def overdue_invoices(db: Session = Depends(get_db)):
+async def overdue_invoices(
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db)
+):
     today = datetime.now()
-    invoices = db.query(InvoiceModel).filter(
+    base_query = db.query(InvoiceModel).filter(
         InvoiceModel.due_date < today,
         InvoiceModel.payment_status != "paid",
         InvoiceModel.status != "cancelled",
-    ).order_by(InvoiceModel.due_date.asc()).all()
+    )
+    total_count = base_query.count()
+    invoices = base_query.order_by(InvoiceModel.due_date.asc()).offset((page - 1) * per_page).limit(per_page).all()
     data = [{"invoice_number": i.invoice_number, "customer_name": i.customer_name, "due_date": i.due_date.isoformat() if i.due_date else None, "days_overdue": (today - i.due_date).days, "balance_amount": i.balance_amount, "total_amount": i.total_amount} for i in invoices]
-    return {"success": True, "data": {"overdue_invoices": data, "count": len(data), "total_overdue": round(sum(d["balance_amount"] for d in data), 2)}}
+    return {
+        "success": True, 
+        "data": {
+            "overdue_invoices": data, 
+            "count": len(data),
+            "total": total_count,
+            "page": page,
+            "per_page": per_page,
+            "total_pages": (total_count + per_page - 1) // per_page,
+            "total_overdue": round(sum(d["balance_amount"] for d in data), 2)
+        }
+    }
 
 @router.get("/analytics/vendor-bills")
 async def vendor_bills_analytics(days: int = Query(90, ge=1, le=365), db: Session = Depends(get_db)):

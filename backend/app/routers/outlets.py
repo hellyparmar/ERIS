@@ -4,12 +4,12 @@ Outlets Management API Router
 
 from datetime import datetime
 from typing import Any, Optional, Union
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, select
 
 from app.database import get_db
-from app.models.sales import SaleTransaction
+from app.models.sales import SaleTransaction, SaleItem
 from app.models.models_v6 import Sale, Product
 from app.models.users import User
 from app.models.outlet import Outlet
@@ -25,6 +25,9 @@ router = APIRouter(prefix="/outlets", tags=["outlets"])
 @router.get("")
 @router.get("/")
 async def list_outlets(
+    page: Optional[int] = Query(None, ge=1),
+    per_page: Optional[int] = Query(None, ge=1, le=100),
+    limit: Optional[int] = Query(None, ge=1, le=100),
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ) -> Any:
@@ -41,6 +44,12 @@ async def list_outlets(
         if not allowed_outlet_ids:
             return []
         stmt = stmt.where(Outlet.id.in_(allowed_outlet_ids))
+
+    effective_limit = per_page or limit
+    if page or effective_limit:
+        effective_page = page or 1
+        page_size = effective_limit or 50
+        stmt = stmt.order_by(Outlet.id).offset((effective_page - 1) * page_size).limit(page_size)
 
     result = await db.execute(stmt)
     rows = result.fetchall()
@@ -111,12 +120,14 @@ async def get_outlet_details(
     top_prod_result = await db.execute(
         select(
             Product.name,
-            func.sum(SaleTransaction.quantity).label("qty")
-        ).join(SaleTransaction, Product.id == SaleTransaction.product_id).where(
+            func.sum(SaleItem.quantity).label("qty")
+        ).join(SaleItem, Product.id == SaleItem.product_id).join(
+            SaleTransaction, SaleTransaction.id == SaleItem.sale_id
+        ).where(
             SaleTransaction.outlet_id == outlet_id,
             func.date(SaleTransaction.transaction_at) >= month_start
         ).group_by(Product.id, Product.name).order_by(
-            func.sum(SaleTransaction.quantity).desc()
+            func.sum(SaleItem.quantity).desc()
         )
     )
     top_product = top_prod_result.first()

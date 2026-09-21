@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 import unittest
 import asyncio
-from unittest.mock import Mock, AsyncMock, MagicMock
+from unittest.mock import Mock, AsyncMock, MagicMock, patch
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.data_isolation import OutletDataAccess, require_outlet_access
@@ -202,7 +202,7 @@ class TestOutletDataAccess(unittest.TestCase):
 
 from fastapi.testclient import TestClient
 from app.main import app
-from app.api.deps import get_current_active_user, get_db, get_accessible_outlet_ids, get_outlet_scope
+from app.api.deps import get_current_active_user, get_current_user, get_db, get_accessible_outlet_ids, get_outlet_scope
 from unittest.mock import MagicMock
 
 client = TestClient(app)
@@ -230,10 +230,26 @@ class TestRouterDataIsolation(unittest.TestCase):
         
     def _override_user(self, user_mock):
         app.dependency_overrides[get_current_active_user] = lambda: user_mock
-        app.dependency_overrides[get_db] = lambda: AsyncMock()
-        async def mock_get_accessible_outlet_ids(user, db):
-            return [acc.outlet_id for acc in user.outlet_access] if user.outlet_access else []
-        app.dependency_overrides[get_accessible_outlet_ids] = lambda: [acc.outlet_id for acc in user_mock.outlet_access]
+        app.dependency_overrides[get_current_user] = lambda: user_mock
+        class DualMock(MagicMock):
+            def __await__(self):
+                async def _coro():
+                    return self
+                return _coro().__await__()
+
+        mock_res = DualMock()
+        mock_res.all.return_value = []
+        mock_res.fetchall.return_value = []
+        mock_res.scalars.return_value.all.return_value = []
+        mock_res.scalar.return_value = 0
+        mock_res.scalar_one_or_none.return_value = MagicMock(id=user_mock.outlet_id if hasattr(user_mock, 'outlet_id') else 10)
+        mock_res.first.return_value = None
+        mock_db = MagicMock()
+        mock_db.execute.return_value = mock_res
+        app.dependency_overrides[get_db] = lambda: mock_db
+        async def mock_accessible_outlets(user=None, db=None):
+            return [acc.outlet_id for acc in user_mock.outlet_access] if user_mock.outlet_access else []
+        app.dependency_overrides[get_accessible_outlet_ids] = mock_accessible_outlets
         app.dependency_overrides[get_outlet_scope] = lambda: [acc.outlet_id for acc in user_mock.outlet_access]
 
     def tearDown(self):
@@ -247,12 +263,14 @@ class TestRouterDataIsolation(unittest.TestCase):
         res = client.get(f"/api/v1/sales/?outlet_id={self.outlet_1_id}")
         self.assertNotEqual(res.status_code, 403)
 
-    def test_forecasting_router_isolation(self):
+    @patch("app.routers.forecasting.run_ensemble_forecast")
+    def test_forecasting_router_isolation(self, mock_task):
+        mock_task.apply_async.return_value = MagicMock(id="mock-task-id")
         self._override_user(self.manager_a)
-        res = client.get(f"/api/v1/forecasting/sales-forecast?outlet_id={self.outlet_2_id}")
+        res = client.get(f"/api/v1/forecasting/sales?outlet_id={self.outlet_2_id}")
         self.assertEqual(res.status_code, 403)
         
-        res = client.get(f"/api/v1/forecasting/sales-forecast?outlet_id={self.outlet_1_id}")
+        res = client.get(f"/api/v1/forecasting/sales?outlet_id={self.outlet_1_id}")
         self.assertNotEqual(res.status_code, 403)
 
     def test_causal_analysis_router_isolation(self):

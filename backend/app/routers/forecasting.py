@@ -26,7 +26,7 @@ from app.models.sales import SaleTransaction
 from app.models.inventory import Inventory
 from app.models.forecast import ForecastResult
 import redis as _redis
-forecast_redis_client = _redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+forecast_redis_client = _redis.Redis(host='localhost', port=6379, db=0, decode_responses=True, socket_connect_timeout=0.1, socket_timeout=0.1)
 try:
     from app.ml.forecasting.lstm_forecaster import LSTMForecaster
 except ImportError:

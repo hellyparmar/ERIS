@@ -104,10 +104,12 @@ from app.models.organization import Organization
 async def list_tenants(
     is_active: Optional[bool] = True,
     search: Optional[str] = None,
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
     """
-    List all registered tenants / organizations.
+    List all registered tenants / organizations with pagination.
     Superadmin only — returns name, UUID, and active status.
     """
     try:
@@ -116,7 +118,7 @@ async def list_tenants(
             query = query.filter(Organization.is_active == is_active)
         if search:
             query = query.filter(Organization.name.ilike(f"%{search}%"))
-        orgs = query.order_by(Organization.name).all()
+        orgs = query.order_by(Organization.name).offset((page - 1) * per_page).limit(per_page).all()
         return [
             {
                 "id": o.id,
