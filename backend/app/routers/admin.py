@@ -10,9 +10,9 @@ from typing import List, Optional
 import logging
 import secrets
 
-from app.middleware.auth import get_current_user
+from app.api.deps import get_current_user
 from app.middleware.rate_limiter import limiter
-from app.models.users import User, UserRoleEnum as UserRole
+from app.models.users import User
 from app.database import get_db
 from sqlalchemy.orm import Session
 from fastapi import Request
@@ -20,7 +20,8 @@ from fastapi import Request
 logger = logging.getLogger(__name__)
 
 def check_admin(current_user: User = Depends(get_current_user)):
-    if current_user.role != UserRole.ADMIN:
+    role_name = getattr(current_user.role, "name", str(current_user.role or "")).lower()
+    if role_name not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Admin privileges required")
     return current_user
 
@@ -38,7 +39,7 @@ class UserSchema(BaseModel):
     organization_id: int
     is_active: bool
     created_at: datetime
-    last_login: Optional[datetime]
+    last_login: Optional[datetime] = None
 
 
 class Role(BaseModel):
@@ -91,7 +92,7 @@ async def get_users(
     """Get all users with optional filtering"""
     try:
         users = [
-            User(
+            UserSchema(
                 id=i,
                 username=f"user{i}",
                 email=f"user{i}@example.com",
@@ -99,8 +100,7 @@ async def get_users(
                 store_id=(i % 5) + 1,
                 organization_id=organization_id or 1,
                 is_active=True if i % 10 != 0 else False,
-                created_at=datetime.now() - timedelta(days=i),
-                last_login=datetime.now() - timedelta(hours=i*2)
+                created_at=datetime.now() - timedelta(days=i)
             )
             for i in range(1, limit + 1)
         ]

@@ -6,8 +6,6 @@ import unittest
 from unittest.mock import AsyncMock, MagicMock
 from app.models.organization import Organization
 from app.models.models_v6 import Product
-from app.models.users import User
-from app.utils.security import get_password_hash
 import uuid
 
 

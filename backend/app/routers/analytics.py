@@ -12,7 +12,7 @@ from fastapi import APIRouter, Query, Depends, Request
 import random
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
-from app.middleware.auth import get_current_user
+from app.api.deps import get_current_user
 from app.middleware.rate_limiter import limiter
 from app.models.users import User
 from app.models.models_v6 import Product
@@ -326,8 +326,7 @@ async def get_model_performance(
 
 from app.database import SessionLocal
 from app.core.security import get_current_user as get_current_user_dash
-from app.middleware.auth import get_current_user
-from app.api.deps import get_outlet_scope
+from app.api.deps import get_current_user, get_outlet_scope
 
 def get_sync_db():
     db = SessionLocal()

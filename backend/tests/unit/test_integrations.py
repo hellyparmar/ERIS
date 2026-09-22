@@ -5,7 +5,7 @@ Unit tests for Odoo & Zoho Integration endpoints and encryption
 import unittest
 from fastapi import HTTPException
 from app.routers.integrations import (
-    test_odoo_connection, test_zoho_connection,
+    test_odoo_connection as api_test_odoo, test_zoho_connection as api_test_zoho,
     OdooConfigRequest, ZohoConfigRequest
 )
 from app.api.utils.encryption import encrypt_data, decrypt_data
@@ -31,7 +31,7 @@ class TestIntegrations(unittest.TestCase):
             api_key="mock_key",
             mock_mode=True
         )
-        res = test_odoo_connection(req)
+        res = api_test_odoo(req)
         self.assertTrue(res.get("success"))
         self.assertEqual(res.get("uid"), 9999)
 
@@ -45,7 +45,7 @@ class TestIntegrations(unittest.TestCase):
             mock_mode=False
         )
         with self.assertRaises(HTTPException) as ctx:
-            test_odoo_connection(req)
+            api_test_odoo(req)
         self.assertEqual(ctx.exception.status_code, 502)
 
     def test_zoho_test_connection_mock_mode(self):
@@ -54,7 +54,7 @@ class TestIntegrations(unittest.TestCase):
             org_id="60001234567",
             mock_mode=True
         )
-        res = asyncio.run(test_zoho_connection(req))
+        res = asyncio.run(api_test_zoho(req))
         self.assertTrue(res.get("connected"))
 
     def test_zoho_test_connection_real_failure(self):
@@ -66,7 +66,7 @@ class TestIntegrations(unittest.TestCase):
             mock_mode=False
         )
         with self.assertRaises(HTTPException) as ctx:
-            asyncio.run(test_zoho_connection(req))
+            asyncio.run(api_test_zoho(req))
         self.assertEqual(ctx.exception.status_code, 502)
 
 
