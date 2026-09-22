@@ -9,19 +9,30 @@ from app.services.model_tracker import ModelTracker
 from fastapi import APIRouter, Query, Depends, Request
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_outlet_scope
 from app.middleware.rate_limiter import limiter
 from app.models.users import User
 from app.models.models_v6 import Product
 from app.models.inventory import Inventory
 from app.models.models_v6 import Sale, SaleItem
 from app.models.alert import Alert
-from app.database import get_db
+from app.database import get_db, SessionLocal
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.schemas.analytics import MetricData, AlertsResponse, ChartDataResponse
 from datetime import timezone
+
+
+def get_sync_db():
+    """Synchronous DB session for non-async endpoints."""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.rollback()
+        db.close()
+
 
 router = APIRouter(prefix="/analytics", tags=["Analytics/Dashboard"])
 
@@ -354,18 +365,6 @@ async def get_model_performance(
 
 
 
-
-from app.database import SessionLocal
-from app.core.security import get_current_user as get_current_user_dash
-from app.api.deps import get_current_user, get_outlet_scope
-
-def get_sync_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.rollback()
-        db.close()
 
 
 from app.services.analytics_service import analytics_service
