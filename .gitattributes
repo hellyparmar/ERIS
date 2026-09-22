@@ -1,0 +1,83 @@
+# .gitattributes
+# ──────────────────────────────────────────────────────────────────────────────
+# CANONICAL LINE-ENDING RULES FOR ERIS
+#
+# General rule: Git auto-detects text files and normalises to LF in the index.
+# Files explicitly listed below override the auto-detection.
+# ──────────────────────────────────────────────────────────────────────────────
+
+# Default: auto-detect text vs binary; normalise text files to LF
+* text=auto eol=lf
+
+# ── Python ────────────────────────────────────────────────────────────────────
+*.py    text eol=lf
+*.pyi   text eol=lf
+*.pyw   text eol=lf
+
+# ── JavaScript / TypeScript ───────────────────────────────────────────────────
+*.js    text eol=lf
+*.jsx   text eol=lf
+*.ts    text eol=lf
+*.tsx   text eol=lf
+*.mjs   text eol=lf
+*.cjs   text eol=lf
+
+# ── Web / Styles ──────────────────────────────────────────────────────────────
+*.html  text eol=lf
+*.htm   text eol=lf
+*.css   text eol=lf
+
+# ── Data / Config ─────────────────────────────────────────────────────────────
+*.json  text eol=lf
+*.yaml  text eol=lf
+*.yml   text eol=lf
+*.toml  text eol=lf
+*.ini   text eol=lf
+*.conf  text eol=lf
+*.xml   text eol=lf
+
+# ── Documentation / Scripts ───────────────────────────────────────────────────
+*.md    text eol=lf
+*.txt   text eol=lf
+*.sh    text eol=lf
+*.mako  text eol=lf
+
+# ── Notebooks (JSON-based; treat as text so diffs are readable) ───────────────
+*.ipynb text eol=lf
+
+# ── Dot-files and misc text ───────────────────────────────────────────────────
+.gitignore   text eol=lf
+.gitattributes text eol=lf
+.gitkeep     text eol=lf
+*.example    text eol=lf
+
+# ── Binary — never diff or mangle line endings ────────────────────────────────
+# Images
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.webp  binary
+*.svg   binary
+
+# Fonts
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.eot   binary
+*.otf   binary
+
+# ML model artefacts (currently: .pkl files under backend/models/ and backend/app/models/)
+# Note: *.pkl and *.joblib are also in .gitignore to prevent future accidental commits.
+*.pkl     binary
+*.joblib  binary
+
+# Archives / compiled
+*.zip   binary
+*.tar   binary
+*.gz    binary
+*.exe   binary
+*.dll   binary
+*.so    binary
+*.pyc   binary
