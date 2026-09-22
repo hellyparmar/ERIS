@@ -6,10 +6,7 @@ Endpoints for dashboard metrics, alerts, and chart data.
 
 
 from app.services.model_tracker import ModelTracker
-import app.api.mock_data as mock_data
-
 from fastapi import APIRouter, Query, Depends, Request
-import random
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 from app.api.deps import get_current_user
@@ -182,57 +179,91 @@ async def get_chart_data(
 
 
 @router.get("/dashboard/realtime")
-async def get_dashboard_realtime():
+def get_dashboard_realtime(
+    db: Session = Depends(get_sync_db),
+    current_user: Any = Depends(get_current_user),
+):
     """
-    Get real-time dashboard metrics for the frontend.
-    
-    Returns: total_orders, total_revenue, today_revenue, active_orders, 
-             avg_order_value, time_multiplier, data_source, recent_transactions
+    Get real-time dashboard metrics for the authenticated user's accessible outlets.
+
+    All numbers come from live DB queries — no synthetic data.
+    Returns explicit zeroes and an empty list when there is no data.
+
+    Returns: total_orders, total_revenue, today_revenue, active_orders,
+             avg_order_value, data_source, recent_transactions
     """
+    from sqlalchemy import text
+
+    outlet_ids = get_outlet_scope(current_user, db)
+    if not outlet_ids:
+        outlet_ids = [-1]  # no accessible outlets → queries return 0 rows
+
+    today = datetime.now().date()
+
+    # ── Aggregate metrics ────────────────────────────────────────────────────
     try:
-        demand_data = mock_data.generate_demand_data(30)
-        
-        total_orders = len(demand_data)
-        total_revenue = sum(d['revenue'] for d in demand_data)
-        today_revenue = sum(d['revenue'] for d in demand_data[-1:])
-        active_orders = max(1, int(total_orders * 0.15))
-        avg_order_value = int(total_revenue / total_orders) if total_orders > 0 else 0
-        time_multiplier = 1.0 + (0.3 * (len([d for d in demand_data[-7:] if d['revenue'] > total_revenue/30])) / 7)
-        
-        # Generate recent transactions for display
+        agg = db.execute(
+            text("""
+                SELECT
+                    COALESCE(SUM(total_amount), 0)                                      AS total_revenue,
+                    COUNT(*)                                                             AS total_orders,
+                    COALESCE(SUM(CASE WHEN DATE(sale_date) = :today THEN total_amount ELSE 0 END), 0) AS today_revenue,
+                    COUNT(CASE WHEN DATE(sale_date) = :today THEN 1 END)                AS today_orders
+                FROM sales
+                WHERE outlet_id IN :outlet_ids
+            """),
+            {"today": today, "outlet_ids": tuple(outlet_ids)},
+        ).fetchone()
+
+        total_revenue = float(agg[0] or 0)
+        total_orders  = int(agg[1] or 0)
+        today_revenue = float(agg[2] or 0)
+        today_orders  = int(agg[3] or 0)
+    except Exception:
+        total_revenue = 0.0
+        total_orders  = 0
+        today_revenue = 0.0
+        today_orders  = 0
+
+    avg_order_value = round(total_revenue / total_orders, 2) if total_orders > 0 else 0.0
+
+    # ── 10 most-recent transactions ──────────────────────────────────────────
+    recent_transactions = []
+    try:
+        rows = db.execute(
+            text("""
+                SELECT s.id, s.sale_number, s.total_amount, s.payment_status, s.sale_date,
+                       COALESCE(c.name, 'Walk-in') AS customer_name
+                FROM sales s
+                LEFT JOIN customers c ON s.customer_id = c.id
+                WHERE s.outlet_id IN :outlet_ids
+                ORDER BY s.sale_date DESC
+                LIMIT 10
+            """),
+            {"outlet_ids": tuple(outlet_ids)},
+        ).fetchall()
         recent_transactions = [
             {
-                "id": f"TXN-{i:06d}",
-                "customer": f"Customer-{i}",
-                "amount": int(demand_data[i % len(demand_data)]['revenue'] / 5),
-                "status": "completed",
-                "timestamp": f"2026-04-{max(1, min(2, (i % 30) + 1)):02d}"
+                "id": r[1] or f"TXN-{r[0]}",
+                "customer": r[5],
+                "amount": float(r[2] or 0),
+                "status": (r[3] or "unknown").lower(),
+                "timestamp": str(r[4])[:19] if r[4] else "",
             }
-            for i in range(min(10, len(demand_data)))
+            for r in rows
         ]
-        
-        return {
-            "total_orders": total_orders,
-            "total_revenue": int(total_revenue),
-            "today_revenue": int(today_revenue),
-            "active_orders": active_orders,
-            "avg_order_value": avg_order_value,
-            "time_multiplier": time_multiplier,
-            "data_source": "mock",
-            "recent_transactions": recent_transactions
-        }
-    except Exception as e:
-        # Return fallback data if error occurs
-        return {
-            "total_orders": 0,
-            "total_revenue": 0,
-            "today_revenue": 0,
-            "active_orders": 0,
-            "avg_order_value": 0,
-            "time_multiplier": 1.0,
-            "data_source": "error",
-            "recent_transactions": []
-        }
+    except Exception:
+        recent_transactions = []
+
+    return {
+        "total_orders":       total_orders,
+        "total_revenue":      total_revenue,
+        "today_revenue":      today_revenue,
+        "active_orders":      today_orders,
+        "avg_order_value":    avg_order_value,
+        "data_source":        "database",
+        "recent_transactions": recent_transactions,
+    }
 
 
 # ============================================================
