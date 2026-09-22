@@ -14,79 +14,48 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/enterprise", tags=["Enterprise"])
 
 @router.get("/overview")
-async def get_enterprise_overview(db: Session = Depends(get_db)):
+def get_enterprise_overview(db: Session = Depends(get_db)):
     """
-    Get aggregated enterprise metrics - PUBLIC endpoint
-    Generates multi-store view from actual sales data
+    Get aggregated enterprise metrics from real outlet data.
+
+    Returns each active outlet's actual revenue and transaction count from
+    the sales table. No synthetic distribution, no random numbers.
+    If no sales data exists yet, returns outlets with zero figures.
     """
+    from sqlalchemy import text
+
     try:
-        from sqlalchemy import text
-        
-        # Use raw SQL to get real aggregated data
-        stats_sql = """
-        SELECT 
-            COALESCE(SUM(total_amount), 0) as total_revenue,
-            COUNT(*) as total_orders,
-            COUNT(DISTINCT customer_id) as total_customers,
-            COUNT(DISTINCT DATE(created_at)) as active_days
-        FROM sales
-        """
-        
-        stats = db.execute(text(stats_sql)).fetchone()
-        
-        total_revenue = float(stats[0] or 0)
-        total_orders = int(stats[1] or 0)
-        total_customers = int(stats[2] or 0)
-        active_days = int(stats[3] or 0)
-        
-        # Generate synthetic multi-store breakdown from the data
-        # Simulate 23 stores across 4 regions based on sales distribution
-        regions = {
-            'North': {'stores': ['Delhi Flagship', 'Bangalore Hub', 'Bangalore Outlet'], 'count': 5},
-            'South': {'stores': ['Chennai Express', 'Hyderabad Outlet'], 'count': 6},
-            'East': {'stores': ['Kolkata Standard', 'Delhi Express'], 'count': 5},
-            'West': {'stores': ['Mumbai Flagship', 'Pune Standard', 'Ahmedabad Express'], 'count': 7}
-        }
-        
-        results = []
-        base_revenue = total_revenue / 23  # Distribute across 23 stores
-        base_orders = total_orders / 23
-        
-        store_id = 1
-        for region, data in regions.items():
-            for i in range(data['count']):
-                # Add variance to make each store unique
-                import random
-                variance = random.uniform(0.7, 1.3)
-                
-                revenue = base_revenue * variance
-                orders = int(base_orders * variance)
-                
-                results.append({
-                    "id": store_id,
-                    "name": f"{region} Store {i+1}",
-                    "region": region,
-                    "location": f"{region} Region, India",
-                    "revenue": round(revenue, 2),
-                    "target": round(revenue * 1.1, 2),
-                    "orders": orders,
-                    "staff": max(8, int(orders / 500)),
-                    "growth": round(random.uniform(8, 22), 1),
-                    "status": "excellent" if revenue > base_revenue else "good",
-                    "customers": round(total_customers / 23 * variance),
-                    "performance": round(random.uniform(85, 98), 1)
-                })
-                store_id += 1
-        
-        return results
+        rows = db.execute(text("""
+            SELECT
+                o.id,
+                o.name,
+                o.city,
+                o.is_active,
+                COALESCE(SUM(s.total_amount), 0)  AS total_revenue,
+                COUNT(s.id)                        AS total_orders
+            FROM outlets o
+            LEFT JOIN sales s ON o.id = s.outlet_id
+            WHERE o.is_active = TRUE
+            GROUP BY o.id, o.name, o.city, o.is_active
+            ORDER BY total_revenue DESC
+        """)).fetchall()
+
+        return [
+            {
+                "id":           r[0],
+                "name":         r[1],
+                "city":         r[2] or "Unknown",
+                "is_active":    r[3],
+                "total_revenue": float(r[4] or 0),
+                "total_orders":  int(r[5] or 0),
+            }
+            for r in rows
+        ]
 
     except Exception as e:
-        logger.error(f"Error fetching enterprise data: {e}")
-        # Return minimal data instead of erroring out
-        return {
-            "error": str(e),
-            "data": []
-        }
+        logger.error(f"Error fetching enterprise overview: {e}")
+        return {"error": str(e), "data": []}
+
 
 
 # ============================================================
