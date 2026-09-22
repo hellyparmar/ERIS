@@ -1,5 +1,29 @@
 """
-Security utilities for JWT authentication and authorization
+CANONICAL SECURITY MODULE — app.core.security
+==============================================
+This is the single, authoritative source of security and authentication
+utilities for the ERIS backend. Do NOT create parallel security modules.
+
+Past duplicates that have been removed:
+  - backend/app/utils/security.py          (deleted; had in-memory token_blacklist)
+  - backend/app/api/utils/auth.py          (deleted; had hardcoded SECRET_KEY fallback
+                                            and a fake in-memory users DB)
+
+Provided API
+------------
+  hash_password(password)          -> str     bcrypt hash (rounds=12)
+  verify_password(plain, hashed)   -> bool    bcrypt verify
+  create_access_token(data)        -> str     HS256 JWT, 24-hour expiry
+  verify_token(token)              -> dict    decodes or raises 401
+  decode_token(token)              -> dict|None  decodes without raising
+  validate_password_strength(pw)   -> (bool, str|None)
+  sanitize_input(value, ...)       -> str
+  check_brute_force(email)         -> (bool, str|None)   Redis-backed
+  record_failed_login(email)       -> bool
+  clear_failed_login(email)        -> None
+  get_current_user(token, session) -> User    FastAPI dependency
+  require_roles(*roles)            -> Depends  role-checking dependency
+  oauth2_scheme                    OAuth2PasswordBearer instance
 """
 
 from datetime import datetime, timedelta

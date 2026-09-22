@@ -19,7 +19,7 @@ from app.models import (
     User, Product, Customer, Inventory, SaleTransaction, Alert,
     Role, Organization, Outlet, Supplier, AlertType, AlertSeverity
 )
-from app.api.utils.auth import get_password_hash
+from app.core.security import hash_password
 
 logger = logging.getLogger(__name__)
 
@@ -124,7 +124,7 @@ class DatabaseSeeder:
                 admin_user = User(
                     username="admin",
                     email="admin@eris.local",
-                    password_hash=get_password_hash("AdminPassword123!"),
+                    password_hash=hash_password("AdminPassword123!"),
                     first_name="System",
                     last_name="Administrator",
                     role_id=1,
@@ -138,7 +138,7 @@ class DatabaseSeeder:
                 helly_user = User(
                     username="hellyparmar",
                     email="hellyparmar306@gmail.com",
-                    password_hash=get_password_hash("password123"),
+                    password_hash=hash_password("password123"),
                     first_name="Helly",
                     last_name="Parmar",
                     role_id=1,
