@@ -495,13 +495,16 @@ async def _get_historical_data(db: AsyncSession, outlet_id: str, days: int = 90)
         })
         
     df = pd.DataFrame(records)
-    # If df is completely flat/zeros, add a tiny bit of noise so causal model doesn't crash on singular matrix
+
+    # If all sales are zero there is no real data to analyse.
+    # Raise explicitly so callers surface an honest "no data" 400 rather than
+    # passing fabricated random numbers into the causal model.
     if df['sales'].sum() == 0:
-        import numpy as np
-        df['sales'] = np.random.normal(50, 10, days)
-        df['revenue'] = df['sales'] * 10
-        df['orders'] = np.random.randint(5, 20, days)
-        
+        raise ValueError(
+            f"No sales data found for outlet '{outlet_id}' in the last {days} days. "
+            "Causal analysis requires real historical sales records."
+        )
+
     return df
 
 
