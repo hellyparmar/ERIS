@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 WeatherResponse = Dict[str, Any]
 
 from app.api.celery_app import celery_app
-from app.api.deps import get_current_user, require_role
+from app.api.deps import get_current_user, require_role, get_current_active_user
 from app.database import get_db
 from app.models.users import User
 from app.models.outlet import Outlet
@@ -662,6 +662,7 @@ class AIQueryRequest(BaseModel):
 async def ai_natural_language_query(
     req: AIQueryRequest,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     ## AI Natural Language Query (P5-T2)
@@ -966,7 +967,8 @@ async def get_weather_forecast(
     description="Fetch weather for multiple store locations in one request"
 )
 async def get_multi_location_weather(
-    locations: List[LocationRequest]
+    locations: List[LocationRequest],
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     Get weather for multiple locations
@@ -1004,7 +1006,8 @@ async def get_multi_location_weather(
 )
 async def analyze_weather_impact(
     city: str = Query(..., description="City name"),
-    country_code: str = Query("IN", description="ISO 3166 country code")
+    country_code: str = Query("IN", description="ISO 3166 country code"),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     Analyze weather impact on retail demand

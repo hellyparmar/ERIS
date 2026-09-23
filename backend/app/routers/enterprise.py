@@ -8,13 +8,18 @@ from sqlalchemy.orm import Session
 import logging
 
 from app.database import get_db
+from app.api.deps import require_role
+from app.models.users import User
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/enterprise", tags=["Enterprise"])
 
 @router.get("/overview")
-def get_enterprise_overview(db: Session = Depends(get_db)):
+def get_enterprise_overview(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("super_admin", "area_manager")),
+):
     """
     Get aggregated enterprise metrics from real outlet data.
 
@@ -76,6 +81,7 @@ async def list_tenants(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("super_admin")),
 ):
     """
     List all registered tenants / organizations with pagination.
@@ -102,7 +108,11 @@ async def list_tenants(
 
 
 @router.get("/tenants/{tenant_id}")
-async def get_tenant(tenant_id: str, db: Session = Depends(get_db)):
+async def get_tenant(
+    tenant_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("super_admin")),
+):
     """Retrieve a single tenant by UUID or ID."""
     try:
         org = db.query(Organization).filter(Organization.name == tenant_id).first()
@@ -123,7 +133,11 @@ async def get_tenant(tenant_id: str, db: Session = Depends(get_db)):
 
 
 @router.patch("/tenants/{tenant_id}/deactivate", status_code=status.HTTP_200_OK)
-async def deactivate_tenant(tenant_id: str, db: Session = Depends(get_db)):
+async def deactivate_tenant(
+    tenant_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("super_admin")),
+):
     """Soft-delete a tenant by marking it inactive."""
     try:
         org = db.query(Organization).filter(Organization.name == tenant_id).first()

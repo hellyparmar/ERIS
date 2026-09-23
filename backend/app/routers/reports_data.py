@@ -36,7 +36,8 @@ class ExportRequest(BaseModel):
 async def download_sales_report(
     format: str = Query("xlsx", pattern="^(xlsx|pdf)$"),
     days: int = Query(30, ge=1, le=365),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Download Sales Report"""
     end_date = datetime.now()
@@ -71,7 +72,8 @@ async def download_sales_report(
 @router.get("/inventory/download")
 async def download_inventory_report(
     format: str = Query("xlsx", pattern="^(xlsx|pdf)$"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Download Inventory/Stock Report"""
     if format == "xlsx":
@@ -104,7 +106,8 @@ async def download_inventory_report(
 async def download_purchase_order(
     item_id: str = Query("GENERAL", min_length=1),
     quantity: int = Query(10, ge=1),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Generate and download a Purchase Order PDF"""
     po_items = [
@@ -294,7 +297,10 @@ async def export_customers(
 # ==================== DATA UPLOADS ====================
 
 @router.post("/data/upload/sales", response_model=UploadResponse)
-async def upload_sales_data(file: UploadFile = File(...)):
+async def upload_sales_data(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_active_user),
+):
     """Upload sales data from CSV file."""
     try:
         if not file.filename.endswith('.csv'):
@@ -305,7 +311,10 @@ async def upload_sales_data(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/data/upload/inventory", response_model=UploadResponse)
-async def upload_inventory_data(file: UploadFile = File(...)):
+async def upload_inventory_data(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_active_user),
+):
     """Upload inventory data from CSV file."""
     try:
         if not file.filename.endswith('.csv'):
@@ -316,7 +325,11 @@ async def upload_inventory_data(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/data/upload/economic", response_model=UploadResponse)
-async def upload_economic_data(file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def upload_economic_data(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
     """Upload macroeconomic data from CSV file."""
     try:
         if not file.filename.endswith('.csv'):

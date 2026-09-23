@@ -5,9 +5,11 @@ MODEL MANAGEMENT ROUTER
 Endpoints for model information and retraining.
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from app.api.schemas import ModelsListResponse, RetrainRequest, RetrainResponse, TrainingStatus
 from app.services.model_service import ModelService
+from app.api.deps import require_role
+from app.models.users import User
 import uuid
 
 router = APIRouter(prefix="/models", tags=["Model Management"])
@@ -25,7 +27,10 @@ async def list_models():
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/retrain", response_model=RetrainResponse)
-async def retrain_model(request: RetrainRequest):
+async def retrain_model(
+    request: RetrainRequest,
+    current_user: User = Depends(require_role("super_admin", "outlet_manager")),
+):
     """
     Initiate model retraining process.
     

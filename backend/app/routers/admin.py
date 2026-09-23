@@ -10,7 +10,7 @@ from typing import List, Optional
 import logging
 import secrets
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_role
 from app.middleware.rate_limiter import limiter
 from app.models.users import User
 from app.database import get_db
@@ -116,7 +116,10 @@ async def get_users(
 
 
 @router.post("/users")
-async def create_user(user_data: dict):
+async def create_user(
+    user_data: dict,
+    current_user: User = Depends(require_role("super_admin")),
+):
     """Create new user"""
     try:
         user_id = int(datetime.now().timestamp() * 1000)
@@ -134,7 +137,11 @@ async def create_user(user_data: dict):
 
 
 @router.put("/users/{user_id}")
-async def update_user(user_id: int, user_data: dict):
+async def update_user(
+    user_id: int,
+    user_data: dict,
+    current_user: User = Depends(require_role("super_admin")),
+):
     """Update user details"""
     try:
         return {
@@ -149,7 +156,10 @@ async def update_user(user_id: int, user_data: dict):
 
 
 @router.delete("/users/{user_id}")
-async def delete_user(user_id: int):
+async def delete_user(
+    user_id: int,
+    current_user: User = Depends(require_role("super_admin")),
+):
     """Delete user"""
     try:
         return {
@@ -235,7 +245,10 @@ async def get_permissions():
 
 
 @router.post("/roles")
-async def create_role(role_data: dict):
+async def create_role(
+    role_data: dict,
+    current_user: User = Depends(require_role("super_admin")),
+):
     """Create custom role"""
     try:
         role_id = int(datetime.now().timestamp() * 1000)
@@ -300,7 +313,10 @@ async def get_stores(
 
 
 @router.post("/organizations")
-async def create_organization(org_data: dict):
+async def create_organization(
+    org_data: dict,
+    current_user: User = Depends(require_role("super_admin")),
+):
     """Create new organization"""
     try:
         org_id = int(datetime.now().timestamp() * 1000)
@@ -316,7 +332,10 @@ async def create_organization(org_data: dict):
 
 
 @router.post("/stores")
-async def create_store(store_data: dict):
+async def create_store(
+    store_data: dict,
+    current_user: User = Depends(require_role("super_admin")),
+):
     """Create new store"""
     try:
         store_id = int(datetime.now().timestamp() * 1000)
@@ -421,7 +440,11 @@ async def get_api_keys():
 
 @router.post("/security/api-keys")
 @limiter.limit("5/minute")
-async def create_api_key(request: Request, key_data: dict):
+async def create_api_key(
+    request: Request,
+    key_data: dict,
+    current_user: User = Depends(require_role("super_admin")),
+):
     """Create new API key"""
     try:
         key_value = "sk_live_" + secrets.token_urlsafe(32)
@@ -544,7 +567,11 @@ class SeedDatabaseRequest(BaseModel):
 
 
 @router.post("/database/seed")
-async def seed_database(request: SeedDatabaseRequest, background_tasks: BackgroundTasks):
+async def seed_database(
+    request: SeedDatabaseRequest,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(require_role("super_admin")),
+):
     """
     Seed database with synthetic initial data.
     

@@ -156,7 +156,10 @@ async def calculate_gst(
     }
 
 @router.post("/calculate-tax")
-async def calculate_gst_tax(req: TaxCalculationRequest):
+async def calculate_gst_tax(
+    req: TaxCalculationRequest,
+    current_user: User = Depends(get_current_user),
+):
     try:
         is_interstate = req.seller_state_code != req.buyer_state_code
         breakdowns, totals = calculate_line_items(
@@ -247,7 +250,11 @@ async def get_category_rates(db: Session = Depends(get_db)):
     return {"category_rates": result}
 
 @router.post("/config/category-rates")
-async def set_category_rate(req: GSTRateUpdate, db: Session = Depends(get_db)):
+async def set_category_rate(
+    req: GSTRateUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     if req.gst_rate not in [0, 5, 12, 18, 28]:
         raise HTTPException(400, "Rate must be one of: 0, 5, 12, 18, 28")
     try:
@@ -271,7 +278,11 @@ async def set_category_rate(req: GSTRateUpdate, db: Session = Depends(get_db)):
         raise HTTPException(500, str(e))
 
 @router.post("/config/apply-business-type")
-async def apply_business_type(req: BusinessTypeConfig, db: Session = Depends(get_db)):
+async def apply_business_type(
+    req: BusinessTypeConfig,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     if req.business_type not in BUSINESS_TYPES:
         raise HTTPException(400, f"Unknown type. Valid: {list(BUSINESS_TYPES.keys())}")
     db.execute(text("""
@@ -491,7 +502,12 @@ async def get_invoice(
     }}
 
 @router.post("/invoices/{invoice_id}/pay")
-async def record_invoice_payment(invoice_id: int, req: InvoicePaymentRequest, db: Session = Depends(get_db)):
+async def record_invoice_payment(
+    invoice_id: int,
+    req: InvoicePaymentRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     from app.models import Payment as PaymentModel
     inv = db.query(InvoiceModel).filter(InvoiceModel.id == invoice_id).first()
     if not inv:
@@ -512,7 +528,11 @@ async def record_invoice_payment(invoice_id: int, req: InvoicePaymentRequest, db
     return {"success": True, "data": {"amount_paid": req.amount, "total_paid": inv.amount_paid, "balance": inv.balance_amount, "status": inv.payment_status}}
 
 @router.patch("/invoices/{invoice_id}/cancel")
-async def cancel_invoice(invoice_id: int, db: Session = Depends(get_db)):
+async def cancel_invoice(
+    invoice_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Cancel an invoice (status set to cancelled)."""
     inv = db.query(InvoiceModel).filter(InvoiceModel.id == invoice_id).first()
     if not inv:
@@ -614,7 +634,12 @@ async def get_bill(bill_id: int, db: Session = Depends(get_db)):
     return BillService.get_bill_details(bill_id, db)
 
 @router.post("/bills/{bill_id}/payment")
-async def record_bill_payment(bill_id: int, req: BillPaymentRequest, db: Session = Depends(get_db)):
+async def record_bill_payment(
+    bill_id: int,
+    req: BillPaymentRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     return BillService.record_bill_payment(bill_id=bill_id, amount=req.amount, payment_date=req.payment_date, payment_method=req.payment_method, db=db)
 
 # ════════════════════════════════════════════
@@ -622,7 +647,11 @@ async def record_bill_payment(bill_id: int, req: BillPaymentRequest, db: Session
 # ════════════════════════════════════════════
 
 @router.post("/e-invoice/prepare")
-async def prepare_einvoice(req: EInvoiceRequest, db: Session = Depends(get_db)):
+async def prepare_einvoice(
+    req: EInvoiceRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     return {"invoice_id": str(req.invoice_id), "message": "E-Invoice stub - requires GSP integration. Invoice data available via /gst/invoices/{id}."}
 
 # ════════════════════════════════════════════

@@ -198,7 +198,8 @@ def mark_thread_as_read(
     thread_id: str,
     user_type: str = Query(...),
     user_id: int = Query(...),
-    db: Session = Depends(get_db_sync_dependency)
+    db: Session = Depends(get_db_sync_dependency),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Mark all messages in a thread as read for the user"""
     service = MessageService(db)

@@ -127,7 +127,10 @@ async def acknowledge_alert(
     return {"success": True, "message": "Alert acknowledged"}
 
 @router.post("/generate-inventory-alerts")
-async def generate_inventory_alerts(db: Session = Depends(get_db)):
+async def generate_inventory_alerts(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
     """
     Generate alerts for low stock, out of stock, and overstocked items
     This can be called periodically or triggered manually
