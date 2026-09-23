@@ -13,7 +13,8 @@ Provided API
 ------------
   hash_password(password)          -> str     bcrypt hash (rounds=12)
   verify_password(plain, hashed)   -> bool    bcrypt verify
-  create_access_token(data)        -> str     HS256 JWT, 24-hour expiry
+  create_access_token(data, ...)   -> str     HS256 JWT, ACCESS_TOKEN_EXPIRE_MINUTES expiry
+  create_refresh_token(data, ...)  -> str     HS256 JWT, REFRESH_TOKEN_EXPIRE_DAYS expiry
   verify_token(token)              -> dict    decodes or raises 401
   decode_token(token)              -> dict|None  decodes without raising
   validate_password_strength(pw)   -> (bool, str|None)
@@ -205,13 +206,32 @@ def sanitize_input(value: str, field_name: str = "input", max_length: int = 255)
     return value
 
 
-def create_access_token(data: dict) -> str:
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """
-    Create JWT access token with user_id, email, role, outlet_id, exp (24 hours)
+    Create JWT access token with user_id, email, role, outlet_id, exp.
+    Honors settings.ACCESS_TOKEN_EXPIRE_MINUTES unless explicit expires_delta is passed.
     """
     to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(hours=24)  # 24 hours as requested
-    to_encode.update({"exp": expire})
+    if expires_delta is not None:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire, "type": "access"})
+    encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+    return encoded_jwt
+
+
+def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+    """
+    Create JWT refresh token with longer expiration.
+    Honors settings.REFRESH_TOKEN_EXPIRE_DAYS unless explicit expires_delta is passed.
+    """
+    to_encode = data.copy()
+    if expires_delta is not None:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+    to_encode.update({"exp": expire, "type": "refresh"})
     encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
     return encoded_jwt
 
