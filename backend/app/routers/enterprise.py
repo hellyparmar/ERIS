@@ -104,6 +104,7 @@ async def list_tenants(
             for o in orgs
         ]
     except Exception as e:
+        logger.error(f"Error listing tenants: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -129,6 +130,7 @@ async def get_tenant(
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"Error fetching tenant {tenant_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -151,5 +153,6 @@ async def deactivate_tenant(
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"Error deactivating tenant {tenant_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
