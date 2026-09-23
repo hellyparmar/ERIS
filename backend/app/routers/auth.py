@@ -13,6 +13,7 @@ from app.models.users import User, Role
 from app.core.security import (
     verify_password,
     create_access_token,
+    create_refresh_token,
     hash_password,
     verify_token,
     validate_password_strength,
@@ -83,6 +84,7 @@ class LoginResponse(BaseModel):
     access_token: str
     token_type: str
     user: UserOut
+    refresh_token: Optional[str] = None
 
 @router.post("/login", response_model=LoginResponse)
 @limiter.limit("1000/minute")
@@ -113,6 +115,11 @@ async def login(
         "user_id": str(user.id),
         "role": role_name
     })
+    refresh_token_val = create_refresh_token({
+        "sub": user.username,
+        "user_id": str(user.id),
+        "role": role_name
+    })
 
     user_data = {
         "id": user.id,
@@ -126,7 +133,8 @@ async def login(
     return {
         "access_token": access_token,
         "token_type": "bearer",
-        "user": user_data
+        "user": user_data,
+        "refresh_token": refresh_token_val
     }
     
 
@@ -163,6 +171,11 @@ async def login_json(
         "user_id": str(user.id),
         "role": role_name
     })
+    refresh_token_val = create_refresh_token({
+        "sub": user.username,
+        "user_id": str(user.id),
+        "role": role_name
+    })
 
     user_data = {
         "id": user.id,
@@ -176,7 +189,8 @@ async def login_json(
     return {
         "access_token": access_token,
         "token_type": "bearer",
-        "user": user_data
+        "user": user_data,
+        "refresh_token": refresh_token_val
     }
 
 class RefreshTokenRequest(BaseModel):
@@ -221,9 +235,11 @@ async def refresh_token(
             )
 
         access_token = create_access_token({"sub": user.username, "role": user.role.name if user.role else 'staff'})
+        new_refresh_token = create_refresh_token({"sub": user.username, "role": user.role.name if user.role else 'staff'})
 
         return {
             "access_token": access_token,
+            "refresh_token": new_refresh_token,
             "token_type": "bearer",
             "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
         }

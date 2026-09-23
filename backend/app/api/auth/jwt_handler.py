@@ -8,17 +8,15 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict
 from jose import JWTError, jwt
 
+from app.core.config import settings
+
 # Configuration
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
-REFRESH_TOKEN_EXPIRE_DAYS = 7
+ALGORITHM = getattr(settings, "JWT_ALGORITHM", "HS256")
+ACCESS_TOKEN_EXPIRE_MINUTES = getattr(settings, "ACCESS_TOKEN_EXPIRE_MINUTES", 15)
+REFRESH_TOKEN_EXPIRE_DAYS = getattr(settings, "REFRESH_TOKEN_EXPIRE_DAYS", 30)
 
 def get_secret_key():
-    try:
-        from app.core.config import settings
-        return settings.JWT_SECRET_KEY
-    except Exception:
-        return os.getenv("JWT_SECRET_KEY", "your-secret-key-change-in-production-immediately")
+    return getattr(settings, "JWT_SECRET_KEY", "your-secret-key-change-in-production-immediately")
 
 def create_access_token(data: Dict, expires_delta: Optional[timedelta] = None) -> str:
     """
@@ -47,18 +45,22 @@ def create_access_token(data: Dict, expires_delta: Optional[timedelta] = None) -
     encoded_jwt = jwt.encode(to_encode, get_secret_key(), algorithm=ALGORITHM)
     return encoded_jwt
 
-def create_refresh_token(data: Dict) -> str:
+def create_refresh_token(data: Dict, expires_delta: Optional[timedelta] = None) -> str:
     """
     Create JWT refresh token (longer expiration)
     
     Args:
         data: Payload to encode
+        expires_delta: Optional custom timedelta
     
     Returns:
         Encoded JWT refresh token
     """
     to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    if expires_delta is not None:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
     
     to_encode.update({
         "exp": expire,
