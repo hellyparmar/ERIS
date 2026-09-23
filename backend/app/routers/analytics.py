@@ -5,6 +5,11 @@ Endpoints for dashboard metrics, alerts, and chart data.
 """
 
 
+import logging
+import random
+
+logger = logging.getLogger(__name__)
+
 from app.services.model_tracker import ModelTracker
 from fastapi import APIRouter, Query, Depends, Request
 from typing import Optional, List, Dict, Any
@@ -230,7 +235,8 @@ def get_dashboard_realtime(
         total_orders  = int(agg[1] or 0)
         today_revenue = float(agg[2] or 0)
         today_orders  = int(agg[3] or 0)
-    except Exception:
+    except Exception as e:
+        logger.error(f"Error calculating dashboard realtime aggregate metrics: {e}")
         total_revenue = 0.0
         total_orders  = 0
         today_revenue = 0.0
@@ -263,7 +269,8 @@ def get_dashboard_realtime(
             }
             for r in rows
         ]
-    except Exception:
+    except Exception as e:
+        logger.error(f"Error fetching dashboard realtime recent transactions: {e}")
         recent_transactions = []
 
     return {
@@ -447,7 +454,8 @@ def get_summary(
         revenue_week = float(row[1] or 0)
         revenue_month = float(row[2] or 0)
         transactions_today = int(row[3] or 0)
-    except Exception:
+    except Exception as e:
+        logger.error(f"Error fetching dashboard summary revenue metrics: {e}")
         revenue_today = 0
         revenue_week = 0
         revenue_month = 0
@@ -467,7 +475,8 @@ def get_summary(
             LIMIT 5
         """), {"month_ago": month_ago, "outlet_ids": tuple(outlet_ids)}).fetchall()
         top_products = [{"product_name": r[0], "revenue": float(r[1]), "quantity_sold": int(r[2])} for r in top]
-    except Exception:
+    except Exception as e:
+        logger.error(f"Error fetching dashboard summary top products: {e}")
         pass
 
     revenue_trend = []
@@ -480,7 +489,8 @@ def get_summary(
             ORDER BY DATE(s.sale_date)
         """), {"month_ago": month_ago, "outlet_ids": tuple(outlet_ids)}).fetchall()
         revenue_trend = [{"date": str(r[0]), "revenue": float(r[1])} for r in trend]
-    except Exception:
+    except Exception as e:
+        logger.error(f"Error fetching dashboard summary revenue trend: {e}")
         pass
 
     cat_sales = []
@@ -501,7 +511,8 @@ def get_summary(
              "percentage": round(float(r[1]) / total_cat * 100, 1) if total_cat > 0 else 0}
             for r in cat
         ]
-    except Exception:
+    except Exception as e:
+        logger.error(f"Error fetching dashboard summary category sales: {e}")
         pass
 
     try:
@@ -511,7 +522,8 @@ def get_summary(
             WHERE DATE(sale_date) >= :prev_start AND DATE(sale_date) < :week_ago AND outlet_id IN :outlet_ids
         """), {"prev_start": prev_week_start, "week_ago": week_ago, "outlet_ids": tuple(outlet_ids)}).scalar() or 1
         change_pct = round((revenue_week - float(prev)) / float(prev) * 100, 1) if float(prev) > 0 else 0
-    except Exception:
+    except Exception as e:
+        logger.error(f"Error calculating dashboard summary change percentage: {e}")
         change_pct = 0
 
     return {
@@ -561,7 +573,8 @@ def get_revenue_trend(
         """)
         rows = db.execute(q, {"start_date": start_date, "outlet_ids": tuple(outlet_ids)}).fetchall()
         return [{"date": str(r[0]), "revenue": float(r[1])} for r in rows]
-    except Exception:
+    except Exception as e:
+        logger.error(f"Error fetching dashboard revenue trend: {e}")
         return []
 
 
@@ -610,7 +623,8 @@ def get_category_breakdown(
                 for r in rows
             ]
         }
-    except Exception:
+    except Exception as e:
+        logger.error(f"Error fetching dashboard category breakdown: {e}")
         return {"period": period, "outlet_id": outlet_id, "total_revenue": 0, "data": []}
 
 
@@ -643,7 +657,8 @@ def get_sales_by_category(
             {"name": r[0] or "Other", "value": float(r[1]), "percent": round((float(r[1]) / total * 100), 1) if total > 0 else 0}
             for r in rows
         ]
-    except Exception:
+    except Exception as e:
+        logger.error(f"Error fetching dashboard sales by category: {e}")
         return []
 
 
@@ -678,7 +693,8 @@ def get_top_products_endpoint(
             {"name": r[0], "revenue": float(r[1]), "quantity_sold": int(r[2]), "category": r[3]}
             for r in rows
         ]
-    except Exception:
+    except Exception as e:
+        logger.error(f"Error fetching dashboard top products: {e}")
         return []
 
 
@@ -698,8 +714,8 @@ def get_outlet_performance_endpoint(
     try:
         q = text("""
             SELECT o.id, o.name, o.city,
-                   COALESCE(SUM(s.total_amount), 0) as revenue,
-                   COUNT(DISTINCT s.id) as transactions
+               COALESCE(SUM(s.total_amount), 0) as revenue,
+               COUNT(DISTINCT s.id) as transactions
             FROM outlets o
             LEFT JOIN sales s ON o.id = s.outlet_id AND DATE(s.sale_date) >= :since
             WHERE o.id IN :outlet_ids AND o.is_active = TRUE
@@ -718,5 +734,6 @@ def get_outlet_performance_endpoint(
             }
             for r in rows
         ]
-    except Exception:
+    except Exception as e:
+        logger.error(f"Error fetching dashboard outlet performance: {e}")
         return []
