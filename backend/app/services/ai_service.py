@@ -67,22 +67,32 @@ class AIService:
         return "mock"
 
     async def generate_response(
-        self, 
-        message: str, 
-        system_prompt: str, 
+        self,
+        message: str,
+        system_prompt: str,
         session_history: list = [],
-        execute_templates: bool = True
+        execute_templates: bool = True,
+        outlet_ids: list = None,
+        tenant_id: str = None,
     ) -> Dict[str, Any]:
         """
         Main entry point to get AI response.
-        Now includes database results if template matches.
+        Includes database results when a semantic-layer template matches.
+
+        outlet_ids -- list of outlet IDs the requesting user may access
+                      (from get_outlet_scope).  Templates that touch `sales`
+                      are scoped to these IDs before execution.
+        tenant_id  -- user's organization_id (str).  Used to open a
+                      get_db_sync(tenant_id=...) session so that PostgreSQL
+                      FORCE ROW LEVEL SECURITY policies are satisfied.
+                      Must be supplied together with outlet_ids.
         """
         # Determine paths based on simple heuristics
         import re
         msg_lower = message.lower()
         needs_vector = bool(re.search(r"why|explain|reason|policy|terms|description|notes|impact|what caused", msg_lower))
         needs_sql = True  # Always try structured matching as primary
-        
+
         # Try to match and execute template query
         database_context = ""
         query_result_data = None
@@ -90,17 +100,35 @@ class AIService:
             try:
                 from app.services.semantic_layer import semantic_layer
                 from app.services.query_executor import query_executor
-                
+
                 template_match = semantic_layer.match_template(message)
                 if template_match:
                     template_name, template_sql = template_match
                     logger.info(f"Template matched: {template_name}")
-                    
-                    # Execute query
-                    result = query_executor.execute_template_query(template_sql, semantic_layer)
-                    
+
+                    if outlet_ids is not None and tenant_id is not None:
+                        # ── Correct path: tenant-scoped session (enforces RLS) ──
+                        from app.database import get_db_sync
+                        scoped_sql, _scope_params = semantic_layer.inject_outlet_filter(
+                            template_sql, outlet_ids
+                        )
+                        logger.info(
+                            f"Executing scoped query tenant={tenant_id} "
+                            f"outlet_ids={outlet_ids}"
+                        )
+                        with get_db_sync(tenant_id=tenant_id) as db:
+                            result = query_executor.execute_template_query_with_session(
+                                scoped_sql, semantic_layer, db, params=_scope_params
+                            )
+                    else:
+                        # ── Legacy fallback: no tenant context, RLS bypassed ──
+                        logger.warning(
+                            "generate_response called without outlet_ids/tenant_id "
+                            "— RLS will NOT be enforced on this query."
+                        )
+                        result = query_executor.execute_template_query(template_sql, semantic_layer)
+
                     if result.get("success"):
-                        # Format results for LLM context
                         database_context = query_executor.format_results_for_llm(result)
                         query_result_data = {
                             "success": True,
@@ -112,7 +140,7 @@ class AIService:
                         logger.info(f"Database results: {result.get('row_count')} rows")
                     else:
                         logger.warning(f"Query execution failed: {result.get('error')}")
-                        
+
             except Exception as e:
                 logger.warning(f"Template execution disabled or failed: {str(e)}")
         

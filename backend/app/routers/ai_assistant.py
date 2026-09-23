@@ -1,30 +1,43 @@
 """
 AI Assistant API Routes
-Handles chat interactions with Google Gemini API
+
+Authentication & RLS notes
+---------------------------
+Every user-facing endpoint in this router requires a valid JWT via
+get_current_active_user (from app.api.deps).  The /chat endpoint extracts the
+authenticated user's organization_id (tenant_id) and accessible outlet IDs
+and threads them through ai_service.generate_response → query_executor, so
+every SQL query the AI assistant executes is (a) tenant-scoped via
+SELECT set_config('app.current_tenant_id', ...) and (b) outlet-filtered by
+the scoped outlet IDs returned by get_outlet_scope().
+
+Conversation history is persisted in the chat_messages table (ChatMessage
+model, backend/app/models/chat.py) keyed on (user_id, session_id), so no
+user can read or delete another user's conversation by supplying an arbitrary
+session_id.  The in-memory `conversations` dict that previously existed here
+has been removed entirely.
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
-from typing import List, Optional, Dict
-import os
+from typing import List, Optional, Dict, Any
 import logging
-from datetime import datetime
-try:
-    import google.generativeai as genai
-except ImportError:
-    genai = None
+from datetime import datetime, timezone
+
+from sqlalchemy.orm import Session
+from sqlalchemy import text
+
+from app.api.deps import get_current_active_user, get_outlet_scope
+from app.models.users import User
+from app.models.chat import ChatMessage
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/ai", tags=["AI Assistant"])
 
-# Configure Gemini API
-# Note: API key should be set in environment variable GEMINI_API_KEY
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
-
-# Concise system prompt for business-focused responses
+# ---------------------------------------------------------------------------
+# System prompt
+# ---------------------------------------------------------------------------
 SYSTEM_PROMPT = """You are an intelligent AI assistant for ERIS, a retail intelligence system.
 
 **Response Guidelines:**
@@ -37,25 +50,14 @@ SYSTEM_PROMPT = """You are an intelligent AI assistant for ERIS, a retail intell
    - Key Insights section with numbered points
    - Suggestions section with numbered recommendations
 
-**Example:**
-User: "What were last month's sales trends?"
-Response: "Last month showed steady growth with total revenue of ₹2.4L, up 12% from the previous month.
-
-Key Insights:
-1. Peak sales occurred on weekends (Fri-Sun), accounting for 45% of revenue
-2. Electronics category drove the growth with 28% increase
-3. Average transaction value increased from ₹850 to ₹920
-
-Suggestions:
-1. Focus weekend promotions on high-margin electronics
-2. Consider extending weekend hours to capture more traffic"
-
 Keep responses under 150 words unless detailed analysis is specifically requested.
 Use simple, clean formatting without bold, italics, or special characters.
 """
 
-# In-memory storage for conversations (replace with database in production)
-conversations = {}
+
+# ---------------------------------------------------------------------------
+# Pydantic schemas
+# ---------------------------------------------------------------------------
 
 class Message(BaseModel):
     text: str
@@ -69,7 +71,7 @@ class ChatRequest(BaseModel):
     system_prompt: Optional[str] = None
 
 class ActionData(BaseModel):
-    type: str # e.g., 'draft_po'
+    type: str
     data: dict
 
 class QueryResult(BaseModel):
@@ -85,199 +87,320 @@ class ChatResponse(BaseModel):
     message: Message
     session_id: str
     action: Optional[ActionData] = None
-    query_result: Optional[QueryResult] = None  # New: database results if available
+    query_result: Optional[QueryResult] = None
+
+
+# ---------------------------------------------------------------------------
+# Synchronous DB dependency (mirrors analytics.py pattern)
+# ---------------------------------------------------------------------------
+
+from app.database import SessionLocal
+
+def get_sync_db():
+    """Synchronous session for this router's endpoints."""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.rollback()
+        db.close()
+
+
+# ---------------------------------------------------------------------------
+# Helpers for ChatMessage-backed history
+# ---------------------------------------------------------------------------
+
+def _load_history(db: Session, user_id: int, session_id: str) -> list:
+    """
+    Load conversation history for (user_id, session_id) from chat_messages.
+    Returns list of {'role': ..., 'parts': [...]} dicts for the LLM.
+    """
+    rows = db.execute(
+        text(
+            "SELECT role, content FROM chat_messages "
+            "WHERE user_id = :uid AND session_id = :sid "
+            "ORDER BY created_at ASC"
+        ),
+        {"uid": user_id, "sid": session_id},
+    ).fetchall()
+    return [{"role": r[0], "parts": [r[1]]} for r in rows]
+
+
+def _save_message(
+    db: Session,
+    user_id: int,
+    outlet_id: int,
+    session_id: str,
+    role: str,
+    content: str,
+):
+    """Persist a single message to chat_messages."""
+    db.execute(
+        text(
+            "INSERT INTO chat_messages "
+            "(session_id, user_id, outlet_id, role, content, created_at) "
+            "VALUES (:sid, :uid, :oid, :role, :content, :ts)"
+        ),
+        {
+            "sid": session_id,
+            "uid": user_id,
+            "oid": outlet_id,
+            "role": role,
+            "content": content,
+            "ts": datetime.now(timezone.utc),
+        },
+    )
+    db.commit()
+
+
+def _assert_session_owned_by_user(db: Session, user_id: int, session_id: str):
+    """Raise 403 if session_id doesn't belong to user_id."""
+    count = db.execute(
+        text(
+            "SELECT COUNT(*) FROM chat_messages "
+            "WHERE session_id = :sid AND user_id = :uid"
+        ),
+        {"sid": session_id, "uid": user_id},
+    ).scalar()
+    if count == 0:
+        raise HTTPException(
+            status_code=403,
+            detail="Session not found or does not belong to this user.",
+        )
+
+
+# ---------------------------------------------------------------------------
+# Endpoints
+# ---------------------------------------------------------------------------
 
 @router.post("/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest):
+async def chat(
+    request: ChatRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_sync_db),
+):
     """
-    Send a message to the AI assistant using Multi-Provider Routing
-    Now includes database results when template matches.
+    Send a message to the AI assistant.
+
+    - Requires a valid JWT (Bearer token).
+    - Conversation history is stored per-user in chat_messages (not in memory).
+    - Every SQL query the assistant executes is scoped to the authenticated
+      user's accessible outlets and tenant, satisfying PostgreSQL RLS.
     """
     try:
         from app.services.ai_service import ai_service
-        from app.services.semantic_layer import semantic_layer
-        from app.services.query_executor import query_executor
-        
-        # Initialize conversation history if not exists
-        if request.session_id not in conversations:
-            conversations[request.session_id] = []
 
-        # Add user message to history
-        conversations[request.session_id].append({
-            "role": "user",
-            "parts": [request.message.text]
-        })
+        # ── Resolve tenant + outlet scope ────────────────────────────────────
+        tenant_id = str(current_user.organization_id)
+        outlet_ids = get_outlet_scope(current_user, db)
+        if not outlet_ids:
+            outlet_ids = [-1]  # no accessible outlets → queries return 0 rows
 
-        # Get system prompt if provided
-        base_system_prompt = request.system_prompt or "You are a helpful AI assistant for an Enterprise Retail Intelligence System."
-        
-        # Try to match and execute a query (template or dynamic)
-        # This is now handled entirely within ai_service.generate_response
-        
-        # Build full system prompt with context
+        # Primary outlet for history storage (first scoped outlet, or user's own)
+        primary_outlet_id = outlet_ids[0] if outlet_ids and outlet_ids[0] != -1 else (
+            getattr(current_user, "outlet_id", None) or 0
+        )
+
+        # ── Load existing history ─────────────────────────────────────────────
+        session_history = _load_history(db, current_user.id, request.session_id)
+
+        # ── Persist incoming user message ─────────────────────────────────────
+        _save_message(
+            db, current_user.id, primary_outlet_id,
+            request.session_id, "user", request.message.text,
+        )
+
+        # ── Build system prompt ───────────────────────────────────────────────
         full_system_prompt = f"""{SYSTEM_PROMPT}
 
 Current Context:
+- User: {current_user.username} (outlet scope: {outlet_ids})
 - User is viewing the ERIS retail intelligence dashboard
 - System has access to sales, inventory, customer, and analytics data
 - Respond in {request.message.language}
 """
-        
-        # Call AI Service (will also execute templates internally)
+
+        # ── Call AI service (tenant-scoped) ───────────────────────────────────
         result = await ai_service.generate_response(
             message=request.message.text,
             system_prompt=full_system_prompt,
-            session_history=conversations[request.session_id][:-1],
-            execute_templates=True
+            session_history=session_history,
+            execute_templates=True,
+            outlet_ids=outlet_ids,
+            tenant_id=tenant_id,
         )
-        
+
         response_text = result["text"]
+
+        # ── Persist AI response ───────────────────────────────────────────────
+        _save_message(
+            db, current_user.id, primary_outlet_id,
+            request.session_id, "model", response_text,
+        )
+
         action_payload = None
-        
         if result.get("action"):
-             action_payload = ActionData(type=result["action"]["type"], data=result["action"]["data"])
+            action_payload = ActionData(
+                type=result["action"]["type"],
+                data=result["action"]["data"],
+            )
 
         query_result_data = None
         if result.get("query_result"):
-             query_result_data = QueryResult(**result["query_result"])
+            query_result_data = QueryResult(**result["query_result"])
 
-        # Add AI response to history
-        conversations[request.session_id].append({
-            "role": "model",
-            "parts": [response_text]
-        })
-
-        # Create response message (NO provider label added to text)
         ai_message = Message(
             text=response_text,
             language=request.message.language,
-            script='native',
-            timestamp=datetime.utcnow().isoformat()
+            script="native",
+            timestamp=datetime.utcnow().isoformat(),
         )
-        
+
         return ChatResponse(
             message=ai_message,
             session_id=request.session_id,
             action=action_payload,
-            query_result=query_result_data  # Include database results if available
+            query_result=query_result_data,
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.error(f"AI chat error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"AI service error: {str(e)}")
 
-@router.get("/history/{session_id}")
-async def get_history(session_id: str):
-    """
-    Retrieve chat history for a session
-    """
-    if session_id not in conversations:
-        return {"session_id": session_id, "messages": []}
 
-    return {
-        "session_id": session_id,
-        "messages": conversations[session_id]
-    }
+@router.get("/history/{session_id}")
+def get_history(
+    session_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_sync_db),
+):
+    """
+    Retrieve chat history for a session owned by the authenticated user.
+    Returns 403 if the session_id belongs to a different user.
+    """
+    rows = db.execute(
+        text(
+            "SELECT role, content, created_at FROM chat_messages "
+            "WHERE session_id = :sid AND user_id = :uid "
+            "ORDER BY created_at ASC"
+        ),
+        {"sid": session_id, "uid": current_user.id},
+    ).fetchall()
+
+    # Empty result is valid (new session) — no ownership check needed here
+    messages = [
+        {"role": r[0], "content": r[1], "timestamp": str(r[2])}
+        for r in rows
+    ]
+    return {"session_id": session_id, "messages": messages}
+
 
 @router.delete("/history/{session_id}")
-async def clear_history(session_id: str):
+def clear_history(
+    session_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_sync_db),
+):
     """
-    Clear chat history for a session
+    Delete all chat history for a session.
+    Returns 403 if session_id belongs to a different user.
     """
-    if session_id in conversations:
-        del conversations[session_id]
-
+    _assert_session_owned_by_user(db, current_user.id, session_id)
+    db.execute(
+        text(
+            "DELETE FROM chat_messages "
+            "WHERE session_id = :sid AND user_id = :uid"
+        ),
+        {"sid": session_id, "uid": current_user.id},
+    )
+    db.commit()
     return {"message": "Chat history cleared", "session_id": session_id}
+
 
 @router.get("/status")
 async def get_status():
     """
-    Check AI service status and provider availability
+    Check AI service status and provider availability.
+    No authentication required — used by the frontend health-check.
     """
     try:
         from app.services.ai_service import ai_service
-        
+
         provider_status = ai_service.get_provider_status()
-        
-        # Determine primary active provider for display
-        # Prefer real API providers over mock; mock is always available
         real_providers = [k for k, v in provider_status.items() if v and k != "mock"]
         active_providers = [k for k, v in provider_status.items() if v]
-        
-        # Pick a friendly primary provider label
+
         if real_providers:
             primary_key = real_providers[0]
             label_map = {
                 "openrouter": "OpenRouter (Llama 3)",
                 "groq": "Groq (Llama 3.3)",
                 "gemini": "Gemini 1.5 Flash",
-                "ollama": "Ollama (Local)"
+                "ollama": "Ollama (Local)",
             }
             primary = label_map.get(primary_key, primary_key.capitalize())
         elif provider_status.get("mock"):
-            primary = "demo"  # Demo Mode — no API key needed
+            primary = "demo"
         else:
             primary = "Offline"
-        
+
         return {
             "service": "ERIS AI Assistant",
             "primary_provider": primary,
             "providers": provider_status,
-            "active_sessions": len(conversations),
-            "status": "online" if active_providers else "offline"
+            "status": "online" if active_providers else "offline",
         }
     except Exception as e:
-        # If ai_service fails to import (missing dependencies), return offline status
         return {
             "service": "ERIS AI Assistant",
             "primary_provider": "Offline",
-            "providers": {
-                "groq": False,
-                "gemini": False,
-                "openrouter": False,
-                "ollama": False,
-                "mock": False
-            },
+            "providers": {"groq": False, "gemini": False, "openrouter": False, "ollama": False, "mock": False},
             "active_sessions": 0,
             "status": "offline",
-            "error": "AI service dependencies not available"
+            "error": "AI service dependencies not available",
         }
+
 
 @router.get("/semantic-layer")
 async def get_semantic_layer_info():
-    """
-    Get semantic layer configuration and capabilities
-    """
+    """Get semantic layer configuration and capabilities."""
     from app.services.semantic_layer import semantic_layer
-    
+
     return {
         "service": "ERIS Semantic Layer",
         "capabilities": {
             "business_terms_count": len(semantic_layer.definitions),
             "schema_tables_count": len(semantic_layer.schema),
             "query_templates_count": len(semantic_layer.templates),
-            "validation_rules_count": len(semantic_layer.rules)
+            "validation_rules_count": len(semantic_layer.rules),
         },
         "templates": list(semantic_layer.templates.keys()),
         "tables": list(semantic_layer.schema.keys()),
-        "status": "active"
+        "status": "active",
     }
 
+
 @router.post("/validate-sql")
-async def validate_sql(request: dict):
+def validate_sql(
+    request: dict,
+    current_user: User = Depends(get_current_active_user),
+):
     """
-    Validate a SQL query against semantic layer rules
+    Validate a SQL query against semantic layer rules.
+    Requires authentication — prevents unauthenticated probing of schema rules.
     """
     from app.services.semantic_layer import semantic_layer
-    
+
     sql = request.get("sql", "")
     if not sql:
         raise HTTPException(status_code=400, detail="SQL query required")
-    
+
     is_valid, issues = semantic_layer.validate_sql(sql)
-    
+
     return {
         "is_valid": is_valid,
         "issues": issues,
-        "sql_length": len(sql)
+        "sql_length": len(sql),
     }
-

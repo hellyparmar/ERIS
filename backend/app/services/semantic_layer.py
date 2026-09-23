@@ -521,7 +521,60 @@ class SemanticLayer:
         
         return None
     
-    def validate_sql(self, sql: str) -> Tuple[bool, List[dict]]:
+    def inject_outlet_filter(
+        self,
+        sql: str,
+        outlet_ids: list,
+    ) -> tuple:
+        """
+        Inject outlet scoping into a template SQL string so users can only
+        see data for outlets they are authorised to access.
+
+        Strategy:
+          - Templates that reference the `sales` table via alias `s` get:
+              AND s.outlet_id IN (:o0, :o1, ...)
+          - Templates that reference `sales` without alias get:
+              AND outlet_id IN (:o0, :o1, ...)
+          - Templates that don't touch `sales` at all (suppliers, products) are
+            left unmodified — they are not outlet-scoped in the current schema.
+
+        Params are expanded as individual named placeholders (:o0, :o1, ...)
+        rather than a single tuple param, for compatibility with both SQLite
+        (used in tests) and PostgreSQL (production).
+
+        Returns (scoped_sql, params_dict).
+        """
+        if not outlet_ids:
+            # Sentinel: no accessible outlets — return zero rows
+            outlet_ids = [-1]
+
+        # Build individual named params: {o0: 1, o1: 2, ...}
+        param_keys = [f"o{i}" for i in range(len(outlet_ids))]
+        params = {k: v for k, v in zip(param_keys, outlet_ids)}
+        placeholders = ", ".join(f":{k}" for k in param_keys)
+
+        # Does the SQL reference the sales table?
+        references_sales = bool(re.search(r"\bFROM\s+sales\b|\bJOIN\s+sales\b", sql, re.IGNORECASE))
+        if not references_sales:
+            return sql, params
+
+        # Determine whether sales is aliased as 's'
+        uses_alias_s = bool(re.search(r"\bFROM\s+sales\s+s\b|\bJOIN\s+sales\s+s\b", sql, re.IGNORECASE))
+        filter_clause = f"s.outlet_id IN ({placeholders})" if uses_alias_s else f"outlet_id IN ({placeholders})"
+
+        # Insert before the first GROUP BY / ORDER BY / LIMIT
+        for keyword in (r"\bGROUP\s+BY\b", r"\bORDER\s+BY\b", r"\bLIMIT\b"):
+            m = re.search(keyword, sql, re.IGNORECASE)
+            if m:
+                pos = m.start()
+                sql = sql[:pos] + f"AND {filter_clause}\n            " + sql[pos:]
+                return sql, params
+
+        # No GROUP/ORDER/LIMIT — append at end
+        sql = sql.rstrip() + f"\nAND {filter_clause}"
+        return sql, params
+
+    def validate_sql(self, sql: str) -> tuple:
         """
         Validate generated SQL against security rules.
         Returns (is_valid, list of issues).
