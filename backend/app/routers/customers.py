@@ -32,7 +32,11 @@ class CustomerUpdate(BaseModel):
 
 # Endpoints
 @router.post("/")
-async def create_customer(customer: CustomerCreate, db: Session = Depends(get_db)):
+async def create_customer(
+    customer: CustomerCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
     """Create a new customer"""
     try:
         # Check if phone already exists
@@ -116,7 +120,8 @@ async def get_customer(customer_id: int, db: Session = Depends(get_db)):
 async def update_customer(
     customer_id: int,
     customer_data: CustomerUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Update customer information"""
     try:
@@ -141,7 +146,11 @@ async def update_customer(
 
 
 @router.delete("/{customer_id}")
-async def delete_customer(customer_id: int, db: Session = Depends(get_db)):
+async def delete_customer(
+    customer_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
     """Delete a customer"""
     try:
         deleted = CustomerService.delete_customer(db, customer_id)
@@ -245,6 +254,7 @@ async def update_credit_rating(
     customer_id: int,
     rating: str = Query(..., pattern="^(A|B|C|D)$", description="New credit rating: A | B | C | D"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Update customer credit rating tier."""
     try:

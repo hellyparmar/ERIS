@@ -20,7 +20,11 @@ router = APIRouter(prefix="/suppliers", tags=["suppliers"])
 # ==================== SUPPLIERS ====================
 
 @router.post("/", status_code=201)
-async def create_supplier(data: SupplierCreate, db: Session = Depends(get_db)):
+async def create_supplier(
+    data: SupplierCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
     """Create a new supplier"""
     try:
         svc = SupplierService(db)
@@ -70,7 +74,12 @@ async def get_supplier(supplier_id: int, db: Session = Depends(get_db)):
 
 
 @router.put("/{supplier_id}")
-async def update_supplier(supplier_id: int, data: SupplierUpdate, db: Session = Depends(get_db)):
+async def update_supplier(
+    supplier_id: int,
+    data: SupplierUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
     """Update supplier information"""
     try:
         svc = SupplierService(db)
@@ -85,7 +94,11 @@ async def update_supplier(supplier_id: int, data: SupplierUpdate, db: Session = 
 
 
 @router.delete("/{supplier_id}")
-async def delete_supplier(supplier_id: int, db: Session = Depends(get_db)):
+async def delete_supplier(
+    supplier_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
     """Deactivate a supplier"""
     svc = SupplierService(db)
     if not svc.delete_supplier(supplier_id):
