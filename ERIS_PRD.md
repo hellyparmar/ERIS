@@ -365,6 +365,22 @@ fabricated/hardcoded "demo mode" numbers when data is genuinely unavailable — 
 **REQ-AI-03:** No exception handler may return raw internal error text to the end
 user; failover across providers must be silent to the user except for the final
 "couldn't get an answer" case ("All AI providers are currently unavailable. Please try again later.") while retaining real grounded SQL execution data in `query_result`.
+**REQ-AI-04 (DISCOVERED GAP — FIXED 2026-09-23):** `POST /api/v1/ai/chat` previously
+had NO authentication dependency and called `ai_service.generate_response()` with no
+tenant or outlet context. `query_executor.py` created its own independent SQLAlchemy
+`Engine` via `create_engine()`, completely bypassing `get_db`/`get_db_sync` and therefore
+never calling `SELECT set_config('app.current_tenant_id', ...)`. This meant every AI
+assistant SQL query either failed (FORCE ROW LEVEL SECURITY) or silently crossed tenant
+boundaries on a real Postgres deployment.
+Fix applied: (1) `POST /chat`, `DELETE /history/{session_id}`, and `POST /validate-sql`
+now require `get_current_active_user`. (2) `/chat` extracts `organization_id` (tenant_id)
+and calls `get_outlet_scope()` to get the user's accessible outlet IDs. (3) These are
+threaded through `generate_response(outlet_ids=..., tenant_id=...)` → `semantic_layer.inject_outlet_filter()`
+→ `execute_template_query_with_session()` inside `get_db_sync(tenant_id=...)` — the same
+pattern `forecasting_tasks.py` already used for Celery tasks. (4) The global in-memory
+`conversations` dict was replaced with `ChatMessage` DB persistence keyed on `(user_id, session_id)`,
+preventing cross-session access. Verified: `check_imports.py` 0 dangling imports; 4/4
+isolation tests pass (SQLite WHERE-clause level — see REQ-TENANCY-02 for Postgres RLS caveat).
 Location: `app/services/ai_service.py`, `app/services/hybrid_rag.py`, `app/services/semantic_layer.py`, `app/services/query_executor.py`.
 
 ### 7.8 Alerts & Notifications
@@ -378,6 +394,15 @@ script), real PostgreSQL `ENABLE ROW LEVEL SECURITY` + `CREATE POLICY` statement
 matching the session variable set by `get_db()`, and both the async (FastAPI request)
 and sync (Celery task) database session paths must set that session variable before
 querying these tables.
+**RLS Gap discovered 2026-09-23:** The AI assistant's data path (`query_executor.py`)
+was a previously-undiscovered bypass: it created its own `create_engine()` connection
+and never called `set_config('app.current_tenant_id', ...)`, silently bypassing all
+FORCE ROW LEVEL SECURITY policies. This has been fixed (see REQ-AI-04).
+To fully verify RLS enforcement in production: run the test suite against a live
+Postgres instance with `alembic upgrade head` applied and FORCE ROW LEVEL SECURITY
+enabled on `sales`, `outlets`, `customers`, `products`, `inventory`, `invoices`.
+SQLite (used in CI) does not enforce RLS — the isolation tests in
+`test_ai_tenant_isolation.py` verify only the WHERE-clause scoping, not PG RLS policies.
 Location: `app/api/middleware/rls_middleware.py`, `app/api/core/rls_database.py`,
 `app/routers/rls_management.py`, `app/routers/multitenant.py`.
 
