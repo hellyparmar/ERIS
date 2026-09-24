@@ -6,7 +6,7 @@ Provides business intelligence calculations for the Analytics page
 from datetime import datetime, timedelta, date
 from typing import Dict, List, Any
 import logging
-from sqlalchemy import text
+from sqlalchemy import text, bindparam
 
 from app.database import engine
 from app.services.base_service import OutletIsolatedService
@@ -36,9 +36,10 @@ class AnalyticsService(OutletIsolatedService):
         
         # Build outlet filter condition
         outlet_condition = ""
+        params = {"start_date": start_date, "end_date": end_date}
         if self.allowed_outlet_ids is not None:
-            outlet_ids_str = ','.join(map(str, self.allowed_outlet_ids))
-            outlet_condition = f"AND s.outlet_id IN ({outlet_ids_str})"
+            outlet_condition = "AND s.outlet_id IN :outlet_ids"
+            params["outlet_ids"] = tuple(self.allowed_outlet_ids) if self.allowed_outlet_ids else tuple([-1])
         
         # Query real database for category sales (filtered by outlet access)
         query = text(f"""
@@ -57,10 +58,12 @@ class AnalyticsService(OutletIsolatedService):
             ORDER BY total_revenue DESC
         """)
         
+        if self.allowed_outlet_ids is not None:
+            query = query.bindparams(bindparam("outlet_ids", expanding=True))
+            
         try:
-            with engine.connect() as conn:
-                result = conn.execute(query, {"start_date": start_date, "end_date": end_date})
-                categories_data = result.fetchall()
+            result = self.db.execute(query, params)
+            categories_data = result.fetchall()
         except Exception as exc:
             logger.warning("Analytics query failed during test or missing schema: %s", exc)
             categories_data = []
@@ -115,9 +118,10 @@ class AnalyticsService(OutletIsolatedService):
         
         # Build outlet filter condition
         outlet_condition = ""
+        params = {}
         if self.allowed_outlet_ids is not None:
-            outlet_ids_str = ','.join(map(str, self.allowed_outlet_ids))
-            outlet_condition = f"AND s.outlet_id IN ({outlet_ids_str})"
+            outlet_condition = "AND s.outlet_id IN :outlet_ids"
+            params["outlet_ids"] = tuple(self.allowed_outlet_ids) if self.allowed_outlet_ids else tuple([-1])
         
         # Query real database (filtered by outlet access)
         query_str = f"""
@@ -139,9 +143,12 @@ class AnalyticsService(OutletIsolatedService):
             LIMIT {limit}
         """
         
-        with engine.connect() as conn:
-            result = conn.execute(text(query_str))
-            products_data = result.fetchall()
+        query = text(query_str)
+        if self.allowed_outlet_ids is not None:
+            query = query.bindparams(bindparam("outlet_ids", expanding=True))
+            
+        result = self.db.execute(query, params)
+        products_data = result.fetchall()
         
         # Format results
         products = []
@@ -179,9 +186,13 @@ class AnalyticsService(OutletIsolatedService):
         
         # Build outlet filter condition
         outlet_condition = ""
+        params = {
+            "start_date": start_date.isoformat(),
+            "end_date": end_date.isoformat()
+        }
         if self.allowed_outlet_ids is not None:
-            outlet_ids_str = ','.join(map(str, self.allowed_outlet_ids))
-            outlet_condition = f"AND outlet_id IN ({outlet_ids_str})"
+            outlet_condition = "AND outlet_id IN :outlet_ids"
+            params["outlet_ids"] = tuple(self.allowed_outlet_ids) if self.allowed_outlet_ids else tuple([-1])
         
         # Query daily sales data
         query = text(f"""
@@ -197,21 +208,20 @@ class AnalyticsService(OutletIsolatedService):
             ORDER BY sale_date
         """)
         
-        with engine.connect() as conn:
-            result = conn.execute(query, {
-                "start_date": start_date.isoformat(),
-                "end_date": end_date.isoformat()
-            })
+        if self.allowed_outlet_ids is not None:
+            query = query.bindparams(bindparam("outlet_ids", expanding=True))
             
-            daily_data = []
-            for row in result.fetchall():
-                sale_date = datetime.strptime(row[0], '%Y-%m-%d') if isinstance(row[0], str) else row[0]
-                daily_data.append({
-                    'date': sale_date.strftime('%Y-%m-%d'),
-                    'sales': float(row[1] or 0),
-                    'orders': int(row[2] or 0),
-                    'day_of_week': sale_date.strftime('%A')
-                })
+        result = self.db.execute(query, params)
+        
+        daily_data = []
+        for row in result.fetchall():
+            sale_date = datetime.strptime(row[0], '%Y-%m-%d') if isinstance(row[0], str) else row[0]
+            daily_data.append({
+                'date': sale_date.strftime('%Y-%m-%d'),
+                'sales': float(row[1] or 0),
+                'orders': int(row[2] or 0),
+                'day_of_week': sale_date.strftime('%A')
+            })
         
         # Calculate weekly aggregates
         weekly_data = []
