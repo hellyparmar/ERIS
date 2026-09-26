@@ -18,7 +18,7 @@ from app.models.models_v6 import Sale
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
-N8N_SECRET = os.getenv("N8N_WEBHOOK_SECRET", "rdios-n8n-secret")
+N8N_SECRET = os.getenv("N8N_WEBHOOK_SECRET", "dev_secret")
 
 
 def verify_n8n_secret(x_n8n_secret: Optional[str] = Header(None)):

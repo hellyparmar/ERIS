@@ -5,6 +5,7 @@ load_testing.py – Locust load test for the Enterprise Retail Intelligence Syst
 from locust import HttpUser, task, between, events
 import random
 import json
+import os
 
 
 class RetailSystemUser(HttpUser):
@@ -20,7 +21,7 @@ class RetailSystemUser(HttpUser):
         """Authenticate before running tasks."""
         with self.client.post("/api/v1/auth/login", data={
             "username": "admin",
-            "password": "Admin123!",
+            "password": os.getenv("TEST_ADMIN_PASSWORD", "testpass"),
         }, catch_response=True) as resp:
             if resp.status_code == 200:
                 body = resp.json()
@@ -66,7 +67,7 @@ class StoreManagerUser(HttpUser):
     def on_start(self):
         with self.client.post("/api/v1/auth/login", data={
             "username": "manager",
-            "password": "Manager123!",
+            "password": os.getenv("TEST_MANAGER_PASSWORD", "testpass"),
         }, catch_response=True) as resp:
             if resp.status_code == 200:
                 self.token = resp.json().get("access_token", "")
