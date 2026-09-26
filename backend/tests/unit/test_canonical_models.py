@@ -71,7 +71,7 @@ class TestCanonicalModels(unittest.TestCase):
             url="https://erp.retailcompany.com",
             database_name="retail_prod_db",
             username="admin@retailcompany.com",
-            api_key="sec_token_999",
+            api_key="MOCK_API_KEY_FOR_TESTS",  # not a real credential
             sync_products=True,
             sync_customers=True,
             sync_invoices=True

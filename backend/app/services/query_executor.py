@@ -42,10 +42,12 @@ class QueryExecutor:
         Uses environment variable or default connection string.
         """
         if db_url is None:
-            db_url = os.getenv(
-                "DATABASE_URL",
-                "postgresql+psycopg://eris_admin:JnCSXvJLgIY7V8KtUd2TT26QXkbgvuwv@localhost:5434/eris_production"
-            )
+            db_url = os.getenv("DATABASE_URL")
+            if not db_url:
+                raise RuntimeError(
+                    "DATABASE_URL environment variable is required but not set. "
+                    "Format: postgresql+psycopg://user:password@host:port/database"
+                )
 
         if not (db_url.startswith("postgresql") or db_url.startswith("sqlite")):
             raise ValueError("QueryExecutor requires a PostgreSQL or SQLite DATABASE_URL")
