@@ -16,7 +16,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = getattr(settings, "ACCESS_TOKEN_EXPIRE_MINUTES", 1
 REFRESH_TOKEN_EXPIRE_DAYS = getattr(settings, "REFRESH_TOKEN_EXPIRE_DAYS", 30)
 
 def get_secret_key():
-    return getattr(settings, "JWT_SECRET_KEY", "your-secret-key-change-in-production-immediately")
+    return getattr(settings, "JWT_SECRET_KEY", "dev_secret")
 
 def create_access_token(data: Dict, expires_delta: Optional[timedelta] = None) -> str:
     """

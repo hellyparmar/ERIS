@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: Optional[str] = None
     
     # JWT
-    JWT_SECRET_KEY: str = "change_me_in_production_extremely_long_random_string"
+    JWT_SECRET_KEY: str = "dev_secret"
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15  # 15 minutes
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30

@@ -11,7 +11,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Set test database before any app imports
 os.environ["DATABASE_URL"] = "sqlite:///./test.db"
-os.environ["JWT_SECRET_KEY"] = "test-secret-key-do-not-use-in-production"
+os.environ["JWT_SECRET_KEY"] = "test_secret"
+os.environ["ENVIRONMENT"] = "test"
 
 import pytest
 from fastapi.testclient import TestClient
@@ -31,7 +32,7 @@ from app.models.users import User
 from app.core.security import hash_password
 from app.database import get_db
 
-# In-memory SQLite for tests
+# One shared in-memory connection keeps tests isolated from local demo data.
 TEST_DATABASE_URL = "sqlite:///:memory:"
 
 engine = create_engine(
@@ -45,6 +46,10 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engin
 @pytest.fixture(scope="function")
 def db():
     """Create a fresh database for each test function."""
+    from app.models import (
+        User, Outlet, Product, Inventory, SaleTransaction,
+        Supplier, PurchaseOrder, Invoice, Alert, Forecast, ChatMessage
+    )
     Base.metadata.create_all(bind=engine)
     session = TestingSessionLocal()
     try:
