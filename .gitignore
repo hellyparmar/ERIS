@@ -91,6 +91,8 @@ dist/
 dist-new/
 build/
 .next/
+.next_old/
+.next_root/
 out/
 
 # Backend builds

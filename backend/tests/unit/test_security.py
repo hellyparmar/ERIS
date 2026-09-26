@@ -126,7 +126,7 @@ def test_auth_rate_limiting(client):
     """
     payload = {
         "username": "dummy_rate_limit_user",
-        "password": "wrong_password"
+        "password": "INTENTIONALLY_WRONG_PASSWORD_FOR_RATE_LIMIT_TEST"
     }
 
     got_429 = False

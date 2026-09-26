@@ -14,6 +14,14 @@ os.environ["DATABASE_URL"] = "sqlite:///./test.db"
 os.environ["JWT_SECRET_KEY"] = "test_secret"
 os.environ["ENVIRONMENT"] = "test"
 
+# ---------------------------------------------------------------------------
+# TEST-ONLY passwords — these are NOT real credentials.
+# They are used exclusively to seed an in-memory SQLite DB for automated tests.
+# ---------------------------------------------------------------------------
+_TEST_ADMIN_PW    = "test-admin-pw"
+_TEST_MANAGER_PW  = "test-manager-pw"
+_TEST_ANALYST_PW  = "test-analyst-pw"
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -32,7 +40,7 @@ from app.models.users import User
 from app.core.security import hash_password
 from app.database import get_db
 
-# One shared in-memory connection keeps tests isolated from local demo data.
+# Use in-memory SQLite — no file written to disk, fully isolated.
 TEST_DATABASE_URL = "sqlite:///:memory:"
 
 engine = create_engine(
@@ -103,7 +111,7 @@ def seed_users(db):
             username="admin",
             first_name="Test",
             last_name="Admin",
-            password_hash=hash_password("admin123"),
+            password_hash=hash_password(_TEST_ADMIN_PW),
             role_id=admin_role.id,
             organization_id=org.id,
         ),
@@ -112,7 +120,7 @@ def seed_users(db):
             username="manager",
             first_name="Test",
             last_name="Manager",
-            password_hash=hash_password("manager123"),
+            password_hash=hash_password(_TEST_MANAGER_PW),
             role_id=manager_role.id,
             organization_id=org.id,
         ),
@@ -121,7 +129,7 @@ def seed_users(db):
             username="analyst",
             first_name="Test",
             last_name="Analyst",
-            password_hash=hash_password("analyst123"),
+            password_hash=hash_password(_TEST_ANALYST_PW),
             role_id=analyst_role.id,
             organization_id=org.id,
         ),
@@ -135,7 +143,7 @@ def seed_users(db):
 @pytest.fixture
 def admin_token(client, seed_users):
     """Get a valid JWT for the admin user."""
-    res = client.post("/api/v1/auth/login", data={"username": "admin@test.com", "password": "admin123"})
+    res = client.post("/api/v1/auth/login", data={"username": "admin@test.com", "password": _TEST_ADMIN_PW})
     assert res.status_code == 200, f"Login failed: {res.json()}"
     return res.json()["access_token"]
 
@@ -143,6 +151,6 @@ def admin_token(client, seed_users):
 @pytest.fixture
 def manager_token(client, seed_users):
     """Get a valid JWT for the manager user."""
-    res = client.post("/api/v1/auth/login", data={"username": "manager@test.com", "password": "manager123"})
+    res = client.post("/api/v1/auth/login", data={"username": "manager@test.com", "password": _TEST_MANAGER_PW})
     assert res.status_code == 200
     return res.json()["access_token"]

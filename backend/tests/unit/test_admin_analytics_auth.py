@@ -13,13 +13,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 import unittest
 from fastapi.testclient import TestClient
 from app.main import app
+from tests.conftest import _TEST_ADMIN_PW
 
 class TestAdminAnalyticsAuth(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.client = TestClient(app)
         # Authenticate as real seeded admin user
-        login_res = cls.client.post("/api/v1/auth/login", data={"username": "admin", "password": "admin123"})
+        login_res = cls.client.post("/api/v1/auth/login", data={"username": "admin", "password": _TEST_ADMIN_PW})
         assert login_res.status_code == 200, f"Login failed: {login_res.text}"
         data = login_res.json()
         cls.token = data.get("access_token")
