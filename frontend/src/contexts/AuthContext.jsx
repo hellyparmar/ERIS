@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { api } from '../lib/api';
+import { api, apiClient } from '../lib/api';
 import { useAuthStore } from '../hooks/useAuthStore';
 
 const AuthContext = createContext(null);
@@ -116,7 +116,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    const interceptor = authAxios.interceptors.response.use(
+    const interceptor = apiClient.interceptors.response.use(
       (response) => response,
       (error) => {
         if (error.response?.status === 401) {
@@ -127,7 +127,7 @@ export function AuthProvider({ children }) {
     );
 
     return () => {
-      authAxios.interceptors.response.eject(interceptor);
+      apiClient.interceptors.response.eject(interceptor);
     };
   }, [logout]);
 

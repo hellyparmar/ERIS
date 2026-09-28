@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LogOut, LayoutDashboard, ShoppingCart, Package, FileText, BarChart3, Bell, Bot, Calculator, Settings, Truck, Receipt, TrendingUp, Users, ChevronLeft, MessageSquare, Activity } from 'lucide-react';
+import { LogOut, LayoutDashboard, ShoppingCart, Package, FileText, BarChart3, Bell, Bot, Calculator, Settings, Truck, Receipt, TrendingUp, Users, ChevronLeft, MessageSquare, Activity, Building2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 const routeRoleMap = {
