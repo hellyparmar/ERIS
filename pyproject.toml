@@ -19,3 +19,11 @@ ignore = [
 max-line-length = 120
 extend-ignore = ["E501"]
 exclude = [".git", "__pycache__", ".venv", "venv", "env", "build", "dist"]
+
+[tool.pyright]
+include = ["backend"]
+extraPaths = ["backend"]
+executionEnvironments = [
+  { root = "backend", extraPaths = ["."] }
+]
+
