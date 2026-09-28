@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LogOut, LayoutDashboard, ShoppingCart, Package, FileText, BarChart3, Bell, Bot, Calculator, Building2, Settings, Truck, Receipt, Tag, TrendingUp, Users, ChevronLeft, MessageSquare, Activity } from 'lucide-react';
+import { LogOut, LayoutDashboard, ShoppingCart, Package, FileText, BarChart3, Bell, Bot, Calculator, Settings, Truck, Receipt, TrendingUp, Users, ChevronLeft, MessageSquare, Activity } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 const routeRoleMap = {
@@ -14,15 +14,12 @@ const routeRoleMap = {
   '/forecasts': ['super_admin', 'superadmin', 'area_manager', 'outlet_manager', 'manager'],
   '/settings': ['super_admin', 'superadmin', 'area_manager', 'outlet_manager', 'manager'],
   '/analytics': ['super_admin', 'superadmin', 'area_manager'],
-  '/multi-store': ['super_admin', 'superadmin', 'area_manager'],
   '/outlets': ['super_admin', 'superadmin', 'area_manager'],
   '/reports': ['super_admin', 'superadmin', 'area_manager'],
   '/customer-insights': ['super_admin', 'superadmin', 'area_manager'],
-  '/team': ['super_admin', 'superadmin'],
   '/integrations': ['super_admin', 'superadmin'],
   '/tax-compliance': ['super_admin', 'superadmin'],
   '/gst-invoice': ['super_admin', 'superadmin'],
-  '/gst-rates': ['super_admin', 'superadmin'],
   '/suppliers': ['super_admin', 'superadmin'],
   '/contacts': ['super_admin', 'superadmin', 'area_manager', 'outlet_manager', 'manager'],
   '/employees': ['super_admin', 'superadmin'],
@@ -72,13 +69,11 @@ export default function Sidebar({ open = false, onClose = () => {}, collapsed = 
       id: 'management',
       title: 'Management',
       items: [
-        { label: 'Employees',   path: '/employees',   icon: Users },
-        { label: 'Suppliers',   path: '/suppliers',   icon: Truck },
-        { label: 'Customers',   path: '/customers',   icon: Users },
-        { label: 'Multi-Store', path: '/multi-store', icon: Building2 },
-        { label: 'Team',        path: '/team',        icon: Users },
-        { label: 'Contacts',    path: '/contacts',    icon: Users },
-        { label: 'Outlets',     path: '/outlets',     icon: Building2 },
+        { label: 'Employees',  path: '/employees',  icon: Users },
+        { label: 'Suppliers',  path: '/suppliers',  icon: Truck },
+        { label: 'Customers',  path: '/customers',  icon: Users },
+        { label: 'Contacts',   path: '/contacts',   icon: Users },
+        { label: 'Outlets',    path: '/outlets',    icon: Building2 },
       ]
     },
     {
@@ -87,7 +82,6 @@ export default function Sidebar({ open = false, onClose = () => {}, collapsed = 
       items: [
         { label: 'Tax Compliance', path: '/tax-compliance', icon: Calculator },
         { label: 'GST Invoice',    path: '/gst-invoice',    icon: Receipt },
-        { label: 'GST Rates',      path: '/gst-rates',      icon: Tag },
         { label: 'Integrations',   path: '/integrations',   icon: Settings },
       ]
     }

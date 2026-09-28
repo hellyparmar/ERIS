@@ -19,12 +19,14 @@ import {
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler, ArcElement);
 
+// GST rate reference — effective 22 September 2025.
+// The 12% and 28% slabs were abolished by the GST Council (55th meeting).
+// Current slabs: NIL / 5% / 18% / 40% (luxury/demerit).
 const DEFAULT_GST_RATES = [
-    { category: 'Essentials', description: 'unprocessed ingredients (rice, flour, vegetables, eggs)', gstin_rate: 0, cgst: 0, sgst: 0, cess: 0, example_hsn: '0401' },
-    { category: 'Food Service', description: 'prepared food served in restaurants, takeaway meals', gstin_rate: 5, cgst: 2.5, sgst: 2.5, cess: 0, example_hsn: '3004' },
-    { category: 'Packaged Food', description: 'branded beverages, packaged snacks, branded dairy', gstin_rate: 12, cgst: 6, sgst: 6, cess: 0, example_hsn: '6109' },
-    { category: 'Premium Service', description: 'food + beverages in AC restaurants (combined rate), alcohol (beer, wine) — note: state excise applies separately', gstin_rate: 18, cgst: 9, sgst: 9, cess: 0, example_hsn: '8471' },
-    { category: 'Luxury', description: 'premium imported spirits, aerated drinks in luxury venues', gstin_rate: 28, cgst: 14, sgst: 14, cess: 0, example_hsn: '8703' },
+    { category: 'NIL / Essentials',    description: 'Unprocessed food, fresh vegetables, eggs, milk, cereals, bread', gstin_rate: 0,  cgst: 0,  sgst: 0,  cess: 0, example_hsn: '0401' },
+    { category: '5% — Food & Pharma',  description: 'Packaged food, branded beverages, snacks (namkeen), most medicines, non-AC restaurant food', gstin_rate: 5,  cgst: 2.5, sgst: 2.5, cess: 0, example_hsn: '3004' },
+    { category: '18% — Standard',      description: 'Clothing, footwear, toys, stationery, electronics, furniture, cleaning products, AC restaurant food + beverages, alcohol', gstin_rate: 18, cgst: 9,  sgst: 9,  cess: 0, example_hsn: '8471' },
+    { category: '40% — Luxury/Demerit', description: 'Tobacco products, premium spirits, luxury goods, aerated drinks, motor vehicles (replaces the old 28% slab)', gstin_rate: 40, cgst: 20, sgst: 20, cess: 0, example_hsn: '8703' },
 ];
 
 const TaxCompliance = () => {

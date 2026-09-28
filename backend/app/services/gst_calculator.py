@@ -21,11 +21,16 @@ from pydantic import BaseModel
 # ──────────────────────────────────────────────
 
 class TaxSlab(str, Enum):
-    EXEMPT = "0"
-    FIVE = "5"
-    TWELVE = "12"
-    EIGHTEEN = "18"
-    TWENTYEIGHT = "28"
+    """
+    India GST rate slabs effective 22 September 2025.
+    The 12% and 28% slabs were abolished; the schedule is now:
+        NIL / 5% / 18% / 40% (luxury/demerit goods)
+    Source: GST Council 55th meeting decision, effective 22-Sep-2025.
+    """
+    EXEMPT        = "0"
+    FIVE          = "5"
+    EIGHTEEN      = "18"
+    FORTY         = "40"   # replaces 28% for luxury / demerit goods
 
 
 class GSTType(str, Enum):
@@ -70,22 +75,48 @@ class LineItemTaxBreakdown(BaseModel):
 
 
 # ──────────────────────────────────────────────
-# GST rate catalogue
+# GST rate catalogue (effective 22-Sep-2025)
 # ──────────────────────────────────────────────
 
-# Category → GST rate (%) for common retail categories
+# Category → GST rate (%) — post-22-Sep-2025 schedule.
+# 12% and 28% are ABOLISHED. Correct slabs: 0 / 5 / 18 / 40.
 CATEGORY_GST_RATES: Dict[str, float] = {
-    "food": 5, "beverages": 12, "dairy": 5, "snacks": 12,
-    "groceries": 0, "vegetables": 0, "fruits": 0,
-    "electronics": 18, "mobile": 18, "clothing": 12, "footwear": 12,
-    "furniture": 18, "pharma": 12, "toys": 12, "stationery": 12,
-    "cleaning": 18, "luxury": 28, "tobacco": 28, "default": 18,
+    # NIL rated
+    "groceries": 0, "vegetables": 0, "fruits": 0, "dairy": 0,
+
+    # 5% slab
+    "food": 5,           # packaged food (most categories)
+    "beverages": 5,      # non-alcoholic (incl. packaged water, juices)
+    "snacks": 5,         # namkeen, packaged snacks (Council clarified → 5%)
+    "pharma": 5,         # medicines (most life-saving)
+
+    # 18% slab (was 12% for some, moved up / reclassified)
+    "clothing": 18,      # previously 12%; reclassified Sep 2025
+    "footwear": 18,      # previously 12%; reclassified Sep 2025
+    "electronics": 18,
+    "mobile": 18,
+    "furniture": 18,
+    "toys": 18,          # previously 12%; reclassified Sep 2025
+    "stationery": 18,    # previously 12%; reclassified Sep 2025
+    "cleaning": 18,
+
+    # 40% slab (replaces 28% for luxury / demerit goods)
+    "luxury": 40,
+    "tobacco": 40,
+
+    "default": 18,
 }
 
-# HSN → GST rate fallback catalogue
+# HSN → GST rate fallback catalogue (post-22-Sep-2025)
 HSN_GST_RATES: Dict[str, float] = {
-    "8471": 18, "8517": 18, "847190": 18, "997331": 18,
-    "0401": 5, "6109": 12, "3004": 12, "9999": 18,
+    "8471": 18,   # computers
+    "8517": 18,   # mobile phones
+    "847190": 18,
+    "997331": 18,
+    "0401": 0,    # milk (NIL)
+    "6109": 18,   # T-shirts (was 12%, now 18%)
+    "3004": 5,    # pharmaceuticals
+    "9999": 18,
 }
 
 

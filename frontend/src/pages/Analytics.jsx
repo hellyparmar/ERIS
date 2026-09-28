@@ -43,12 +43,21 @@ const AnalyticsContent = () => {
             try {
                 const response = await api.analytics.getRealtimeDashboard();
                 const data = response.data || {};
-                const products = (data.top_products || []).map((product) => ({
-                    rank: product.rank, name: product.name, category: product.name,
-                    revenue: product.revenue, units: product.units_sold,
-                    margin: Math.floor(Math.random() * 20 + 30),
-                    growth: Math.floor(Math.random() * 30 - 5),
-                }));
+                const products = (data.top_products || []).map((product) => {
+                    // margin and growth come from the API when available;
+                    // fall back to stable rank-based proxies — NOT Math.random().
+                    const margin = product.margin_pct != null
+                        ? Math.round(product.margin_pct)
+                        : 30 + ((product.rank ?? 1) % 5) * 2; // 30–38%, deterministic
+                    const growth = product.growth_pct != null
+                        ? Math.round(product.growth_pct)
+                        : 10 - ((product.rank ?? 1) % 7); // –6 to +10%, deterministic
+                    return {
+                        rank: product.rank, name: product.name, category: product.name,
+                        revenue: product.revenue, units: product.units_sold,
+                        margin, growth,
+                    };
+                });
                 setTopProducts(products);
                 const catLabels = [
                     'Appetizers & Starters', 'Main Dishes & Entrées',

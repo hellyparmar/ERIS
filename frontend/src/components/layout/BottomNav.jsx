@@ -14,7 +14,6 @@ const drawerItems = [
   { label: 'Analytics',    path: '/analytics',      icon: BarChart3 },
   { label: 'AI Assistant', path: '/ai-assistant',   icon: Bot },
   { label: 'Invoices',     path: '/invoices',       icon: FileText },
-  { label: 'Multi-Store',  path: '/multi-store',    icon: Building2 },
   { label: 'Settings',     path: '/settings',       icon: Settings },
 ];
 

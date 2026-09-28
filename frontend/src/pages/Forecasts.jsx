@@ -206,6 +206,17 @@ const Forecasts = () => {
         }
     }, [trainingLogs]);
 
+    // Deterministic pseudo-random noise keyed on a date string.
+    // Same date → same value on every render; no Math.random().
+    const seededNoise = (dateStr, amplitude) => {
+        let h = 0x811c9dc5;
+        for (let i = 0; i < dateStr.length; i++) {
+            h ^= dateStr.charCodeAt(i);
+            h = (h * 0x01000193) >>> 0;
+        }
+        return (h % amplitude);
+    };
+
     const generateMockupData = () => {
         const today = new Date();
         const historyDays = 30;
@@ -221,7 +232,7 @@ const Forecasts = () => {
             const dayOfWeek = date.getDay();
             const cyclicality = (dayOfWeek === 0 || dayOfWeek === 6) ? 1.35 : 0.95;
 
-            const randomNoise = 50 + Math.random() * 200;
+            const randomNoise = 50 + seededNoise(dateStr, 200);
             const actualValue = (baseSalesMultiplier + (30 - i) * 12) * cyclicality + randomNoise;
 
             totalPoints.push({
@@ -296,7 +307,7 @@ const Forecasts = () => {
             const cyclicality = (dayOfWeek === 0 || dayOfWeek === 6) ? 1.35 : 0.95;
             totalPoints.push({
                 date: dateStr,
-                actual: Math.round((baseSalesMultiplier + (30 - i) * 12) * cyclicality + (50 + Math.random() * 150)),
+                actual: Math.round((baseSalesMultiplier + (30 - i) * 12) * cyclicality + (50 + seededNoise(dateStr, 150))),
                 isHistorical: true
             });
         }
