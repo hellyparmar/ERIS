@@ -6,19 +6,25 @@ import logging
 logger = logging.getLogger(__name__)
 
 class RLSMiddleware(BaseHTTPMiddleware):
+    """
+    Tenant context middleware.
+
+    Extracts the tenant/outlet context from the Bearer JWT and attaches it
+    to ``request.state.tenant_context`` so downstream dependencies can use it
+    without re-decoding the token.
+
+    This middleware does NOT enforce PostgreSQL row-level security at the
+    database session level.  DB-level isolation (SET LOCAL app.tenant_id) is
+    the responsibility of the ``get_db`` dependency / query executor.
+    """
     async def dispatch(self, request: Request, call_next):
-        """
-        Extracts tenant context from the authenticated user/JWT token
-        and attaches it to request.state.tenant_context.
-        """
         auth_header = request.headers.get("Authorization", "")
         if auth_header.startswith("Bearer "):
             try:
-                # This will populate request.state.tenant_context
                 await TenantContextManager.extract_from_request(request)
             except Exception as e:
-                # We log but do not block here, so public endpoints can still work.
-                # Endpoints needing tenant context will enforce it via dependencies.
+                # Log but do not block — public/unauthenticated endpoints must
+                # still work.  Authenticated endpoints enforce context via deps.
                 logger.debug(f"Could not extract tenant context in middleware: {e}")
-                
+
         return await call_next(request)

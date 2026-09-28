@@ -680,7 +680,7 @@ async def ai_natural_language_query(
         from app.services.ai_service import ai_service
 
         system_prompt = (
-            "You are R-DIOS, an intelligent retail analytics assistant for an Indian retail business. "
+            "You are ERIS AI, an intelligent retail analytics assistant for an Indian retail business. "
             "You have access to sales data, inventory, customer data, and GST information. "
             "Give concise, business-relevant answers. Use ₹ for currency. "
             "Focus on actionable insights. Keep responses under 200 words."
@@ -708,9 +708,9 @@ async def ai_natural_language_query(
             "success": True,
             "query": req.query,
             "response": (
-                f"I'm R-DIOS AI. You asked: \"{req.query}\". "
-                "I'm currently running in demo mode. "
-                "Configure GROQ_API_KEY or OPENROUTER_API_KEY to enable live AI responses. "
+                f"ERIS AI received your query: \"{req.query}\". "
+                "Currently running in demo mode — configure GROQ_API_KEY or OPENROUTER_API_KEY "
+                "to enable live AI responses. "
                 "Available data: sales, inventory, customers, GST records."
             ),
             "provider": "fallback",

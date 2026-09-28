@@ -66,26 +66,36 @@ BUSINESS_DEFINITIONS = {
 # DATA TRANSLATION - Map raw database values to User-Friendly English
 # ============================================================================
 
+# Maps product category slugs (as stored in DB) to user-friendly display names.
+# These are the actual categories used in the Indian retail product catalog.
 CATEGORY_MAPPING = {
-    "moveis_decoracao": "Restaurant Interiors",
-    "moveis_cozinha_area_de_servico_jantar_e_jardim": "Kitchen Area Furniture",
-    "cama_mesa_banho": "Table Linens",
-    "utilidades_domesticas": "Kitchen Equipment",
-    "eletrodomesticos": "Commercial Appliances",
-    "eletrodomesticos_2": "Commercial Appliances",
-    "eletroportateis": "Food Prep Equipment",
-    "casa_conforto": "Ambiance & Comfort",
-    "casa_conforto_2": "Ambiance & Comfort",
-    "alimentos": "Raw Ingredients",
-    "alimentos_bebidas": "Food & Beverages",
-    "bebidas": "Bar Inventory",
-    "la_cuisine": "Gourmet Supplies",
-    "portateis_cozinha_e_preparadores_de_alimentos": "Prep Machines",
-    "informatica_acessorios": "Electronics Accessories",
-    "telefonia": "Mobile Phones",
-    "eletronicos": "Electronics",
-    "bebes": "Kids Menu Toys",
-    "esporte_lazer": "Staff Recreation"
+    # Food & Beverage
+    "food_beverages": "Food & Beverages",
+    "packaged_food": "Packaged Food",
+    "dairy_products": "Dairy Products",
+    "snacks": "Snacks & Namkeen",
+    "beverages": "Beverages",
+    "bakery": "Bakery & Confectionery",
+    # Personal Care
+    "personal_care": "Personal Care",
+    "health_hygiene": "Health & Hygiene",
+    "baby_care": "Baby Care",
+    # Household
+    "household_care": "Household Care & Cleaning",
+    "home_essentials": "Home Essentials",
+    # Electronics
+    "electronics": "Electronics & Accessories",
+    "mobile_accessories": "Mobile & Accessories",
+    # Apparel
+    "clothing": "Clothing",
+    "footwear": "Footwear",
+    # Stationery
+    "stationery": "Stationery & Office",
+    # Pharma
+    "pharma": "Pharmaceuticals & OTC",
+    # General
+    "general_merchandise": "General Merchandise",
+    "other": "Other",
 }
 
 
@@ -425,16 +435,15 @@ class SemanticLayer:
     
     def get_translation_context(self) -> str:
         """
-        Generate translation context for category names.
+        Generate category display-name context for the LLM.
         """
-        context_parts = ["## Category Translations (IMPORTANT)\n"]
-        context_parts.append("The database uses Portuguese category names. You MUST TRANSLATE them to English equivalents in your final response:\n")
-        
-        for portuguese, english in CATEGORY_MAPPING.items():
-            context_parts.append(f"- **{portuguese}** → **{english}**")
-            # Also add reverse mapping for query understanding
-            context_parts.append(f"- (User asks for '{english}') → Use '{portuguese}' in SQL")
-            
+        context_parts = ["## Category Names Reference\n"]
+        context_parts.append("The database stores product categories using the following slug → display name mapping:\n")
+
+        for slug, display in CATEGORY_MAPPING.items():
+            context_parts.append(f"- **{slug}** → **{display}**")
+            context_parts.append(f"- (User asks for '{display}') → Use '{slug}' in SQL")
+
         return "\n".join(context_parts)
     
     def get_business_terms_context(self) -> str:
@@ -454,7 +463,7 @@ class SemanticLayer:
         Enhance the system prompt with semantic layer context.
         """
         parts = [
-            "You are an AI assistant for R-DIOS, a retail intelligence system.",
+            "You are an AI assistant for ERIS, an Indian retail intelligence system.",
             "When generating SQL queries, follow these rules strictly:",
             "",
         ]
