@@ -94,7 +94,10 @@ async def login(
     db: AsyncSession = Depends(get_db)
 ) -> Any:
     result = await _execute(db,
-        select(User).where(User.username == oauth_request.username, User.is_active == True)
+        select(User).where(
+            (User.username == oauth_request.username) | (User.email == oauth_request.username),
+            User.is_active == True
+        )
     )
     user = result.scalar_one_or_none()
 

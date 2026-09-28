@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     DEBUG: bool = os.getenv("DEBUG", "true").lower() == "true"
     
     # PostgreSQL configuration - DATABASE_URL is REQUIRED
+    # PostgreSQL configuration - DATABASE_URL is REQUIRED
     DATABASE_URL: str = os.getenv("DATABASE_URL", "")
     DB_POOL_SIZE: int = int(os.getenv("DB_POOL_SIZE", "20"))
     DB_MAX_OVERFLOW: int = int(os.getenv("DB_MAX_OVERFLOW", "30"))
@@ -18,14 +19,14 @@ class Settings(BaseSettings):
     # Redis configuration
     REDIS_URL: str = os.getenv("REDIS_URL", "redis://redis:6379/0")
     
-    # JWT
-    JWT_SECRET_KEY: str = os.getenv(
-        "JWT_SECRET_KEY",
-        "dev_secret"
-    )
+    # JWT - JWT_SECRET_KEY is REQUIRED
+    JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY") or os.getenv("JWT_SECRET", "")
     JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "15"))
     REFRESH_TOKEN_EXPIRE_DAYS: int = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "30"))
+
+    # Encryption - ENCRYPTION_KEY is REQUIRED
+    ENCRYPTION_KEY: str = os.getenv("ENCRYPTION_KEY", "")
     
     # CORS
     ALLOWED_ORIGINS: str = os.getenv(
@@ -43,29 +44,73 @@ class Settings(BaseSettings):
     # Feature Flags
     ENABLE_AI_ASSISTANT: bool = os.getenv("ENABLE_AI_ASSISTANT", "true").lower() == "true"
 
-    
     @field_validator("DATABASE_URL", mode="before")
     @classmethod
     def validate_database_url(cls, v: str) -> str:
         """
-        Validate that DATABASE_URL is set and properly formatted.
-        This validation runs at startup BEFORE any database operations.
+        Validate that DATABASE_URL is set, not a placeholder, and properly formatted.
         """
         if not v or not v.strip():
-            raise ValueError(
+            raise RuntimeError(
                 "DATABASE_URL environment variable is not set. "
                 "This is a REQUIRED configuration at startup. "
-                "Set it in your .env file or environment variables. "
                 "Format: postgresql+asyncpg://USER:PASSWORD@HOST:PORT/DATABASE"
+            )
+        cleaned = v.strip().lower()
+        if cleaned.startswith("change_me") or cleaned in {"changeme", "placeholder", "dummy"}:
+            raise RuntimeError(
+                f"DATABASE_URL contains a placeholder value ({v!r}). "
+                "A real database connection string must be configured."
             )
         
         # Basic format validation (support postgresql and sqlite for testing)
         if not v.startswith(("postgresql+", "postgresql://", "sqlite://", "sqlite+")):
-            raise ValueError(
+            raise RuntimeError(
                 f"DATABASE_URL has an invalid format: {v[:50]}... "
                 "Must start with 'postgresql+asyncpg://', 'postgresql://', or 'sqlite://'"
             )
         
+        return v
+
+    @field_validator("JWT_SECRET_KEY", mode="before")
+    @classmethod
+    def validate_jwt_secret_key(cls, v: str) -> str:
+        """
+        Validate that JWT_SECRET_KEY is set and not a placeholder.
+        """
+        if not v or not v.strip():
+            raise RuntimeError(
+                "JWT_SECRET_KEY / JWT_SECRET environment variable is not set. "
+                "This is a REQUIRED configuration at startup."
+            )
+        cleaned = v.strip().lower()
+        if cleaned.startswith("change_me") or cleaned in {
+            "changeme", "your_secret_key", "your-secret-key",
+            "your-super-secret-key", "placeholder", "dummy", "dev_secret", "secret"
+        }:
+            raise RuntimeError(
+                f"JWT_SECRET_KEY contains a placeholder value ({v!r}). "
+                "A secure secret key must be configured."
+            )
+        return v
+
+    @field_validator("ENCRYPTION_KEY", mode="before")
+    @classmethod
+    def validate_encryption_key(cls, v: str) -> str:
+        """
+        Validate that ENCRYPTION_KEY is set and not a placeholder.
+        """
+        if not v or not v.strip():
+            raise RuntimeError(
+                "ENCRYPTION_KEY environment variable is not set. "
+                "This is a REQUIRED configuration at startup."
+            )
+        cleaned = v.strip().lower()
+        if cleaned.startswith("change_me") or cleaned in {"changeme", "placeholder", "dummy"}:
+            raise RuntimeError(
+                f"ENCRYPTION_KEY contains a placeholder value ({v!r}). "
+                "A valid 32-byte Fernet key must be configured."
+            )
         return v
     
     class Config:
@@ -78,7 +123,7 @@ class Settings(BaseSettings):
 # This ensures DATABASE_URL validation happens at application startup
 try:
     settings = Settings()
-except ValueError as e:
+except (ValueError, RuntimeError) as e:
     # Provide clear error message on startup
     import sys
     error_msg = (

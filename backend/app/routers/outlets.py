@@ -22,6 +22,12 @@ from app.core.data_isolation import OutletDataAccess, require_outlet_access
 router = APIRouter(prefix="/outlets", tags=["outlets"])
 
 
+async def _execute(db: Any, stmt: Any) -> Any:
+    if isinstance(db, AsyncSession):
+        return await db.execute(stmt)
+    return db.execute(stmt)
+
+
 @router.get("")
 @router.get("/")
 async def list_outlets(
@@ -29,7 +35,7 @@ async def list_outlets(
     per_page: Optional[int] = Query(None, ge=1, le=100),
     limit: Optional[int] = Query(None, ge=1, le=100),
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_db)
+    db: Any = Depends(get_db)
 ) -> Any:
     allowed_outlet_ids = await get_accessible_outlet_ids(current_user, db)
     stmt = select(
@@ -51,7 +57,7 @@ async def list_outlets(
         page_size = effective_limit or 50
         stmt = stmt.order_by(Outlet.id).offset((effective_page - 1) * page_size).limit(page_size)
 
-    result = await db.execute(stmt)
+    result = await _execute(db, stmt)
     rows = result.fetchall()
 
     return [{

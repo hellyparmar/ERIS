@@ -7,17 +7,29 @@ from cryptography.fernet import Fernet
 import base64
 
 
-# Get encryption key from environment or generate one
-ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY")
+_DISALLOWED_PLACEHOLDERS = {
+    "change_me",
+    "change_me_or_leave_blank",
+    "changeme",
+    "your_secret_key",
+    "your-secret-key",
+    "placeholder",
+    "dummy",
+}
 
-if not ENCRYPTION_KEY:
-    # Generate a key for development (NEVER use this in production)
-    ENCRYPTION_KEY = Fernet.generate_key().decode()
-    print(f"WARNING: Using generated encryption key. Set ENCRYPTION_KEY in production!")
-    print(f"Generated key: {ENCRYPTION_KEY}")
+def get_encryption_key() -> str:
+    key = os.getenv("ENCRYPTION_KEY", "").strip()
+    if not key:
+        raise RuntimeError("ENCRYPTION_KEY environment variable is not set. A 32-byte Fernet key is required.")
+    if key.lower() in _DISALLOWED_PLACEHOLDERS or key.lower().startswith("change_me"):
+        raise RuntimeError(f"ENCRYPTION_KEY contains a placeholder value ({key!r}). A valid Fernet key must be supplied.")
+    return key
 
-# Initialize Fernet cipher
-cipher = Fernet(ENCRYPTION_KEY.encode() if isinstance(ENCRYPTION_KEY, str) else ENCRYPTION_KEY)
+
+def get_cipher() -> Fernet:
+    key = get_encryption_key()
+    return Fernet(key.encode() if isinstance(key, str) else key)
+
 
 
 def encrypt_data(data: str) -> str:
@@ -33,7 +45,7 @@ def encrypt_data(data: str) -> str:
     if not data:
         return ""
     
-    encrypted = cipher.encrypt(data.encode())
+    encrypted = get_cipher().encrypt(data.encode())
     return base64.b64encode(encrypted).decode()
 
 
@@ -52,7 +64,8 @@ def decrypt_data(encrypted_data: str) -> str:
     
     try:
         decoded = base64.b64decode(encrypted_data.encode())
-        decrypted = cipher.decrypt(decoded)
+        decrypted = get_cipher().decrypt(decoded)
         return decrypted.decode()
     except Exception as e:
         raise ValueError(f"Decryption failed: {str(e)}")
+

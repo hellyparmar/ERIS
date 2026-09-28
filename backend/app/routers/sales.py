@@ -30,6 +30,12 @@ from app.core.data_isolation import OutletDataAccess, require_outlet_access
 router = APIRouter(prefix="/sales", tags=["sales"])
 
 
+async def _execute(db: Any, stmt: Any) -> Any:
+    if isinstance(db, AsyncSession):
+        return await db.execute(stmt)
+    return db.execute(stmt)
+
+
 @router.get("/")
 async def list_sales(
     outlet_id: Optional[int] = None,
@@ -41,7 +47,7 @@ async def list_sales(
     page: int = Query(1, ge=1),
     per_page: int = Query(10, ge=1, le=100),
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_db)
+    db: Any = Depends(get_db)
 ) -> Any:
     """
     Get paginated sales transactions with filtering.
@@ -49,10 +55,13 @@ async def list_sales(
     """
     allowed_outlet_ids = await get_accessible_outlet_ids(current_user, db)
     if not allowed_outlet_ids:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No outlets accessible"
-        )
+        return {
+            "page": page,
+            "per_page": per_page,
+            "total": 0,
+            "total_pages": 0,
+            "items": []
+        }
 
     if outlet_id:
         if allowed_outlet_ids and outlet_id not in allowed_outlet_ids:
@@ -104,12 +113,13 @@ async def list_sales(
             raise HTTPException(status_code=400, detail="Invalid date_to format. Use YYYY-MM-DD")
 
     # Get total count via a subquery
-    count_result = await db.execute(select(func.count()).select_from(stmt.subquery()))
+    count_result = await _execute(db, select(func.count()).select_from(stmt.subquery()))
     total = count_result.scalar() or 0
 
     # Paginate and order
     offset = (page - 1) * per_page
-    items_result = await db.execute(
+    items_result = await _execute(
+        db,
         stmt.order_by(desc(SaleTransaction.transaction_at)).offset(offset).limit(per_page)
     )
     items = items_result.all()

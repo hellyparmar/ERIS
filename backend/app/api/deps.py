@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Any
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
@@ -11,7 +11,13 @@ from app.core.security import decode_token
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
-async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)) -> User:
+async def _execute_db(db: Any, stmt: Any) -> Any:
+    """Execute SQL statement supporting both AsyncSession and sync Session."""
+    if isinstance(db, AsyncSession):
+        return await db.execute(stmt)
+    return db.execute(stmt)
+
+async def get_current_user(token: str = Depends(oauth2_scheme), db: Any = Depends(get_db)) -> User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -25,7 +31,8 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession
     except:
         raise credentials_exception
 
-    result = await db.execute(
+    result = await _execute_db(
+        db,
         select(User)
         .options(selectinload(User.role), selectinload(User.outlet_access))
         .where(User.username == username)
@@ -76,7 +83,7 @@ async def get_accessible_outlet_ids(
         role_name = role_name.lower().replace(' ', '_')
     
     if role_name in ("super_admin", "admin", "superadmin", "1"):
-        result = await db.execute(select(Outlet.id))
+        result = await _execute_db(db, select(Outlet.id))
         return [row[0] for row in result.fetchall()]
         
     elif role_name == "area_manager":
@@ -85,7 +92,8 @@ async def get_accessible_outlet_ids(
                 return [access.outlet_id for access in current_user.outlet_access]
         except Exception:
             pass
-        result = await db.execute(
+        result = await _execute_db(
+            db,
             select(UserOutletAccess.outlet_id).where(UserOutletAccess.user_id == current_user.id)
         )
         return [row[0] for row in result.fetchall()]
@@ -95,7 +103,8 @@ async def get_accessible_outlet_ids(
             return [access.outlet_id for access in current_user.outlet_access]
         if getattr(current_user, 'outlet_id', None):
             return [current_user.outlet_id]
-        result = await db.execute(
+        result = await _execute_db(
+            db,
             select(UserOutletAccess.outlet_id).where(UserOutletAccess.user_id == current_user.id)
         )
         rows = [row[0] for row in result.fetchall()]

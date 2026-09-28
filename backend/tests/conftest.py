@@ -9,9 +9,11 @@ from typing import Generator
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# Set test database before any app imports
+# Set test database and test secrets before any app imports
 os.environ["DATABASE_URL"] = "sqlite:///./test.db"
-os.environ["JWT_SECRET_KEY"] = "test_secret"
+os.environ["JWT_SECRET_KEY"] = "test-jwt-secret-key-32-chars-long-for-testing-only"
+os.environ["JWT_SECRET"] = os.environ["JWT_SECRET_KEY"]
+os.environ["ENCRYPTION_KEY"] = "MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA="
 os.environ["ENVIRONMENT"] = "test"
 
 # ---------------------------------------------------------------------------

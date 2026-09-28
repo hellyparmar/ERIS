@@ -11,6 +11,8 @@ import logging
 import asyncio
 import sys
 import uuid
+import os
+from typing import Optional, List, Dict, Any
 
 from app.database import init_db, healthcheck_db
 from app.core.config import settings
@@ -24,25 +26,53 @@ logger = logging.getLogger(__name__)
 limiter = Limiter(key_func=get_remote_address)
 
 
+DISALLOWED_PLACEHOLDERS = {
+    "change_me",
+    "change_me_or_leave_blank",
+    "changeme",
+    "your_secret_key",
+    "your-secret-key",
+    "your-super-secret-key",
+    "dev_secret",
+    "secret",
+    "placeholder",
+    "dummy",
+    "xxx",
+    "todo",
+    "replace_me",
+}
+
+def is_placeholder_secret(val: Optional[str]) -> bool:
+    if not val or not str(val).strip():
+        return True
+    cleaned = str(val).strip().lower()
+    return cleaned in DISALLOWED_PLACEHOLDERS or cleaned.startswith("change_me")
+
+
 def validate_required_env_vars() -> None:
     missing = []
-    if not settings.DATABASE_URL or not settings.DATABASE_URL.strip():
-        missing.append("DATABASE_URL: PostgreSQL connection string (postgresql+asyncpg://...)")
-    if not settings.JWT_SECRET_KEY or not settings.JWT_SECRET_KEY.strip():
-        missing.append("JWT_SECRET_KEY: JWT signing key (min 32 chars for production)")
-    if not settings.REDIS_URL or not settings.REDIS_URL.strip():
-        missing.append("REDIS_URL: Redis connection string (redis://...)")
+    database_url = os.getenv("DATABASE_URL")
+    jwt_secret = os.getenv("JWT_SECRET_KEY") or os.getenv("JWT_SECRET")
+    encryption_key = os.getenv("ENCRYPTION_KEY")
+
+    if is_placeholder_secret(database_url):
+        missing.append("DATABASE_URL: PostgreSQL connection string (postgresql+asyncpg://...) - missing or placeholder value")
+    if is_placeholder_secret(jwt_secret):
+        missing.append("JWT_SECRET / JWT_SECRET_KEY: JWT signing key (min 32 chars for production) - missing or placeholder value")
+    if is_placeholder_secret(encryption_key):
+        missing.append("ENCRYPTION_KEY: 32-byte Fernet key - missing or placeholder value")
+
     if missing:
         error_msg = (
             "\n" + "=" * 70 + "\n"
-            "CRITICAL: Missing required environment variables at startup\n"
+            "CRITICAL: Missing or placeholder required environment variables at startup\n"
             "=" * 70 + "\n"
         )
         for var_desc in missing:
             error_msg += f"  * {var_desc}\n"
-        error_msg += "\nSet these in your .env file or environment variables.\n" + "=" * 70 + "\n"
+        error_msg += "\nSet real credentials in your .env file or environment variables.\n" + "=" * 70 + "\n"
         logger.critical(error_msg)
-        sys.exit(1)
+        raise RuntimeError(error_msg)
     logger.info("Environment variables validation successful")
 
 
