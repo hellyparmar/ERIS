@@ -2,7 +2,7 @@ from sqlalchemy import ForeignKey
 import uuid
 from sqlalchemy.dialects.postgresql import UUID
 """
-R-DIOS v6.0 SQLAlchemy Models
+ERIS v6.0 SQLAlchemy Models
 Comprehensive ORM models for thesis database schema
 """
 

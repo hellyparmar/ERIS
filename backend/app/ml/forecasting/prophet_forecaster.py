@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 class ProphetForecaster:
     """
-    Prophet-based demand forecasting for R-DIOS thesis
+    Prophet-based demand forecasting for ERIS thesis
     
     Key features:
     - Multiple seasonality (yearly, weekly, monthly)

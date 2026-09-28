@@ -15,7 +15,7 @@ class PDFReport(FPDF):
         self.set_font('Helvetica', 'B', 15)
         self.set_fill_color(79, 70, 229)  # Indigo
         self.set_text_color(255, 255, 255)
-        self.cell(0, 10, 'R-DIOS | Enterprise Report', 0, 1, 'C', fill=True)
+        self.cell(0, 10, 'ERIS | Enterprise Report', 0, 1, 'C', fill=True)
         self.ln(5)
 
     def footer(self):
@@ -94,7 +94,7 @@ class ReportingService:
         # 1. Report Header
         ws.merge_cells('A1:F1')
         header_cell = ws['A1']
-        header_cell.value = f"R-DIOS | {title}"
+        header_cell.value = f"ERIS | {title}"
         header_cell.font = Font(size=16, bold=True, color="FFFFFF")
         header_cell.fill = PatternFill(start_color="4F46E5", end_color="4F46E5", fill_type="solid")
         header_cell.alignment = Alignment(horizontal="center", vertical="center")

@@ -69,14 +69,6 @@ class Store(BaseModel):
     created_at: datetime
 
 
-class Organization(BaseModel):
-    id: int
-    name: str
-    type: str  # retail, restaurant, grocery
-    subscription_tier: str  # basic, pro, enterprise
-    is_active: bool
-    created_at: datetime
-
 
 # ==================== Admin User Management ====================
 
@@ -263,27 +255,7 @@ async def create_role(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ==================== Multi-Tenancy Management ====================
-
-@router.get("/organizations", response_model=List[Organization])
-async def get_organizations():
-    """Get all organizations"""
-    try:
-        organizations = [
-            Organization(
-                id=i,
-                name=f"Organization {i}",
-                type=["retail", "restaurant", "grocery"][i % 3],
-                subscription_tier=["basic", "pro", "enterprise"][i % 3],
-                is_active=True if i % 10 != 0 else False,
-                created_at=datetime.now() - timedelta(days=i*30)
-            )
-            for i in range(1, 11)
-        ]
-        return organizations
-    except Exception as e:
-        logger.error(f"Error fetching organizations: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+# ==================== Store Management ====================
 
 
 @router.get("/stores", response_model=List[Store])
@@ -311,24 +283,6 @@ async def get_stores(
         logger.error(f"Error fetching stores: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-
-@router.post("/organizations")
-async def create_organization(
-    org_data: dict,
-    current_user: User = Depends(require_role("super_admin")),
-):
-    """Create new organization"""
-    try:
-        org_id = int(datetime.now().timestamp() * 1000)
-        return {
-            "id": org_id,
-            "name": org_data.get("name"),
-            "status": "created",
-            "message": "Organization created successfully"
-        }
-    except Exception as e:
-        logger.error(f"Error creating organization: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/stores")

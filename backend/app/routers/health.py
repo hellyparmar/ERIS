@@ -24,7 +24,7 @@ async def health_check():
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
         "version": "5.0.0",
-        "service": "R-DIOS API"
+        "service": "ERIS API"
     }
 
 @router.get("/ready")

@@ -1,5 +1,5 @@
 """
-Pytest configuration and fixtures for R-DIOS tests.
+Pytest configuration and fixtures for ERIS tests.
 Uses SQLite in-memory database for fast, isolated tests.
 """
 import sys

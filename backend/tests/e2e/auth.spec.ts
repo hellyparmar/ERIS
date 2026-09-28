@@ -19,7 +19,7 @@ test.describe('Authentication', () => {
     });
 
     test('should display login page', async ({ page }) => {
-        await expect(page).toHaveTitle(/R-DIOS/);
+        await expect(page).toHaveTitle(/ERIS/);
         await expect(page.locator('h1')).toContainText('Welcome');
     });
 

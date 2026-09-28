@@ -582,7 +582,6 @@ async def explain_sales_anomaly(
         )
 
 from app.services.forecasting import build_forecast
-from app.services.ai_service import ai_service
 from app.services.anomaly_detection import detect_revenue_anomalies, detect_product_anomalies
 import logging
 logger = logging.getLogger(__name__)
@@ -650,72 +649,6 @@ async def revenue_forecast(
             detail=f"Forecast engine error: {str(e)}",
         )
 
-
-# ── P5-T2: AI Natural Language Query ──────────────────────────────────────────
-
-class AIQueryRequest(BaseModel):
-    query: str
-    session_id: Optional[str] = None
-
-
-@router.post("/query")
-async def ai_natural_language_query(
-    req: AIQueryRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
-):
-    """
-    ## AI Natural Language Query (P5-T2)
-
-    Ask questions about your retail data in plain English.
-    Supported queries:
-    - "What is the total revenue this month?"
-    - "Show me dead stock items"
-    - "Which products need reordering?"
-    - "What are the top selling categories?"
-    - "How many customers have outstanding balance?"
-    """
-    try:
-        # Import the existing multi-provider AI service
-        from app.services.ai_service import ai_service
-
-        system_prompt = (
-            "You are ERIS AI, an intelligent retail analytics assistant for an Indian retail business. "
-            "You have access to sales data, inventory, customer data, and GST information. "
-            "Give concise, business-relevant answers. Use ₹ for currency. "
-            "Focus on actionable insights. Keep responses under 200 words."
-        )
-
-        result = await ai_service.generate_response(
-            message=req.query,
-            system_prompt=system_prompt,
-            session_history=[],
-            execute_templates=True
-        )
-
-        return {
-            "success": True,
-            "query": req.query,
-            "response": result.get("text", ""),
-            "provider": result.get("provider", "unknown"),
-            "action": result.get("action"),
-        }
-
-    except Exception as e:
-        logger.exception("AI query error")
-        # Graceful degradation — return a helpful but simple response
-        return {
-            "success": True,
-            "query": req.query,
-            "response": (
-                f"ERIS AI received your query: \"{req.query}\". "
-                "Currently running in demo mode — configure GROQ_API_KEY or OPENROUTER_API_KEY "
-                "to enable live AI responses. "
-                "Available data: sales, inventory, customers, GST records."
-            ),
-            "provider": "fallback",
-            "action": None,
-        }
 
 
 # ── P5-T3: Z-Score Anomaly Detection ─────────────────────────────────────────

@@ -1,4 +1,4 @@
-# R-DIOS API Production Dockerfile
+# ERIS API Production Dockerfile
 
 # Build stage
 FROM python:3.11-slim as builder

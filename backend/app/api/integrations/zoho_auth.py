@@ -49,7 +49,7 @@ class ZohoAuthService:
         Generate OAuth authorization URL
         
         Args:
-            organization_id: R-DIOS organization ID
+            organization_id: ERIS organization ID
             
         Returns:
             dict with authorization URL and state
@@ -91,7 +91,7 @@ class ZohoAuthService:
         
         Args:
             code: Authorization code from OAuth callback
-            organization_id: R-DIOS organization ID
+            organization_id: ERIS organization ID
             state: CSRF token (optional, should validate)
             
         Returns:
@@ -141,7 +141,7 @@ class ZohoAuthService:
         Save or update tokens in database
         
         Args:
-            organization_id: R-DIOS organization ID
+            organization_id: ERIS organization ID
             token_data: Token data from Zoho
         """
         # Calculate expiry time
@@ -187,7 +187,7 @@ class ZohoAuthService:
         Get a valid access token, refreshing if necessary
         
         Args:
-            organization_id: R-DIOS organization ID
+            organization_id: ERIS organization ID
             
         Returns:
             Valid access token or None if not connected
@@ -223,7 +223,7 @@ class ZohoAuthService:
         Refresh access token using refresh token
         
         Args:
-            organization_id: R-DIOS organization ID
+            organization_id: ERIS organization ID
             
         Returns:
             dict with new token information
@@ -278,7 +278,7 @@ class ZohoAuthService:
         Revoke access token and delete from database
         
         Args:
-            organization_id: R-DIOS organization ID
+            organization_id: ERIS organization ID
             
         Returns:
             True if successful
@@ -324,7 +324,7 @@ class ZohoAuthService:
         Check if organization is connected to Zoho Books
         
         Args:
-            organization_id: R-DIOS organization ID
+            organization_id: ERIS organization ID
             
         Returns:
             dict with connection status

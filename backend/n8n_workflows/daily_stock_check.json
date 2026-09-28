@@ -1,5 +1,5 @@
 {
-  "name": "R-DIOS Daily Stock Check",
+  "name": "ERIS Daily Stock Check",
   "description": "Automated daily stock check that creates alerts for low inventory",
   "nodes": [
     {

@@ -1,7 +1,7 @@
 {
     "name": "rdios-testing",
     "version": "1.0.0",
-    "description": "E2E and load testing for R-DIOS",
+    "description": "E2E and load testing for ERIS",
     "scripts": {
         "test:e2e": "playwright test",
         "test:e2e:headed": "playwright test --headed",

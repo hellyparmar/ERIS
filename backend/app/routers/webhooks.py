@@ -1,5 +1,5 @@
 """
-R-DIOS Webhook endpoints for n8n to trigger.
+ERIS Webhook endpoints for n8n to trigger.
 These are internal endpoints called by n8n workflows.
 """
 from fastapi import APIRouter, Header, HTTPException, Depends

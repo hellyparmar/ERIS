@@ -1,5 +1,5 @@
 """
-Structured logging configuration for R-DIOS API.
+Structured logging configuration for ERIS API.
 
 In production, logs are JSON formatted for easier parsing and analysis.
 In development, logs are human-readable with color coding.

@@ -1,4 +1,4 @@
-// Service Worker for R-DIOS PWA
+// Service Worker for ERIS PWA
 // Provides offline caching and performance optimization
 
 const CACHE_NAME = 'rdios-v1.0.0';
@@ -164,7 +164,7 @@ self.addEventListener('push', (event) => {
     };
 
     event.waitUntil(
-        self.registration.showNotification(data.title || 'R-DIOS', options)
+        self.registration.showNotification(data.title || 'ERIS', options)
     );
 });
 

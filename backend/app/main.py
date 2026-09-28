@@ -143,12 +143,9 @@ logger.info("CORS configured")
 # app.add_middleware(SlowAPIMiddleware)
 # logger.info("Rate limiting middleware enabled")
 
-# NOTE: RLSMiddleware extracts JWT tenant context into request.state.
-# It does NOT enforce PostgreSQL row-level security at the DB session level.
-# True pg-level RLS (SET LOCAL app.tenant_id) is enforced per-query in get_db().
-from app.middleware.rls_middleware import RLSMiddleware
-app.add_middleware(RLSMiddleware)
-logger.info("Tenant-context middleware enabled (JWT → request.state.tenant_context)")
+# Note: RLSMiddleware unmounted for single-organization portfolio architecture.
+# Multi-tenant DB-level RLS policies are disabled.
+
 
 add_request_id_middleware(app)
 logger.info("Request ID tracking enabled")

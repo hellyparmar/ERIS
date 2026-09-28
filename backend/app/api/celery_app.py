@@ -1,5 +1,5 @@
 """
-Celery Configuration for R-DIOS
+Celery Configuration for ERIS
 Async task queue for PDF generation, bulk operations, scheduled jobs
 """
 

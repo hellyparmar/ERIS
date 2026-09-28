@@ -250,7 +250,7 @@ class ZohoClient:
 
     async def get_organization_details(self, organization_id: str) -> Dict[str, Any]:
         """Get details of specific organization"""
-        # Note: This uses the organization_id from Zoho, not R-DIOS
+        # Note: This uses the organization_id from Zoho, not ERIS
         response = await self._make_request("GET", f"/organizations/{organization_id}")
         return response.get("organization", {})
 

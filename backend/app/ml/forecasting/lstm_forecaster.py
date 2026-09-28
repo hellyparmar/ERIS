@@ -1,5 +1,5 @@
 """
-LSTM Forecaster for R-DIOS Demand Forecasting
+LSTM Forecaster for ERIS Demand Forecasting
 Deep Learning Time-Series Model using PyTorch
 """
 
@@ -59,7 +59,7 @@ def _get_torch_classes():
 if TORCH_AVAILABLE:
 
     class LSTMForecaster:
-        """LSTM-based demand forecasting for R-DIOS"""
+        """LSTM-based demand forecasting for ERIS"""
 
         def __init__(self, seq_length: int = 30, hidden_size: int = 64, num_layers: int = 2, dropout: float = 0.2, learning_rate: float = 0.001, batch_size: int = 32, epochs: int = 50, device: str = None):
             self.seq_length = seq_length
