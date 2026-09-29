@@ -1,36 +1,9 @@
-from pydantic_settings import BaseSettings
-from typing import Optional
+"""Compatibility alias for the canonical, fail-fast settings object.
 
-class Settings(BaseSettings):
-    # App Settings
-    DEBUG: bool = True
-    
-    # Database
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/enterprise_retail"
-    REDIS_URL: str = "redis://localhost:6379/0"
-    
-    # AI/ML
-    USE_OLLAMA: bool = True
-    OLLAMA_BASE_URL: str = "http://localhost:11434"
-    OLLAMA_MODEL: str = "llama2"
-    ANTHROPIC_API_KEY: Optional[str] = None
-    OPENAI_API_KEY: Optional[str] = None
-    
-    # JWT
-    JWT_SECRET_KEY: str = "dev_secret"
-    JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15  # 15 minutes
-    REFRESH_TOKEN_EXPIRE_DAYS: int = 30
-    
-    # CORS
-    ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:5173"
-    
-    # Feature Flags
-    ENABLE_AI_ASSISTANT: bool = True
+New code should import from :mod:`app.core.config`. This module remains while
+legacy modules are migrated away from ``app.config``.
+"""
 
-    
-    class Config:
-        env_file = ".env"
-        extra = "ignore"
+from app.core.config import Settings, settings
 
-settings = Settings()
+__all__ = ["Settings", "settings"]

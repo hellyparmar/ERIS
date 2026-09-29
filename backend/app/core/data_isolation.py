@@ -3,13 +3,14 @@ Data Isolation Utilities for Role-Based Access Control
 
 This module provides utilities for enforcing outlet-based data isolation
 in the Enterprise Retail Intelligence System. It ensures that users with
-Manager and Analyst roles can only access data from their assigned outlet,
+Manager and Viewer roles can only access data from their assigned outlets,
 while Admin users can access data across all outlets.
 """
 
 from typing import TypeVar, Optional, List
 from sqlalchemy.orm import Query
 from sqlalchemy.sql import Select
+from app.core.roles import ADMIN, user_role
 
 
 T = TypeVar('T')
@@ -20,7 +21,7 @@ class OutletDataAccess:
 
     This class provides methods to filter database queries based on user roles:
     - Admin users: No filtering (access to all outlets)
-    - Manager/Analyst users: Filtered to their assigned outlet only
+    - Manager/Viewer users: Filtered to their assigned outlets
     """
 
     @staticmethod
@@ -34,34 +35,15 @@ class OutletDataAccess:
         Returns:
             List of outlet IDs, or None if user can access all outlets
         """
-        role_name = ""
-        if hasattr(user, 'role') and user.role:
-            role_name = getattr(user.role, 'name', '')
-            if not isinstance(role_name, str) and hasattr(user.role, 'value'):
-                role_name = user.role.value
-        if not role_name and hasattr(user, 'role_id') and user.role_id:
-            role_name = str(user.role_id)
+        role_name = user_role(user)
 
-        # Standardize/lowercase
-        if isinstance(role_name, str):
-            role_name = role_name.lower().replace(' ', '_')
-
-        if role_name in ('admin', 'superadmin', 'super_admin'):
+        if role_name == ADMIN:
             return None  # Admin can access all outlets
 
-        if role_name == 'area_manager':
-            if hasattr(user, 'outlet_access') and user.outlet_access:
-                return [access.outlet_id for access in user.outlet_access]
-            if getattr(user, 'outlet_id', None):
-                return [user.outlet_id]
-            return []
-
-        if role_name in ('manager', 'outlet_manager', 'staff'):
-            if hasattr(user, 'outlet_access') and user.outlet_access:
-                return [user.outlet_access[0].outlet_id]
-            if getattr(user, 'outlet_id', None):
-                return [user.outlet_id]
-            return []
+        if hasattr(user, 'outlet_access') and user.outlet_access:
+            return [access.outlet_id for access in user.outlet_access]
+        if getattr(user, 'outlet_id', None):
+            return [user.outlet_id]
 
         # Default: no access
         return []

@@ -54,7 +54,7 @@ class Settings(BaseSettings):
             raise RuntimeError(
                 "DATABASE_URL environment variable is not set. "
                 "This is a REQUIRED configuration at startup. "
-                "Format: postgresql+asyncpg://USER:PASSWORD@HOST:PORT/DATABASE"
+                "Provide a PostgreSQL async URL or a SQLite URL."
             )
         cleaned = v.strip().lower()
         if cleaned.startswith("change_me") or cleaned in {"changeme", "placeholder", "dummy"}:
@@ -135,5 +135,4 @@ except (ValueError, RuntimeError) as e:
     )
     print(error_msg, file=sys.stderr)
     raise
-
 

@@ -63,43 +63,6 @@ BUSINESS_DEFINITIONS = {
 }
 
 # ============================================================================
-# DATA TRANSLATION - Map raw database values to User-Friendly English
-# ============================================================================
-
-# Maps product category slugs (as stored in DB) to user-friendly display names.
-# These are the actual categories used in the Indian retail product catalog.
-CATEGORY_MAPPING = {
-    # Food & Beverage
-    "food_beverages": "Food & Beverages",
-    "packaged_food": "Packaged Food",
-    "dairy_products": "Dairy Products",
-    "snacks": "Snacks & Namkeen",
-    "beverages": "Beverages",
-    "bakery": "Bakery & Confectionery",
-    # Personal Care
-    "personal_care": "Personal Care",
-    "health_hygiene": "Health & Hygiene",
-    "baby_care": "Baby Care",
-    # Household
-    "household_care": "Household Care & Cleaning",
-    "home_essentials": "Home Essentials",
-    # Electronics
-    "electronics": "Electronics & Accessories",
-    "mobile_accessories": "Mobile & Accessories",
-    # Apparel
-    "clothing": "Clothing",
-    "footwear": "Footwear",
-    # Stationery
-    "stationery": "Stationery & Office",
-    # Pharma
-    "pharma": "Pharmaceuticals & OTC",
-    # General
-    "general_merchandise": "General Merchandise",
-    "other": "Other",
-}
-
-
-# ============================================================================
 # DATABASE SCHEMA - Describe tables and columns for LLM context
 # ============================================================================
 
@@ -433,19 +396,6 @@ class SemanticLayer:
         
         return "\n".join(context_parts)
     
-    def get_translation_context(self) -> str:
-        """
-        Generate category display-name context for the LLM.
-        """
-        context_parts = ["## Category Names Reference\n"]
-        context_parts.append("The database stores product categories using the following slug → display name mapping:\n")
-
-        for slug, display in CATEGORY_MAPPING.items():
-            context_parts.append(f"- **{slug}** → **{display}**")
-            context_parts.append(f"- (User asks for '{display}') → Use '{slug}' in SQL")
-
-        return "\n".join(context_parts)
-    
     def get_business_terms_context(self) -> str:
         """
         Generate business terms glossary for LLM context.
@@ -473,9 +423,6 @@ class SemanticLayer:
         
         parts.append(self.get_business_terms_context())
         
-        # Add translation context
-        parts.append(self.get_translation_context())
-        
         parts.extend([
             "",
             "## Important SQL Rules:",
@@ -485,7 +432,6 @@ class SemanticLayer:
             "4. Use COALESCE for nullable columns (tax_amount, discount_amount)",
             "5. For date columns, use 'sale_date' not 'date'",
             "6. Join products table when you need product names",
-            "7. IF generating results, replace raw category names with their English translations defined above.",
             "",
             f"User Query: {user_query}",
         ])

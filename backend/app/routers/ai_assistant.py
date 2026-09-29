@@ -1,20 +1,16 @@
 """
 AI Assistant API Routes
 
-Authentication & RLS notes
----------------------------
+Authentication & Authorization notes
+-------------------------------------
 Every user-facing endpoint in this router requires a valid JWT via
-get_current_active_user (from app.api.deps).  The /chat endpoint extracts the
-authenticated user's organization_id (tenant_id) and accessible outlet IDs
-and threads them through ai_service.generate_response → query_executor, so
-every SQL query the AI assistant executes is (a) tenant-scoped via
-SELECT set_config('app.current_tenant_id', ...) and (b) outlet-filtered by
-the scoped outlet IDs returned by get_outlet_scope().
+get_current_active_user (from app.api.deps). The /chat endpoint filters
+queries by the scoped outlet IDs returned by get_outlet_scope().
 
 Conversation history is persisted in the chat_messages table (ChatMessage
 model, backend/app/models/chat.py) keyed on (user_id, session_id), so no
 user can read or delete another user's conversation by supplying an arbitrary
-session_id.  The in-memory `conversations` dict that previously existed here
+session_id. The in-memory `conversations` dict that previously existed here
 has been removed entirely.
 """
 
@@ -185,13 +181,12 @@ async def chat(
     - Requires a valid JWT (Bearer token).
     - Conversation history is stored per-user in chat_messages (not in memory).
     - Every SQL query the assistant executes is scoped to the authenticated
-      user's accessible outlets and tenant, satisfying PostgreSQL RLS.
+      user's accessible outlets.
     """
     try:
         from app.services.ai_service import ai_service
 
-        # ── Resolve tenant + outlet scope ────────────────────────────────────
-        tenant_id = str(current_user.organization_id)
+        # ── Resolve outlet scope ─────────────────────────────────────────────
         outlet_ids = get_outlet_scope(current_user, db)
         if not outlet_ids:
             outlet_ids = [-1]  # no accessible outlets → queries return 0 rows
@@ -220,14 +215,13 @@ Current Context:
 - Respond in {request.message.language}
 """
 
-        # ── Call AI service (tenant-scoped) ───────────────────────────────────
+        # ── Call AI service ──────────────────────────────────────────────────
         result = await ai_service.generate_response(
             message=request.message.text,
             system_prompt=full_system_prompt,
             session_history=session_history,
             execute_templates=True,
             outlet_ids=outlet_ids,
-            tenant_id=tenant_id,
         )
 
         response_text = result["text"]

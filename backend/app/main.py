@@ -102,20 +102,23 @@ async def lifespan(app: FastAPI):
     logger.info("=" * 60)
     try:
         validate_required_env_vars()
-        logger.info("Initializing database models...")
-        await init_db()
-        
-        logger.info("Bootstrapping essential records...")
-        from app.database import AsyncSessionLocal
-        from app.seed_database import bootstrap_essentials
-        async with AsyncSessionLocal() as session:
-            await bootstrap_essentials(session)
-            
-        logger.info("Checking database connectivity...")
-        db_ok = await check_database_connection()
-        if not db_ok:
-            logger.warning("Database connection check failed, continuing startup")
-        scheduler = start_scheduler()
+        if settings.ENVIRONMENT != "test":
+            logger.info("Initializing database models...")
+            await init_db()
+
+            logger.info("Bootstrapping essential records...")
+            from app.database import AsyncSessionLocal
+            from app.seed_database import bootstrap_essentials
+            async with AsyncSessionLocal() as session:
+                await bootstrap_essentials(session)
+
+            logger.info("Checking database connectivity...")
+            db_ok = await check_database_connection()
+            if not db_ok:
+                logger.warning("Database connection check failed, continuing startup")
+            start_scheduler()
+        else:
+            logger.info("Test environment: external startup services are disabled")
         logger.info("=" * 60)
         logger.info("ERIS API Ready")
         logger.info("=" * 60)
@@ -172,10 +175,6 @@ logger.info("CORS configured")
 # app.state.limiter = limiter
 # app.add_middleware(SlowAPIMiddleware)
 # logger.info("Rate limiting middleware enabled")
-
-# Note: RLSMiddleware unmounted for single-organization portfolio architecture.
-# Multi-tenant DB-level RLS policies are disabled.
-
 
 add_request_id_middleware(app)
 logger.info("Request ID tracking enabled")
@@ -275,4 +274,3 @@ async def check_seed_status(task_id: str):
         response["message"] = task_result.info.get('message', 'In progress...') if task_result.info else "In progress..."
         
     return response
-

@@ -41,32 +41,3 @@ class SaleChannel(enum.Enum):
 
 
 # ── Sale ──────────────────────────────────────────────────────────────────────
-
-
-
-class Refund(Base):
-    """
-    Records returns and refunds for sold items.
-    """
-    __tablename__ = "refunds"
-
-    id           = Column(Integer, primary_key=True, index=True)
-    sale_id      = Column(Integer, ForeignKey("sales.id", ondelete="RESTRICT"), nullable=False, index=True)
-    sale_item_id = Column(Integer, ForeignKey("sale_items.id", ondelete="RESTRICT"), index=True)
-    processed_by = Column(Integer, ForeignKey("users.id"), nullable=False)
-
-    quantity_returned = Column(Integer, nullable=False)
-    refund_amount     = Column(DECIMAL(12, 2), nullable=False)
-    reason            = Column(String(255))
-    refund_method     = Column(String(50), default=PaymentMethod.CASH.value)
-    reference         = Column(String(150))
-
-    created_at   = Column(DateTime(timezone=True), server_default=func.now(), index=True)
-
-    # Relationships
-    sale      = relationship("Sale")
-    sale_item = relationship("SaleItem")
-    processor = relationship("User", foreign_keys=[processed_by])
-
-    def __repr__(self):
-        return f"<Refund sale={self.sale_id} ₹{self.refund_amount}>"

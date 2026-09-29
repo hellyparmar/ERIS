@@ -2,18 +2,6 @@
 Query Executor for AI Assistant
 Safely executes pre-approved SQL templates against the PostgreSQL database.
 Provides data context to LLM for generating informed responses.
-
-IMPORTANT — RLS & TENANT CONTEXT
----------------------------------
-All query execution that is tenant-scoped MUST use execute_query_with_session(),
-passing a SQLAlchemy Session that was opened via get_db_sync(tenant_id=...).
-That context manager issues SELECT set_config('app.current_tenant_id', ...) on
-the same connection *before* yielding it, so PostgreSQL FORCE ROW LEVEL SECURITY
-policies are satisfied without creating a second independent engine.
-
-The legacy execute_query() (which creates its own connection from self.engine)
-is kept for internal tooling/diagnostics only and MUST NOT be called from any
-user-facing endpoint.
 """
 
 import logging
@@ -45,8 +33,7 @@ class QueryExecutor:
             db_url = os.getenv("DATABASE_URL")
             if not db_url:
                 raise RuntimeError(
-                    "DATABASE_URL environment variable is required but not set. "
-                    "Format: postgresql+psycopg://user:password@host:port/database"
+                    "DATABASE_URL environment variable is required but not set."
                 )
 
         if not (db_url.startswith("postgresql") or db_url.startswith("sqlite")):
@@ -64,7 +51,7 @@ class QueryExecutor:
         )
 
     # ------------------------------------------------------------------
-    # PRIMARY PATH — tenant-scoped, uses the app's existing session
+    # PRIMARY PATH — uses the app's existing session
     # ------------------------------------------------------------------
 
     def execute_query_with_session(
@@ -76,11 +63,7 @@ class QueryExecutor:
     ) -> Dict[str, Any]:
         """
         Execute a SELECT query using an already-open SQLAlchemy Session that
-        was obtained via get_db_sync(tenant_id=...).
-
-        This is the correct path for all user-facing AI-assistant queries.
-        The Session's connection already has app.current_tenant_id set via
-        SELECT set_config(), so PostgreSQL RLS policies are satisfied.
+        was obtained via get_db_sync().
         """
         start_time = time.time()
 
@@ -103,7 +86,7 @@ class QueryExecutor:
             execution_time = (time.time() - start_time) * 1000
 
             logger.info(
-                f"Query (tenant-scoped session) executed successfully. "
+                f"Query executed successfully. "
                 f"Rows: {len(data)}, Time: {execution_time:.2f}ms"
             )
 
@@ -147,7 +130,7 @@ class QueryExecutor:
         params: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
-        Validate + execute a template query using a tenant-scoped Session.
+        Validate + execute a template query using a database Session.
         params -- extra bind parameters (e.g. {"outlet_ids": (1, 2)}) from
                   inject_outlet_filter(); merged into the query execution.
         """
@@ -179,7 +162,7 @@ class QueryExecutor:
             }
 
     # ------------------------------------------------------------------
-    # LEGACY PATH — no tenant context; do NOT call from user endpoints
+    # ENGINE PATH — internal diagnostics only
     # ------------------------------------------------------------------
 
     def execute_query(
@@ -190,11 +173,7 @@ class QueryExecutor:
     ) -> Dict[str, Any]:
         """
         Execute a SQL query using the executor's own engine connection.
-
-        WARNING: This method creates its own connection and NEVER sets the
-        PostgreSQL session variable app.current_tenant_id.  It bypasses RLS
-        entirely.  Only use this for internal diagnostics (get_table_stats).
-        User-facing endpoints MUST use execute_query_with_session() instead.
+        Only use this for internal diagnostics (get_table_stats).
         """
         start_time = time.time()
 

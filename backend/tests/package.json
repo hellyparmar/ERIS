@@ -1,5 +1,5 @@
 {
-    "name": "rdios-testing",
+    "name": "eris-testing",
     "version": "1.0.0",
     "description": "E2E and load testing for ERIS",
     "scripts": {

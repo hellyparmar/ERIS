@@ -84,14 +84,14 @@ export const ALERT_THRESHOLDS = {
 // ROLE-BASED ACCESS CONTROL
 // ============================================================================
 export const USER_ROLES = {
-    EXECUTIVE: 'executive',
+    ADMIN: 'admin',
     MANAGER: 'manager',
-    ANALYST: 'analyst'
+    VIEWER: 'viewer'
 };
 
 export const ROLE_CONFIG = {
-    [USER_ROLES.EXECUTIVE]: {
-        label: 'Executive',
+    [USER_ROLES.ADMIN]: {
+        label: 'Admin',
         dashboardView: 'strategic',
         features: ['insights', 'trends', 'forecasts'],
         icon: 'Building2'
@@ -102,7 +102,7 @@ export const ROLE_CONFIG = {
         features: ['alerts', 'inventory', 'sales', 'actions'],
         icon: 'Users'
     },
-    [USER_ROLES.ANALYST]: {
+    [USER_ROLES.VIEWER]: {
         label: 'Analyst',
         dashboardView: 'technical',
         features: ['reports', 'analytics', 'data', 'exports'],

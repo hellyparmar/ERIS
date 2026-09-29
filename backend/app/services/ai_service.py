@@ -73,19 +73,14 @@ class AIService:
         session_history: list = [],
         execute_templates: bool = True,
         outlet_ids: list = None,
-        tenant_id: str = None,
     ) -> Dict[str, Any]:
         """
         Main entry point to get AI response.
         Includes database results when a semantic-layer template matches.
 
         outlet_ids -- list of outlet IDs the requesting user may access
-                      (from get_outlet_scope).  Templates that touch `sales`
+                      (from get_outlet_scope). Templates that touch `sales`
                       are scoped to these IDs before execution.
-        tenant_id  -- user's organization_id (str).  Used to open a
-                      get_db_sync(tenant_id=...) session so that PostgreSQL
-                      FORCE ROW LEVEL SECURITY policies are satisfied.
-                      Must be supplied together with outlet_ids.
         """
         # Determine paths based on simple heuristics
         import re
@@ -106,27 +101,23 @@ class AIService:
                     template_name, template_sql = template_match
                     logger.info(f"Template matched: {template_name}")
 
-                    if outlet_ids is not None and tenant_id is not None:
-                        # ── Correct path: tenant-scoped session (enforces RLS) ──
-                        from app.database import get_db_sync
+                    from app.database import get_db_sync
+                    if outlet_ids is not None:
                         scoped_sql, _scope_params = semantic_layer.inject_outlet_filter(
                             template_sql, outlet_ids
                         )
                         logger.info(
-                            f"Executing scoped query tenant={tenant_id} "
-                            f"outlet_ids={outlet_ids}"
+                            f"Executing scoped query outlet_ids={outlet_ids}"
                         )
-                        with get_db_sync(tenant_id=tenant_id) as db:
+                        with get_db_sync() as db:
                             result = query_executor.execute_template_query_with_session(
                                 scoped_sql, semantic_layer, db, params=_scope_params
                             )
                     else:
-                        # ── Legacy fallback: no tenant context, RLS bypassed ──
-                        logger.warning(
-                            "generate_response called without outlet_ids/tenant_id "
-                            "— RLS will NOT be enforced on this query."
-                        )
-                        result = query_executor.execute_template_query(template_sql, semantic_layer)
+                        with get_db_sync() as db:
+                            result = query_executor.execute_template_query_with_session(
+                                template_sql, semantic_layer, db
+                            )
 
                     if result.get("success"):
                         database_context = query_executor.format_results_for_llm(result)

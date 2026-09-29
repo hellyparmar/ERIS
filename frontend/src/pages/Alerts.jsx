@@ -20,11 +20,11 @@ export default function Alerts() {
     queryKey: ['user'],
     queryFn: async () => {
       const response = await api.get('/api/v1/auth/me');
-      return response.data.user;
+      return response.data;
     },
   });
 
-  const isSuperAdmin = userData?.role === 'super_admin';
+  const isSuperAdmin = userData?.role === 'admin';
 
   const { data: outletsData } = useQuery({
     queryKey: ['outlets'],

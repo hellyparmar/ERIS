@@ -25,8 +25,8 @@ test.describe('Authentication', () => {
 
     test('should login with valid credentials', async ({ page }) => {
         // Fill login form
-        await page.fill('input[name="email"]', 'demo@rdios.com');
-        await page.fill('input[name="password"]', 'Demo@123');
+        await page.fill('input[name="email"]', 'demo@eris.local');
+        await page.fill('input[name="password"]', 'test-admin-pw');
 
         // Click login button
         await page.click('button[type="submit"]');
@@ -41,7 +41,7 @@ test.describe('Authentication', () => {
 
     test('should show error with invalid credentials', async ({ page }) => {
         await page.fill('input[name="email"]', 'invalid@email.com');
-        await page.fill('input[name="password"]', 'wrongpassword');
+        await page.fill('input[name="password"]', 'not-the-test-password');
 
         await page.click('button[type="submit"]');
 
@@ -54,8 +54,8 @@ test.describe('Authentication', () => {
 
     test('should logout successfully', async ({ page }) => {
         // Login first
-        await page.fill('input[name="email"]', 'demo@rdios.com');
-        await page.fill('input[name="password"]', 'Demo@123');
+        await page.fill('input[name="email"]', 'demo@eris.local');
+        await page.fill('input[name="password"]', 'test-admin-pw');
         await page.click('button[type="submit"]');
         await page.waitForURL('/dashboard');
 
@@ -75,7 +75,7 @@ test.describe('Authentication', () => {
 
     test('should validate email format', async ({ page }) => {
         await page.fill('input[name="email"]', 'invalid-email');
-        await page.fill('input[name="password"]', 'Password123');
+        await page.fill('input[name="password"]', 'test-registration-pw');
 
         // Try to submit
         await page.click('button[type="submit"]');
@@ -87,8 +87,8 @@ test.describe('Authentication', () => {
 
     test('should persist session after refresh', async ({ page }) => {
         // Login
-        await page.fill('input[name="email"]', 'demo@rdios.com');
-        await page.fill('input[name="password"]', 'Demo@123');
+        await page.fill('input[name="email"]', 'demo@eris.local');
+        await page.fill('input[name="password"]', 'test-admin-pw');
         await page.click('button[type="submit"]');
         await page.waitForURL('/dashboard');
 
@@ -111,7 +111,7 @@ test.describe('Authentication', () => {
         await page.goto('/reset-password');
 
         // Enter email
-        await page.fill('input[name="email"]', 'demo@rdios.com');
+        await page.fill('input[name="email"]', 'demo@eris.local');
         await page.click('button[type="submit"]');
 
         // Should show success message
@@ -125,8 +125,8 @@ test.describe('Authentication', () => {
             await route.continue();
         });
 
-        await page.fill('input[name="email"]', 'demo@rdios.com');
-        await page.fill('input[name="password"]', 'Demo@123');
+        await page.fill('input[name="email"]', 'demo@eris.local');
+        await page.fill('input[name="password"]', 'test-admin-pw');
 
         const submitButton = page.locator('button[type="submit"]');
         await submitButton.click();
@@ -138,8 +138,8 @@ test.describe('Authentication', () => {
 
     test('should handle session timeout', async ({ page, context }) => {
         // Login
-        await page.fill('input[name="email"]', 'demo@rdios.com');
-        await page.fill('input[name="password"]', 'Demo@123');
+        await page.fill('input[name="email"]', 'demo@eris.local');
+        await page.fill('input[name="password"]', 'test-admin-pw');
         await page.click('button[type="submit"]');
         await page.waitForURL('/dashboard');
 
@@ -177,7 +177,7 @@ test.describe('Authentication', () => {
         await expect(strengthIndicator).toContainText(/Weak/i);
 
         // Strong password
-        await page.fill('input[name="password"]', 'SecureP@ssw0rd123!');
+        await page.fill('input[name="password"]', 'test-strong-password-123!');
         await expect(strengthIndicator).toContainText(/Strong/i);
     });
 
@@ -190,8 +190,8 @@ test.describe('Authentication', () => {
         // Simulate network failure
         await page.route('**/api/v1/auth/login', route => route.abort());
 
-        await page.fill('input[name="email"]', 'demo@rdios.com');
-        await page.fill('input[name="password"]', 'Demo@123');
+        await page.fill('input[name="email"]', 'demo@eris.local');
+        await page.fill('input[name="password"]', 'test-admin-pw');
         await page.click('button[type="submit"]');
 
         // Should show network error

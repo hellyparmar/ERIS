@@ -43,7 +43,6 @@ RUN pip install --no-cache-dir --default-timeout=1000 /wheels/*
 
 # Copy Application Code (Ensure correct context)
 COPY backend/ /app/
-COPY alembic/ /app/alembic/
 COPY alembic.ini /app/
 
 # Fix permissions

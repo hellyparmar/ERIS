@@ -9,8 +9,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = 'f28595157a94'
-down_revision = 'ab696fc771ed'
+revision = 'f28595157a94'  # pragma: allowlist secret
+down_revision = 'ab696fc771ed'  # pragma: allowlist secret
 branch_labels = None
 depends_on = None
 

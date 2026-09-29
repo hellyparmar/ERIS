@@ -4,27 +4,21 @@ import { LogOut, LayoutDashboard, ShoppingCart, Package, FileText, BarChart3, Be
 import { useAuth } from '../../contexts/AuthContext';
 
 const routeRoleMap = {
-  '/dashboard': ['super_admin', 'superadmin', 'area_manager', 'outlet_manager', 'manager'],
-  '/sales': ['super_admin', 'superadmin', 'area_manager', 'outlet_manager', 'manager'],
-  '/inventory': ['super_admin', 'superadmin', 'area_manager', 'outlet_manager', 'manager'],
-  '/invoices': ['super_admin', 'superadmin', 'area_manager', 'outlet_manager', 'manager'],
-  '/alerts': ['super_admin', 'superadmin', 'area_manager', 'outlet_manager', 'manager'],
-  '/ai-assistant': ['super_admin', 'superadmin', 'area_manager', 'outlet_manager', 'manager'],
-  '/customers': ['super_admin', 'superadmin', 'area_manager', 'outlet_manager', 'manager'],
-  '/forecasts': ['super_admin', 'superadmin', 'area_manager', 'outlet_manager', 'manager'],
-  '/settings': ['super_admin', 'superadmin', 'area_manager', 'outlet_manager', 'manager'],
-  '/analytics': ['super_admin', 'superadmin', 'area_manager'],
-  '/outlets': ['super_admin', 'superadmin', 'area_manager'],
-  '/reports': ['super_admin', 'superadmin', 'area_manager'],
-  '/customer-insights': ['super_admin', 'superadmin', 'area_manager'],
-  '/integrations': ['super_admin', 'superadmin'],
-  '/tax-compliance': ['super_admin', 'superadmin'],
-  '/gst-invoice': ['super_admin', 'superadmin'],
-  '/suppliers': ['super_admin', 'superadmin'],
-  '/contacts': ['super_admin', 'superadmin', 'area_manager', 'outlet_manager', 'manager'],
-  '/employees': ['super_admin', 'superadmin'],
-  '/causal-analysis': ['super_admin', 'superadmin', 'area_manager'],
-  '/communication': ['super_admin', 'superadmin', 'area_manager', 'outlet_manager', 'manager'],
+  '/dashboard': ['admin', 'manager', 'viewer'],
+  '/sales': ['admin', 'manager', 'viewer'],
+  '/inventory': ['admin', 'manager', 'viewer'],
+  '/invoices': ['admin', 'manager', 'viewer'],
+  '/alerts': ['admin', 'manager', 'viewer'],
+  '/ai-assistant': ['admin', 'manager', 'viewer'],
+  '/customers': ['admin', 'manager', 'viewer'],
+  '/forecasts': ['admin', 'manager', 'viewer'],
+  '/settings': ['admin', 'manager', 'viewer'],
+  '/analytics': ['admin', 'manager'],
+  '/outlets': ['admin', 'manager'],
+  '/customer-insights': ['admin', 'manager'],
+  '/gst-invoice': ['admin'],
+  '/suppliers': ['admin'],
+  '/causal-analysis': ['admin', 'manager'],
 };
 
 export default function Sidebar({ open = false, onClose = () => {}, collapsed = false, onToggle }) {
@@ -33,7 +27,7 @@ export default function Sidebar({ open = false, onClose = () => {}, collapsed = 
 
   const user = useMemo(() => {
     try {
-      const stored = JSON.parse(localStorage.getItem('rdios-user') || '{}');
+      const stored = JSON.parse(localStorage.getItem('eris-user') || '{}');
       return { ...stored, ...authUser };
     } catch {
       return authUser || { name: 'User', role: 'Admin' };
@@ -61,7 +55,6 @@ export default function Sidebar({ open = false, onClose = () => {}, collapsed = 
         { label: 'Causal Analysis',    path: '/causal-analysis',   icon: Activity },
         { label: 'Forecasts',          path: '/forecasts',         icon: TrendingUp },
         { label: 'AI Assistant',       path: '/ai-assistant',      icon: Bot },
-        { label: 'Communication Hub',  path: '/communication',     icon: MessageSquare },
         { label: 'Alerts',             path: '/alerts',            icon: Bell },
       ]
     },
@@ -69,10 +62,8 @@ export default function Sidebar({ open = false, onClose = () => {}, collapsed = 
       id: 'management',
       title: 'Management',
       items: [
-        { label: 'Employees',  path: '/employees',  icon: Users },
         { label: 'Suppliers',  path: '/suppliers',  icon: Truck },
         { label: 'Customers',  path: '/customers',  icon: Users },
-        { label: 'Contacts',   path: '/contacts',   icon: Users },
         { label: 'Outlets',    path: '/outlets',    icon: Building2 },
       ]
     },
@@ -80,9 +71,7 @@ export default function Sidebar({ open = false, onClose = () => {}, collapsed = 
       id: 'compliance',
       title: 'Compliance',
       items: [
-        { label: 'Tax Compliance', path: '/tax-compliance', icon: Calculator },
         { label: 'GST Invoice',    path: '/gst-invoice',    icon: Receipt },
-        { label: 'Integrations',   path: '/integrations',   icon: Settings },
       ]
     }
   ];

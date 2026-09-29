@@ -18,6 +18,7 @@ from app.models.inventory import Inventory
 from app.models.employee_models import Employee
 from app.api.deps import get_current_active_user, get_accessible_outlet_ids
 from app.core.data_isolation import OutletDataAccess, require_outlet_access
+from app.core.roles import ADMIN, user_role
 
 router = APIRouter(prefix="/outlets", tags=["outlets"])
 
@@ -165,8 +166,7 @@ async def update_outlet(
     db: AsyncSession = Depends(get_db)
 ) -> Any:
     """Update outlet info. Superadmin/Admin only."""
-    role_name = getattr(current_user.role, 'name', str(current_user.role or '')).lower()
-    if role_name not in ["super_admin", "admin", "superadmin"]:
+    if user_role(current_user) != ADMIN:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only superadmin can update outlets"
@@ -305,8 +305,7 @@ async def create_outlet(
     db: AsyncSession = Depends(get_db)
 ) -> Any:
     """Create new outlet. Superadmin only."""
-    role_name = getattr(current_user.role, 'name', str(current_user.role or '')).lower()
-    if role_name not in ["super_admin", "admin", "superadmin"]:
+    if user_role(current_user) != ADMIN:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only superadmin can create outlets"
@@ -340,8 +339,7 @@ async def delete_outlet(
     db: AsyncSession = Depends(get_db)
 ) -> Any:
     """Delete outlet. Superadmin only."""
-    role_name = getattr(current_user.role, 'name', str(current_user.role or '')).lower()
-    if role_name not in ["super_admin", "admin", "superadmin"]:
+    if user_role(current_user) != ADMIN:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only superadmin can delete outlets"

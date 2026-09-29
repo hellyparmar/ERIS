@@ -21,6 +21,7 @@ from app.core.security import (
 )
 from app.api.deps import get_current_active_user, require_role
 from app.core.config import settings
+from app.core.roles import CANONICAL_ROLES, normalize_role
 import logging
 
 logger = logging.getLogger(__name__)
@@ -64,10 +65,11 @@ async def _rollback(db: Any) -> None:
 
 class RegisterRequest(BaseModel):
     username: str
+    email: str
     password: str
     first_name: str
     last_name: str
-    role: str = "outlet_manager"
+    role: str = "viewer"
 
 class UserOut(BaseModel):
     id: int
@@ -107,11 +109,11 @@ async def login(
             detail="Invalid credentials"
         )
 
-    role_name = "staff"
+    role_name = "viewer"
     role_result = await _execute(db, select(Role.name).where(Role.id == user.role_id))
     role_row = role_result.scalar_one_or_none()
     if role_row:
-        role_name = role_row
+        role_name = normalize_role(role_row)
 
     access_token = create_access_token({
         "sub": user.username,
@@ -163,11 +165,11 @@ async def login_json(
             detail="Invalid credentials"
         )
 
-    role_name = "staff"
+    role_name = "viewer"
     role_result = await _execute(db, select(Role.name).where(Role.id == user.role_id))
     role_row = role_result.scalar_one_or_none()
     if role_row:
-        role_name = role_row
+        role_name = normalize_role(role_row)
 
     access_token = create_access_token({
         "sub": user.username,
@@ -237,8 +239,9 @@ async def refresh_token(
                 detail="Invalid refresh token"
             )
 
-        access_token = create_access_token({"sub": user.username, "role": user.role.name if user.role else 'staff'})
-        new_refresh_token = create_refresh_token({"sub": user.username, "role": user.role.name if user.role else 'staff'})
+        role_name = normalize_role(user.role.name if user.role else None)
+        access_token = create_access_token({"sub": user.username, "role": role_name})
+        new_refresh_token = create_refresh_token({"sub": user.username, "role": role_name})
 
         return {
             "access_token": access_token,
@@ -278,7 +281,7 @@ async def read_users_me(
         username = payload.get("sub")
         if username is None:
             raise credentials_exception
-    except:
+    except Exception:
         raise credentials_exception
     
     result = await _execute(db, select(User).where(User.username == username))
@@ -287,11 +290,11 @@ async def read_users_me(
     if not user or not user.is_active:
         raise credentials_exception
 
-    role_name = "staff"
+    role_name = "viewer"
     role_result = await _execute(db, select(Role.name).where(Role.id == user.role_id))
     role_row = role_result.scalar_one_or_none()
     if role_row:
-        role_name = role_row
+        role_name = normalize_role(role_row)
     
     return {
         "id": user.id,
@@ -309,10 +312,10 @@ async def register(
     request: Request,
     req: RegisterRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role("super_admin", "area_manager"))
+    current_user: User = Depends(require_role("admin"))
 ) -> Any:
     """
-    Register a new user (only super_admin or area_manager can register).
+    Register a new user (admin only).
     
     SECURITY FEATURES:
     - Password strength validation (min 12 chars, uppercase, lowercase, digit, special)
@@ -323,6 +326,7 @@ async def register(
     try:
         # Sanitize inputs
         username = sanitize_input(req.username, "username", 50)
+        email = sanitize_input(req.email, "email", 120)
         first_name = sanitize_input(req.first_name, "first_name", 100)
         last_name = sanitize_input(req.last_name, "last_name", 100)
         
@@ -345,16 +349,15 @@ async def register(
             )
 
         # Resolve role relationship
-        req_role = req.role.lower().replace(' ', '_')
-        if req_role == "staff":
-            req_role = "outlet_manager"
-        elif req_role in ("manager", "outlet_manager"):
-            req_role = "outlet_manager"
-        elif req_role in ("admin", "superadmin", "super_admin"):
-            req_role = "super_admin"
+        req_role = normalize_role(req.role)
+        if req_role not in CANONICAL_ROLES:
+            raise HTTPException(status_code=400, detail="Invalid role specified")
 
-        role_result = await _execute(db, select(Role).where(Role.name == req_role))
-        role_obj = role_result.scalar_one_or_none()
+        role_result = await _execute(db, select(Role))
+        role_obj = next(
+            (role for role in role_result.scalars().all() if normalize_role(role.name) == req_role),
+            None,
+        )
         if not role_obj:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -367,6 +370,7 @@ async def register(
         # Create user
         new_user = User(
             username=username,
+            email=email,
             hashed_password=hashed_password,
             first_name=first_name,
             last_name=last_name,

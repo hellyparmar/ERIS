@@ -1,6 +1,6 @@
 repos:
   # ----------------------------------------------------------------
-  # gitleaks – blocks commits that contain secrets
+  # gitleaks - blocks commits that contain secrets
   # Docs: https://github.com/gitleaks/gitleaks
   # ----------------------------------------------------------------
   - repo: https://github.com/gitleaks/gitleaks
@@ -9,7 +9,7 @@ repos:
       - id: gitleaks
 
   # ----------------------------------------------------------------
-  # detect-secrets – secondary scanner (different ruleset)
+  # detect-secrets - secondary scanner (different ruleset)
   # To update baseline:  detect-secrets scan > .secrets.baseline
   # ----------------------------------------------------------------
   - repo: https://github.com/Yelp/detect-secrets
@@ -17,9 +17,6 @@ repos:
     hooks:
       - id: detect-secrets
         args: ["--baseline", ".secrets.baseline"]
-        exclude: |
-          (?x)^(
-            package-lock\.json|
-            .*\.example|
-            .*\.ipynb
-          )$
+        # Lock files contain package integrity hashes. Example files and
+        # notebooks remain scanned because both can contain live keys.
+        exclude: '(?i)(^|/)package-lock\.json$'

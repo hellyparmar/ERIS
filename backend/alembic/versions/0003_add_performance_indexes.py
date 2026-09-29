@@ -22,7 +22,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '003_add_performance_indexes'
-down_revision = '459541e7af7d'
+down_revision = '459541e7af7d'  # pragma: allowlist secret
 branch_labels = None
 depends_on = None
 

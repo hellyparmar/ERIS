@@ -1,7 +1,7 @@
 # Import all models to ensure they are registered with SQLAlchemy
 
 from .base import Base
-from .users import User, UserRoleEnum as UserRole, Role, UserOutletAccess
+from .users import User, UserRoleEnum as UserRole, Role, UserOutletAccess, UserOutlet
 from .organization import Organization
 from .outlet import Outlet
 from .customers import Customer
@@ -29,7 +29,7 @@ from .audit import AuditLogEntry
 
 __all__ = [
     "Base",
-    "User", "UserRole", "Role", "UserOutletAccess",
+    "User", "UserRole", "Role", "UserOutletAccess", "UserOutlet",
     "Outlet",
     "Customer",
     "Product",

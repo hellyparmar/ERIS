@@ -57,7 +57,7 @@ export default function Inventory() {
     },
   });
   
-  const isSuperAdmin = userData?.role === 'super_admin';
+  const isSuperAdmin = userData?.role === 'admin';
   const userOutletId = userData?.outlet_id;
 
   const { data: inventoryData, isLoading: inventoryLoading, error: inventoryError, refetch: refetchInventory } = useQuery({

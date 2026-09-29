@@ -2,7 +2,11 @@
 
 This document tracks every credential, token, and secret that has ever been present or referenced across the ERIS codebase and repository history.
 
-> **Status Notice**: All credentials in active code (`HEAD`) have been removed and replaced with dynamic reads from environment variables. Any required secret missing or set to a placeholder (`CHANGE_ME`) at runtime causes an immediate fail-fast termination (`RuntimeError`).
+> **Status Notice**: Active code reads credentials from environment variables and
+> required secrets fail fast when missing or set to `CHANGE_ME`. Historical
+> findings remain incidents until the associated services are rotated and the
+> GitGuardian records are resolved; cleaning the current tree does not revoke a
+> credential or remove it from Git history.
 
 ---
 
@@ -11,9 +15,9 @@ This document tracks every credential, token, and secret that has ever been pres
 | # | Credential / Secret | Where It Lived in Repo History | Rotated (Y/N) | Env Var Name Now Used | Purpose / Usage Context |
 |---|---------------------|--------------------------------|---------------|-----------------------|-------------------------|
 | 1 | **Database Password** | `backend/app/services/query_executor.py`, `backend/app/database.py` (commits `492088a`, `fb38a65`, `4017deb`) | [ ] | `DATABASE_URL`, `POSTGRES_PASSWORD` | PostgreSQL production database connection string and password. |
-| 2 | **JWT Secret Key** | Hardcoded defaults (`"your-super-secret-key..."`, `"dev_secret"`, `"your-secret-key"`) in `backend/app/core/security.py`, `backend/app/core/config.py`, `backend/app/models/tenant_context.py` | [ ] | `JWT_SECRET_KEY` (alias `JWT_SECRET`) | HS256 HMAC signing key for user authentication tokens. |
+| 2 | **JWT Secret Key** | Historical hardcoded defaults in authentication/configuration modules | [ ] | `JWT_SECRET_KEY` (alias `JWT_SECRET`) | HS256 HMAC signing key for user authentication tokens. |
 | 3 | **Encryption / Fernet Key** | Fallback key generation / dummy strings in `backend/app/api/utils/encryption.py`, `backend/app/api/integrations/zoho_auth.py` | [ ] | `ENCRYPTION_KEY` | Symmetric 32-byte Fernet key for encrypting sensitive tenant/integration tokens at rest. |
-| 4 | **n8n / Webhook Secret** | `docker-compose.yml`, `backend/n8n_workflows/daily_stock_check.json`, `backend/app/routers/webhooks.py` (`rdios-n8n-secret`) | [ ] | `N8N_WEBHOOK_SECRET` / `WEBHOOK_SECRET` | Header secret token (`X-Webhook-Secret`) authenticating incoming automated trigger requests. |
+| 4 | **n8n / Webhook Secret** | Historical Compose, workflow, and webhook-router defaults | [ ] | `N8N_WEBHOOK_SECRET` | Header secret token (`X-Webhook-Secret`) authenticating incoming automated trigger requests. |
 | 5 | **Groq API Key** | `backend/app/services/ai_service.py`, `backend/app/routers/forecasting.py`, `.env.example` | [ ] | `GROQ_API_KEY` | Fast LLM inference endpoint (Llama / Mixtral models). |
 | 6 | **Gemini API Key** | `backend/app/services/ai_service.py`, `research/notebooks/ai_assistant_evaluation.ipynb`, `.env.example` | [ ] | `GEMINI_API_KEY` | Google Gemini AI assistant and natural language SQL query generation. |
 | 7 | **OpenRouter API Key** | `backend/app/services/ai_service.py`, `.env.example` | [ ] | `OPENROUTER_API_KEY` | Multi-model fallback gateway for retail intelligence queries. |
@@ -22,6 +26,7 @@ This document tracks every credential, token, and secret that has ever been pres
 | 10 | **Zoho OAuth Client Secret & Refresh Token** | `backend/app/api/integrations/zoho_client.py`, `backend/app/api/integrations/zoho_auth.py` | [ ] | `ZOHO_CLIENT_SECRET`, `ZOHO_REFRESH_TOKEN` | OAuth2 credentials for syncing Zoho Inventory and Books. |
 | 11 | **MSG91 / WhatsApp API Key** | `backend/app/services/message_service.py`, `backend/app/services/whatsapp.py`, `.env.example` | [ ] | `MSG91_API_KEY`, `WHATSAPP_API_TOKEN` | SMS / WhatsApp transactional alerts and customer notification dispatch. |
 | 12 | **OpenWeather API Key** | `backend/app/services/weather_service.py`, `.env.example` | [ ] | `OPENWEATHER_API_KEY` | External factor demand forecasting weather enrichment. |
+| 13 | **Supabase Project URL / Browser Key** | `frontend/.env.example` in repository history | [ ] | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` | Remove if Supabase is not used; otherwise rotate/restrict the key and verify row-level policies. |
 
 ---
 

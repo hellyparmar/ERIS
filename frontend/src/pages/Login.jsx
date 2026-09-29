@@ -22,12 +22,12 @@ export default function Login() {
 
   const fillDemo = (role) => {
     const map = {
-      admin:   ['admin',   'admin123'],
-      manager: ['manager', 'manager123'],
-      analyst: ['analyst', 'analyst123'],
+      admin: 'admin',
+      manager: 'manager',
+      viewer: 'viewer',
     };
-    setUsername(map[role][0]);
-    setPassword(map[role][1]);
+    setUsername(map[role]);
+    setPassword('');
     setError('');
   };
 
@@ -147,7 +147,7 @@ export default function Login() {
               Quick Demo Access
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              {['admin', 'manager', 'analyst'].map(role => (
+              {['admin', 'manager', 'viewer'].map(role => (
                 <button
                   key={role}
                   className="action-btn"

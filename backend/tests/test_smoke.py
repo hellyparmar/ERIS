@@ -37,7 +37,7 @@ def test_login_invalid_password_refused(client, seed_users):
     """Smoke test: Login with bad credentials is explicitly rejected with 401."""
     res = client.post(
         "/api/v1/auth/login",
-        data={"username": "admin", "password": "wrong-password"}
+        data={"username": "admin", "password": "not-the-test-password"},  # pragma: allowlist secret
     )
     assert res.status_code == 401
 
@@ -105,7 +105,7 @@ def test_startup_refuses_placeholder_jwt_secret(monkeypatch):
     monkeypatch.setenv("JWT_SECRET_KEY", "CHANGE_ME")
     monkeypatch.setenv("JWT_SECRET", "CHANGE_ME")
     monkeypatch.setenv("DATABASE_URL", "sqlite:///./test.db")
-    monkeypatch.setenv("ENCRYPTION_KEY", "MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA=")
+    monkeypatch.setenv("ENCRYPTION_KEY", "TU9DS19FTkNSWVBUSU9OX0tFWV9GT1JfVEVTVFNfX18=")  # pragma: allowlist secret
     with pytest.raises(RuntimeError, match="Missing or placeholder required environment variables"):
         validate_required_env_vars()
 
@@ -113,8 +113,8 @@ def test_startup_refuses_placeholder_jwt_secret(monkeypatch):
 def test_startup_refuses_placeholder_database_url(monkeypatch):
     """App startup validation must raise RuntimeError if DATABASE_URL is a placeholder."""
     monkeypatch.setenv("DATABASE_URL", "CHANGE_ME")
-    monkeypatch.setenv("JWT_SECRET_KEY", "test-jwt-secret-key-32-chars-long-for-testing-only")
-    monkeypatch.setenv("ENCRYPTION_KEY", "MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA=")
+    monkeypatch.setenv("JWT_SECRET_KEY", "MOCK_JWT_SIGNING_KEY_FOR_TESTS")  # pragma: allowlist secret
+    monkeypatch.setenv("ENCRYPTION_KEY", "TU9DS19FTkNSWVBUSU9OX0tFWV9GT1JfVEVTVFNfX18=")  # pragma: allowlist secret
     with pytest.raises(RuntimeError, match="Missing or placeholder required environment variables"):
         validate_required_env_vars()
 
@@ -122,7 +122,7 @@ def test_startup_refuses_placeholder_database_url(monkeypatch):
 def test_startup_refuses_placeholder_encryption_key(monkeypatch):
     """App startup validation must raise RuntimeError if ENCRYPTION_KEY is a placeholder."""
     monkeypatch.setenv("DATABASE_URL", "sqlite:///./test.db")
-    monkeypatch.setenv("JWT_SECRET_KEY", "test-jwt-secret-key-32-chars-long-for-testing-only")
+    monkeypatch.setenv("JWT_SECRET_KEY", "MOCK_JWT_SIGNING_KEY_FOR_TESTS")  # pragma: allowlist secret
     monkeypatch.setenv("ENCRYPTION_KEY", "CHANGE_ME")
     with pytest.raises(RuntimeError, match="Missing or placeholder required environment variables"):
         validate_required_env_vars()

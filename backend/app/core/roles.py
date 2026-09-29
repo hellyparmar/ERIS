@@ -39,3 +39,14 @@ def normalize_role(value: Any) -> str:
             value = role_name
     key = str(value).strip().lower().replace(" ", "_")
     return _ALIASES.get(key, key)
+
+
+def user_role(user: Any) -> str:
+    """Return the canonical role for a user-like object."""
+    role = getattr(user, "role", None)
+    if role is not None:
+        name = getattr(role, "name", None)
+        if name is not None:
+            return normalize_role(name)
+        return normalize_role(role)
+    return normalize_role(None)

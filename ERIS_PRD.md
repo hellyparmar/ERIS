@@ -3,9 +3,9 @@
 
 ```
 doc_type: PRD
-doc_version: 1.0
+doc_version: 1.1
 generated_from: ERIS_project.zip (audited directly, file-by-file, not assumed)
-audit_date: 2026-07-24
+audit_date: 2026-09-29
 project_stage: Student internship portfolio project (Petpooja internship context)
 project_status: ACTIVE DEVELOPMENT — NOT PRODUCTION READY
 ```
@@ -31,13 +31,12 @@ acceptance criterion. Treat unmet acceptance criteria as bugs, not opinions.
 
 ## 1. Project Overview
 
-**What ERIS is:** a single-tenant-first, multi-tenant-capable business intelligence and
-monitoring platform for a multi-outlet Indian restaurant/QSR chain that already has sales
-data (e.g. imported or synced from an existing POS system like Petpooja). ERIS is NOT a
-live point-of-sale terminal at a till; it covers sales analytics and record management,
-inventory, GST-compliant billing, supplier/employee management, an AI chat assistant
-grounded in the business's own data, and demand forecasting that accounts for weather,
-public holidays/festivals, and macroeconomic conditions.
+**What ERIS is:** a single-organization business intelligence and monitoring platform
+for one multi-outlet Indian restaurant/QSR chain. It receives sales through its own
+synthetic-data generator, CSV import, or manual entry. ERIS is NOT a live point-of-sale
+terminal; its portfolio thesis is sales/inventory analytics, GST-compliant billing, a
+data-grounded AI assistant, and demand forecasting that accounts for weather, public
+holidays/festivals, and macroeconomic conditions.
 
 **Origin & context:** built as a student internship project (Petpooja internship, an
 Indian restaurant POS/billing company), using only free/open-source tools and
@@ -58,8 +57,8 @@ This choice was made deliberately because:
   was the natural direction
 
 **REQ-CORE-01:** The system SHALL model a single fictional Indian restaurant chain
-across 5-6 outlets in different Indian cities, not a generic/multi-domain retail system.
-*Acceptance:* `app/seed_database.py`'s `OUTLETS` list contains 5-6 entries with real
+across five outlets in different Indian cities, not a generic/multi-domain retail system.
+*Acceptance:* `app/seed_database.py`'s `OUTLETS` list contains five entries with real
 Indian city names, real approximate lat/lon, and a climate `type` classification.
 *Status: MET* — 5 outlets currently defined (Mumbai, Delhi, Bangalore, Chennai, Jaipur)
 with real coordinates and climate typing (`coastal`/`extreme`/`mild`).
@@ -82,7 +81,7 @@ macroeconomic indicators (CPI/inflation/repo rate).
 *Acceptance:* see Section 8.5.
 
 **REQ-GOAL-03 (Operations):** Provide one coherent place to manage inventory, sales,
-suppliers, employees, and GST-compliant billing across all outlets.
+suppliers, outlets, and GST-compliant billing across all outlets.
 *Acceptance:* see Section 8.1-8.3.
 
 **REQ-GOAL-04 (Insights):** Surface actionable insights (alerts, causal drivers of
@@ -90,10 +89,9 @@ sales changes, dashboards) rather than raw data dumps.
 *Acceptance:* see Section 8.6.
 
 **REQ-GOAL-05 (Cost constraint):** The system SHALL be buildable and runnable using
-only free and open-source tools and services as its primary path. Paid APIs (Groq,
-OpenRouter, Gemini, Zoho, Odoo cloud) may exist as optional integrations but the system
-MUST be fully functional with zero paid dependencies (Ollama local inference,
-Open-Meteo weather, self-hosted Postgres/Redis/n8n).
+only free and open-source tools and services as its primary path. Optional LLM API keys
+may be supported, but the system MUST be fully functional with zero paid dependencies
+(Ollama local inference, Open-Meteo weather, PostgreSQL, and Valkey).
 *Acceptance:* the app starts and every core feature (sales, inventory, GST, forecasting,
 AI assistant) works with `.env` containing no third-party paid API keys at all.
 
@@ -104,22 +102,26 @@ reverses this)
 |---|---|---|
 | Point-of-Sale (POS) terminal / till hardware sync | Removed | ERIS is a pure BI & retail analytics platform; retailers use their own POS |
 | Shopify / WooCommerce integrations | Explicitly descoped | No backend connector or router exists; out of scope for Indian QSR chain focus |
-| Tally integration | Removed | Legacy connector was a broken stub; removed in favor of real Odoo & Zoho Books integrations |
+| Tally integration | Removed | Legacy connector was a broken stub and is unnecessary for the portfolio thesis |
 | Loyalty program | Cut | Not core to stated goals; adds scope without proving the core thesis |
 | Khata / credit ledger | Cut | Same as above |
 | Community / inter-business marketplace | Cut | Out of scope for a single-chain intelligence system |
 | Prometheus/Grafana observability stack | Cut | Production-grade observability is overkill for a portfolio project; a plain `/health` endpoint is sufficient |
 | Generic `crud_v2` router | Cut | Redundant with domain-specific routers; confirmed superseded |
-| Full-system (all 30+ tables) multi-tenant RLS | Explicitly descoped | Scoped instead to 6 core tables (Section 2.2) — doing this correctly on 6 tables beats doing it superficially on all of them |
+| Multi-tenant organizations / RLS | Removed | The owner explicitly selected one organization with 5-7 outlets; outlet authorization is sufficient |
+| Employee management, Contacts, Communication Hub | Deferred | Large secondary domains that dilute the AI/forecasting portfolio focus |
+| Odoo/Zoho/POS vendor sync | Deferred | CSV import, manual entry, and synthetic data are the required sources; add one connector only after a demonstrated need |
+| n8n automation service | Removed | APScheduler/Celery already cover current background work without another service |
 
-## 2.2 Multi-tenant RLS — explicit scope decision
+## 2.2 Single-organization authorization — explicit scope decision
 
-**REQ-TENANCY-01:** Multi-tenant row-level security applies ONLY to these six tables:
-`Outlet`, `Product`, `Inventory`, `SaleTransaction`, `Customer`, `Invoice`. No other
-table is required to be tenant-isolated. This was a deliberate scope decision (not a
-shortcut discovered later) made because full-system RLS is a large, security-critical
-undertaking better done correctly on a limited surface than broadly and unreliably.
-*Acceptance:* see Section 8.7.
+**REQ-TENANCY-01:** ERIS SHALL operate as one organization with five seeded outlets.
+Authorization is enforced by role and outlet assignment: an admin can access every
+outlet, a manager can access assigned outlets, and a viewer has read-only access to
+assigned data. Legacy tenant columns may remain for migration compatibility, but no
+request middleware or PostgreSQL RLS session variable is required.
+*Acceptance:* cross-outlet authorization tests pass and no multi-organization UI or API
+is exposed.
 
 ---
 
@@ -127,10 +129,9 @@ undertaking better done correctly on a limited surface than broadly and unreliab
 
 | Persona | Needs |
 |---|---|
-| Outlet Manager | Daily sales visibility, inventory tracking and alerts, staff scheduling, local store metrics |
-| Area Manager | Multi-outlet operational oversight, store comparisons, regional stock and staffing balance |
-| Chain Owner / Admin | Cross-outlet analytics, demand forecasting, GST compliance, causal insight into demand swings, financial reporting |
-| (Future) Accountant | GST filing exports, Tally/Zoho sync |
+| Manager | Daily sales visibility, inventory tracking, alerts, and assigned-outlet metrics |
+| Viewer / Analyst | Read-only dashboards, reports, forecasts, and AI-assisted analysis |
+| Chain Owner / Admin | All-outlet analytics, configuration, demand forecasting, GST compliance, and user/outlet administration |
 
 ---
 
@@ -143,9 +144,9 @@ undertaking better done correctly on a limited surface than broadly and unreliab
 | Backend framework | FastAPI (Python) | Async throughout |
 | ORM | SQLAlchemy (async) | `app/database.py` is the single canonical DB module |
 | Database | PostgreSQL | via `asyncpg` + `psycopg2-binary` |
-| Cache/Queue broker | Redis | |
-| Async task queue | Celery (worker + beat) | Module path: `app.api.celery_app:celery_app` |
-| Migrations | Alembic | `alembic/versions/` |
+| Cache/Queue broker | Valkey | Open-source Redis-compatible service |
+| Async task queue | Celery worker | Module path: `app.api.celery_app:celery_app`; APScheduler owns periodic jobs |
+| Migrations | Alembic | Single canonical tree: `backend/alembic/versions/` |
 | Auth | JWT (`python-jose`, `PyJWT`), `passlib`/`bcrypt` | Role-based email/username + password login for managers, area managers, admins |
 | LLM inference (primary) | Ollama (local, free) | via `OLLAMA_BASE_URL` |
 | LLM inference (fallback) | Groq, OpenRouter (free-tier) | Gemini/OpenAI/Anthropic SDKs present in requirements but not part of the required fallback chain — see REQ-AI-02 |
@@ -159,8 +160,7 @@ undertaking better done correctly on a limited surface than broadly and unreliab
 | Frontend charts | Chart.js + react-chartjs-2, Recharts | |
 | Frontend animation | Framer Motion, react-three-fiber/drei (three.js) | used for some visual/3D UI elements |
 | Frontend testing | Playwright | `frontend/tests/` |
-| Automation (optional) | n8n (self-hosted, free) | workflow: `backend/n8n_workflows/daily_stock_check.json` |
-| Containerization | Docker Compose | services: db, redis, backend, worker, celery_beat, frontend, proxy |
+| Containerization | Docker Compose | services: db, Valkey, backend, worker, frontend, proxy |
 
 **REQ-STACK-01:** No new paid third-party SDK dependency may be added to
 `requirements.txt` or `package.json` without an explicit, documented free-tier or
@@ -168,11 +168,10 @@ self-hosted alternative already working as the default path.
 
 ### 4.2 Deployment topology
 
-`docker-compose.yml` (canonical, actively used) defines: `db` (Postgres), `redis`,
-`backend` (FastAPI/uvicorn), `worker` (Celery worker), `frontend` (Vite/nginx),
-`proxy` (nginx reverse proxy), and `n8n` (automation). Two older,
-inconsistent compose files (`docker-compose.prod.yml`, `docker-compose.production.yml`)
-are archived under `/deploy-reference/` — reference only, not for active use.
+`docker-compose.yml` (canonical) defines: `db` (PostgreSQL), `redis` (Valkey),
+`backend` (FastAPI/Gunicorn), `worker` (Celery worker), `frontend` (Vite build served by
+nginx), and `proxy` (nginx reverse proxy). Services communicate on the Compose bridge
+network by service name.
 
 
 ### 4.3 Backend directory map (Cleaned Architecture)
@@ -185,7 +184,7 @@ backend/
   app/
     main.py                     — FastAPI app entrypoint, middleware registration
     api_router_registry.py      — SINGLE SOURCE OF TRUTH for live router registrations
-    database.py                 — Canonical async DB engine/session (get_db dependency)
+    database.py                 — Canonical async/sync DB engines and dependencies
     seed_database.py            — Canonical dataset generator & seeder (outlets, products, sales, customers)
     seed_rag.py                 — Ingestion script populating unstructured RAG documents
     models/                     — Canonical ORM models (models_v6.py, users.py, outlet.py, base.py, etc.)
@@ -198,14 +197,11 @@ backend/
                                    - weather_service.py (Open-Meteo integration)
                                    - external_factors_service.py (Weather/holiday regressors)
                                    - causal_analysis.py (Causal driver analysis)
-                                   - message_service.py (Communication Hub)
     ml/forecasting/             — Forecasting models:
                                    - prophet_forecaster.py (Prophet model with weather/holiday regressors)
                                    - ensemble.py & xgboost_forecaster.py (Multi-model forecasting support)
                                    - causal_engine.py (DoWhy/CausalML inference engine)
-    middleware/                 — Middleware stack:
-                                   - rls_middleware.py (Row-level security tenant enforcement)
-                                   - rate_limiter.py (SlowAPI rate limiting)
+    middleware/                 — Request controls such as SlowAPI rate limiting
 ```
 
 ### 4.4 Status of Dead Code Trees & Scratch Files (Purged in Phase 6 + Session 2026-09-07)
@@ -263,8 +259,8 @@ signal — optional enhancement, not a defect).
 outlet, agreed explicitly during project planning.
 *Status: MET* — `app/seed_database.py` generates 365 days (1 full year) of daily
 sales, line items, day-close reconciliations, and inventory tracking across all
-5 outlets (`start_date = end_date - timedelta(days=365)`), adhering to multi-tenant
-RLS requirements and realistic growth/holiday/monsoon scalers.
+5 outlets (`start_date = end_date - timedelta(days=365)`) with realistic
+growth/holiday/monsoon scalers.
 
 **REQ-DATA-04:** Sales patterns must be explainable, not random noise: weekday/weekend
 multipliers, lunch/dinner time-of-day multipliers, per-outlet monsoon-month dips,
@@ -305,7 +301,9 @@ status verdicts are consolidated in Section 8 to avoid duplication — this sect
 the "what should be true" spec; Section 8 is the "what is actually true right now" audit.
 
 ### 7.1 Auth
-**REQ-AUTH-01:** Unified JWT-based auth flow supporting role-based password login (admin, manager, analyst) with refresh and session restore.
+**REQ-AUTH-01:** Unified JWT-based auth flow supporting role-based password login
+(admin, manager, viewer) with refresh and session restore. Legacy role names are
+accepted only at compatibility boundaries and normalized before authorization.
 Location: `app/routers/auth.py`, `app/api/auth/`.
 
 ### 7.2 Sales
@@ -327,7 +325,7 @@ Location: `app/routers/customers.py`.
 calculation (correct restaurant slab — 5% no-ITC for standalone restaurants),
 e-invoice preparation, GSTR-1-style reporting, bill reconciliation.
 Location: `app/routers/gst_billing.py`, `app/services/gst_calculator.py`,
-`app/services/bill_management_service.py`, `app/services/einvoice_service.py`,
+`app/services/invoice_service.py`, `app/services/invoice_pdf_service.py`, and
 `app/services/gstr1_service.py`.
 **REQ-GST-02:** Exactly one `GSTCalculator` implementation may exist; no router may
 import GST rate logic from two different modules simultaneously.
@@ -340,7 +338,7 @@ Location: `app/ml/forecasting/prophet_forecaster.py`, `app/ml/forecasting/xgboos
 `app/ml/forecasting/lstm_forecaster.py`, `app/ml/forecasting/ensemble.py`.
 **REQ-FORECAST-02:** Async forecast requests must be processed by a real Celery
 worker, not hang indefinitely. Results and metrics (MAPE, RMSE, MAE) for all models must be stored in DB.
-Location: `docker-compose.yml` `worker`/`celery_beat` services,
+Location: `docker-compose.yml` `worker` service,
 `app/tasks/forecasting_tasks.py`.
 
 ### 7.7 AI Assistant
@@ -355,83 +353,58 @@ order value trends. Template identifiers (from `QUERY_TEMPLATES` dict in `semant
 `top_products_by_revenue`, `revenue_by_period`, `daily_sales_trend`, `top_customers`,
 `low_stock_products`, `dead_stock_analysis`, `compare_revenue_periods`,
 `underperforming_outlets`, `slowest_inventory`, `supplier_debt`, `aov_trend`.
-Schema discrepancy noted: `SCHEMA_DESCRIPTIONS['customers']` lists a `name` column that
-does not exist in the actual DB; real columns are `first_name` + `last_name`. The SQL
-in `top_customers` template is correct (`c.first_name || ' ' || c.last_name`) but the
-schema doc in `semantic_layer.py` should be updated if used to generate LLM SQL.
 **REQ-AI-02:** LLM provider priority order: Ollama (local, free, primary) → Groq
 (free tier) → OpenRouter (free tier) → Gemini (free tier) → generic error, with NO silent fallback to
 fabricated/hardcoded "demo mode" numbers when data is genuinely unavailable — verified 0% literal fabrication.
 **REQ-AI-03:** No exception handler may return raw internal error text to the end
 user; failover across providers must be silent to the user except for the final
 "couldn't get an answer" case ("All AI providers are currently unavailable. Please try again later.") while retaining real grounded SQL execution data in `query_result`.
-**REQ-AI-04 (DISCOVERED GAP — FIXED 2026-09-23):** `POST /api/v1/ai/chat` previously
-had NO authentication dependency and called `ai_service.generate_response()` with no
-tenant or outlet context. `query_executor.py` created its own independent SQLAlchemy
-`Engine` via `create_engine()`, completely bypassing `get_db`/`get_db_sync` and therefore
-never calling `SELECT set_config('app.current_tenant_id', ...)`. This meant every AI
-assistant SQL query either failed (FORCE ROW LEVEL SECURITY) or silently crossed tenant
-boundaries on a real Postgres deployment.
-Fix applied: (1) `POST /chat`, `DELETE /history/{session_id}`, and `POST /validate-sql`
-now require `get_current_active_user`. (2) `/chat` extracts `organization_id` (tenant_id)
-and calls `get_outlet_scope()` to get the user's accessible outlet IDs. (3) These are
-threaded through `generate_response(outlet_ids=..., tenant_id=...)` → `semantic_layer.inject_outlet_filter()`
-→ `execute_template_query_with_session()` inside `get_db_sync(tenant_id=...)` — the same
-pattern `forecasting_tasks.py` already used for Celery tasks. (4) The global in-memory
-`conversations` dict was replaced with `ChatMessage` DB persistence keyed on `(user_id, session_id)`,
-preventing cross-session access. Verified: `check_imports.py` 0 dangling imports; 4/4
-isolation tests pass (SQLite WHERE-clause level — see REQ-TENANCY-02 for Postgres RLS caveat).
+**REQ-AI-04:** `POST /api/v1/ai/chat`, history deletion, and SQL validation require an
+authenticated user. The assistant receives the user's allowed outlet IDs, injects an
+outlet filter into approved semantic-layer templates, and executes through the request's
+database session. Conversation history is persisted by `(user_id, session_id)` to
+prevent cross-user access. No unscoped, user-controlled SQL may execute.
 Location: `app/services/ai_service.py`, `app/services/hybrid_rag.py`, `app/services/semantic_layer.py`, `app/services/query_executor.py`.
 
 ### 7.8 Alerts & Notifications
 **REQ-ALERT-01:** Real-time low-stock and anomaly alerts derived from actual
 inventory/sales data. Background scheduling is handled by APScheduler (in-process via `scheduler.py`), rather than a separate Celery Beat container. Alerts write to the actual database so they show up on the frontend via polling. Location: `app/routers/alerts.py`, `app/routers/notifications.py`, `app/services/scheduler.py`.
 
-### 7.9 Multi-tenant RLS
-**REQ-TENANCY-02:** The six in-scope tables (Section 2.2) must have a real
-`tenant_id` column (added via a proper Alembic migration, not a loose disconnected
-script), real PostgreSQL `ENABLE ROW LEVEL SECURITY` + `CREATE POLICY` statements
-matching the session variable set by `get_db()`, and both the async (FastAPI request)
-and sync (Celery task) database session paths must set that session variable before
-querying these tables.
-**RLS Gap discovered 2026-09-23:** The AI assistant's data path (`query_executor.py`)
-was a previously-undiscovered bypass: it created its own `create_engine()` connection
-and never called `set_config('app.current_tenant_id', ...)`, silently bypassing all
-FORCE ROW LEVEL SECURITY policies. This has been fixed (see REQ-AI-04).
-To fully verify RLS enforcement in production: run the test suite against a live
-Postgres instance with `alembic upgrade head` applied and FORCE ROW LEVEL SECURITY
-enabled on `sales`, `outlets`, `customers`, `products`, `inventory`, `invoices`.
-SQLite (used in CI) does not enforce RLS — the isolation tests in
-`test_ai_tenant_isolation.py` verify only the WHERE-clause scoping, not PG RLS policies.
-Location: `app/api/middleware/rls_middleware.py`, `app/api/core/rls_database.py`,
-`app/routers/rls_management.py`, `app/routers/multitenant.py`.
+### 7.9 Outlet authorization
+**REQ-TENANCY-02:** Admins may access all five outlets; managers and viewers may access
+only explicitly assigned outlets. Every outlet-sensitive router and every AI-generated
+SQL template must use the authenticated user's outlet scope. Tests must prove that a
+manager cannot request another outlet's data. PostgreSQL RLS and multiple organizations
+are explicitly out of scope.
 
 ### 7.10 Causal Analysis (kept, optional-tier feature)
 **REQ-CAUSAL-01:** Endpoints for holiday-impact estimation, counterfactual analysis,
 and driver identification, grounded in real sales + external-factors data (including,
 once wired, the same economic indicator data forecasting uses).
 Location: `app/routers/causal_analysis.py`, `app/services/causal_analysis.py`.
-**Gap:** no frontend page exists for this feature yet (Section 9).
+Frontend: `/causal-analysis`. Remaining gap: formal causal-method validation and
+clear uncertainty/no-data presentation.
 
-### 7.11 Communication Hub (kept, optional-tier feature)
-**REQ-COMMS-01:** Thread-based internal messaging (send, list, mark-read).
-Location: `app/routers/messages.py`, `app/services/message_service.py`.
-### 7.12 Integrations (Odoo ERP & Zoho Books)
-**REQ-INTEG-01:** Connectors for Odoo ERP (XML-RPC) and Zoho Books (OAuth/REST) with real connection testing, Fernet encrypted-at-rest credential storage (`OdooConfig` in `app/models/odoo_config.py`, `IntegrationToken` in `app/models/integration_token_model.py`), and real test/save/disconnect API endpoints. (Note: full live synchronization requires user-provided third-party sandbox credentials). Shopify/WooCommerce descoped; legacy Tally stub removed.
-Location: `app/routers/integrations.py`, `app/api/integrations/odoo_connector.py`, `app/api/integrations/zoho_client.py`, `app/api/integrations/zoho_auth.py`, `app/api/utils/encryption.py`.
-Frontend: `/integrations` (`frontend/src/pages/Integrations.jsx`).
+### 7.11 Communication Hub (deferred)
+**REQ-COMMS-01:** Not part of the current portfolio release. The page and router are
+not exposed; revisit only after the AI, forecasting, imports, and core workflows meet
+their acceptance tests.
+
+### 7.12 Integrations (deferred)
+**REQ-INTEG-01:** The required ingestion paths are synthetic data, CSV import, and
+manual sales entry. Odoo/Zoho/POS synchronization is not exposed in the current release.
+One connector may be added later only with a real sandbox, end-to-end sync tests, and a
+clear benefit over CSV import.
 
 ### 7.13 Reports & Export
 **REQ-REPORT-01:** One consolidated reports/export/data-import domain (not three
 separate overlapping routers). Location: `app/api/routers/reports.py`, `export.py`,
 `data.py` (consolidation status: see Section 9).
 
-### 7.14 Employees, Suppliers, Contacts, Outlets
-**REQ-OPS-01:** Standard CRUD + role/shift modeling for employees, supplier +
-purchase-order management, business contact directory (suppliers, distributors, logistics),
-and outlet management (with lat/lon for weather).
-Location: `app/api/routers/employees.py`, `suppliers.py`, `contacts.py`, `app/api/outlets.py`.
-Frontend: `/employees`, `/suppliers`, `/contacts`, `/outlets`.
+### 7.14 Suppliers and Outlets
+**REQ-OPS-01:** Standard supplier/purchase-order management and outlet management
+(including lat/lon for weather). Employee and general-contact management are deferred.
+Frontend: `/suppliers`, `/outlets`.
 
 ---
 
@@ -442,8 +415,8 @@ prior session, confirmed broken now) · ⚪ Not implemented
 
 | # | Feature | Status | Evidence |
 |---|---|---|---|
-| 8.1 | Auth consolidation / stability | ✅ | `auth.py` + `pos_auth.py`, single flow, no duplicate legacy auth router registered. Quick Demo Access users correctly seeded with valid password hashes. JWT `sub` claim correctly resolved to `username` (not `email`) in `api/deps.py` `get_current_user()`. Fully purged orphaned `app.middleware.auth` (which still queried `User.email == sub`) and `app.utils.security`; unified `admin.py` and `analytics.py` to `app.api.deps.get_current_user`. Verified with live authenticated tests and 0 dangling imports. |
-| 8.2 | Sales/Inventory/Customers consolidation & API Pagination | ✅ | `sales_analytics`, `customer_analytics`, `inventory_analytics`, `inventory_control` have been fully purged and consolidated into `sales`, `customers`, and `inventory` routers. Standardized pagination across `inventory`, `suppliers`, and `employees` supporting `per_page` and `limit` query parameters, returning consistent `{items, total, page, per_page, total_pages}` envelope with full backward compatibility. Added pagination UI controls to `Inventory.jsx` and verified all endpoints against live database. |
+| 8.1 | Auth consolidation / stability | 🟡 | One active auth router issues short-lived access and refresh tokens, and authenticated admin/analytics tests pass. Demo passwords are environment-only. Public roles are normalized to admin/manager/viewer with legacy-value compatibility. Remaining work: add refresh/logout browser E2E coverage and a role-data migration for existing deployments. |
+| 8.2 | Sales/Inventory/Customers consolidation & API Pagination | 🟡 | Active routers are consolidated and inventory pagination exists. Remaining work: complete CSV import/manual-entry validation, idempotency, consistent response envelopes, and frontend error/empty/loading states. |
 | 8.3 | GST/Billing consolidation | ✅ | Single `gst_billing.py` router registered; old `gst.py`/`gst_config.py`/`gstr1.py`/`invoicing_v2.py`/`bill_management.py` not present in registry |
 | 8.3b | GST calculator duplication | ✅ | `app/services/gst_calculator.py` is the single source of truth for GST tax math; duplicate `calculate_gst()` removed from `invoice_service.py` and duplicate GST services deleted. |
 | 8.4 | AI Assistant — Ollama-primary provider routing | ✅ | `_get_provider()` in `ai_service.py` implements Ollama -> Groq -> OpenRouter -> Gemini -> generic error fallback. Tested and verified live without exposing raw internal exceptions to user. |
@@ -452,38 +425,88 @@ prior session, confirmed broken now) · ⚪ Not implemented
 | 8.5 | Forecasting — weather via Open-Meteo, outlet-aware | ✅ | `prophet_forecaster.py` resolves each outlet's real city/lat/lon before calling `weather_service.py` (Open-Meteo) |
 | 8.5b | Forecasting — festival/holiday dates | ✅ | Uses the `holidays` package (`holidays.India`/`holidays.IN`), not hardcoded date windows |
 | 8.5c | Forecasting — economic indicators wired as regressor | ✅ | `EconomicIndicatorHistory` table populated with 36 months of real published RBI repo rates and MOSPI CPI/WPI/food inflation figures by `app/seed_database.py`. Queried by `external_factors_service.py` and used by `prophet_forecaster.py`. |
-| 8.5d | Forecasting — Celery worker actually processes jobs | ✅ | `worker` + `celery_beat` services present and correctly configured in `docker-compose.yml` |
+| 8.5d | Forecasting — Celery worker actually processes jobs | 🟡 | A Celery worker is configured with Valkey. A clean Docker end-to-end forecast job still needs to be executed and recorded; periodic jobs are owned by APScheduler, not Celery Beat. |
 | 8.5e | Forecasting — Ensemble Engine | ✅ | Prophet, XGBoost, and LSTM integrated via inverse-error-weighting in `ensemble.py`, executed in `run_ensemble_forecast` Celery task. Fully polling-enabled in frontend. Re-evaluated against 30-day holdout in `model_comparison.ipynb`: Ensemble achieves 23.13% MAPE on Outlet 2 (beating individual Prophet 23.90% and XGBoost 40.13%) and 29.76% on Outlet 1 (beating XGBoost 79.49%). |
 | 8.6 | Analytics/Dashboard consolidation | ✅ | Single `analytics.router` registered |
 | 8.6b | Forecasting/Predictions/Intelligence consolidation | ✅ | Only `forecasting.router` registered; no separate `predictions`/`intelligence` routers found |
-| 8.7 | Multi-tenant RLS & Celery Isolation | ✅ | `RLSMiddleware` registered. `get_db()` and `get_db_sync()` fail-closed on tenant session init errors. `run_prophet_forecast` task takes `tenant_id` and sets session variable. Outlet scoping enforced across all routers (`sales`, `customers`, `forecasting`, `causal_analysis`, `suppliers`, `employees`, `outlets`, `gst_billing`, `alerts`). Note: A previous audit mistakenly claimed this was finished, but 6 routers were missed. This is now fully completed and verified by unit tests. |
-| 8.8 | Dataset — realistic multi-outlet generator | ✅ | `app/seed_database.py` is the single canonical dataset generator & seeder (1 year of history, multi-tenant RLS, weather/monsoon/holiday scaling, business contacts). |
+| 8.7 | Single-organization outlet authorization | 🟡 | Legacy RLS middleware/models have been removed; admin/manager/viewer normalization and current outlet-scoping tests pass. Remaining work: add integration tests for every outlet-sensitive active router and enforce viewer read-only behavior on every mutation. |
+| 8.8 | Dataset — realistic multi-outlet generator | 🟡 | `app/seed_database.py` generates five outlets and one year of historical data from documented `ERIS_DEMO_DATA_SEED`. A deterministic checksum-valid GSTIN-shaped demo identifier is stored in `organizations.tax_id` and explicitly contains `DEMOX`. Remaining work: verify CSV/manual sales ingestion against the same schema and make the date window independently reproducible. |
 | 8.9 | Dataset — vector-store content for RAG | 🟡 | `app/seed_rag.py` populates `hybrid_rag.py` vector store; chromadb dependency is optional and degrades gracefully. |
-| 8.10 | Dead-code purge (Phase 1 + 6) | ✅ | Complete dead-code purge executed. All confirmed-dead files purged. `check_imports.py` reports 0 dangling imports. 130 reachable modules, 5 intentionally-unreachable files remaining. |
-| 8.11 | Business Contacts frontend page | ✅ | Built `frontend/src/pages/Contacts.jsx` backed by `BusinessContact` model and `/api/v1/contacts/` CRUD endpoints. Added to router and navigation. |
+| 8.10 | Active-surface cleanup | 🟡 | Deferred frontend pages and backend routes are no longer exposed; duplicate root Alembic tree and stale seeder were removed. A fresh reachability report is still required before deleting remaining dormant modules. |
+| 8.11 | Business Contacts frontend page | ⚪ | Deferred and removed from the active route/navigation surface. |
 | 8.12 | Alerts & Notifications | ✅ | Removed dead Celery Beat scheduling. Fixed `scheduler.py` to write real `Alert` records. Hooked up anomaly detection for sales anomalies. Rewrote `/list` endpoint to properly serve alerts from DB to frontend. |
-| 8.13 | Causal Analysis / Communication Hub frontend pages | ✅ | Both frontend pages built and fully wired: `frontend/src/pages/CausalAnalysis.jsx` (`/causal-analysis`, backed by `/api/v1/causal/summary/{outlet_id}`) and `frontend/src/pages/CommunicationHub.jsx` (`/communication`, backed by `/api/v1/messages/inbox`). Registered in `App.jsx` with role-based protection and linked in `Sidebar.jsx` navigation. |
-| 8.14 | n8n as an actual running service | ⚪ | Webhook receiver + one workflow JSON exist; `n8n` service exists in `docker-compose.yml` but might need more configuration validation. |
+| 8.13 | Causal Analysis / Communication Hub | 🟡 | Causal Analysis remains active. Communication Hub is deferred and removed from active routes. |
+| 8.14 | n8n automation | ⚪ | Removed from the current architecture; APScheduler and Celery cover the required jobs. |
 | 8.15 | Fake/synthetic data purge from live endpoints | ✅ | Three fabricated-data paths removed: (1) `GET /api/v1/analytics/dashboard/realtime` — `mock_data.generate_demand_data()` replaced with real `SELECT COALESCE(SUM(total_amount),0) … FROM sales WHERE outlet_id IN :outlet_ids` + auth + outlet-scoping; `data_source` field now `"database"`. (2) `GET /api/v1/enterprise/overview` — 23-store `random.uniform` distribution replaced with real `SELECT o.id, o.name, o.city, SUM(s.total_amount) FROM outlets LEFT JOIN sales … GROUP BY o.id` returning only the 5 real seeded outlets. (3) `_get_historical_data()` in `causal_analysis.py` — `np.random.normal(50,10,days)` zero-sales substitution replaced with explicit `ValueError` so callers receive honest HTTP 400. Confirmed by direct sqlite3 query: 183,049 real sales rows, total_revenue=234,621,077.25, 5 real outlets. |
-| 8.16 | Router-wide Auth & Role-Based Access Enforcement | ✅ | Full sweep of mutating and sensitive endpoints across all routers: added `get_current_active_user` and `require_role` dependencies across `enterprise.py` (all 4 endpoints secured with `super_admin`/`area_manager`), `models.py` (`POST /retrain` guarded with `super_admin`/`outlet_manager`), `reports_data.py` (all 3 download and 3 upload endpoints secured), `admin.py` (8 user/role/org/store/key/seed endpoints restricted to `super_admin`), `customers.py` & `suppliers.py` (all mutating endpoints secured), `alerts.py` (`POST /generate-inventory-alerts`), `gst_billing.py` (tax calc, rates config, payments, cancellations, and einvoice), `messages.py` (`POST /thread/{id}/mark-read`), and `forecasting.py` (`POST /query` and weather analysis). Verified via real test requests returning HTTP 401 Unauthorized for unauthenticated callers. |
-| 8.17 | Observability & Error Logging in Realtime/Enterprise Endpoints | ✅ | Fixed silent exception swallowing in `analytics.py` and `enterprise.py`. Replaced bare `except Exception:` returning silent zeroes or empty lists with `logger.error(...)` across `get_dashboard_realtime` (aggregate metrics and recent transactions), `get_summary`, `get_revenue_trend`, `get_category_breakdown`, `get_sales_by_category`, `get_top_products_endpoint`, `get_outlet_performance_endpoint`, and `enterprise.py` tenant endpoints. Verified via unit test simulating DB failures that errors are logged while returning graceful defaults. |
+| 8.16 | Active-router auth and role enforcement | 🟡 | Authentication is enforced on tested admin, analytics, sales, forecasting, and data routes. Remaining work: endpoint-by-endpoint permission matrix tests for every active mutating route using admin/manager/viewer. |
+| 8.17 | Observability and error handling | 🟡 | Request IDs and structured application logging exist. Remaining work: eliminate raw exception details from non-development responses, add job/import correlation IDs, and document useful local logs/health checks. |
 | 8.18 | Short-Lived Access Tokens & Configurable Token Expiry | ✅ | Fixed `backend/app/core/security.py`'s `create_access_token` which previously hardcoded `expire = datetime.utcnow() + timedelta(hours=24)` to instead honor `settings.ACCESS_TOKEN_EXPIRE_MINUTES` (default 15 minutes) and accept optional `expires_delta`. Added `create_refresh_token` honoring `settings.REFRESH_TOKEN_EXPIRE_DAYS` (default 30 days). Aligned `backend/.env`, `backend/.env.example`, `backend/app/config.py`, and `backend/app/api/auth/jwt_handler.py`. Wired `refresh_token` into `LoginResponse` and `/api/v1/auth/refresh`. Verified with real unit tests in `tests/unit/test_security.py` that expired access and refresh tokens are rejected by `verify_token` with HTTP 401 Unauthorized. |
 
 ---
 
 ## 9. Known Issues / Required Remediation (prioritized)
 
-**REQ-CLEANUP-01 (Done):** Purged duplicate routers. Registered `RLSMiddleware`. Added AST-based `check_imports.py` to enforce 0 dangling imports. Phase 1 extension: additionally deleted 22 unreachable `app/api/` and `app/ml/causal/` files.
+### Active implementation plan
+
+**Phase 0 — Security and CI gate (mostly complete):** keep `.env` files ignored; use
+environment-only secrets with fail-fast validation; keep the `detect-secrets` baseline
+empty; scan examples and notebooks; pass Gitleaks and `detect-secrets` on every push.
+Still external/manual: rotate or revoke any Supabase, database, webhook, messaging, or
+LLM credentials that were ever real; resolve GitGuardian incidents; decide separately
+whether coordinated Git history rewriting is warranted.
+
+**Phase 1 — Architecture foundation (substantially complete):** admin/manager/viewer
+roles are normalized; the project retains one organization and five outlets; one
+Alembic tree and the canonical database/session dependencies remain; only active
+routers/pages are exposed. Make Docker Compose boot the
+PostgreSQL, Valkey, API, worker, frontend, and proxy stack from a fresh clone. Exit
+criteria: migrations reach one head, all backend tests pass, frontend lint has no
+errors, production build passes, and a clean Compose smoke test is recorded.
+
+**Phase 2 — Complete sales ingestion (started):** the synthetic generator now uses a
+documented seed and stores a checksum-valid but clearly fictional `DEMOX` GSTIN; add
+CSV upload with preview, column mapping, row-level validation, duplicate detection,
+atomic import, downloadable error report, and import audit record; complete manual sale
+entry with line items, GST calculation, inventory update, and role/outlet checks. Exit
+criteria: generator, CSV, and manual entry all create the same canonical sale schema and
+are covered by API/UI integration tests.
+
+**Phase 3 — Portfolio-grade AI assistant:** verify every supported business question
+against live SQL; remove or disable unsafe arbitrary-SQL paths; enforce outlet scope;
+populate and query the real local vector store; show provider, sources, query time, and
+an honest no-data state; create a repeatable evaluation set for grounding accuracy,
+retrieval quality, latency, and no-fabrication behavior. Ollama is the default path.
+
+**Phase 4 — Portfolio-grade forecasting:** establish reproducible time-based
+train/validation/holdout splits; compare seasonal-naive, Prophet, and XGBoost baselines;
+use weather/holiday/economic regressors only when validated; persist run metadata and
+metrics; execute jobs through Celery/Valkey; provide outlet/product/horizon controls,
+confidence intervals, backtest charts, and downloadable results. Prefer the best
+validated model over an unnecessarily complex ensemble.
+
+**Phase 5 — Product completion and portfolio delivery:** finish active-page
+loading/empty/error/accessibility states; add end-to-end journeys for login, CSV import,
+manual sale, dashboard, AI, forecast, and invoice; add backup/restore and demo reset;
+document setup and architecture; produce screenshots/demo video and concise resume
+metrics. Do not reactivate deferred domains until all Phase 1–5 exit criteria pass.
+
+### Historical remediation record
+
+**REQ-CLEANUP-01 (Superseded):** Earlier cleanup registered `RLSMiddleware`; the
+2026-09-29 owner scope decision removed multi-tenant RLS and its middleware.
 
 **REQ-CLEANUP-02 (Done):** Purged all 49 scratch/debug scripts. Consolidated 5 competing dataset generators & 3 loaders to single canonical `backend/scripts/seed.py`. Phase 1 extension: additionally deleted root `/scripts/`, `/tasks/`, `/dist/`, and `/deploy-reference/` folders, and `backend/scripts/seed_database.py` (worse duplicate).
 
-**REQ-CLEANUP-03 (Done):** Extended `app/seed_database.py`'s date range to 365 days (1 year), and converted raw string-interpolated inserts to parameterized SQLAlchemy queries to safely insert data while adhering to strict RLS requirements.
+**REQ-CLEANUP-03 (Done):** Extended `app/seed_database.py`'s date range to 365 days
+(1 year) and converted raw string-interpolated inserts to parameterized SQLAlchemy
+queries.
 
 **REQ-CLEANUP-04 (Done):** Populated `EconomicIndicatorHistory` table with 36 months of real published Indian historical monthly figures (RBI MPC repo rates, MOSPI CPI, WPI, and Food inflation) in `app/seed_database.py`. The `external_factors_service.py` queries these monthly records and provides real macroeconomic regressors to `prophet_forecaster.py` without requiring manual CSV uploads.
 
 **REQ-CLEANUP-05 (Done):** Resolved duplicate `app/api/auth.py` vs `app/api/auth/` package conflict and removed duplicate `app/api/` subtrees. Consolidated live route handlers in `app/routers/`.
 
-**REQ-CLEANUP-06 (Done):** Built and wired frontend pages for Causal Analysis (`CausalAnalysis.jsx` at `/causal-analysis`) and Communication Hub (`CommunicationHub.jsx` at `/communication`) with role-based routing in `App.jsx` and icons/links in `Sidebar.jsx`. Both features are fully reachable by users in navigation.
+**REQ-CLEANUP-06 (Partially superseded):** Causal Analysis remains active;
+Communication Hub is deferred and removed from the active route/navigation surface.
 
 **REQ-CLEANUP-07 (Done):** Added `check_imports.py` to `backend/scripts/` to statically trace all reachable imports from `app.main` and verify 0 dangling imports.
 
@@ -495,13 +518,13 @@ prior session, confirmed broken now) · ⚪ Not implemented
 
 ## 10. Acceptance / Verification Checklist (run before considering any work "done")
 
-1. `docker-compose up --build` — db, redis, backend, worker, celery_beat, frontend,
-   proxy all start healthy (add n8n once REQ-CLEANUP-07 is done).
+1. `docker compose up --build` — PostgreSQL, Valkey, backend, worker, frontend,
+   and proxy all start healthy using only values supplied through the environment.
 2. A fresh import-reachability trace from `app/main.py` reports zero or near-zero
    orphaned files under `app/`.
 3. `api_router_registry.py` contains no duplicate-domain routers (one router per
    business domain, per Section 7).
-4. Seeding populates 5-6 outlets with 1-2 years of daily history showing visible
+4. Seeding populates five outlets with 1-2 years of daily history showing visible
    weekly/seasonal/festival patterns, not flat noise.
 5. Asking the AI assistant a numeric question returns a real SQL-grounded answer from
    Ollama (confirm via a `provider` field or log) when Ollama is running; killing
@@ -510,13 +533,14 @@ prior session, confirmed broken now) · ⚪ Not implemented
 6. Asking the AI assistant an explanatory "why" question returns content actually
    retrieved from the vector store (confirm via logs showing a non-empty ChromaDB
    query result).
-7. A forecast for any of the 5-6 outlets includes non-trivial weather, holiday, AND
+7. A forecast for any of the five outlets includes non-trivial weather, holiday, AND
    economic regressors (check Prophet's component breakdown, not just that the code
    runs).
-8. Two-organization RLS isolation test (Section 7.9) passes concretely for all six
-   in-scope tables.
-9. Every frontend page (including Causal Analysis and Communication Hub once built)
-   is reachable from navigation and shows real seeded data, no console errors.
+8. Role/outlet isolation tests prove that managers and viewers cannot access an
+   unassigned outlet, while admins can access all five outlets.
+9. Every active frontend page is reachable from navigation, is backed by a registered
+   API, and shows real seeded/imported data without console errors. Deferred pages and
+   routers are not exposed.
 10. No hardcoded/fabricated currency or percentage literal exists anywhere in
     `app/services/ai_service.py`.
 
@@ -526,6 +550,8 @@ prior session, confirmed broken now) · ⚪ Not implemented
 
 | Date (approx.) | Decision |
 |---|---|
+| 2026-09-29 (Security gate and architecture foundation) | Replaced the stale detect-secrets baseline with an empty, reviewed baseline; added narrow inline allowlists only for obvious test placeholders and migration revision IDs; upgraded checkout to v5; standardized example configuration placeholders; removed runtime secret fallbacks; documented the historical-incident/rotation boundary. Consolidated to one Alembic tree, removed deferred routes/pages from the active surface, aligned Compose with PostgreSQL + Valkey + API + worker + frontend + proxy, and normalized public roles to admin/manager/viewer with legacy compatibility. Verification: 51 backend tests passed, frontend lint had 0 errors, production build passed, one Alembic head, OpenAPI generated 178 paths, detect-secrets passed, and config/diff validation passed. Docker/Gitleaks execution remains CI/manual because Docker is unavailable and Windows policy blocks the local Gitleaks binary. |
+| 2026-09-29 (Owner scope reset; supersedes earlier scope decisions) | **Portfolio release scope is one organization with five outlets.** Core: auth/RBAC, sales (synthetic generator + CSV import + manual entry), inventory, suppliers/outlets, GST billing, analytics, AI assistant, forecasting, causal analysis, alerts, reports/settings. Deferred: multi-tenant RLS, Employees, Contacts, Communication Hub, Enterprise tenant UI, Odoo/Zoho/POS sync. Removed from runtime: n8n. Primary infrastructure remains free/open source (PostgreSQL, Valkey, Ollama, Open-Meteo, React/FastAPI). Historical rows below document prior work but do not override this decision. |
 | Round 1 | Confirmed domain = Indian multi-outlet QSR/restaurant chain |
 | Round 1 | AI LLM strategy = Ollama primary + Groq/OpenRouter free-tier fallback |
 | Round 1 | RAG strategy = hybrid (SQL-grounding for structured data + real vector RAG for unstructured content), replacing 3 confirmed-orphaned LangChain+Chroma implementations |
@@ -570,4 +596,3 @@ prior session, confirmed broken now) · ⚪ Not implemented
 update Section 8's status table in the same work session — do not let this document
 drift out of sync with the code, since drift is exactly the failure mode it exists to
 prevent.**
-

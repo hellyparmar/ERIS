@@ -37,10 +37,10 @@ def _save_forecast_results(db, outlet_id, product_id, model_type, results_data, 
 
 
 @celery_app.task(bind=True, name="app.tasks.forecasting_tasks.run_ensemble_forecast")
-def run_ensemble_forecast(self, outlet_id: int, product_id: int = None, horizon: int = 30, tenant_id: str = None):
-    logger.info(f"Running ensemble forecast for outlet {outlet_id} with tenant context {tenant_id}")
+def run_ensemble_forecast(self, outlet_id: int, product_id: int = None, horizon: int = 30):
+    logger.info(f"Running ensemble forecast for outlet {outlet_id}")
     try:
-        with get_db_sync(tenant_id=tenant_id) as db:
+        with get_db_sync() as db:
             stmt = select(Sale.sale_date.label('date'), SaleItem.quantity.label('y'))
             stmt = stmt.join(SaleItem, Sale.id == SaleItem.sale_id)
             stmt = stmt.where(Sale.outlet_id == outlet_id)

@@ -21,22 +21,12 @@ from app.models.models_v6 import Product
 from app.models.inventory import Inventory
 from app.models.models_v6 import Sale, SaleItem
 from app.models.alert import Alert
-from app.database import get_db, SessionLocal
+from app.database import get_db, get_db_sync_dependency
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.schemas.analytics import MetricData, AlertsResponse, ChartDataResponse
 from datetime import timezone
-
-
-def get_sync_db():
-    """Synchronous DB session for non-async endpoints."""
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.rollback()
-        db.close()
 
 
 router = APIRouter(prefix="/analytics", tags=["Analytics/Dashboard"])
@@ -196,7 +186,7 @@ async def get_chart_data(
 
 @router.get("/dashboard/realtime")
 def get_dashboard_realtime(
-    db: Session = Depends(get_sync_db),
+    db: Session = Depends(get_db_sync_dependency),
     current_user: Any = Depends(get_current_user),
 ):
     """
@@ -429,7 +419,7 @@ async def get_trend_analysis(
 @router.get("/dashboard/summary")
 def get_summary(
     current_user: Any = Depends(get_current_user),
-    db: Session = Depends(get_sync_db)
+    db: Session = Depends(get_db_sync_dependency)
 ) -> Any:
     today = datetime.now().date()
     week_ago = today - timedelta(days=7)
@@ -547,7 +537,7 @@ def get_revenue_trend(
     period: Optional[str] = Query(None, pattern="^(7d|30d|90d|365d)$"),
     outlet_id: Optional[int] = None,
     current_user: Any = Depends(get_current_user),
-    db: Session = Depends(get_sync_db)
+    db: Session = Depends(get_db_sync_dependency)
 ) -> Any:
     period_days = {"7d": 7, "30d": 30, "90d": 90, "365d": 365}.get(period, days or 30) if period else (days or 30)
     start_date = datetime.now().date() - timedelta(days=period_days)
@@ -583,7 +573,7 @@ def get_category_breakdown(
     period: str = Query("30d", pattern="^(7d|30d|90d|365d)$"),
     outlet_id: Optional[int] = None,
     current_user: Any = Depends(get_current_user),
-    db: Session = Depends(get_sync_db)
+    db: Session = Depends(get_db_sync_dependency)
 ) -> Any:
     period_days = {"7d": 7, "30d": 30, "90d": 90, "365d": 365}.get(period, 30)
     start_date = datetime.now().date() - timedelta(days=period_days)
@@ -631,7 +621,7 @@ def get_category_breakdown(
 @router.get("/dashboard/sales-by-category")
 def get_sales_by_category(
     current_user: Any = Depends(get_current_user),
-    db: Session = Depends(get_sync_db)
+    db: Session = Depends(get_db_sync_dependency)
 ) -> Any:
     month_ago = datetime.now().date() - timedelta(days=30)
 
@@ -666,7 +656,7 @@ def get_sales_by_category(
 def get_top_products_endpoint(
     limit: int = Query(5, ge=1, le=50),
     current_user: Any = Depends(get_current_user),
-    db: Session = Depends(get_sync_db)
+    db: Session = Depends(get_db_sync_dependency)
 ) -> Any:
     month_ago = datetime.now().date() - timedelta(days=30)
 
@@ -702,7 +692,7 @@ def get_top_products_endpoint(
 def get_outlet_performance_endpoint(
     period: str = Query("30d", description="Period: 7d, 30d, 90d"),
     current_user: Any = Depends(get_current_user),
-    db: Session = Depends(get_sync_db)
+    db: Session = Depends(get_db_sync_dependency)
 ) -> Any:
     days = {"7d": 7, "14d": 14, "30d": 30, "90d": 90}.get(period, 30)
     since = datetime.now().date() - timedelta(days=days)

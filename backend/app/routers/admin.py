@@ -11,6 +11,7 @@ import logging
 import secrets
 
 from app.api.deps import get_current_user, require_role
+from app.core.roles import ADMIN, user_role
 from app.middleware.rate_limiter import limiter
 from app.models.users import User
 from app.database import get_db
@@ -20,8 +21,7 @@ from fastapi import Request
 logger = logging.getLogger(__name__)
 
 def check_admin(current_user: User = Depends(get_current_user)):
-    role_name = getattr(current_user.role, "name", str(current_user.role or "")).lower()
-    if role_name not in ["admin", "super_admin"]:
+    if user_role(current_user) != ADMIN:
         raise HTTPException(status_code=403, detail="Admin privileges required")
     return current_user
 
@@ -110,7 +110,7 @@ async def get_users(
 @router.post("/users")
 async def create_user(
     user_data: dict,
-    current_user: User = Depends(require_role("super_admin")),
+    current_user: User = Depends(require_role("admin")),
 ):
     """Create new user"""
     try:
@@ -132,7 +132,7 @@ async def create_user(
 async def update_user(
     user_id: int,
     user_data: dict,
-    current_user: User = Depends(require_role("super_admin")),
+    current_user: User = Depends(require_role("admin")),
 ):
     """Update user details"""
     try:
@@ -150,7 +150,7 @@ async def update_user(
 @router.delete("/users/{user_id}")
 async def delete_user(
     user_id: int,
-    current_user: User = Depends(require_role("super_admin")),
+    current_user: User = Depends(require_role("admin")),
 ):
     """Delete user"""
     try:
@@ -239,7 +239,7 @@ async def get_permissions():
 @router.post("/roles")
 async def create_role(
     role_data: dict,
-    current_user: User = Depends(require_role("super_admin")),
+    current_user: User = Depends(require_role("admin")),
 ):
     """Create custom role"""
     try:
@@ -288,7 +288,7 @@ async def get_stores(
 @router.post("/stores")
 async def create_store(
     store_data: dict,
-    current_user: User = Depends(require_role("super_admin")),
+    current_user: User = Depends(require_role("admin")),
 ):
     """Create new store"""
     try:
@@ -397,7 +397,7 @@ async def get_api_keys():
 async def create_api_key(
     request: Request,
     key_data: dict,
-    current_user: User = Depends(require_role("super_admin")),
+    current_user: User = Depends(require_role("admin")),
 ):
     """Create new API key"""
     try:
@@ -524,7 +524,7 @@ class SeedDatabaseRequest(BaseModel):
 async def seed_database(
     request: SeedDatabaseRequest,
     background_tasks: BackgroundTasks,
-    current_user: User = Depends(require_role("super_admin")),
+    current_user: User = Depends(require_role("admin")),
 ):
     """
     Seed database with synthetic initial data.

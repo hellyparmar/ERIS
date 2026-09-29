@@ -46,7 +46,7 @@ class OutletIsolatedService(Generic[T]):
         if not self.current_user:
             return query
         if self.allowed_outlet_ids is None:
-            return query # super_admin
+            return query  # admin
         model_class = query.column_descriptions[0]['type']
         column = getattr(model_class, outlet_column)
         return query.filter(column.in_(self.allowed_outlet_ids))

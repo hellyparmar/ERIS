@@ -8,6 +8,10 @@ from sqlalchemy.orm import relationship
 from .base import Base
 
 class UserRoleEnum(str, enum.Enum):
+    admin = "admin"
+    manager = "manager"
+    viewer = "viewer"
+    # Compatibility members for old databases/tests. API responses are canonical.
     super_admin = "super_admin"
     area_manager = "area_manager"
     outlet_manager = "outlet_manager"
@@ -42,7 +46,7 @@ class Role(Base):
     def __str__(self):
         return self.name
 
-class UserOutletAccess(Base):
+class UserOutlet(Base):
     __tablename__ = "user_outlets"
     __table_args__ = {'extend_existing': True}
 
@@ -52,6 +56,9 @@ class UserOutletAccess(Base):
     # Relationships
     user = relationship("User", back_populates="outlet_access")
     outlet = relationship("Outlet")
+
+
+UserOutletAccess = UserOutlet
 
 class User(Base):
     __tablename__ = "users"
@@ -79,7 +86,7 @@ class User(Base):
     # Relationships
     role = relationship("Role", backref="users")
     organization = relationship("Organization", backref="users")
-    outlet_access = relationship("UserOutletAccess", back_populates="user", cascade="all, delete-orphan")
+    outlet_access = relationship("UserOutlet", back_populates="user", cascade="all, delete-orphan")
 
     @property
     def full_name(self):

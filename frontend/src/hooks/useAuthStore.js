@@ -4,8 +4,8 @@ export const useAuthStore = create((set) => {
   let initialUser = null;
   let initialToken = null;
   try {
-    const storedUser = localStorage.getItem('rdios-user');
-    const storedToken = localStorage.getItem('rdios-token');
+    const storedUser = localStorage.getItem('eris-user');
+    const storedToken = localStorage.getItem('eris-token');
     if (storedUser) initialUser = JSON.parse(storedUser);
     if (storedToken) initialToken = storedToken;
   } catch (e) {
@@ -17,24 +17,24 @@ export const useAuthStore = create((set) => {
     token: initialToken,
     setUser: (user) => {
       if (user) {
-        localStorage.setItem('rdios-user', JSON.stringify(user));
+        localStorage.setItem('eris-user', JSON.stringify(user));
       } else {
-        localStorage.removeItem('rdios-user');
+        localStorage.removeItem('eris-user');
       }
       set({ user });
     },
     setToken: (token) => {
       if (token) {
-        localStorage.setItem('rdios-token', token);
+        localStorage.setItem('eris-token', token);
       } else {
-        localStorage.removeItem('rdios-token');
+        localStorage.removeItem('eris-token');
       }
       set({ token });
     },
     logout: () => {
-      localStorage.removeItem('rdios-user');
-      localStorage.removeItem('rdios-token');
-      localStorage.removeItem('rdios-auth');
+      localStorage.removeItem('eris-user');
+      localStorage.removeItem('eris-token');
+      localStorage.removeItem('eris-auth');
       set({ user: null, token: null });
     }
   };

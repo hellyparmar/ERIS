@@ -282,12 +282,10 @@ class TestRouterDataIsolation(unittest.TestCase):
         self.assertNotEqual(res.status_code, 403)
 
     def test_employees_router_isolation(self):
+        """Employee management is deferred and must not be exposed."""
         self._override_user(self.manager_a)
         res = client.get(f"/api/v1/employees/?store_id={self.outlet_2_id}")
-        self.assertEqual(res.status_code, 403)
-        
-        res = client.get(f"/api/v1/employees/?store_id={self.outlet_1_id}")
-        self.assertNotEqual(res.status_code, 403)
+        self.assertEqual(res.status_code, 404)
 
     def test_outlets_router_isolation(self):
         self._override_user(self.manager_a)

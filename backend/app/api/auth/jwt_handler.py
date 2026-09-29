@@ -3,7 +3,6 @@ JWT Token Handler
 Generate and validate JWT tokens for authentication
 """
 
-import os
 from datetime import datetime, timedelta
 from typing import Optional, Dict
 from jose import JWTError, jwt
@@ -15,8 +14,11 @@ ALGORITHM = getattr(settings, "JWT_ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = getattr(settings, "ACCESS_TOKEN_EXPIRE_MINUTES", 15)
 REFRESH_TOKEN_EXPIRE_DAYS = getattr(settings, "REFRESH_TOKEN_EXPIRE_DAYS", 30)
 
-def get_secret_key():
-    return getattr(settings, "JWT_SECRET_KEY", "dev_secret")
+def get_secret_key() -> str:
+    secret_key = getattr(settings, "JWT_SECRET_KEY", "").strip()
+    if not secret_key:
+        raise RuntimeError("JWT_SECRET_KEY is required for token operations.")
+    return secret_key
 
 def create_access_token(data: Dict, expires_delta: Optional[timedelta] = None) -> str:
     """

@@ -9,11 +9,14 @@ from typing import Generator
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# Set test database and test secrets before any app imports
-os.environ["DATABASE_URL"] = "sqlite:///./test.db"
-os.environ["JWT_SECRET_KEY"] = "test-jwt-secret-key-32-chars-long-for-testing-only"
+# Set isolated test configuration before any app imports. These values are
+# explicit test-only placeholders; production configuration never falls back
+# to them.
+os.environ["DATABASE_URL"] = "sqlite:///:memory:"
+os.environ["JWT_SECRET_KEY"] = "MOCK_JWT_SIGNING_KEY_FOR_TESTS"  # pragma: allowlist secret
 os.environ["JWT_SECRET"] = os.environ["JWT_SECRET_KEY"]
-os.environ["ENCRYPTION_KEY"] = "MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA="
+os.environ["ENCRYPTION_KEY"] = "TU9DS19FTkNSWVBUSU9OX0tFWV9GT1JfVEVTVFNfX18="  # pragma: allowlist secret
+os.environ["ERIS_SEED_PASSWORD"] = "test-admin-pw"  # pragma: allowlist secret
 os.environ["ENVIRONMENT"] = "test"
 
 # ---------------------------------------------------------------------------
@@ -40,7 +43,7 @@ except ImportError as e:
 from app.models.schema import Base
 from app.models.users import User
 from app.core.security import hash_password
-from app.database import get_db
+from app.database import get_db, get_db_sync_dependency
 
 # Use in-memory SQLite — no file written to disk, fully isolated.
 TEST_DATABASE_URL = "sqlite:///:memory:"
@@ -82,6 +85,7 @@ def client(db):
             pass
 
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_db_sync_dependency] = override_get_db
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()

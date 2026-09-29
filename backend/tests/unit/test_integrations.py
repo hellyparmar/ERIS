@@ -16,7 +16,7 @@ class TestIntegrations(unittest.TestCase):
 
     def test_encryption_roundtrip(self):
         """Ensure sensitive API keys are correctly encrypted and decrypted via Fernet"""
-        raw_key = "secret_odoo_api_key_12345"
+        raw_key = "MOCK_ODOO_API_KEY_FOR_TESTS"
         encrypted = encrypt_data(raw_key)
         self.assertNotEqual(raw_key, encrypted)
         decrypted = decrypt_data(encrypted)
@@ -28,7 +28,7 @@ class TestIntegrations(unittest.TestCase):
             url="https://mock-odoo.test",
             db_name="mock_db",
             username="admin@test.com",
-            api_key="MOCK_KEY_FOR_TESTS",  # not a real credential
+            api_key="MOCK_KEY_FOR_TESTS",  # pragma: allowlist secret
             mock_mode=True
         )
         res = api_test_odoo(req)
@@ -41,7 +41,7 @@ class TestIntegrations(unittest.TestCase):
             url="http://localhost:59999",
             db_name="invalid_db",
             username="invalid_user",
-            api_key="INVALID_KEY_FOR_TESTS",  # intentionally invalid to trigger 502
+            api_key="INVALID_KEY_FOR_TESTS",  # pragma: allowlist secret
             mock_mode=False
         )
         with self.assertRaises(HTTPException) as ctx:
@@ -62,7 +62,7 @@ class TestIntegrations(unittest.TestCase):
         req = ZohoConfigRequest(
             org_id="60009999999",
             client_id="1000.INVALID",
-            client_secret="INVALID_SECRET_FOR_TESTS",  # intentionally invalid to trigger 502
+            client_secret="INVALID_SECRET_FOR_TESTS",  # pragma: allowlist secret
             mock_mode=False
         )
         with self.assertRaises(HTTPException) as ctx:

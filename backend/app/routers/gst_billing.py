@@ -18,8 +18,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from app.database import get_db
-from app.core.security import get_current_user
-from app.api.deps import get_outlet_scope
+from app.api.deps import get_current_user, get_outlet_scope
 from app.core.data_isolation import require_outlet_access
 from app.models.users import User
 from app.models import Invoice as InvoiceModel, Bill
@@ -33,7 +32,11 @@ from app.services.invoice_pdf_service import generate_invoice_pdf
 from app.services.invoice_service import BillService
 from app.services import gstr1_service
 
-router = APIRouter(prefix="/gst", tags=["GST / Billing"])
+router = APIRouter(
+    prefix="/gst",
+    tags=["GST / Billing"],
+    dependencies=[Depends(get_current_user)],
+)
 
 logger = __import__("logging").getLogger(__name__)
 

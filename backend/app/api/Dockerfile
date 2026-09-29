@@ -27,7 +27,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
-RUN groupadd -r rdios && useradd -r -g rdios rdios
+RUN groupadd -r eris && useradd -r -g eris eris
 
 # Copy wheels from builder
 COPY --from=builder /app/wheels /wheels
@@ -37,10 +37,10 @@ RUN pip install --no-cache /wheels/*
 COPY . .
 
 # Set ownership
-RUN chown -R rdios:rdios /app
+RUN chown -R eris:eris /app
 
 # Switch to non-root user
-USER rdios
+USER eris
 
 # Expose port
 EXPOSE 8000

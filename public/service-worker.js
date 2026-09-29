@@ -1,8 +1,8 @@
 // Service Worker for ERIS PWA
 // Provides offline caching and performance optimization
 
-const CACHE_NAME = 'rdios-v1.0.0';
-const API_CACHE = 'rdios-api-v1.0.0';
+const CACHE_NAME = 'eris-v1.0.0';
+const API_CACHE = 'eris-api-v1.0.0';
 
 // Static assets to cache immediately
 const STATIC_ASSETS = [

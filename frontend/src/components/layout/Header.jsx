@@ -8,13 +8,12 @@ const pageTitleMap = {
   '/invoices': 'Invoices', '/analytics': 'Analytics',
   '/forecasts': 'Forecasts', '/ai-assistant': 'AI Assistant',
   '/customer-insights': 'Customer Insights', '/alerts': 'Alerts',
-  '/employees': 'Employees', '/suppliers': 'Suppliers',
-  '/customers': 'Customers', '/multi-store': 'Multi-Store',
-  '/team': 'Team', '/contacts': 'Contacts',
-  '/tax-compliance': 'Tax Compliance', '/gst-invoice': 'GST Invoice',
-  '/gst-rates': 'GST Rates', '/integrations': 'Integrations',
+  '/suppliers': 'Suppliers',
+  '/customers': 'Customers',
+  '/gst-invoice': 'GST Invoice',
   '/settings': 'Settings',
   '/outlets': 'Outlets',
+  '/causal-analysis': 'Causal Analysis',
 };
 
 export default function Header({ onMenuClick }) {

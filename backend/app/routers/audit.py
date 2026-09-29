@@ -20,10 +20,10 @@ async def get_audit_logs(
     page: int = Query(1, ge=1),
     limit: int = Query(50, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role("super_admin", "area_manager"))
+    current_user: User = Depends(require_role("admin", "manager"))
 ):
     """
-    Retrieve audit logs. Only accessible by super_admin or area_manager.
+    Retrieve audit logs. Only accessible by admins or managers.
     """
     try:
         stmt = select(AuditLogEntry)

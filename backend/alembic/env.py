@@ -63,8 +63,7 @@ def get_database_url() -> str:
             "=" * 70 + "\n"
             "DATABASE_URL environment variable is not set.\n"
             "This is REQUIRED for Alembic migrations to run.\n\n"
-            "Set DATABASE_URL in your .env file or environment variables:\n"
-            "  DATABASE_URL=postgresql+asyncpg://USER:PASSWORD@HOST:PORT/DATABASE\n\n"
+            "Set DATABASE_URL in your .env file or environment variables.\n\n"
             "Note: For migrations, asyncpg URLs will be converted to psycopg2 (sync).\n"
             "=" * 70 + "\n"
         )

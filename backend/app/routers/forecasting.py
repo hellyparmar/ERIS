@@ -18,6 +18,7 @@ WeatherResponse = Dict[str, Any]
 
 from app.api.celery_app import celery_app
 from app.api.deps import get_current_user, require_role, get_current_active_user
+from app.core.roles import MANAGER, user_role
 from app.database import get_db
 from app.models.users import User
 from app.models.outlet import Outlet
@@ -217,15 +218,7 @@ async def get_sales_forecast(
             message="Forecast retrieved from cache"
         )
 
-    tenant_id = None
-    if request and hasattr(request.state, "tenant_context") and request.state.tenant_context:
-        tenant_id = str(request.state.tenant_context.tenant_id)
-    elif hasattr(current_user, "organization") and current_user.organization and getattr(current_user.organization, "tenant_id", None):
-        tenant_id = str(current_user.organization.tenant_id)
-    elif hasattr(current_user, "tenant_id") and getattr(current_user, "tenant_id", None):
-        tenant_id = str(current_user.tenant_id)
-
-    task = run_ensemble_forecast.apply_async(args=[outlet_id, product_id, horizon, tenant_id])
+    task = run_ensemble_forecast.apply_async(args=[outlet_id, product_id, horizon])
 
     return ForecastResponse(
         task_id=task.id,
@@ -339,7 +332,7 @@ async def get_forecast_scenarios(
 @router.post("/retrain", response_model=ForecastResponse)
 async def retrain_models(
     outlet_id: int = Query(..., description="Outlet ID"),
-    current_user: User = Depends(require_role("super_admin", "outlet_manager")),
+    current_user: User = Depends(require_role("admin", "manager")),
     db: Session = Depends(get_db),
 ) -> ForecastResponse:
     """Retrain forecasting models with latest data."""
@@ -369,7 +362,7 @@ async def get_forecast_accuracy(
     if outlet_id is not None:
         _get_outlet_with_access_check(outlet_id, current_user, db)
         stmt = stmt.where(ForecastResult.outlet_id == outlet_id)
-    elif current_user.role == "outlet_manager":
+    elif user_role(current_user) == MANAGER:
         stmt = stmt.where(ForecastResult.outlet_id == current_user.outlet_id)
 
     if model_type:
@@ -704,99 +697,6 @@ async def product_demand_anomalies(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-
-# ── P5-T1: ARIMA Revenue Forecast ─────────────────────────────────────────────
-
-@router.get("/forecast")
-async def revenue_forecast(
-    store_id: Optional[int] = Query(
-        default=None,
-        description="Filter to a specific store. Omit for all stores."
-    ),
-    horizon: int = Query(
-        default=30,
-        ge=7,
-        le=90,
-        description="Forecast horizon in days (7–90). Default: 30."
-    ),
-    lookback: int = Query(
-        default=180,
-        ge=30,
-        le=730,
-        description="Training window in days. Default: 180."
-    ),
-    db: Session = Depends(get_db),
-):
-    """
-    ## ARIMA(7,1,1) Revenue Forecast
-
-    Generates a `horizon`-day revenue forecast trained on historical invoice data.
-
-    ### Response shape
-    ```json
-    {
-      "dates":      ["2026-01-01", ...],   // historical YYYY-MM-DD
-      "historical": [1200.0, ...],          // daily revenue per date
-      "forecast":   [1350.0, ...],          // predicted revenue
-      "lower_band": [1100.0, ...],          // 95% CI lower
-      "upper_band": [1600.0, ...],          // 95% CI upper
-      "model":      "ARIMA(7, 1, 1)",
-      "warning":    null,                   // non-null when naive fallback used
-      "meta":       { ... }
-    }
-    ```
-
-    ### Model selection
-    | Active sale days | Model used |
-    |---|---|
-    | < 14 | Naive flat-line average (no 500 error) |
-    | ≥ 14 | ARIMA(7,1,1) with 95% confidence intervals |
-    """
-    try:
-        result = build_forecast(
-            db=db,
-            store_id=store_id,
-            horizon=horizon,
-            lookback_days=lookback,
-        )
-        return {"success": True, **result}
-
-    except Exception as e:
-        # Never let a modelling error become a 500 to the client
-        logger.exception("Unhandled error in revenue_forecast")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Forecast engine error: {str(e)}",
-        )
-
-
-# ── P5-T3: Z-Score Anomaly Detection ─────────────────────────────────────────
-
-@router.get("/anomalies")
-async def revenue_anomalies(
-    store_id: int = Query(default=1, description="Store ID (default: 1)"),
-    db: Session   = Depends(get_db),
-):
-    """
-    Detect anomalous revenue days using z-score analysis.
-    - **Drops** (z < -2.0)  → concern
-    - **Spikes** (z > 3.0) → investigate
-    """
-    from app.services.anomaly_detection import detect_revenue_anomalies
-    
-    try:
-        anomalies = detect_revenue_anomalies(db, store_id)
-        return {
-            "success": True,
-            "total_anomalies": len(anomalies),
-            "anomalies": anomalies
-        }
-    except Exception as e:
-        logger.exception("Error in anomaly detection")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error evaluating anomalies: {str(e)}",
-        )
 
 @router.get(
     "/weather/current",

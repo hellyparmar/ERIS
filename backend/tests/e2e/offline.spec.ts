@@ -15,8 +15,8 @@ import { test, expect } from '@playwright/test';
 
 async function login(page) {
     await page.goto('/');
-    await page.fill('input[name="email"]', 'demo@rdios.com');
-    await page.fill('input[name="password"]', 'Demo@123');
+    await page.fill('input[name="email"]', 'demo@eris.local');
+    await page.fill('input[name="password"]', 'test-admin-pw');
     await page.click('button[type="submit"]');
     await page.waitForURL('/dashboard');
 }

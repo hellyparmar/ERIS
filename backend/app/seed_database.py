@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Dict
 import random
 import uuid
+import os
 import numpy as np
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,8 +24,10 @@ from app.models.models_v6 import Supplier, Product, Sale, SaleItem
 from app.models.inventory import Inventory
 from app.models.business_contact import BusinessContact, ContactType
 from app.models.external_factors_models import EconomicIndicatorHistory
+from app.core.gstin import generate_synthetic_gstin
 
 logger = logging.getLogger(__name__)
+DEMO_DATA_SEED = int(os.getenv("ERIS_DEMO_DATA_SEED", "42"))
 
 def pg_or_sqlite_insert(session: AsyncSession, model):
     try:
@@ -35,13 +38,7 @@ def pg_or_sqlite_insert(session: AsyncSession, model):
         pass
     return pg_insert(model)
 
-async def safe_set_config(session: AsyncSession, key: str, val: str):
-    try:
-        bind = getattr(session, 'bind', None) or getattr(session, '_bind', None)
-        if bind and hasattr(bind, 'dialect') and bind.dialect.name == "postgresql":
-            await session.execute(text(f"SELECT set_config('{key}', :t, false)"), {"t": val})
-    except Exception:
-        pass
+
 
 # Real cities with specific lat/lon and weather profiles
 OUTLETS = [
@@ -161,10 +158,19 @@ async def check_data_exists(session: AsyncSession, table: str = "organizations")
 
 DEFAULT_TENANT_ID = uuid.uuid5(uuid.NAMESPACE_DNS, "spiceroute.in") # Deterministic UUID for the tenant
 
+
+def _required_seed_password() -> str:
+    """Read the demo seed password without ever embedding one in source."""
+    password = os.getenv("ERIS_SEED_PASSWORD", "").strip()
+    if not password or password.lower().startswith("change_me"):
+        raise RuntimeError(
+            "ERIS_SEED_PASSWORD must be set before creating demo users."
+        )
+    return password
+
 async def bootstrap_essentials(session: AsyncSession) -> Dict:
     """Fast, safe, idempotent generation of essential records (org, admin user)."""
     stats = {"status": "pending", "records": {}, "errors": []}
-    await safe_set_config(session, 'app.current_tenant', str(DEFAULT_TENANT_ID))
     
     try:
         if await check_data_exists(session, "users"):
@@ -173,20 +179,29 @@ async def bootstrap_essentials(session: AsyncSession) -> Dict:
             return stats
             
         logger.info("🚀 Bootstrapping essential database records...")
-        await safe_set_config(session, 'app.current_tenant_id', str(DEFAULT_TENANT_ID))
         
         # 1. Organizations & Roles
         await session.execute(
             pg_or_sqlite_insert(session, Organization).values([
-                {"id": 1, "tenant_id": DEFAULT_TENANT_ID, "name": 'Spice Route Retail', "is_active": True}
+                {
+                    "id": 1,
+                    "tenant_id": DEFAULT_TENANT_ID,
+                    "name": "Spice Route Retail (Demo)",
+                    "tax_id": generate_synthetic_gstin("29", DEMO_DATA_SEED),
+                    "is_active": True,
+                }
             ]).on_conflict_do_update(
                 index_elements=['id'],
-                set_={"tenant_id": DEFAULT_TENANT_ID, "name": "Spice Route Retail"}
+                set_={
+                    "tenant_id": DEFAULT_TENANT_ID,
+                    "name": "Spice Route Retail (Demo)",
+                    "tax_id": generate_synthetic_gstin("29", DEMO_DATA_SEED),
+                }
             )
         )
         
         roles = []
-        for i, role in enumerate(["Admin", "Manager", "Staff", "Guest"]):
+        for i, role in enumerate(["admin", "manager", "viewer"]):
             roles.append({"id": i+1, "name": role, "is_active": True})
         if roles:
             await session.execute(
@@ -196,26 +211,24 @@ async def bootstrap_essentials(session: AsyncSession) -> Dict:
         
         # 2. Admin User
         from app.core.security import hash_password
-        admin_hash = hash_password('admin123')
-        manager_hash = hash_password('manager123')
-        analyst_hash = hash_password('analyst123')
+        seed_password_hash = hash_password(_required_seed_password())
         
         await session.execute(
             pg_or_sqlite_insert(session, User).values([
             {
                 "id": 999, "organization_id": 1,
-                "username": 'admin', "email": 'admin@eris.com', "first_name": 'System',
-                "last_name": 'Admin', "password_hash": admin_hash, "role_id": 1, "is_active": True
+                "username": 'admin', "email": 'admin@eris.example', "first_name": 'System',
+                "last_name": 'Admin', "password_hash": seed_password_hash, "role_id": 1, "is_active": True
             },
             {
                 "id": 998, "organization_id": 1,
-                "username": 'manager', "email": 'manager@eris.com', "first_name": 'Demo',
-                "last_name": 'Manager', "password_hash": manager_hash, "role_id": 2, "is_active": True
+                "username": 'manager', "email": 'manager@eris.example', "first_name": 'Demo',
+                "last_name": 'Manager', "password_hash": seed_password_hash, "role_id": 2, "is_active": True
             },
             {
                 "id": 997, "organization_id": 1,
-                "username": 'analyst', "email": 'analyst@eris.com', "first_name": 'Demo',
-                "last_name": 'Analyst', "password_hash": analyst_hash, "role_id": 2, "is_active": True
+                "username": 'viewer', "email": 'viewer@eris.example', "first_name": 'Demo',
+                "last_name": 'Viewer', "password_hash": seed_password_hash, "role_id": 3, "is_active": True
             }]).on_conflict_do_nothing()
         )
         await session.commit()
@@ -311,10 +324,8 @@ async def seed_economic_indicators(session: AsyncSession) -> Dict:
 async def generate_historical_data(session: AsyncSession) -> Dict:
     """Heavy generation of history (outlets, products, sales, inventory) over 1-2 years."""
     stats = {"status": "pending", "records": {}, "errors": []}
-    np.random.seed(42)
-    random.seed(42)
-    
-    await safe_set_config(session, 'app.current_tenant', str(DEFAULT_TENANT_ID))
+    np.random.seed(DEMO_DATA_SEED)
+    random.seed(DEMO_DATA_SEED)
     
     try:
         # Seed economic indicators if not already present
@@ -326,7 +337,6 @@ async def generate_historical_data(session: AsyncSession) -> Dict:
             return stats
             
         logger.info("🚀 Starting realistic historical data generation (1 year)...")
-        await safe_set_config(session, 'app.current_tenant_id', str(DEFAULT_TENANT_ID))
         
         # Outlets
         outlets_data = []
@@ -343,7 +353,7 @@ async def generate_historical_data(session: AsyncSession) -> Dict:
         # Users
         users_data = []
         from app.core.security import hash_password
-        demo_hash = hash_password('user123')
+        demo_hash = hash_password(_required_seed_password())
         
         for i in range(1, 11):
             users_data.append({
@@ -385,7 +395,7 @@ async def generate_historical_data(session: AsyncSession) -> Dict:
                 "company_name": "AgroFresh Supplies Ltd",
                 "contact_person": "Vikram Desai",
                 "phone": "+919876500001",
-                "gst_number": "27AABCA1234A1Z5",
+                "gst_number": generate_synthetic_gstin("27", DEMO_DATA_SEED + 101),
                 "address": "Plot 45, APMC Market, Vashi",
                 "city": "Mumbai",
                 "contact_type": ContactType.supplier,
@@ -397,7 +407,7 @@ async def generate_historical_data(session: AsyncSession) -> Dict:
                 "company_name": "SpiceRoute Logistics Hub",
                 "contact_person": "Pooja Sharma",
                 "phone": "+919876500002",
-                "gst_number": "07AAACB5678B1Z2",
+                "gst_number": generate_synthetic_gstin("07", DEMO_DATA_SEED + 102),
                 "address": "Warehouse 12, Okhla Industrial Area",
                 "city": "Delhi",
                 "contact_type": ContactType.logistics,
@@ -409,7 +419,7 @@ async def generate_historical_data(session: AsyncSession) -> Dict:
                 "company_name": "Deccan Beverages & Syrups",
                 "contact_person": "Karthik Reddy",
                 "phone": "+919876500003",
-                "gst_number": "29AACCD9012C1Z8",
+                "gst_number": generate_synthetic_gstin("29", DEMO_DATA_SEED + 103),
                 "address": "88 Industrial Layout, Peenya",
                 "city": "Bangalore",
                 "contact_type": ContactType.distributor,
@@ -421,7 +431,7 @@ async def generate_historical_data(session: AsyncSession) -> Dict:
                 "company_name": "Coastal Seafood & Poultry",
                 "contact_person": "Muthu Raman",
                 "phone": "+919876500004",
-                "gst_number": "33AABCP3456D1Z1",
+                "gst_number": generate_synthetic_gstin("33", DEMO_DATA_SEED + 104),
                 "address": "Harbor Wharf Rd, Royapuram",
                 "city": "Chennai",
                 "contact_type": ContactType.supplier,
@@ -433,7 +443,7 @@ async def generate_historical_data(session: AsyncSession) -> Dict:
                 "company_name": "Rajputana Spices & Flour Mills",
                 "contact_person": "Raghuvir Singh",
                 "phone": "+919876500005",
-                "gst_number": "08AAECR7890E1Z4",
+                "gst_number": generate_synthetic_gstin("08", DEMO_DATA_SEED + 105),
                 "address": "RIICO Industrial Area, Mansarovar",
                 "city": "Jaipur",
                 "contact_type": ContactType.distributor,

@@ -29,7 +29,7 @@ async def list_models():
 @router.post("/retrain", response_model=RetrainResponse)
 async def retrain_model(
     request: RetrainRequest,
-    current_user: User = Depends(require_role("super_admin", "outlet_manager")),
+    current_user: User = Depends(require_role("admin", "manager")),
 ):
     """
     Initiate model retraining process.

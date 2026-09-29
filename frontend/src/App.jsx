@@ -22,20 +22,15 @@ const Customers = lazy(() => import('./pages/Customers.jsx'));
 const Forecasts = lazy(() => import('./pages/Forecasts.jsx'));
 const Alerts = lazy(() => import('./pages/Alerts.jsx'));
 const AIAssistant = lazy(() => import('./pages/AIAssistant.jsx'));
-const Integrations = lazy(() => import('./pages/Integrations.jsx'));
-const TaxCompliance = lazy(() => import('./pages/TaxCompliance.jsx'));
 const Invoices = lazy(() => import('./pages/Invoices.jsx'));
 const CustomerInsights = lazy(() => import('./pages/CustomerInsights.jsx'));
 const Settings = lazy(() => import('./pages/Settings.jsx'));
-const Employees = lazy(() => import('./pages/Employees.jsx'));
 const Suppliers = lazy(() => import('./pages/Suppliers.jsx'));
-const Contacts = lazy(() => import('./pages/Contacts.jsx'));
 const Sales = lazy(() => import('./pages/Sales.jsx'));
 const GSTInvoice = lazy(() => import('./pages/GSTInvoice.jsx'));
 
 const Outlets = lazy(() => import('./pages/Outlets.jsx'));
 const CausalAnalysis = lazy(() => import('./pages/CausalAnalysis.jsx'));
-const CommunicationHub = lazy(() => import('./pages/CommunicationHub.jsx'));
 const NotFound = lazy(() => import('./pages/NotFound.jsx'));
 
 const LoadingSpinner = () => (
@@ -47,9 +42,9 @@ const LoadingSpinner = () => (
   </div>
 );
 
-const ALL_ROLES = ['super_admin', 'superadmin', 'area_manager', 'outlet_manager', 'manager'];
-const SUPER_AND_AREA = ['super_admin', 'superadmin', 'area_manager'];
-const SUPER_ONLY = ['super_admin', 'superadmin'];
+const ALL_ROLES = ['admin', 'manager', 'viewer'];
+const ADMIN_AND_MANAGER = ['admin', 'manager'];
+const ADMIN_ONLY = ['admin'];
 
 function AppLayout() {
   return (
@@ -58,26 +53,21 @@ function AppLayout() {
         <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<ProtectedRoute roles={ALL_ROLES}><Dashboard /></ProtectedRoute>} />
-            <Route path="/analytics" element={<ProtectedRoute roles={SUPER_AND_AREA}><Analytics /></ProtectedRoute>} />
+            <Route path="/analytics" element={<ProtectedRoute roles={ADMIN_AND_MANAGER}><Analytics /></ProtectedRoute>} />
             <Route path="/inventory" element={<ProtectedRoute roles={ALL_ROLES}><Inventory /></ProtectedRoute>} />
             <Route path="/customers" element={<ProtectedRoute roles={ALL_ROLES}><Customers /></ProtectedRoute>} />
             <Route path="/forecasts" element={<ProtectedRoute roles={ALL_ROLES}><Forecasts /></ProtectedRoute>} />
             <Route path="/alerts" element={<ProtectedRoute roles={ALL_ROLES}><Alerts /></ProtectedRoute>} />
             <Route path="/ai-assistant" element={<ProtectedRoute roles={ALL_ROLES}><AIAssistant /></ProtectedRoute>} />
-            <Route path="/tax-compliance" element={<ProtectedRoute roles={SUPER_ONLY}><TaxCompliance /></ProtectedRoute>} />
-            <Route path="/integrations" element={<ProtectedRoute roles={SUPER_ONLY}><Integrations /></ProtectedRoute>} />
             <Route path="/invoices" element={<ProtectedRoute roles={ALL_ROLES}><Invoices /></ProtectedRoute>} />
-            <Route path="/customer-insights" element={<ProtectedRoute roles={SUPER_AND_AREA}><CustomerInsights /></ProtectedRoute>} />
+            <Route path="/customer-insights" element={<ProtectedRoute roles={ADMIN_AND_MANAGER}><CustomerInsights /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute roles={ALL_ROLES}><Settings /></ProtectedRoute>} />
-            <Route path="/employees" element={<ProtectedRoute roles={SUPER_ONLY}><Employees /></ProtectedRoute>} />
-            <Route path="/suppliers" element={<ProtectedRoute roles={SUPER_ONLY}><Suppliers /></ProtectedRoute>} />
-            <Route path="/contacts" element={<ProtectedRoute roles={ALL_ROLES}><Contacts /></ProtectedRoute>} />
+            <Route path="/suppliers" element={<ProtectedRoute roles={ADMIN_ONLY}><Suppliers /></ProtectedRoute>} />
             <Route path="/sales" element={<ProtectedRoute roles={ALL_ROLES}><Sales /></ProtectedRoute>} />
             <Route path="/gst-invoice" element={<ProtectedRoute roles={ALL_ROLES}><GSTInvoice /></ProtectedRoute>} />
 
-            <Route path="/outlets" element={<ProtectedRoute roles={SUPER_AND_AREA}><Outlets /></ProtectedRoute>} />
-            <Route path="/causal-analysis" element={<ProtectedRoute roles={SUPER_AND_AREA}><CausalAnalysis /></ProtectedRoute>} />
-            <Route path="/communication" element={<ProtectedRoute roles={ALL_ROLES}><CommunicationHub /></ProtectedRoute>} />
+            <Route path="/outlets" element={<ProtectedRoute roles={ADMIN_AND_MANAGER}><Outlets /></ProtectedRoute>} />
+            <Route path="/causal-analysis" element={<ProtectedRoute roles={ADMIN_AND_MANAGER}><CausalAnalysis /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
       </Suspense>

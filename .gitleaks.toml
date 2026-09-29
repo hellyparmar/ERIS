@@ -1,13 +1,9 @@
 title = "ERIS Gitleaks Config"
 
 [allowlist]
-  description = "Allowlisted test fixtures — these are deliberately fake values in unit tests"
-  paths = [
-    "backend/tests/unit/test_integrations.py",
-    "backend/tests/unit/test_canonical_models.py",
-    "backend/tests/unit/test_security.py",
-    "backend/tests/conftest.py",
-    ".env.example",
-    "backend/.env.example",
-    "frontend/.env.example",
+  description = "Only unmistakable placeholders used by tests and config templates"
+  regexes = [
+    '''(?i)CHANGE_ME(?:_OR_LEAVE_BLANK)?''',
+    '''(?i)(?:MOCK|INVALID)_[A-Z0-9_]+_FOR_TESTS''',
+    '''(?i)test(?:pass|-[a-z0-9-]+-pw)''',
   ]

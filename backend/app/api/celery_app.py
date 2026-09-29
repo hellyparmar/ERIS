@@ -9,7 +9,7 @@ from celery.schedules import crontab
 
 # Create Celery app
 celery_app = Celery(
-    'rdios',
+    'eris',
     broker=os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0'),
     backend=os.getenv('CELERY_RESULT_BACKEND', 'redis://localhost:6379/0')
 )

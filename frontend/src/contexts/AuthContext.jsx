@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { api, apiClient } from '../lib/api';
 import { useAuthStore } from '../hooks/useAuthStore';
+import { normalizeUser } from '../lib/roles';
 
 const AuthContext = createContext(null);
 
@@ -23,9 +24,9 @@ export function AuthProvider({ children }) {
     setUser(null);
     setToken(null);
     setIsAuthenticated(false);
-    localStorage.removeItem('rdios-auth');
-    localStorage.removeItem('rdios-user');
-    localStorage.removeItem('rdios-token');
+    localStorage.removeItem('eris-auth');
+    localStorage.removeItem('eris-user');
+    localStorage.removeItem('eris-token');
 
     useAuthStore.getState().logout();
 
@@ -47,11 +48,12 @@ export function AuthProvider({ children }) {
         },
       });
 
-      const { access_token, user: userData } = response.data;
+      const { access_token, refresh_token, user: rawUser } = response.data;
+      const userData = normalizeUser(rawUser);
 
-      localStorage.setItem('rdios-token', access_token);
-      localStorage.setItem('rdios-auth', JSON.stringify({ access_token }));
-      localStorage.setItem('rdios-user', JSON.stringify(userData));
+      localStorage.setItem('eris-token', access_token);
+      localStorage.setItem('eris-auth', JSON.stringify({ access_token, refresh_token }));
+      localStorage.setItem('eris-user', JSON.stringify(userData));
 
       setToken(access_token);
       setUser(userData);
@@ -75,8 +77,8 @@ export function AuthProvider({ children }) {
     const restoreSession = async () => {
       setIsLoading(true);
       try {
-        const storedToken = localStorage.getItem('rdios-token');
-        const storedUser = localStorage.getItem('rdios-user');
+        const storedToken = localStorage.getItem('eris-token');
+        const storedUser = localStorage.getItem('eris-user');
 
         if (storedToken && storedUser) {
           try {
@@ -87,14 +89,15 @@ export function AuthProvider({ children }) {
             });
 
             setToken(storedToken);
-            setUser(response.data);
+            const userData = normalizeUser(response.data);
+            setUser(userData);
             useAuthStore.getState().setToken(storedToken);
-            useAuthStore.getState().setUser(response.data);
+            useAuthStore.getState().setUser(userData);
             setIsAuthenticated(true);
           } catch (error) {
-            localStorage.removeItem('rdios-token');
-            localStorage.removeItem('rdios-auth');
-            localStorage.removeItem('rdios-user');
+            localStorage.removeItem('eris-token');
+            localStorage.removeItem('eris-auth');
+            localStorage.removeItem('eris-user');
             setToken(null);
             setUser(null);
             useAuthStore.getState().logout();

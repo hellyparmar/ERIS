@@ -8,6 +8,7 @@ from sqlalchemy import func
 from typing import Optional
 from datetime import date, timedelta
 import os
+import hmac
 
 from app.database import get_db_sync_dependency
 from app.models.schema import InventoryMovement
@@ -18,12 +19,15 @@ from app.models.models_v6 import Sale
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
-N8N_SECRET = os.getenv("N8N_WEBHOOK_SECRET", "dev_secret")
-
-
 def verify_n8n_secret(x_n8n_secret: Optional[str] = Header(None)):
-    """Verify n8n webhook secret from header."""
-    if x_n8n_secret != N8N_SECRET:
+    """Verify the n8n webhook secret without a committed fallback value."""
+    configured_secret = os.getenv("N8N_WEBHOOK_SECRET", "").strip()
+    if not configured_secret or configured_secret.lower().startswith("change_me"):
+        raise HTTPException(
+            status_code=503,
+            detail="Webhook integration is not configured",
+        )
+    if not x_n8n_secret or not hmac.compare_digest(x_n8n_secret, configured_secret):
         raise HTTPException(status_code=403, detail="Invalid webhook secret")
 
 
