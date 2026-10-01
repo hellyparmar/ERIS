@@ -1,13 +1,9 @@
-from sqlalchemy import ForeignKey
-import uuid
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Time, func, text, Float
 from .base import Base
 
+
 class Outlet(Base):
     __tablename__ = "outlets"
-    tenant_id = Column(UUID(as_uuid=True), nullable=False, default=uuid.uuid4)
-
     id = Column(Integer, primary_key=True, index=True)
     organization_id = Column(Integer, nullable=False, default=1)
     name = Column(String(200), nullable=False)
@@ -21,8 +17,8 @@ class Outlet(Base):
     email = Column(String(120), nullable=True)
     opening_time = Column(Time)
     closing_time = Column(Time)
-    is_active = Column(Boolean, nullable=False, server_default=text('true'), default=True)
-    is_deleted = Column(Boolean, nullable=False, server_default=text('false'), default=False)
+    is_active = Column(Boolean, nullable=False, server_default=text("true"), default=True)
+    is_deleted = Column(Boolean, nullable=False, server_default=text("false"), default=False)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 

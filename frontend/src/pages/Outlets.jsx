@@ -1,382 +1,96 @@
-import React, { useState, useMemo } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { MapPin, Phone, Users, TrendingUp, Plus, Edit, Trash2, Eye, Search, Filter, Clock, AlertCircle } from 'lucide-react';
-import api from '../lib/api';
-import Badge from '../components/ui/Badge';
+import { useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Building2, MapPin, Phone, Plus, Search } from 'lucide-react';
+
 import SEO from '../components/SEO';
+import Modal from '../components/ui/Modal';
+import { useAuth } from '../contexts/AuthContext';
+import { api } from '../lib/api';
 import '../styles/outlets.css';
 
-const Outlets = () => {
-    const [searchQuery, setSearchQuery] = useState('');
-    const [selectedStatus, setSelectedStatus] = useState('');
-    const [selectedCity, setSelectedCity] = useState('');
-    const [selectedOutlet, setSelectedOutlet] = useState(null);
-    const [isDetailsOpen, setIsDetailsOpen] = useState(false);
-    // eslint-disable-next-line no-unused-vars
-    const [isAddFormOpen, setIsAddFormOpen] = useState(false);
+const money = (value) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(Number(value) || 0);
+const errorText = (error, fallback) => error?.response?.data?.detail || error?.message || fallback;
 
-    // Fetch outlets data
-    const { data: outletsData, isLoading, refetch } = useQuery({
-        queryKey: ['outlets', selectedStatus, selectedCity],
-        queryFn: () => {
-            const params = new URLSearchParams();
-            if (selectedStatus) params.append('status', selectedStatus);
-            if (selectedCity) params.append('city', selectedCity);
-            return api.get(`/api/v1/outlets?${params}`).then(r => r.data.data || []);
-        },
-    });
+export default function Outlets() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [search, setSearch] = useState('');
+  const [selectedId, setSelectedId] = useState(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [form, setForm] = useState({ name: '', city: '', address: '', phone: '' });
+  const [formError, setFormError] = useState('');
+  const isAdmin = user?.role === 'admin';
 
-    // Filter outlets
-    const filteredOutlets = useMemo(() => {
-        if (!outletsData) return [];
-        return outletsData.filter(outlet => {
-            const matchSearch = outlet.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                outlet.city?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                outlet.phone?.includes(searchQuery);
-            return matchSearch;
-        });
-    }, [outletsData, searchQuery]);
+  const outletsQuery = useQuery({ queryKey: ['outlets'], queryFn: () => api.get('/api/v1/outlets').then((response) => response.data) });
+  const detailQuery = useQuery({
+    queryKey: ['outlet', selectedId],
+    queryFn: () => api.get(`/api/v1/outlets/${selectedId}`).then((response) => response.data),
+    enabled: selectedId != null,
+  });
+  const createMutation = useMutation({
+    mutationFn: (payload) => api.post('/api/v1/outlets/', null, { params: payload }),
+    onSuccess: async () => {
+      setCreateOpen(false);
+      setForm({ name: '', city: '', address: '', phone: '' });
+      await queryClient.invalidateQueries({ queryKey: ['outlets'] });
+    },
+    onError: (error) => setFormError(errorText(error, 'Unable to create outlet.')),
+  });
+  const deactivateMutation = useMutation({
+    mutationFn: (id) => api.delete(`/api/v1/outlets/${id}`),
+    onSuccess: async () => {
+      setSelectedId(null);
+      await queryClient.invalidateQueries({ queryKey: ['outlets'] });
+    },
+  });
 
-    // Get unique cities
-    const cities = useMemo(() => {
-        if (!outletsData) return [];
-        return [...new Set(outletsData.map(o => o.city).filter(Boolean))];
-    }, [outletsData]);
+  const rows = useMemo(() => (outletsQuery.data || []).filter((outlet) => {
+    const needle = search.trim().toLowerCase();
+    return !needle || [outlet.name, outlet.city, outlet.address, outlet.phone].some((value) => String(value || '').toLowerCase().includes(needle));
+  }), [outletsQuery.data, search]);
 
-    // Delete outlet mutation
-    const deleteOutletMutation = useMutation({
-        mutationFn: (id) => api.delete(`/api/v1/outlets/${id}`),
-        onSuccess: () => {
-            refetch();
-        }
-    });
+  const submit = (event) => {
+    event.preventDefault();
+    setFormError('');
+    createMutation.mutate({ ...form, phone: form.phone || undefined });
+  };
 
-    const openOutletDetails = (outlet) => {
-        setSelectedOutlet(outlet);
-        setIsDetailsOpen(true);
-    };
+  return <>
+    <SEO title="Outlets" description="Manage the organization's retail outlets" />
+    <div className="outlets-container">
+      <div className="outlets-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div><h1 className="page-title">Outlets</h1><p style={{ margin: 0, color: 'var(--c-ink-muted)', fontSize: 12 }}>One organization, {outletsQuery.data?.length || 0} active locations</p></div>
+        {isAdmin && <button className="btn-add-outlet" onClick={() => setCreateOpen(true)}><Plus size={18} /> Add outlet</button>}
+      </div>
+      <div className="filter-search" style={{ maxWidth: 380, marginBottom: 20 }}><Search size={18} className="filter-search-icon" /><input className="filter-input" aria-label="Search outlets" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search name, city, address, or phone" /></div>
+      {outletsQuery.isError && <div className="error-state">{errorText(outletsQuery.error, 'Unable to load outlets.')}</div>}
+      <div className="outlets-grid">
+        {rows.map((outlet) => <button key={outlet.id} className="outlet-card" onClick={() => setSelectedId(outlet.id)} style={{ textAlign: 'left' }}>
+          <div className="outlet-card-header"><div className="outlet-info-header"><Building2 size={18} /><h3 className="outlet-name">{outlet.name}</h3></div><span className={`badge ${outlet.is_active ? 'active' : 'neutral'}`}>{outlet.is_active ? 'Active' : 'Inactive'}</span></div>
+          <div className="outlet-location"><MapPin size={16} /><div><div>{outlet.address || 'Address not provided'}</div><div className="location-city">{outlet.city || 'City not provided'}</div></div></div>
+          <div className="outlet-contacts"><div className="contact-item"><Phone size={14} />{outlet.phone || 'Phone not provided'}</div></div>
+        </button>)}
+      </div>
+      {!outletsQuery.isLoading && rows.length === 0 && <div className="outlets-empty"><MapPin size={40} /><p>No outlets match this search.</p></div>}
+    </div>
 
-    const closeOutletDetails = () => {
-        setIsDetailsOpen(false);
-        setTimeout(() => setSelectedOutlet(null), 300);
-    };
+    <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Add outlet">
+      <form onSubmit={submit} style={{ display: 'grid', gap: 12 }}>
+        {formError && <div className="error-state">{formError}</div>}
+        <label>Name *<input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label>
+        <label>City *<input required value={form.city} onChange={(event) => setForm({ ...form, city: event.target.value })} /></label>
+        <label>Address *<input required value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} /></label>
+        <label>Phone<input value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} /></label>
+        <div style={{ display: 'flex', justifyContent: 'end', gap: 8 }}><button type="button" className="action-btn" onClick={() => setCreateOpen(false)}>Cancel</button><button className="action-btn primary" disabled={createMutation.isPending}>Create</button></div>
+      </form>
+    </Modal>
 
-    const handleDeleteOutlet = (id) => {
-        if (window.confirm('Are you sure you want to delete this outlet?')) {
-            deleteOutletMutation.mutate(id);
-        }
-    };
-
-    // Format currency
-    const formatCurrency = (value) => {
-        // eslint-disable-next-line no-undef
-        return new Intl.NumberFormat('en-IN', {
-            style: 'currency',
-            currency: 'INR',
-            maximumFractionDigits: 0
-        }).format(value || 0);
-    };
-
-    const getStatusColor = (status) => {
-        switch(status) {
-            case 'active': return 'success';
-            case 'inactive': return 'secondary';
-            case 'maintenance': return 'warning';
-            default: return 'secondary';
-        }
-    };
-
-    // Skeleton loader
-    if (isLoading) {
-        return (
-            <div className="outlets-container">
-                <div className="outlets-header">
-                </div>
-                <div className="skeleton-filters"></div>
-                <div className="skeleton-grid"></div>
-            </div>
-        );
-    }
-
-    const totalOutlets = outletsData?.length || 0;
-    const activeOutlets = outletsData?.filter(o => o.status === 'active').length || 0;
-    const totalMonthlyRev = outletsData?.reduce((acc, o) => acc + (o.monthly_revenue || 0), 0) || 0;
-    const totalAnnualRev = outletsData?.reduce((acc, o) => acc + (o.annual_revenue || 0), 0) || 0;
-
-    return (
-        <div className="outlets-container">
-            <SEO title="Outlets Management" description="Network-wide retail outlets" />
-            {/* Header */}
-            <div className="outlets-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div className="outlets-title-group">
-                    <h1 className="page-title" style={{ margin: 0, fontSize: '24px' }}>Outlets</h1>
-                </div>
-                <button className="btn-add-outlet" onClick={() => setIsAddFormOpen(true)}>
-                    <Plus size={18} />
-                    Add Outlet
-                </button>
-            </div>
-
-            {/* KPI Strip */}
-            <div className="kpi-strip" style={{ marginBottom: '24px' }}>
-                <div className="kpi-cell">
-                    <div className="kpi-label">Total Outlets</div>
-                    <div className="kpi-value">{totalOutlets}</div>
-                </div>
-                <div className="kpi-cell">
-                    <div className="kpi-label">Active Outlets</div>
-                    <div className="kpi-value sage">{activeOutlets}</div>
-                </div>
-                <div className="kpi-cell">
-                    <div className="kpi-label">Monthly Network Rev</div>
-                    <div className="kpi-value brown">{formatCurrency(totalMonthlyRev)}</div>
-                </div>
-                <div className="kpi-cell">
-                    <div className="kpi-label">Annual Network Rev</div>
-                    <div className="kpi-value brown">{formatCurrency(totalAnnualRev)}</div>
-                </div>
-            </div>
-
-            {/* Filters */}
-            <div className="outlets-filters">
-                <div className="filter-search">
-                    <Search size={18} className="filter-search-icon" />
-                    <input
-                        type="text"
-                        placeholder="Search by name, city, or phone..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="filter-input"
-                    />
-                </div>
-                <select value={selectedCity} onChange={(e) => setSelectedCity(e.target.value)} className="filter-select">
-                    <option value="">All Cities</option>
-                    {cities.map(city => (
-                        <option key={city} value={city}>{city}</option>
-                    ))}
-                </select>
-                <select value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)} className="filter-select">
-                    <option value="">All Status</option>
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                    <option value="maintenance">Maintenance</option>
-                </select>
-            </div>
-
-            {/* Outlets Grid */}
-            {filteredOutlets.length > 0 ? (
-                <div className="outlets-grid">
-                    {filteredOutlets.map((outlet) => (
-                        <div key={outlet.id} className="outlet-card">
-                            <div className="outlet-card-header">
-                                <div className="outlet-info-header">
-                                    <h3 className="outlet-name">{outlet.name}</h3>
-                                    <Badge variant={getStatusColor(outlet.status)} size="sm">
-                                        {outlet.status}
-                                    </Badge>
-                                </div>
-                                <div className="outlet-menu">
-                                    <button className="menu-button" onClick={() => openOutletDetails(outlet)} title="View Details">
-                                        <Eye size={16} />
-                                    </button>
-                                    <button className="menu-button" title="Edit">
-                                        <Edit size={16} />
-                                    </button>
-                                    <button className="menu-button delete" onClick={() => handleDeleteOutlet(outlet.id)} title="Delete">
-                                        <Trash2 size={16} />
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Location Info */}
-                            <div className="outlet-location">
-                                <MapPin size={16} />
-                                <div className="location-text">
-                                    <p className="location-address">{outlet.address}</p>
-                                    <p className="location-city">{outlet.city}, {outlet.state} {outlet.postal_code}</p>
-                                </div>
-                            </div>
-
-                            {/* Contact Info */}
-                            <div className="outlet-contacts">
-                                <div className="contact-item">
-                                    <Phone size={14} />
-                                    <a href={`tel:${outlet.phone}`}>{outlet.phone}</a>
-                                </div>
-                            </div>
-
-                            {/* Metrics */}
-                            <div className="outlet-metrics">
-                                <div className="metric">
-                                    <Users size={14} />
-                                    <div className="metric-content">
-                                        <div className="metric-label">Staff</div>
-                                        <div className="metric-value">{outlet.staff_count || 0}</div>
-                                    </div>
-                                </div>
-                                <div className="metric">
-                                    <TrendingUp size={14} />
-                                    <div className="metric-content">
-                                        <div className="metric-label">Revenue</div>
-                                        <div className="metric-value">{formatCurrency(outlet.monthly_revenue)}</div>
-                                    </div>
-                                </div>
-                                <div className="metric">
-                                    <Clock size={14} />
-                                    <div className="metric-content">
-                                        <div className="metric-label">Hours</div>
-                                        <div className="metric-value">{outlet.opening_time} - {outlet.closing_time}</div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Footer */}
-                            <div className="outlet-footer">
-                                <span className="outlet-id">ID: {outlet.code}</span>
-                                <span className="outlet-since">Since {new Date(outlet.created_at).getFullYear()}</span>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            ) : (
-                <div className="outlets-empty">
-                    <MapPin size={48} />
-                    <p>No outlets found</p>
-                </div>
-            )}
-
-            {/* Details Modal */}
-            {isDetailsOpen && selectedOutlet && (
-                <div className={`outlet-modal ${isDetailsOpen ? 'open' : ''}`} onClick={closeOutletDetails}>
-                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h2 className="modal-title">{selectedOutlet.name}</h2>
-                            <button className="modal-close" onClick={closeOutletDetails}>×</button>
-                        </div>
-                        <div className="modal-body">
-                            {/* Status */}
-                            <div className="detail-section">
-                                <h3 className="detail-section-title">Status</h3>
-                                <Badge variant={getStatusColor(selectedOutlet.status)} size="md">
-                                    {selectedOutlet.status}
-                                </Badge>
-                            </div>
-
-                            {/* Location Details */}
-                            <div className="detail-section">
-                                <h3 className="detail-section-title">Location Details</h3>
-                                <div className="detail-grid">
-                                    <div className="detail-field">
-                                        <label>Address</label>
-                                        <p>{selectedOutlet.address}</p>
-                                    </div>
-                                    <div className="detail-field">
-                                        <label>City</label>
-                                        <p>{selectedOutlet.city}</p>
-                                    </div>
-                                    <div className="detail-field">
-                                        <label>State</label>
-                                        <p>{selectedOutlet.state}</p>
-                                    </div>
-                                    <div className="detail-field">
-                                        <label>Postal Code</label>
-                                        <p>{selectedOutlet.postal_code}</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Contact Information */}
-                            <div className="detail-section">
-                                <h3 className="detail-section-title">Contact Information</h3>
-                                <div className="detail-grid">
-                                    <div className="detail-field">
-                                        <label>Phone</label>
-                                        <p><a href={`tel:${selectedOutlet.phone}`}>{selectedOutlet.phone}</a></p>
-                                    </div>
-                                    <div className="detail-field">
-                                        <label>Manager</label>
-                                        <p>{selectedOutlet.manager_name || '-'}</p>
-                                    </div>
-                                    <div className="detail-field">
-                                        <label>Manager Phone</label>
-                                        <p>{selectedOutlet.manager_phone || '-'}</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Operating Hours */}
-                            <div className="detail-section">
-                                <h3 className="detail-section-title">Operating Hours</h3>
-                                <div className="detail-grid">
-                                    <div className="detail-field">
-                                        <label>Opening Time</label>
-                                        <p>{selectedOutlet.opening_time}</p>
-                                    </div>
-                                    <div className="detail-field">
-                                        <label>Closing Time</label>
-                                        <p>{selectedOutlet.closing_time}</p>
-                                    </div>
-                                    <div className="detail-field">
-                                        <label>Days Open</label>
-                                        <p>{selectedOutlet.days_open || 'All Days'}</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Performance Metrics */}
-                            <div className="detail-section">
-                                <h3 className="detail-section-title">Performance Metrics</h3>
-                                <div className="detail-grid metrics-grid">
-                                    <div className="metric-card">
-                                        <div className="metric-label">Monthly Revenue</div>
-                                        <div className="metric-value">{formatCurrency(selectedOutlet.monthly_revenue)}</div>
-                                    </div>
-                                    <div className="metric-card">
-                                        <div className="metric-label">Annual Revenue</div>
-                                        <div className="metric-value">{formatCurrency(selectedOutlet.annual_revenue)}</div>
-                                    </div>
-                                    <div className="metric-card">
-                                        <div className="metric-label">Staff Count</div>
-                                        <div className="metric-value">{selectedOutlet.staff_count || 0}</div>
-                                    </div>
-                                    <div className="metric-card">
-                                        <div className="metric-label">Customer Count</div>
-                                        <div className="metric-value">{selectedOutlet.customer_count || 0}</div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Inventory */}
-                            <div className="detail-section">
-                                <h3 className="detail-section-title">Inventory Status</h3>
-                                <div className="inventory-info">
-                                    <div className="inventory-item">
-                                        <span>Total Items</span>
-                                        <strong>{selectedOutlet.inventory_count || 0}</strong>
-                                    </div>
-                                    <div className="inventory-item warning">
-                                        <span>Low Stock</span>
-                                        <strong>{selectedOutlet.low_stock_count || 0}</strong>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Additional Info */}
-                            {selectedOutlet.notes && (
-                                <div className="detail-section">
-                                    <h3 className="detail-section-title">Notes</h3>
-                                    <p className="detail-notes">{selectedOutlet.notes}</p>
-                                </div>
-                            )}
-                        </div>
-                        <div className="modal-footer">
-                            <button className="btn-close" onClick={closeOutletDetails}>Close</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-};
-
-export default Outlets;
+    <Modal open={selectedId != null} onClose={() => setSelectedId(null)} title={detailQuery.data?.name || 'Outlet details'}>
+      {detailQuery.isLoading ? <p>Loading outlet…</p> : detailQuery.isError ? <div className="error-state">{errorText(detailQuery.error, 'Unable to load outlet.')}</div> : detailQuery.data && <div style={{ display: 'grid', gap: 16 }}>
+        <p><MapPin size={14} /> {detailQuery.data.address || 'Address not provided'}, {detailQuery.data.city || ''}<br /><Phone size={14} /> {detailQuery.data.phone || 'Phone not provided'}</p>
+        <div className="kpi-strip" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}><div className="kpi-cell"><div className="kpi-label">Month revenue</div><div className="kpi-value">{money(detailQuery.data.performance?.revenue_this_month)}</div></div><div className="kpi-cell"><div className="kpi-label">Active alerts</div><div className="kpi-value">{detailQuery.data.performance?.active_alerts || 0}</div></div><div className="kpi-cell"><div className="kpi-label">Top product</div><div style={{ fontWeight: 600 }}>{detailQuery.data.performance?.top_product || 'No sales yet'}</div></div></div>
+        {isAdmin && <button className="action-btn" disabled={deactivateMutation.isPending} onClick={() => { if (window.confirm('Deactivate this outlet?')) deactivateMutation.mutate(selectedId); }}>Deactivate outlet</button>}
+      </div>}
+    </Modal>
+  </>;
+}

@@ -1,16 +1,17 @@
 from fastapi import APIRouter
 
 from app.routers import (
-    admin, analytics, auth, causal_analysis,
-    customers, forecasting, gst_billing,
-    health as main_health, inventory, models, notifications,
-    sales, ai_assistant as ai_assistant_routes
+    analytics,
+    auth,
+    customers,
+    forecasting,
+    gst_billing,
+    inventory,
+    sales,
+    ai_assistant as ai_assistant_routes,
 )
 from app.routers.inventory import categories_router
-from app.routers import (
-    alerts, suppliers, reports_data,
-    outlets, user_settings, audit
-)
+from app.routers import alerts, suppliers, reports_data, outlets, user_settings, audit
 
 api_router = APIRouter()
 
@@ -28,7 +29,6 @@ api_router.include_router(analytics.router, tags=["Analytics/Dashboard"])
 api_router.include_router(forecasting.router, tags=["Forecasting"])
 api_router.include_router(customers.router, tags=["Customers"])
 api_router.include_router(gst_billing.router, tags=["GST"])
-api_router.include_router(notifications.router, tags=["Notifications"])
 
 # -----------------------
 # INVENTORY
@@ -45,20 +45,12 @@ api_router.include_router(categories_router, tags=["Categories"])
 # AI & INTELLIGENCE
 # -----------------------
 api_router.include_router(ai_assistant_routes.router, tags=["AI Assistant"])
-api_router.include_router(models.router, tags=["Model Management"])
-
-# -----------------------
-# HEALTH & MONITORING
-# -----------------------
-api_router.include_router(main_health.router, tags=["Health"])
-
 # -----------------------
 # OPERATIONS & OTHERS
 # -----------------------
 api_router.include_router(suppliers.router, tags=["Supplier Management"])
-api_router.include_router(causal_analysis.router, tags=["Causal Analysis"])
 api_router.include_router(alerts.router, tags=["Alerts"])
-api_router.include_router(admin.router, tags=["Admin"])
 api_router.include_router(outlets.router, tags=["Outlets"])
 api_router.include_router(user_settings.router, tags=["User Settings"])
 api_router.include_router(reports_data.router, tags=["Reports & Data"])
+api_router.include_router(reports_data.data_router, tags=["Data imports"])

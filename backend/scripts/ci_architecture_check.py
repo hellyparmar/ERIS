@@ -47,9 +47,11 @@ def find_declarative_base_definitions(app_dir: Path):
                         base_id = base.id
                     elif isinstance(base, ast.Attribute):
                         base_id = base.attr
-                    
+
                     if base_id in ("DeclarativeBase", "declarative_base"):
-                        declarative_base_locations.append((resolved_path, f"class {node.name}({base_id}) at line {node.lineno}"))
+                        declarative_base_locations.append(
+                            (resolved_path, f"class {node.name}({base_id}) at line {node.lineno}")
+                        )
 
             # Check 2: x = declarative_base(...)
             elif isinstance(node, ast.Call):
@@ -58,7 +60,7 @@ def find_declarative_base_definitions(app_dir: Path):
                     func_name = node.func.id
                 elif isinstance(node.func, ast.Attribute):
                     func_name = node.func.attr
-                
+
                 if func_name == "declarative_base":
                     declarative_base_locations.append((resolved_path, f"declarative_base() call at line {node.lineno}"))
 
@@ -87,7 +89,7 @@ def check_duplicate_model_classes(models_dir: Path):
                         bases.append(base.id)
                     elif isinstance(base, ast.Attribute):
                         bases.append(base.attr)
-                
+
                 if "Base" in bases or "DeclarativeBase" in bases or any("Base" in b for b in bases):
                     class_locations[node.name].append(py_file.name)
 
@@ -107,13 +109,11 @@ def main():
     for file_path, desc in base_defs:
         print(f"  - {file_path.relative_to(BACKEND_DIR)}: {desc}")
 
-    non_canonical_bases = [
-        (fp, desc) for fp, desc in base_defs if fp != CANONICAL_BASE_FILE
-    ]
+    non_canonical_bases = [(fp, desc) for fp, desc in base_defs if fp != CANONICAL_BASE_FILE]
 
     if non_canonical_bases:
         errors.append(
-            f"ERROR: Non-canonical Declarative Base definitions found outside app/models/base.py:\n"
+            "ERROR: Non-canonical Declarative Base definitions found outside app/models/base.py:\n"
             + "\n".join(f"  {fp.relative_to(BACKEND_DIR)}: {desc}" for fp, desc in non_canonical_bases)
         )
 
@@ -124,7 +124,7 @@ def main():
     duplicates = check_duplicate_model_classes(MODELS_DIR)
     if duplicates:
         errors.append(
-            f"ERROR: Duplicate ORM model class names defined across models:\n"
+            "ERROR: Duplicate ORM model class names defined across models:\n"
             + "\n".join(f"  {name}: {files}" for name, files in duplicates.items())
         )
 

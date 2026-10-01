@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { X, Bell } from 'lucide-react';
+import { Bell } from 'lucide-react';
 import api from '../lib/api';
 import SEO from '../components/SEO';
 
@@ -9,9 +9,6 @@ export default function Alerts() {
   const [filterStatus, setFilterStatus] = useState('active');
   const [selectedOutlet, setSelectedOutlet] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
-  const [resolvePopover, setResolvePopover] = useState(null);
-  const [reorderPopover, setReorderPopover] = useState(null);
-  const [resolveNotes, setResolveNotes] = useState('');
 
   const queryClient = useQueryClient();
   const itemsPerPage = 20;
@@ -34,28 +31,19 @@ export default function Alerts() {
     },
   });
 
-  const { data: alertsSummary } = useQuery({
-    queryKey: ['alerts-summary'],
-    queryFn: async () => {
-      return null;
-    },
-  });
-
   const { data: alertsResponse, isLoading, isError, error: _err } = useQuery({
     queryKey: ['alerts', filterStatus],
     queryFn: async () => {
       const params = {
-        per_page: 1000,
+        per_page: 100,
       };
       if (filterStatus === 'active') {
-        params.status = 'active';
+        params.unread_only = true;
       } else if (filterStatus === 'resolved') {
         params.acknowledged = true;
       }
       return api.get('/api/v1/alerts/list', { params })
-        .then(response => {
-          return response.data.alerts ?? response.data.items ?? response.data ?? [];
-        })
+        .then(response => response.data.items ?? [])
         .catch(err => {
           console.error("Alerts API Error:", err);
           throw err;
@@ -78,12 +66,7 @@ export default function Alerts() {
     if (!alertsData) return [];
     let filtered = [...alertsData];
     if (filterType !== 'all') {
-      filtered = filtered.filter((alert) => {
-        if (filterType === 'low-stock') return alert.type === 'low_stock';
-        if (filterType === 'overstock') return alert.type === 'overstock';
-        if (filterType === 'expiry') return alert.type === 'expiry_warning';
-        return true;
-      });
+      filtered = filtered.filter((alert) => alert.type === filterType);
     }
     if (selectedOutlet !== 'all' && isSuperAdmin) {
       filtered = filtered.filter((alert) => alert.outlet_id === parseInt(selectedOutlet));
@@ -101,20 +84,12 @@ export default function Alerts() {
       ).length;
     }
 
-    if (alertsSummary) {
-      return {
-        active: alertsSummary.total_unacknowledged || 0,
-        resolvedToday,
-        critical: alertsSummary.critical_high_count || 0
-      };
-    }
-    
     if (!alertsData) return { active: 0, resolvedToday: 0, critical: 0 };
     const activeAlerts = alertsData.filter((a) => a.status === 'active');
-    const criticalAlerts = activeAlerts.filter((a) => a.current_stock === 0 || a.type === 'critical');
+    const criticalAlerts = activeAlerts.filter((a) => a.severity === 'critical');
     
     return { active: activeAlerts.length, resolvedToday, critical: criticalAlerts.length };
-  }, [alertsData, alertsSummary]);
+  }, [alertsData]);
 
   const totalPages = Math.ceil(filteredAlerts.length / itemsPerPage);
   const paginatedAlerts = useMemo(() => {
@@ -123,15 +98,12 @@ export default function Alerts() {
   }, [filteredAlerts, currentPage]);
 
   const resolveAlertMutation = useMutation({
-    mutationFn: async ({ alertId, notes }) => {
+    mutationFn: async (alertId) => {
       const response = await api.patch(`/api/v1/alerts/${alertId}/acknowledge`);
       return response.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['alerts'] });
-      queryClient.invalidateQueries({ queryKey: ['alerts-summary'] });
-      setResolvePopover(null);
-      setResolveNotes('');
       setCurrentPage(1);
     },
   });
@@ -154,9 +126,9 @@ export default function Alerts() {
     return `${diffDays}d ago`;
   };
 
-  const getAlertNodeColor = (type) => {
-    if (type === 'critical') return 'var(--c-critical)';
-    if (type === 'low_stock') return 'var(--c-brown)';
+  const getAlertNodeColor = (alert) => {
+    if (alert.severity === 'critical') return 'var(--c-critical)';
+    if (alert.type === 'low_stock') return 'var(--c-brown)';
     return 'var(--c-sage)';
   };
 
@@ -169,9 +141,9 @@ export default function Alerts() {
 
   const tabs = [
     { id: 'all', label: 'All' },
-    { id: 'low-stock', label: 'Low Stock' },
-    { id: 'overstock', label: 'Overstock' },
-    { id: 'expiry', label: 'Expiry' },
+    { id: 'low_stock', label: 'Low Stock' },
+    { id: 'stockout', label: 'Stockout' },
+    { id: 'sales_anomaly', label: 'Sales Anomaly' },
   ];
 
   return (
@@ -201,7 +173,7 @@ export default function Alerts() {
         }}>
           <h1 className="page-title" >Alerts</h1>
           <p style={{ fontSize: '11px', color: 'var(--c-ink-muted)', margin: '4px 0 0' }}>
-            Monitor and resolve inventory warnings in real-time
+            Monitor and acknowledge persisted inventory warnings
           </p>
         </div>
 
@@ -324,7 +296,7 @@ export default function Alerts() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
             <div className="feed-stream">
               {paginatedAlerts.map((alert, idx) => {
-                const nodeColor = getAlertNodeColor(alert.type);
+                const nodeColor = getAlertNodeColor(alert);
                 const isResolved = alert.status === 'resolved';
                 
                 return (
@@ -360,58 +332,11 @@ export default function Alerts() {
                       <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
                         <button 
                           className="action-btn"
-                          onClick={() => setResolvePopover(alert.id)}
+                          onClick={() => resolveAlertMutation.mutate(alert.id)}
+                          disabled={resolveAlertMutation.isPending}
                         >
-                          Resolve
+                          {resolveAlertMutation.isPending ? 'Resolving…' : 'Resolve'}
                         </button>
-                        <button 
-                          className="action-btn primary"
-                          onClick={() => setReorderPopover(alert.id)}
-                        >
-                          Create Reorder
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Popover overlay modal for resolve notes */}
-                    {resolvePopover === alert.id && (
-                      <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
-                        <div onClick={e => e.stopPropagation()} style={{ width: 300, background: 'var(--c-canvas)', border: '1px solid var(--c-border)', borderRadius: 'var(--radius)', padding: '16px' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                            <div style={{ fontSize: '14px', fontWeight: 600 }}>Resolve Alert</div>
-                            <button className="action-btn" onClick={() => setResolvePopover(null)} style={{ padding: '4px' }}><X size={12} /></button>
-                          </div>
-                          <p style={{ fontSize: 13, color: 'var(--c-ink-muted)', marginBottom: 8 }}>Add notes about this resolution (optional):</p>
-                          <textarea value={resolveNotes} onChange={(e) => setResolveNotes(e.target.value)}
-                            placeholder="e.g., Restocked items..." rows={3} style={{ marginBottom: 12, width: '100%' }} />
-                          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                            <button className="action-btn" onClick={() => setResolvePopover(null)}>Cancel</button>
-                            <button className="action-btn primary" onClick={() => resolveAlertMutation.mutate({ alertId: alert.id, notes: resolveNotes })} disabled={resolveAlertMutation.isPending}>
-                              {resolveAlertMutation.isPending ? 'Resolving...' : 'Confirm'}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Popover overlay modal for reorder PO details */}
-                    {reorderPopover === alert.id && (
-                      <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
-                        <div onClick={e => e.stopPropagation()} style={{ width: 320, background: 'var(--c-canvas)', border: '1px solid var(--c-border)', borderRadius: 'var(--radius)', padding: '16px' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                            <div style={{ fontSize: '14px', fontWeight: 600 }}>Create Purchase Order</div>
-                            <button className="action-btn" onClick={() => setReorderPopover(null)} style={{ padding: '4px' }}><X size={12} /></button>
-                          </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
-                            <div><span style={{ fontSize: '11px', color: 'var(--c-ink-muted)' }}>Product:</span> <span style={{ fontSize: 13, color: 'var(--c-dark)', fontWeight: 600 }}>{alert.product_name}</span></div>
-                            <div><span style={{ fontSize: '11px', color: 'var(--c-ink-muted)' }}>Current Stock:</span> <span style={{ fontSize: 13, color: 'var(--c-dark)', fontWeight: 600 }}>{alert.current_stock} units</span></div>
-                            <div><span style={{ fontSize: '11px', color: 'var(--c-ink-muted)' }}>Suggested Order:</span> <span style={{ fontSize: 13, color: 'var(--c-dark)', fontWeight: 600 }}>{Math.max(alert.reorder_level * 2 - alert.current_stock, alert.reorder_level)} units</span></div>
-                          </div>
-                          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                            <button className="action-btn" onClick={() => setReorderPopover(null)}>Close</button>
-                            <a href="/invoices" className="action-btn primary" style={{ textDecoration: 'none' }}>Create PO</a>
-                          </div>
-                        </div>
                       </div>
                     )}
 

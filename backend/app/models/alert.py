@@ -2,12 +2,13 @@
 Alert Models
 """
 
-from sqlalchemy import Boolean, Text, DateTime, ForeignKey, Enum, Integer
+from sqlalchemy import Boolean, Text, DateTime, ForeignKey, Enum, Integer, func
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import Uuid
 from app.models.base import Base
 import enum
 import uuid
+
 
 class AlertType(str, enum.Enum):
     low_stock = "low_stock"
@@ -18,11 +19,13 @@ class AlertType(str, enum.Enum):
     supplier_delay = "supplier_delay"
     gst_reminder = "gst_reminder"
 
+
 class AlertSeverity(str, enum.Enum):
     low = "low"
     medium = "medium"
     high = "high"
     critical = "critical"
+
 
 class Alert(Base):
     __tablename__ = "alerts"
@@ -36,3 +39,4 @@ class Alert(Base):
     is_acknowledged: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     acknowledged_by: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
     acknowledged_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)

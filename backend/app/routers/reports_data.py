@@ -1,352 +1,254 @@
-"""
-Reports and Data Router
-Consolidated API Endpoints for Data Export, Reports, and Data Upload
-"""
+"""Authenticated report downloads, exports, and persistent CSV imports."""
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
-from fastapi.responses import StreamingResponse, Response
-from sqlalchemy.orm import Session
-from sqlalchemy import select
-from typing import Optional
 from datetime import datetime, timedelta
+from typing import Literal, Optional
+
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi.responses import Response
 from pydantic import BaseModel
+from sqlalchemy import func
+from sqlalchemy.orm import Session
 
-from app.database import get_db
-from app.models import User, Sale, Product, Invoice, Customer
-from app.services.reporting_service import ReportingService
-from app.services.export_service import ExportService
+from app.api.deps import get_current_active_user, get_outlet_scope, require_role
+from app.api.schemas import DataSource, DataSourcesResponse, UploadResponse
+from app.database import get_db_sync_dependency
+from app.models import Customer, Inventory, Invoice, Sale, User
 from app.services.data_service import DataService
-from app.api.auth.dependencies import get_current_active_user
-from app.api.schemas import UploadResponse, DataSourcesResponse, DataSource
+from app.services.export_service import ExportService
+from app.services.reporting_service import ReportingService
 
-router = APIRouter(prefix="/reports", tags=["Reports & Data"])
+
+router = APIRouter(prefix="/reports", tags=["Reports"])
+data_router = APIRouter(prefix="/data", tags=["Data imports"])
 data_service = DataService()
+export_service = ExportService()
 
-# ==================== REQUEST MODELS ====================
 
 class ExportRequest(BaseModel):
-    format: str = "pdf"  # pdf, excel, csv
-    start_date: Optional[str] = None
-    end_date: Optional[str] = None
+    format: Literal["pdf", "excel", "csv"] = "pdf"
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
     filters: Optional[dict] = None
 
-# ==================== REPORTS ====================
+
+def _outlet_ids(current_user: User, db: Session) -> list[int]:
+    return get_outlet_scope(current_user, db)
+
+
+def _download(content: bytes, media_type: str, filename: str) -> Response:
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+def _export_response(content: bytes, export_format: str, stem: str) -> Response:
+    media_types = {
+        "pdf": "application/pdf",
+        "excel": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "csv": "text/csv; charset=utf-8",
+    }
+    extensions = {"pdf": "pdf", "excel": "xlsx", "csv": "csv"}
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return _download(content, media_types[export_format], f"{stem}_{timestamp}.{extensions[export_format]}")
+
 
 @router.get("/sales/download")
 async def download_sales_report(
-    format: str = Query("xlsx", pattern="^(xlsx|pdf)$"),
+    format: Literal["xlsx", "pdf"] = Query("xlsx"),
     days: int = Query(30, ge=1, le=365),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_sync_dependency),
     current_user: User = Depends(get_current_active_user),
 ):
-    """Download Sales Report"""
     end_date = datetime.now()
     start_date = end_date - timedelta(days=days)
-    
-    if format == "xlsx":
-        report_buffer = ReportingService.generate_sales_report(start_date, end_date, db)
-        filename = f"sales_report_{datetime.now().strftime('%Y%m%d')}.xlsx"
-        return StreamingResponse(
-            report_buffer,
-            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={"Content-Disposition": f"attachment; filename={filename}"}
-        )
-    elif format == "pdf":
-        report_buffer = ReportingService.generate_pdf_report(
-            [
-                {"order_id": "ORD-001", "date": "2023-10-01", "customer": "John Doe", "amount": 1500.00, "status": "Completed"},
-                {"order_id": "ORD-002", "date": "2023-10-02", "customer": "Jane Smith", "amount": 2300.50, "status": "Completed"},
-                {"order_id": "ORD-003", "date": "2023-10-02", "customer": "Bob Brown", "amount": 450.00, "status": "Pending"},
-            ],
-            title=f"Sales Report ({start_date.date()} to {end_date.date()})"
-        )
-        filename = f"sales_report_{datetime.now().strftime('%Y%m%d')}.pdf"
-        return StreamingResponse(
-            report_buffer,
-            media_type="application/pdf",
-            headers={"Content-Disposition": f"attachment; filename={filename}"}
-        )
-    else:
-        raise HTTPException(status_code=400, detail="Invalid format")
+    rows = ReportingService.get_sales_rows(start_date, end_date, db, _outlet_ids(current_user, db))
+    if format == "pdf":
+        content = ReportingService.generate_pdf_report(
+            rows, f"Sales Report ({start_date.date()} to {end_date.date()})"
+        ).getvalue()
+        return _download(content, "application/pdf", f"sales_report_{end_date:%Y%m%d}.pdf")
+    content = ReportingService.generate_excel_report(
+        rows, f"Sales Report ({start_date.date()} to {end_date.date()})"
+    ).getvalue()
+    return _download(
+        content,
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        f"sales_report_{end_date:%Y%m%d}.xlsx",
+    )
+
 
 @router.get("/inventory/download")
 async def download_inventory_report(
-    format: str = Query("xlsx", pattern="^(xlsx|pdf)$"),
-    db: Session = Depends(get_db),
+    format: Literal["xlsx", "pdf"] = Query("xlsx"),
+    db: Session = Depends(get_db_sync_dependency),
     current_user: User = Depends(get_current_active_user),
 ):
-    """Download Inventory/Stock Report"""
-    if format == "xlsx":
-        report_buffer = ReportingService.generate_inventory_report(db)
-        filename = f"inventory_report_{datetime.now().strftime('%Y%m%d')}.xlsx"
-        return StreamingResponse(
-            report_buffer,
-            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={"Content-Disposition": f"attachment; filename={filename}"}
-        )
-    elif format == "pdf":
-        report_buffer = ReportingService.generate_pdf_report(
-            [
-                {"product_name": "Premium T-Shirt", "sku": "TSH-001", "stock_qty": 45, "price": 499.00, "status": "In Stock"},
-                {"product_name": "Slim Fit Jeans", "sku": "JNS-002", "stock_qty": 12, "price": 1299.00, "status": "Low Stock"},
-                {"product_name": "Cotton Socks", "sku": "SOC-005", "stock_qty": 0, "price": 99.00, "status": "Out of Stock"},
-            ],
-            title="Inventory Status Report"
-        )
-        filename = f"inventory_report_{datetime.now().strftime('%Y%m%d')}.pdf"
-        return StreamingResponse(
-            report_buffer,
-            media_type="application/pdf",
-            headers={"Content-Disposition": f"attachment; filename={filename}"}
-        )
-    else:
-        raise HTTPException(status_code=400, detail="Invalid format")
-
-@router.get("/purchase-order/download")
-async def download_purchase_order(
-    item_id: str = Query("GENERAL", min_length=1),
-    quantity: int = Query(10, ge=1),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
-):
-    """Generate and download a Purchase Order PDF"""
-    po_items = [
-        {"item_code": item_id, "description": f"Refill Stock for {item_id}", "quantity": quantity, "unit_price": 450.00, "total": quantity * 450.00},
-        {"item_code": "SHIP-001", "description": "Express Shipping", "quantity": 1, "unit_price": 50.00, "total": 50.00},
-    ]
-    report_buffer = ReportingService.generate_purchase_order(
-        po_items, 
-        title=f"Purchase Order for {item_id}"
-    )
-    filename = f"PO_{item_id}_{datetime.now().strftime('%Y%m%d')}.pdf"
-    return StreamingResponse(
-        report_buffer,
-        media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    rows = ReportingService.get_inventory_rows(db, _outlet_ids(current_user, db))
+    if format == "pdf":
+        content = ReportingService.generate_pdf_report(rows, "Inventory Status Report").getvalue()
+        return _download(content, "application/pdf", f"inventory_report_{datetime.now():%Y%m%d}.pdf")
+    content = ReportingService.generate_excel_report(rows, "Inventory Status Report").getvalue()
+    return _download(
+        content,
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        f"inventory_report_{datetime.now():%Y%m%d}.xlsx",
     )
 
-# ==================== DATA EXPORTS ====================
 
 @router.post("/export/sales")
 async def export_sales(
     request: ExportRequest,
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db_sync_dependency),
 ):
-    """Export sales data in specified format"""
-    try:
-        query = db.query(Sale)
-        if request.start_date:
-            start = datetime.fromisoformat(request.start_date)
-            query = query.filter(Sale.sale_date >= start)
-        if request.end_date:
-            end = datetime.fromisoformat(request.end_date)
-            query = query.filter(Sale.sale_date <= end)
-        sales = query.all()
-        
-        sales_data = [{
-            "id": sale.id,
-            "sale_date": sale.sale_date.strftime("%Y-%m-%d") if sale.sale_date else "",
-            "customer_id": sale.customer_id or "",
-            "product_id": sale.product_id or "",
-            "quantity": sale.quantity or 0,
-            "unit_price": float(sale.unit_price or 0),
-            "total_amount": float(sale.total_amount or 0),
-            "payment_method": sale.payment_method or "",
-            "channel": sale.channel or ""
-        } for sale in sales]
-        
-        export_service = ExportService()
-        date_range = f"{request.start_date} to {request.end_date}" if request.start_date and request.end_date else None
-        file_bytes = export_service.export_sales_report(sales_data, format=request.format, date_range=date_range)
-        
-        content_types = {"pdf": "application/pdf", "excel": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "csv": "text/csv"}
-        extensions = {"pdf": "pdf", "excel": "xlsx", "csv": "csv"}
-        
-        return Response(
-            content=file_bytes,
-            media_type=content_types.get(request.format.lower(), "application/octet-stream"),
-            headers={"Content-Disposition": f"attachment; filename=sales_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{extensions.get(request.format.lower(), 'bin')}"}
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Export failed: {str(e)}")
+    end = request.end_date or datetime.now()
+    start = request.start_date or end - timedelta(days=30)
+    rows = ReportingService.get_sales_rows(start, end, db, _outlet_ids(current_user, db))
+    content = export_service.export_sales_report(
+        rows, format=request.format, date_range=f"{start.date()} to {end.date()}"
+    )
+    return _export_response(content, request.format, "sales_report")
+
 
 @router.post("/export/inventory")
 async def export_inventory(
     request: ExportRequest,
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db_sync_dependency),
 ):
-    """Export inventory data in specified format"""
-    try:
-        query = db.query(Product)
-        if request.filters:
-            if request.filters.get("category"):
-                query = query.filter(Product.category == request.filters["category"])
-            if request.filters.get("low_stock"):
-                query = query.filter(Product.stock_level <= Product.reorder_point)
-        
-        products = query.all()
-        inventory_data = [{
-            "sku": product.sku or "",
-            "name": product.name or "",
-            "category": product.category or "",
-            "stock_level": product.stock_level or 0,
-            "reorder_point": product.reorder_point or 0,
-            "cost_price": float(product.cost_price or 0),
-            "selling_price": float(product.selling_price or 0),
-            "hsn_code": product.hsn_code or "",
-            "gst_rate": float(product.gst_rate or 0)
-        } for product in products]
-        
-        export_service = ExportService()
-        file_bytes = export_service.export_inventory_report(inventory_data, format=request.format)
-        
-        content_types = {"pdf": "application/pdf", "excel": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "csv": "text/csv"}
-        extensions = {"pdf": "pdf", "excel": "xlsx", "csv": "csv"}
-        
-        return Response(
-            content=file_bytes,
-            media_type=content_types.get(request.format.lower(), "application/octet-stream"),
-            headers={"Content-Disposition": f"attachment; filename=inventory_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{extensions.get(request.format.lower(), 'bin')}"}
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Export failed: {str(e)}")
+    rows = ReportingService.get_inventory_rows(db, _outlet_ids(current_user, db))
+    content = export_service.export_inventory_report(rows, format=request.format)
+    return _export_response(content, request.format, "inventory_report")
+
 
 @router.post("/export/invoices")
 async def export_invoices(
     request: ExportRequest,
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db_sync_dependency),
 ):
-    """Export invoice data in specified format"""
-    try:
-        query = db.query(Invoice)
-        if request.start_date:
-            start = datetime.fromisoformat(request.start_date)
-            query = query.filter(Invoice.invoice_date >= start)
-        if request.end_date:
-            end = datetime.fromisoformat(request.end_date)
-            query = query.filter(Invoice.invoice_date <= end)
-        
-        invoices = query.all()
-        invoice_data = [{
-            "invoice_number": inv.invoice_number or "",
-            "invoice_date": inv.invoice_date.strftime("%Y-%m-%d") if inv.invoice_date else "",
-            "customer_id": inv.customer_id or "",
-            "total_amount": float(inv.total_amount or 0),
-            "amount_paid": float(inv.amount_paid or 0),
-            "amount_due": float(inv.amount_due or 0),
-            "payment_status": inv.payment_status.value if inv.payment_status else "",
-            "due_date": inv.due_date.strftime("%Y-%m-%d") if inv.due_date else ""
-        } for inv in invoices]
-        
-        export_service = ExportService()
-        file_bytes = export_service.export_invoice_report(invoice_data, format=request.format)
-        
-        content_types = {"pdf": "application/pdf", "excel": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "csv": "text/csv"}
-        extensions = {"pdf": "pdf", "excel": "xlsx", "csv": "csv"}
-        
-        return Response(
-            content=file_bytes,
-            media_type=content_types.get(request.format.lower(), "application/octet-stream"),
-            headers={"Content-Disposition": f"attachment; filename=invoices_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{extensions.get(request.format.lower(), 'bin')}"}
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Export failed: {str(e)}")
+    outlet_ids = _outlet_ids(current_user, db)
+    query = db.query(Invoice).filter(Invoice.organization_id == current_user.organization_id)
+    query = query.filter(Invoice.outlet_id.in_(outlet_ids)) if outlet_ids else query.filter(False)
+    if request.start_date:
+        query = query.filter(Invoice.invoice_date >= request.start_date)
+    if request.end_date:
+        query = query.filter(Invoice.invoice_date <= request.end_date)
+    rows = [
+        {
+            "invoice_number": invoice.invoice_number,
+            "invoice_date": invoice.invoice_date.strftime("%Y-%m-%d") if invoice.invoice_date else "",
+            "customer_id": invoice.customer_id or "",
+            "total_amount": float(invoice.total_amount or 0),
+            "amount_paid": float(invoice.amount_paid or 0),
+            "amount_due": float(invoice.amount_due or 0),
+            "payment_status": invoice.payment_status or "",
+            "due_date": invoice.due_date.strftime("%Y-%m-%d") if invoice.due_date else "",
+        }
+        for invoice in query.order_by(Invoice.invoice_date.desc()).all()
+    ]
+    content = export_service.export_invoice_report(rows, format=request.format)
+    return _export_response(content, request.format, "invoices_report")
+
 
 @router.post("/export/customers")
 async def export_customers(
     request: ExportRequest,
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db_sync_dependency),
 ):
-    """Export customer data in specified format"""
-    try:
-        result = await db.execute(select(Customer))
-        customers = result.scalars().all()
-        customer_data = [{
-            "id": cust.id,
-            "name": cust.name or "",
-            "email": cust.email or "",
-            "phone": cust.phone or "",
-            "city": cust.city or "",
-            "state": cust.state or "",
-            "total_purchases": float(cust.total_purchases or 0)
-        } for cust in customers]
-        
-        export_service = ExportService()
-        if request.format.lower() == "pdf":
-            file_bytes = export_service.export_to_pdf(customer_data, "Customer Report")
-        elif request.format.lower() == "excel":
-            file_bytes = export_service.export_to_excel(customer_data, "Customers", "Customer Report")
-        else:
-            file_bytes = export_service.export_to_csv(customer_data)
-        
-        content_types = {"pdf": "application/pdf", "excel": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "csv": "text/csv"}
-        extensions = {"pdf": "pdf", "excel": "xlsx", "csv": "csv"}
-        
-        return Response(
-            content=file_bytes,
-            media_type=content_types.get(request.format.lower(), "application/octet-stream"),
-            headers={"Content-Disposition": f"attachment; filename=customers_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{extensions.get(request.format.lower(), 'bin')}"}
+    customers = (
+        db.query(Customer)
+        .filter(
+            Customer.organization_id == current_user.organization_id,
+            Customer.is_deleted.is_(False),
         )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Export failed: {str(e)}")
+        .order_by(Customer.created_at.desc())
+        .all()
+    )
+    rows = [
+        {
+            "id": customer.id,
+            "name": customer.name,
+            "email": customer.email or "",
+            "phone": customer.phone or "",
+            "city": customer.city or "",
+            "state": customer.state or "",
+            "total_spent": float(customer.total_purchases or 0),
+            "transactions": customer.total_transactions or 0,
+        }
+        for customer in customers
+    ]
+    if request.format == "pdf":
+        content = export_service.export_to_pdf(rows, "Customer Report")
+    elif request.format == "excel":
+        content = export_service.export_to_excel(rows, "Customers", "Customer Report")
+    else:
+        content = export_service.export_to_csv(rows)
+    return _export_response(content, request.format, "customers_report")
 
-# ==================== DATA UPLOADS ====================
 
-@router.post("/data/upload/sales", response_model=UploadResponse)
+async def _csv_bytes(file: UploadFile) -> bytes:
+    if not file.filename or not file.filename.lower().endswith(".csv"):
+        raise HTTPException(status_code=400, detail="File must use the .csv extension")
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="CSV file is empty")
+    return content
+
+
+@data_router.post("/upload/sales", response_model=UploadResponse)
 async def upload_sales_data(
     file: UploadFile = File(...),
-    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db_sync_dependency),
+    current_user: User = Depends(require_role("admin", "manager")),
 ):
-    """Upload sales data from CSV file."""
-    try:
-        if not file.filename.endswith('.csv'):
-            raise HTTPException(status_code=400, detail="File must be CSV format")
-        contents = await file.read()
-        return await data_service.process_sales_upload(contents)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return data_service.process_sales_upload(
+        await _csv_bytes(file), db, current_user.organization_id, _outlet_ids(current_user, db), current_user.id
+    )
 
-@router.post("/data/upload/inventory", response_model=UploadResponse)
+
+@data_router.post("/upload/inventory", response_model=UploadResponse)
 async def upload_inventory_data(
     file: UploadFile = File(...),
+    db: Session = Depends(get_db_sync_dependency),
+    current_user: User = Depends(require_role("admin", "manager")),
+):
+    return data_service.process_inventory_upload(
+        await _csv_bytes(file), db, current_user.organization_id, _outlet_ids(current_user, db), current_user.id
+    )
+
+
+@data_router.get("/sources", response_model=DataSourcesResponse)
+async def get_data_sources(
+    db: Session = Depends(get_db_sync_dependency),
     current_user: User = Depends(get_current_active_user),
 ):
-    """Upload inventory data from CSV file."""
-    try:
-        if not file.filename.endswith('.csv'):
-            raise HTTPException(status_code=400, detail="File must be CSV format")
-        contents = await file.read()
-        return await data_service.process_inventory_upload(contents)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.post("/data/upload/economic", response_model=UploadResponse)
-async def upload_economic_data(
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
-):
-    """Upload macroeconomic data from CSV file."""
-    try:
-        if not file.filename.endswith('.csv'):
-            raise HTTPException(status_code=400, detail="File must be CSV format")
-        contents = await file.read()
-        return await data_service.process_economic_indicators_upload(contents, db)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.get("/data/sources", response_model=DataSourcesResponse)
-async def get_data_sources():
-    """List all available data sources with metadata."""
-    try:
-        sources = [
-            DataSource(name="Sales Data (Synthetic)", type="sales", last_updated=datetime.now(), row_count=18250),
-            DataSource(name="Inventory Data (Synthetic)", type="inventory", last_updated=datetime.now(), row_count=20)
+    outlet_ids = _outlet_ids(current_user, db)
+    sales_query = db.query(func.count(Sale.id), func.max(Sale.updated_at)).filter(
+        Sale.organization_id == current_user.organization_id
+    )
+    inventory_query = db.query(func.count(Inventory.id), func.max(Inventory.last_restocked_at)).filter(
+        Inventory.organization_id == current_user.organization_id
+    )
+    if outlet_ids:
+        sales_query = sales_query.filter(Sale.outlet_id.in_(outlet_ids))
+        inventory_query = inventory_query.filter(Inventory.outlet_id.in_(outlet_ids))
+    else:
+        sales_query = sales_query.filter(False)
+        inventory_query = inventory_query.filter(False)
+    sales_count, sales_updated = sales_query.one()
+    inventory_count, inventory_updated = inventory_query.one()
+    return DataSourcesResponse(
+        sources=[
+            DataSource(name="Recorded sales", type="sales", last_updated=sales_updated, row_count=sales_count or 0),
+            DataSource(
+                name="Current inventory",
+                type="inventory",
+                last_updated=inventory_updated,
+                row_count=inventory_count or 0,
+            ),
         ]
-        return DataSourcesResponse(sources=sources)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    )

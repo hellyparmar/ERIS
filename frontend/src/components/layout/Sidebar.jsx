@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LogOut, LayoutDashboard, ShoppingCart, Package, FileText, BarChart3, Bell, Bot, Calculator, Settings, Truck, Receipt, TrendingUp, Users, ChevronLeft, MessageSquare, Activity, Building2 } from 'lucide-react';
+import { LogOut, LayoutDashboard, Package, FileText, BarChart3, Bell, Bot, Settings, Truck, Receipt, TrendingUp, Users, ChevronLeft, Building2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 const routeRoleMap = {
@@ -15,10 +15,8 @@ const routeRoleMap = {
   '/settings': ['admin', 'manager', 'viewer'],
   '/analytics': ['admin', 'manager'],
   '/outlets': ['admin', 'manager'],
-  '/customer-insights': ['admin', 'manager'],
-  '/gst-invoice': ['admin'],
+  '/gst-invoice': ['admin', 'manager', 'viewer'],
   '/suppliers': ['admin'],
-  '/causal-analysis': ['admin', 'manager'],
 };
 
 export default function Sidebar({ open = false, onClose = () => {}, collapsed = false, onToggle }) {
@@ -52,7 +50,6 @@ export default function Sidebar({ open = false, onClose = () => {}, collapsed = 
       title: 'Intelligence',
       items: [
         { label: 'Analytics',          path: '/analytics',         icon: BarChart3 },
-        { label: 'Causal Analysis',    path: '/causal-analysis',   icon: Activity },
         { label: 'Forecasts',          path: '/forecasts',         icon: TrendingUp },
         { label: 'AI Assistant',       path: '/ai-assistant',      icon: Bot },
         { label: 'Alerts',             path: '/alerts',            icon: Bell },
@@ -65,6 +62,7 @@ export default function Sidebar({ open = false, onClose = () => {}, collapsed = 
         { label: 'Suppliers',  path: '/suppliers',  icon: Truck },
         { label: 'Customers',  path: '/customers',  icon: Users },
         { label: 'Outlets',    path: '/outlets',    icon: Building2 },
+        { label: 'Settings',   path: '/settings',   icon: Settings },
       ]
     },
     {

@@ -6,17 +6,17 @@ Asserts that:
 3. All models inherit from the single canonical Base in app.models.base.
 """
 
-import os
 import ast
 from pathlib import Path
 from collections import defaultdict
 
 MODELS_DIR = Path(__file__).resolve().parent.parent / "app" / "models"
 
+
 def get_class_definitions(file_path):
     with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
         tree = ast.parse(f.read(), filename=str(file_path))
-    
+
     classes = []
     for node in ast.walk(tree):
         if isinstance(node, ast.ClassDef):
@@ -30,10 +30,11 @@ def get_class_definitions(file_path):
             classes.append((node.name, base_names))
     return classes
 
+
 import unittest
 
-class TestArchitecturalIntegrity(unittest.TestCase):
 
+class TestArchitecturalIntegrity(unittest.TestCase):
     def test_single_model_class_definitions(self):
         """Ensure every SQLAlchemy model class is defined in exactly one canonical file."""
         model_files = [f for f in MODELS_DIR.glob("*.py") if f.name != "__init__.py"]
@@ -69,11 +70,23 @@ class TestArchitecturalIntegrity(unittest.TestCase):
             for node in ast.walk(tree):
                 if isinstance(node, ast.ClassDef):
                     for base in node.bases:
-                        base_id = base.id if isinstance(base, ast.Name) else base.attr if isinstance(base, ast.Attribute) else None
+                        base_id = (
+                            base.id
+                            if isinstance(base, ast.Name)
+                            else base.attr
+                            if isinstance(base, ast.Attribute)
+                            else None
+                        )
                         if base_id in ("DeclarativeBase", "declarative_base"):
                             violations.append(f"{py_file.name}: class {node.name}({base_id}) at line {node.lineno}")
                 elif isinstance(node, ast.Call):
-                    func_name = node.func.id if isinstance(node.func, ast.Name) else node.func.attr if isinstance(node.func, ast.Attribute) else None
+                    func_name = (
+                        node.func.id
+                        if isinstance(node.func, ast.Name)
+                        else node.func.attr
+                        if isinstance(node.func, ast.Attribute)
+                        else None
+                    )
                     if func_name == "declarative_base":
                         violations.append(f"{py_file.name}: declarative_base() at line {node.lineno}")
 
@@ -90,4 +103,3 @@ class TestArchitecturalIntegrity(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

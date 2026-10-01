@@ -9,7 +9,7 @@ const AIAssistant = () => {
   const [messages, setMessages] = useState([]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const [sessions, setSessions] = useState([]);
+  const [provider, setProvider] = useState('Checking provider…');
 
   const textareaRef = useRef(null);
   const chatEndRef = useRef(null);
@@ -21,23 +21,27 @@ const AIAssistant = () => {
     "What's the sales forecast for next month?",
   ];
 
-  const generateUUID = useCallback(() => {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-      const r = (Math.random() * 16) | 0;
-      const v = c === 'x' ? r : (r & 0x3) | 0x8;
-      return v.toString(16);
-    });
-  }, []);
+  const generateUUID = useCallback(() => crypto.randomUUID(), []);
 
   useEffect(() => {
     const newSessionId = generateUUID();
     setSessionId(newSessionId);
-    const savedSessions = localStorage.getItem('chatSessions');
-    if (savedSessions) {
-      try { setSessions(JSON.parse(savedSessions)); }
-      catch (e) { setSessions([]); }
-    }
   }, [generateUUID]);
+
+  const { data: sessions = [], refetch: refetchSessions } = useQuery({
+    queryKey: ['chatSessions'],
+    queryFn: async () => (await api.get('/api/v1/ai/sessions')).data,
+  });
+
+  useQuery({
+    queryKey: ['aiStatus'],
+    queryFn: async () => {
+      const status = (await api.get('/api/v1/ai/status')).data;
+      setProvider(status.status === 'online' ? status.primary_provider : 'Provider offline');
+      return status;
+    },
+    staleTime: 30_000,
+  });
 
   const { data: historyData } = useQuery({
     queryKey: ['chatHistory', sessionId],
@@ -69,12 +73,14 @@ const AIAssistant = () => {
     },
     onSuccess: (data) => {
       setIsTyping(false);
+      setProvider((current) => data.provider || current);
       setMessages((prev) => [...prev, {
         id: data.response_id || Date.now().toString(),
         content: data.message?.text || data.response || data.message,
         sender: 'assistant',
         timestamp: new Date(),
       }]);
+      refetchSessions();
     },
     onError: () => {
       setIsTyping(false);
@@ -105,16 +111,10 @@ const AIAssistant = () => {
     setMessages((prev) => [...prev, {
       id: Date.now().toString(), content: trimmed, sender: 'user', timestamp: new Date(),
     }]);
-    if (!sessions.some((s) => s.session_id === sessionId)) {
-      const truncated = trimmed.substring(0, 40) + (trimmed.length > 40 ? '...' : '');
-      const updated = [{ session_id: sessionId, first_message: truncated, created_at: new Date() }, ...sessions];
-      setSessions(updated);
-      localStorage.setItem('chatSessions', JSON.stringify(updated));
-    }
     setInputValue('');
     setIsTyping(true);
     sendMessageMutation.mutate(trimmed);
-  }, [inputValue, isTyping, sessionId, sessions, sendMessageMutation]);
+  }, [inputValue, isTyping, sendMessageMutation]);
 
   const handleKeyDown = useCallback((e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); }
@@ -128,9 +128,18 @@ const AIAssistant = () => {
     setSessionId(id); setMessages([]); setInputValue(''); setIsTyping(false);
   }, []);
 
+  const clearChatMutation = useMutation({
+    mutationFn: async () => api.delete(`/api/v1/ai/history/${sessionId}`),
+    onSettled: () => refetchSessions(),
+  });
+
   const handleClearChat = useCallback(() => {
-    if (window.confirm('Clear all messages in this chat?')) { setMessages([]); setInputValue(''); handleNewChat(); }
-  }, [handleNewChat]);
+    if (!window.confirm('Clear all messages in this chat?')) return;
+    if (messages.length > 0) clearChatMutation.mutate();
+    setMessages([]);
+    setInputValue('');
+    handleNewChat();
+  }, [clearChatMutation, handleNewChat, messages.length]);
 
   const handleSuggestionClick = (suggestion) => setInputValue(suggestion);
 
@@ -209,7 +218,7 @@ const AIAssistant = () => {
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <h2 style={{ fontSize: 16, fontWeight: 600, color: 'var(--c-dark)', margin: 0 }}>Retail Intelligence Assistant</h2>
-              <div className="badge active" style={{ fontSize: 10 }}>Mistral AI</div>
+              <div className="badge active" style={{ fontSize: 10 }}>{provider}</div>
             </div>
             <button className="action-btn" onClick={handleClearChat}>
               <Trash2 size={13} style={{ marginRight: 4 }} /> Clear

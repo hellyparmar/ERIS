@@ -1,7 +1,5 @@
 # Heavy ML libraries (sklearn, xgboost) are lazy-loaded inside methods to save startup RAM.
-import os
 from typing import Optional, Dict, Any
-from datetime import datetime
 
 import pandas as pd
 import numpy as np
@@ -10,12 +8,10 @@ import numpy as np
 class XGBoostForecaster:
     """XGBoost-based forecasting for retail sales time series."""
 
-    def __init__(self, model_dir: str = "models"):
+    def __init__(self):
         self.model: Optional[Any] = None
         self.scaler: Optional[Any] = None
-        self.model_dir = model_dir
         self.product_id: Optional[str] = None
-        os.makedirs(model_dir, exist_ok=True)
 
     @staticmethod
     def create_features(df: pd.DataFrame) -> pd.DataFrame:
@@ -29,8 +25,14 @@ class XGBoostForecaster:
         data["quarter"] = data["ds"].dt.quarter
         data["is_weekend"] = (data["day_of_week"] >= 5).astype(int)
 
-        # Holiday indicator placeholder; user should inject from external holiday table
-        data["is_holiday"] = 0
+        try:
+            import holidays
+
+            years = sorted(data["ds"].dt.year.unique().tolist())
+            indian_holidays = holidays.country_holidays("IN", years=years)
+            data["is_holiday"] = data["ds"].dt.date.isin(indian_holidays).astype(int)
+        except Exception:
+            data["is_holiday"] = 0
 
         # Lag features
         for lag in [1, 7, 14, 30]:
@@ -53,7 +55,9 @@ class XGBoostForecaster:
 
         return data
 
-    def train(self, X: pd.DataFrame, y: pd.Series, product_id: str = "default", params: Dict[str, Any] = None) -> Dict[str, Any]:
+    def train(
+        self, X: pd.DataFrame, y: pd.Series, product_id: str = "default", params: Dict[str, Any] = None
+    ) -> Dict[str, Any]:
         """Train XGBoost regression model."""
         self.product_id = product_id
 
@@ -61,7 +65,7 @@ class XGBoostForecaster:
         y = y.copy()
 
         from sklearn.preprocessing import StandardScaler
-        
+
         self.feature_names = list(X.columns)
         self.scaler = StandardScaler()
         X_scaled = self.scaler.fit_transform(X)
@@ -78,23 +82,13 @@ class XGBoostForecaster:
         }
 
         import xgboost as xgb
+
         self.model = xgb.XGBRegressor(**params)
         self.model.fit(X_scaled, y)
-
-        import pickle
-        model_path = os.path.join(self.model_dir, f"xgb_{product_id}.pkl")
-        with open(model_path, "wb") as f:
-            pickle.dump({
-                "model": self.model,
-                "scaler": self.scaler,
-                "feature_names": self.feature_names
-            }, f)
 
         return {
             "status": "success",
             "product_id": product_id,
-            "model_path": model_path,
-            "trained_at": datetime.utcnow().isoformat(),
         }
 
     def predict(self, X: pd.DataFrame) -> np.ndarray:
@@ -116,6 +110,7 @@ class XGBoostForecaster:
         """Evaluate model with RMSE, MAE, MAPE."""
         preds = self.predict(X_test)
         from sklearn.metrics import mean_squared_error, mean_absolute_error
+
         rmse = np.sqrt(mean_squared_error(y_test, preds))
         mae = mean_absolute_error(y_test, preds)
 
@@ -129,16 +124,26 @@ class XGBoostForecaster:
             "n": len(y_test),
         }
 
-    def load(self, product_id: str) -> None:
-        """Load model from disk."""
-        import pickle
-        model_path = os.path.join(self.model_dir, f"xgb_{product_id}.pkl")
-        if not os.path.exists(model_path):
-            raise FileNotFoundError(f"Model not found: {model_path}")
-        with open(model_path, "rb") as f:
-            data = pickle.load(f)
-        self.model = data["model"]
-        self.scaler = data["scaler"]
-        self.feature_names = data.get("feature_names", [])
-        self.product_id = product_id
-
+    def forecast(self, history: pd.DataFrame, periods: int) -> np.ndarray:
+        """Generate recursive forecasts so each future lag uses earlier predictions."""
+        if periods < 1:
+            return np.array([], dtype=float)
+        working = history[["ds", "y"]].copy().sort_values("ds").reset_index(drop=True)
+        predictions = []
+        for _ in range(periods):
+            next_date = working["ds"].max() + pd.Timedelta(days=1)
+            candidate = pd.concat(
+                [working, pd.DataFrame({"ds": [next_date], "y": [0.0]})],
+                ignore_index=True,
+            )
+            features = self.create_features(candidate)
+            if features.empty or features.iloc[-1]["ds"] != next_date:
+                raise ValueError("At least 31 daily observations are required for XGBoost forecasting")
+            next_x = features.tail(1).drop(columns=["ds", "y"])
+            prediction = float(self.predict(next_x)[0])
+            working = pd.concat(
+                [working, pd.DataFrame({"ds": [next_date], "y": [prediction]})],
+                ignore_index=True,
+            )
+            predictions.append(prediction)
+        return np.asarray(predictions)

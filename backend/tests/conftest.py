@@ -2,9 +2,9 @@
 Pytest configuration and fixtures for ERIS tests.
 Uses SQLite in-memory database for fast, isolated tests.
 """
+
 import sys
 import os
-from typing import Generator
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -15,7 +15,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 os.environ["JWT_SECRET_KEY"] = "MOCK_JWT_SIGNING_KEY_FOR_TESTS"  # pragma: allowlist secret
 os.environ["JWT_SECRET"] = os.environ["JWT_SECRET_KEY"]
-os.environ["ENCRYPTION_KEY"] = "TU9DS19FTkNSWVBUSU9OX0tFWV9GT1JfVEVTVFNfX18="  # pragma: allowlist secret
 os.environ["ERIS_SEED_PASSWORD"] = "test-admin-pw"  # pragma: allowlist secret
 os.environ["ENVIRONMENT"] = "test"
 
@@ -23,9 +22,9 @@ os.environ["ENVIRONMENT"] = "test"
 # TEST-ONLY passwords — these are NOT real credentials.
 # They are used exclusively to seed an in-memory SQLite DB for automated tests.
 # ---------------------------------------------------------------------------
-_TEST_ADMIN_PW    = "test-admin-pw"
-_TEST_MANAGER_PW  = "test-manager-pw"
-_TEST_ANALYST_PW  = "test-analyst-pw"
+_TEST_ADMIN_PW = "test-admin-pw"
+_TEST_MANAGER_PW = "test-manager-pw"
+_TEST_VIEWER_PW = "test-viewer-pw"
 
 import pytest
 from fastapi.testclient import TestClient
@@ -33,17 +32,18 @@ from sqlalchemy import create_engine
 from sqlalchemy.pool import StaticPool
 from sqlalchemy.orm import sessionmaker
 
-# Import app components only after DATABASE_URL is set  
+# Import app components only after DATABASE_URL is set
 try:
     from app.main import app
 except ImportError as e:
     print(f"WARNING: Could not import app.main: {e}")
     app = None
 
-from app.models.schema import Base
+from app.models.base import Base
 from app.models.users import User
 from app.core.security import hash_password
 from app.database import get_db, get_db_sync_dependency
+from app.middleware.rate_limiter import limiter
 
 # Use in-memory SQLite — no file written to disk, fully isolated.
 TEST_DATABASE_URL = "sqlite:///:memory:"
@@ -56,13 +56,17 @@ engine = create_engine(
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
+@pytest.fixture(autouse=True)
+def reset_rate_limits():
+    """Prevent one test's synthetic client traffic from throttling another."""
+    limiter.reset()
+    yield
+    limiter.reset()
+
+
 @pytest.fixture(scope="function")
 def db():
     """Create a fresh database for each test function."""
-    from app.models import (
-        User, Outlet, Product, Inventory, SaleTransaction,
-        Supplier, PurchaseOrder, Invoice, Alert, Forecast, ChatMessage
-    )
     Base.metadata.create_all(bind=engine)
     session = TestingSessionLocal()
     try:
@@ -77,7 +81,7 @@ def client(db):
     """Create a test client with the test database injected."""
     if app is None:
         pytest.skip("FastAPI app not available")
-    
+
     def override_get_db():
         try:
             yield db
@@ -96,21 +100,21 @@ def seed_users(db):
     """Seed test users with properly hashed passwords."""
     from app.models.users import Role
     from app.models.organization import Organization
-    
+
     # Create a test organization if it doesn't exist
     org = Organization(name="Test Organization")
     db.add(org)
     db.commit()
-    
+
     # Create roles
     admin_role = Role(name="admin", description="Administrator")
     manager_role = Role(name="manager", description="Manager")
-    analyst_role = Role(name="analyst", description="Analyst")
+    viewer_role = Role(name="viewer", description="Viewer")
     db.add(admin_role)
     db.add(manager_role)
-    db.add(analyst_role)
+    db.add(viewer_role)
     db.commit()
-    
+
     users = [
         User(
             email="admin@test.com",
@@ -131,12 +135,12 @@ def seed_users(db):
             organization_id=org.id,
         ),
         User(
-            email="analyst@test.com",
-            username="analyst",
+            email="viewer@test.com",
+            username="viewer",
             first_name="Test",
-            last_name="Analyst",
-            password_hash=hash_password(_TEST_ANALYST_PW),
-            role_id=analyst_role.id,
+            last_name="Viewer",
+            password_hash=hash_password(_TEST_VIEWER_PW),
+            role_id=viewer_role.id,
             organization_id=org.id,
         ),
     ]

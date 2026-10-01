@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, ShoppingCart, TrendingUp, Package, Bell, MoreHorizontal, BarChart3, Bot, FileText, Building2, Settings } from 'lucide-react';
+import { LayoutDashboard, TrendingUp, Package, Bell, MoreHorizontal, BarChart3, Bot, FileText, Building2, Settings, Users, Truck, Receipt } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 const mainItems = [
   { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
@@ -11,14 +12,20 @@ const mainItems = [
 ];
 
 const drawerItems = [
-  { label: 'Analytics',    path: '/analytics',      icon: BarChart3 },
-  { label: 'AI Assistant', path: '/ai-assistant',   icon: Bot },
-  { label: 'Invoices',     path: '/invoices',       icon: FileText },
-  { label: 'Settings',     path: '/settings',       icon: Settings },
+  { label: 'Analytics', path: '/analytics', icon: BarChart3, roles: ['admin', 'manager'] },
+  { label: 'AI Assistant', path: '/ai-assistant', icon: Bot },
+  { label: 'Invoices', path: '/invoices', icon: FileText },
+  { label: 'Customers', path: '/customers', icon: Users },
+  { label: 'Outlets', path: '/outlets', icon: Building2, roles: ['admin', 'manager'] },
+  { label: 'Suppliers', path: '/suppliers', icon: Truck, roles: ['admin'] },
+  { label: 'GST', path: '/gst-invoice', icon: Receipt },
+  { label: 'Settings', path: '/settings', icon: Settings },
 ];
 
 export default function BottomNav() {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const { user } = useAuth();
+  const visibleDrawerItems = drawerItems.filter(item => !item.roles || item.roles.includes(user?.role));
 
   return (
     <>
@@ -102,7 +109,7 @@ export default function BottomNav() {
       <div className={`bnav-drawer ${drawerOpen ? 'open' : ''}`}>
         <div className="bnav-drawer-handle" />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-          {drawerItems.map(item => {
+          {visibleDrawerItems.map(item => {
             const Icon = item.icon;
             return (
               <NavLink

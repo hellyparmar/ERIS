@@ -3,28 +3,24 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
-from slowapi import Limiter
 from slowapi.middleware import SlowAPIMiddleware
-from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 import logging
 import asyncio
-import sys
 import uuid
 import os
-from typing import Optional, List, Dict, Any
+from typing import Optional
+from urllib.parse import urlparse
 
 from app.database import init_db, healthcheck_db
 from app.core.config import settings
 from app.core.logging_config import setup_logging
 
 from app.services.scheduler import start_scheduler
+from app.middleware.rate_limiter import limiter
 
 setup_logging(settings.ENVIRONMENT)
 logger = logging.getLogger(__name__)
-
-limiter = Limiter(key_func=get_remote_address)
-
 
 DISALLOWED_PLACEHOLDERS = {
     "change_me",
@@ -42,6 +38,7 @@ DISALLOWED_PLACEHOLDERS = {
     "replace_me",
 }
 
+
 def is_placeholder_secret(val: Optional[str]) -> bool:
     if not val or not str(val).strip():
         return True
@@ -53,15 +50,15 @@ def validate_required_env_vars() -> None:
     missing = []
     database_url = os.getenv("DATABASE_URL")
     jwt_secret = os.getenv("JWT_SECRET_KEY") or os.getenv("JWT_SECRET")
-    encryption_key = os.getenv("ENCRYPTION_KEY")
 
     if is_placeholder_secret(database_url):
-        missing.append("DATABASE_URL: PostgreSQL connection string (postgresql+asyncpg://...) - missing or placeholder value")
+        missing.append(
+            "DATABASE_URL: PostgreSQL connection string (postgresql+asyncpg://...) - missing or placeholder value"
+        )
     if is_placeholder_secret(jwt_secret):
-        missing.append("JWT_SECRET / JWT_SECRET_KEY: JWT signing key (min 32 chars for production) - missing or placeholder value")
-    if is_placeholder_secret(encryption_key):
-        missing.append("ENCRYPTION_KEY: 32-byte Fernet key - missing or placeholder value")
-
+        missing.append(
+            "JWT_SECRET / JWT_SECRET_KEY: JWT signing key (min 32 chars for production) - missing or placeholder value"
+        )
     if missing:
         error_msg = (
             "\n" + "=" * 70 + "\n"
@@ -109,6 +106,7 @@ async def lifespan(app: FastAPI):
             logger.info("Bootstrapping essential records...")
             from app.database import AsyncSessionLocal
             from app.seed_database import bootstrap_essentials
+
             async with AsyncSessionLocal() as session:
                 await bootstrap_essentials(session)
 
@@ -129,12 +127,7 @@ async def lifespan(app: FastAPI):
     logger.info("ERIS API shutting down...")
 
 
-app = FastAPI(
-    title="ERIS API",
-    description="Enterprise Retail Intelligence System",
-    version="1.0.0",
-    lifespan=lifespan
-)
+app = FastAPI(title="ERIS API", description="Enterprise Retail Intelligence System", version="1.0.0", lifespan=lifespan)
 
 
 def add_request_id_middleware(app: FastAPI) -> None:
@@ -148,33 +141,33 @@ def add_request_id_middleware(app: FastAPI) -> None:
 
 
 if settings.ENVIRONMENT == "production":
-    allowed_hosts = []
+    allowed_hosts = ["localhost", "127.0.0.1", "*.onrender.com"]
     if settings.ALLOWED_ORIGINS and settings.ALLOWED_ORIGINS != "*":
-        allowed_hosts = [
-            host.strip().replace("http://", "").replace("https://", "")
-            for host in settings.ALLOWED_ORIGINS.split(",")
-        ]
-    allowed_hosts.extend(["localhost", "127.0.0.1", "0.0.0.0", "*"])
+        allowed_hosts.extend(
+            parsed.hostname
+            for origin in settings.ALLOWED_ORIGINS.split(",")
+            if (parsed := urlparse(origin.strip())).hostname
+        )
     app.add_middleware(
         TrustedHostMiddleware,
-        allowed_hosts=allowed_hosts if allowed_hosts else ["*"]
+        allowed_hosts=sorted(set(allowed_hosts)),
     )
     logger.info("TrustedHost middleware enabled")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        host.strip() for host in settings.ALLOWED_ORIGINS.split(",")
-    ] if settings.ALLOWED_ORIGINS and settings.ALLOWED_ORIGINS != "*" else ["http://localhost:5173", "http://localhost:3000", "http://localhost:4173"],
+    allow_origins=[host.strip() for host in settings.ALLOWED_ORIGINS.split(",")]
+    if settings.ALLOWED_ORIGINS and settings.ALLOWED_ORIGINS != "*"
+    else ["http://localhost:5173", "http://localhost:3000", "http://localhost:4173"],
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"]
+    allow_headers=["*"],
 )
 logger.info("CORS configured")
 
-# app.state.limiter = limiter
-# app.add_middleware(SlowAPIMiddleware)
-# logger.info("Rate limiting middleware enabled")
+app.state.limiter = limiter
+app.add_middleware(SlowAPIMiddleware)
+logger.info("Rate limiting middleware enabled")
 
 add_request_id_middleware(app)
 logger.info("Request ID tracking enabled")
@@ -185,43 +178,30 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
     return JSONResponse(
         status_code=429,
         content={"detail": "Rate limit exceeded. Please try again later."},
-        headers={"Retry-After": "60", "X-Request-ID": getattr(request.state, "request_id", "unknown")}
+        headers={"Retry-After": "60", "X-Request-ID": getattr(request.state, "request_id", "unknown")},
     )
 
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    request_id = getattr(request.state, 'request_id', 'unknown')
+    request_id = getattr(request.state, "request_id", "unknown")
     logger.error(f"Unhandled exception for request {request_id}: {exc}", exc_info=True)
     content = {"error": "Internal server error", "request_id": request_id, "status": 500}
     if settings.ENVIRONMENT != "production":
         content["detail"] = str(exc)
-        
-    return JSONResponse(
-        status_code=500,
-        content=content,
-        headers={"X-Request-ID": request_id}
-    )
+
+    return JSONResponse(status_code=500, content=content, headers={"X-Request-ID": request_id})
 
 
-from app.api_router_registry import api_router
+from app.api_router_registry import api_router  # noqa: E402 - routes mount after middleware and handlers
 
 # All endpoints are mounted under the canonical /api/v1 prefix
 app.include_router(api_router, prefix="/api/v1")
 
-from app.api.websocket_manager import websocket_endpoint
-@app.websocket("/api/ws")
-async def websocket(websocket):
-    await websocket_endpoint(websocket)
 
 @app.get("/health")
 async def health():
-    return {
-        "status": "ok",
-        "service": "ERIS API",
-        "version": "1.0.0",
-        "environment": settings.ENVIRONMENT
-    }
+    return {"status": "ok", "service": "ERIS API", "version": "1.0.0", "environment": settings.ENVIRONMENT}
 
 
 @app.get("/")
@@ -229,48 +209,5 @@ async def root():
     return {
         "message": "ERIS API is running",
         "documentation": "/docs",
-        "service": "Enterprise Retail Intelligence System"
+        "service": "Enterprise Retail Intelligence System",
     }
-
-
-@app.post("/admin/seed-database")
-async def seed_database_endpoint():
-    try:
-        from app.tasks.seed_tasks import run_historical_seed
-        # Enqueue the background task
-        task = run_historical_seed.delay()
-        return {
-            "status": "pending",
-            "message": "Historical data generation started in background",
-            "task_id": task.id
-        }
-    except Exception as e:
-        logger.error(f"Seeding endpoint error: {str(e)}")
-        return {"status": "failed", "message": str(e), "task_id": None}
-
-@app.get("/admin/seed-database/{task_id}")
-async def check_seed_status(task_id: str):
-    from celery.result import AsyncResult
-    from app.api.celery_app import celery_app
-    
-    task_result = AsyncResult(task_id, app=celery_app)
-    
-    response = {
-        "task_id": task_id,
-        "status": task_result.status,
-        "message": ""
-    }
-    
-    if task_result.status == 'SUCCESS':
-        result_data = task_result.result
-        response["status"] = result_data.get("status", "success")
-        response["message"] = "Seeding completed successfully"
-        response["statistics"] = result_data.get("records", {})
-        if "errors" in result_data and result_data["errors"]:
-            response["errors"] = result_data["errors"]
-    elif task_result.status == 'FAILURE':
-        response["message"] = str(task_result.result)
-    elif task_result.status == 'PROGRESS':
-        response["message"] = task_result.info.get('message', 'In progress...') if task_result.info else "In progress..."
-        
-    return response

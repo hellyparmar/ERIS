@@ -5,19 +5,22 @@ import { TrendingUp, TrendingDown, Plus, X } from 'lucide-react';
 import api from '../lib/api';
 import SEO from '../components/SEO';
 import Modal from '../components/ui/Modal';
-import { useToast } from '../components/ui/Toast';
+import { useToast } from '../contexts/ToastContext';
+import { useAuth } from '../contexts/AuthContext';
 
 const formatCurrency = (value) =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(value || 0);
 
 export default function Sales() {
+  const { user } = useAuth();
+  const canWrite = user?.role === 'admin' || user?.role === 'manager';
   const [selectedOutlet, setSelectedOutlet] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedPeriod, setSelectedPeriod] = useState('30');
   
   const { addToast } = useToast();
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [addForm, setAddForm] = useState({
+    outlet_id: '',
     product_id: '',
     quantity: 1,
     discount: 0,
@@ -27,25 +30,35 @@ export default function Sales() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('action') === 'new') {
+    if (canWrite && params.get('action') === 'new') {
       setAddModalOpen(true);
     }
-  }, []);
+  }, [canWrite]);
   
-  const [elapsed, setElapsed] = useState(0);
-  useEffect(() => {
-    const start = Date.now();
-    const interval = setInterval(() => setElapsed(Date.now() - start), 100);
-    return () => clearInterval(interval);
-  }, []);
-
   const { data: outletsData } = useQuery({
     queryKey: ['outlets'],
     queryFn: () => api.get('/api/v1/outlets').then(r => r.data.data || []),
   });
 
+  useEffect(() => {
+    if (!addForm.outlet_id && outletsData?.length) {
+      setAddForm((current) => ({
+        ...current,
+        outlet_id: selectedOutlet || String(outletsData[0].id),
+      }));
+    }
+  }, [addForm.outlet_id, outletsData, selectedOutlet]);
+
+  const { data: saleInventory = [] } = useQuery({
+    queryKey: ['saleInventory', addForm.outlet_id],
+    queryFn: () => api.get('/api/v1/inventory', {
+      params: { outlet_id: Number(addForm.outlet_id) },
+    }).then((response) => Array.isArray(response.data) ? response.data : response.data?.items || []),
+    enabled: Boolean(addForm.outlet_id),
+  });
+
   const { data: salesData } = useQuery({
-    queryKey: ['sales', selectedOutlet, selectedCategory, selectedPeriod],
+    queryKey: ['sales', selectedOutlet, selectedPeriod],
     queryFn: () => {
       const params = new URLSearchParams();
       if (selectedOutlet) params.append('outlet_id', selectedOutlet);
@@ -59,14 +72,16 @@ export default function Sales() {
     queryFn: () => {
       const params = new URLSearchParams();
       if (selectedOutlet) params.append('outlet_id', selectedOutlet);
-      return api.get(`/api/v1/analytics/dashboard/top-products?limit=10&${params}`).then(r => r.data || []);
+      params.append('period', `${selectedPeriod}d`);
+      params.append('limit', '10');
+      return api.get(`/api/v1/analytics/dashboard/top-products?${params}`).then(r => r.data || []);
     },
   });
 
   const { data: outletPerformanceData } = useQuery({
     queryKey: ['outletPerformance', selectedPeriod],
     queryFn: () => {
-      return api.get(`/api/v1/analytics/dashboard/outlet-performance`).then(r => r.data || []);
+      return api.get(`/api/v1/analytics/dashboard/outlet-performance?period=${selectedPeriod}d`).then(r => r.data || []);
     },
   });
 
@@ -84,39 +99,37 @@ export default function Sales() {
     return { totalRevenue, avgDailySales, totalTransactions, growth };
   }, [salesData]);
 
-  const categoriesList = useMemo(() => {
-    if (!topProductsData) return [];
-    return [...new Set(topProductsData.map(p => p.category))].filter(Boolean);
-  }, [topProductsData]);
-
   const maxOutletRevenue = useMemo(() =>
     Math.max(...(outletPerformanceData || []).map(o => o.revenue || 0), 1),
   [outletPerformanceData]);
-
-  const liveSales = ((summaryStats.avgDailySales / 86400) * (elapsed / 1000)).toFixed(1);
 
   const queryClient = useQueryClient();
   const handleAddSubmit = async (e) => {
     e.preventDefault();
     setAddError('');
     try {
-      const prod = topProductsData?.find(p => p.id === parseInt(addForm.product_id));
-      if (!prod) {
+      const inventoryItem = saleInventory.find(
+        (item) => Number(item.product?.id) === Number(addForm.product_id),
+      );
+      if (!inventoryItem || inventoryItem.quantity < Number(addForm.quantity)) {
         setAddError('Please select a valid product.');
         return;
       }
-      const unit_price = prod.unit_price || prod.price || 100;
+      const unitPrice = Number(inventoryItem.product.selling_price);
+      const quantity = Number(addForm.quantity);
+      const discount = Number(addForm.discount) || 0;
+      const taxableAmount = Math.max(0, (unitPrice * quantity) - discount);
+      const taxAmount = taxableAmount * (Number(inventoryItem.product.gst_rate) || 0) / 100;
       
       const payload = {
-        store_id: outletsData?.[0]?.id || 1,
-        customer_id: 1, // Default guest
-        discount: parseFloat(addForm.discount) || 0,
-        tax_amount: 0,
+        outlet_id: Number(addForm.outlet_id),
+        customer_id: null,
+        discount,
+        tax_amount: Number(taxAmount.toFixed(2)),
         payment_method: addForm.payment_method,
         items: [{
-          product_id: parseInt(addForm.product_id),
-          quantity: parseInt(addForm.quantity),
-          unit_price: unit_price
+          product_id: Number(addForm.product_id),
+          quantity,
         }]
       };
 
@@ -124,7 +137,7 @@ export default function Sales() {
       if (res.data) {
         addToast('Sale recorded successfully', 'success');
         setAddModalOpen(false);
-        setAddForm({ product_id: '', quantity: 1, discount: 0, payment_method: 'card' });
+        setAddForm((current) => ({ ...current, product_id: '', quantity: 1, discount: 0, payment_method: 'card' }));
         queryClient.invalidateQueries({ queryKey: ['sales'] });
         queryClient.invalidateQueries({ queryKey: ['topProducts'] });
         queryClient.invalidateQueries({ queryKey: ['outletPerformance'] });
@@ -139,7 +152,7 @@ export default function Sales() {
       <SEO title="Sales & Revenue" description="Track sales performance across outlets" />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 0, minHeight: 'calc(100vh - 50px)', background: 'var(--c-canvas)' }}>
         
-        {/* 1. Live Ticker Bar */}
+        {/* Page header and filters */}
         <div style={{
           background: '#222831',
           padding: '10px 24px',
@@ -151,18 +164,16 @@ export default function Sales() {
           boxSizing: 'border-box'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <span style={{ fontSize: '9px', color: '#AEB784', letterSpacing: '1.5px', fontWeight: '600', textTransform: 'uppercase' }}>
-              LIVE SALES VELOCITY
-            </span>
-            <span className="kpi-value" style={{ fontSize: '16px', color: '#E8C97A', fontWeight: '700' }}>
-              ₹{liveSales}
-            </span>
-            <span style={{ fontSize: '10px', color: '#F3E4C9', opacity: 0.7 }}>
-              earned since page load
-            </span>
+            <span style={{ fontSize: '14px', color: '#F3E4C9', fontWeight: '700' }}>Sales & Revenue</span>
+            <span style={{ fontSize: '10px', color: '#F3E4C9', opacity: 0.7 }}>Recorded transaction performance</span>
           </div>
           
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            {canWrite && (
+              <button className="action-btn primary" onClick={() => setAddModalOpen(true)}>
+                <Plus size={13} /> New Sale
+              </button>
+            )}
             <select 
               value={selectedOutlet} 
               onChange={(e) => setSelectedOutlet(e.target.value)} 
@@ -179,24 +190,6 @@ export default function Sales() {
               <option value="" style={{ background: 'var(--c-dark)', color: '#F3E4C9' }}>All Outlets</option>
               {outletsData?.map(outlet => (
                 <option key={outlet.id} value={outlet.id} style={{ background: 'var(--c-dark)', color: '#F3E4C9' }}>{outlet.name}</option>
-              ))}
-            </select>
-            <select 
-              value={selectedCategory} 
-              onChange={(e) => setSelectedCategory(e.target.value)} 
-              style={{
-                padding: '4px 10px',
-                fontSize: '11px',
-                background: 'transparent',
-                borderColor: 'rgba(243,228,201,0.2)',
-                color: '#F3E4C9',
-                outline: 'none',
-                borderRadius: 'var(--radius)'
-              }}
-            >
-              <option value="" style={{ background: 'var(--c-dark)', color: '#F3E4C9' }}>All Categories</option>
-              {categoriesList.map(category => (
-                <option key={category} value={category} style={{ background: 'var(--c-dark)', color: '#F3E4C9' }}>{category}</option>
               ))}
             </select>
             <select 
@@ -348,21 +341,30 @@ export default function Sales() {
         </div>
       </div>
       
-      <Modal open={addModalOpen} onClose={() => setAddModalOpen(false)} title="New Quick Sale">
+      <Modal open={canWrite && addModalOpen} onClose={() => setAddModalOpen(false)} title="New Quick Sale">
         <form onSubmit={handleAddSubmit}>
           {addError && <div style={{ color: 'var(--c-critical)', marginBottom: 12, fontSize: 13 }}>{addError}</div>}
           
           <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', fontSize: 12, marginBottom: 4 }}>Select Product *</label>
-            <select required value={addForm.product_id} onChange={e => setAddForm({ ...addForm, product_id: e.target.value })} style={{ width: '100%', padding: '6px 12px' }}>
-              <option value="">-- Choose from Top Products --</option>
-              {topProductsData?.map(p => (
-                <option key={p.id} value={p.id}>{p.name}</option>
+            <label style={{ display: 'block', fontSize: 12, marginBottom: 4 }}>Outlet *</label>
+            <select required value={addForm.outlet_id} onChange={e => setAddForm({ ...addForm, outlet_id: e.target.value, product_id: '' })} style={{ width: '100%', padding: '6px 12px' }}>
+              <option value="">-- Select outlet --</option>
+              {outletsData?.map(outlet => (
+                <option key={outlet.id} value={outlet.id}>{outlet.name}</option>
               ))}
             </select>
-            <div style={{ fontSize: 11, color: 'var(--c-ink-muted)', marginTop: 4 }}>
-              (Note: For demo purposes, only top products are listed here)
-            </div>
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ display: 'block', fontSize: 12, marginBottom: 4 }}>Select Product *</label>
+            <select required value={addForm.product_id} onChange={e => setAddForm({ ...addForm, product_id: e.target.value })} style={{ width: '100%', padding: '6px 12px' }}>
+              <option value="">-- Choose in-stock product --</option>
+              {saleInventory.filter(item => item.quantity > 0).map(item => (
+                <option key={item.product.id} value={item.product.id}>
+                  {item.product.name} — {item.quantity} available
+                </option>
+              ))}
+            </select>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>

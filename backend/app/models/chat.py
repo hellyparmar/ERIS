@@ -6,6 +6,7 @@ from sqlalchemy import String, Integer, DateTime, ForeignKey, Text, Index
 from sqlalchemy.orm import Mapped, mapped_column
 from app.models.base import Base
 
+
 class ChatMessage(Base):
     __tablename__ = "chat_messages"
 

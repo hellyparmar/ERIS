@@ -1,607 +1,297 @@
-"""
-Semantic Layer for AI Assistant
-Provides business definitions and schema context to improve LLM-to-SQL accuracy.
-Created: January 2026
+"""Small, auditable semantic layer used by the ERIS AI assistant.
 
-This layer addresses the 40-50% SQL accuracy problem by:
-1. Providing clear business term definitions
-2. Schema descriptions with column types
-3. Pre-approved query templates for common requests
-4. Validation rules to catch common errors
+Only pre-approved SELECT templates can execute. Date values and result limits
+are produced locally; user text is never interpolated into SQL.
 """
 
-from typing import List, Optional, Tuple
-import re
+from __future__ import annotations
+
+from datetime import date, timedelta
 import logging
+import re
+from typing import Optional
+
 
 logger = logging.getLogger(__name__)
 
-
-# ============================================================================
-# BUSINESS DEFINITIONS - Map business terms to SQL expressions
-# ============================================================================
-
 BUSINESS_DEFINITIONS = {
-    # Revenue Metrics
-    "revenue": "SUM(total_amount)",
-    "total_revenue": "SUM(total_amount)",
-    "sales": "SUM(total_amount)",
-    "net_revenue": "SUM(total_amount - COALESCE(tax_amount, 0) - COALESCE(discount_amount, 0))",
-    "gross_revenue": "SUM(total_amount)",
-    
-    # Volume Metrics
-    "orders": "COUNT(DISTINCT id)",
-    "order_count": "COUNT(DISTINCT id)",
-    "transactions": "COUNT(DISTINCT id)",
-    "units_sold": "SUM(quantity)",
-    "quantity": "SUM(quantity)",
-    
-    # Average Metrics
-    "average_order_value": "ROUND(SUM(total_amount) / COUNT(DISTINCT id), 2)",
-    "aov": "ROUND(SUM(total_amount) / COUNT(DISTINCT id), 2)",
-    "average_price": "ROUND(AVG(unit_price), 2)",
-    
-    # Time-based
-    "today": "DATE(sale_date) = DATE('now')",
-    "yesterday": "DATE(sale_date) = DATE('now', '-1 day')",
-    "this_week": "sale_date >= DATE('now', '-7 days')",
-    "last_week": "sale_date >= DATE('now', '-14 days') AND sale_date < DATE('now', '-7 days')",
-    "this_month": "strftime('%Y-%m', sale_date) = strftime('%Y-%m', 'now')",
-    "last_month": "strftime('%Y-%m', sale_date) = strftime('%Y-%m', 'now', '-1 month')",
-    "this_year": "strftime('%Y', sale_date) = strftime('%Y', 'now')",
-    
-    # Customer Metrics
-    "unique_customers": "COUNT(DISTINCT customer_id)",
-    "customer_count": "COUNT(DISTINCT customer_id)",
-    "repeat_customers": "COUNT(DISTINCT customer_id) FILTER (WHERE customer_id IN (SELECT customer_id FROM sales GROUP BY customer_id HAVING COUNT(*) > 1))",
-
-    # Inventory Metrics
-    "dead_stock": "current_stock > 0 AND id NOT IN (SELECT product_id FROM sale_items JOIN sales ON sale_items.sale_id = sales.id WHERE sales.sale_date >= DATE('now', '-90 days'))",
-    "stock_turnover": "SUM(quantity) / AVG(current_stock)",
-    "days_inventory_outstanding": "(AVG(current_stock) / SUM(quantity)) * 365",
-    "stock_value": "SUM(current_stock * cost_price)",
+    "revenue": "sum of completed sale totals",
+    "average_order_value": "revenue divided by completed order count",
+    "units_sold": "sum of sale-item quantities",
+    "low_stock": "outlet inventory at or below the product reorder level",
+    "dead_stock": "inventory on hand with no sales during the last 90 days",
 }
-
-# ============================================================================
-# DATABASE SCHEMA - Describe tables and columns for LLM context
-# ============================================================================
 
 SCHEMA_DESCRIPTIONS = {
-    "sales": {
-        "description": "Transaction-level sales data.",
-        "columns": {
-            "id": "INTEGER PRIMARY KEY - Unique sale record ID",
-            "sale_number": "VARCHAR(100) - Transaction identifier",
-            "outlet_id": "INTEGER - Store location identifier",
-            "customer_id": "INTEGER - Foreign key to customers table (nullable)",
-            "sale_date": "DATETIME - When the sale occurred",
-            "subtotal": "DECIMAL(12,2)",
-            "discount_amount": "DECIMAL(12,2) - Discount applied (nullable)",
-            "tax_amount": "DECIMAL(12,2) - Tax amount (nullable)",
-            "total_amount": "DECIMAL(12,2) - Final amount charged",
-            "payment_method": "VARCHAR(50) - cash/card/upi/credit",
-            "payment_status": "VARCHAR(7) - paid/pending",
-        }
-    },
-    "sale_items": {
-        "description": "Individual items within a sale.",
-        "columns": {
-            "id": "INTEGER PRIMARY KEY",
-            "sale_id": "INTEGER - Foreign key to sales",
-            "product_id": "INTEGER - Foreign key to products",
-            "quantity": "INTEGER - Units sold",
-            "unit_price": "DECIMAL(10,2) - Price per unit",
-            "line_total": "DECIMAL(12,2)"
-        }
-    },
-    "products": {
-        "description": "Product catalog with pricing and inventory info.",
-        "columns": {
-            "id": "INTEGER PRIMARY KEY - Unique product ID",
-            "name": "VARCHAR(255) - Product name",
-            "sku": "VARCHAR(100) - Stock keeping unit",
-            "category_id": "INTEGER - Product category",
-            "selling_price": "DECIMAL(12,2) - List price",
-            "cost_price": "DECIMAL(12,2) - Cost price (for margin calculation)",
-            "current_stock": "INTEGER - Current stock quantity",
-            "reorder_level": "INTEGER - Reorder threshold"
-        }
-    },
-    "customers": {
-        "description": "Customer profiles with contact info.",
-        "columns": {
-            "id": "INTEGER PRIMARY KEY - Unique customer ID",
-            "first_name": "VARCHAR(100) - Customer first name",
-            "last_name": "VARCHAR(100) - Customer last name (concatenate with first_name for full name)",
-            "email": "VARCHAR(120) - Email address",
-            "phone": "VARCHAR(20) - Phone number",
-            "customer_type": "VARCHAR(50) - Customer classification",
-            "created_at": "DATETIME - Registration date",
-        }
-    },
-    "inventory": {
-        "description": "Current stock levels by product and location.",
-        "columns": {
-            "id": "INTEGER PRIMARY KEY",
-            "product_id": "INTEGER - Foreign key to products",
-            "outlet_id": "INTEGER - Store location",
-            "current_stock": "INTEGER - Current stock",
-        }
-    },
-    "suppliers": {
-        "description": "Suppliers and vendors.",
-        "columns": {
-            "id": "INTEGER PRIMARY KEY",
-            "name": "VARCHAR - Supplier name",
-            "outstanding_payable": "DECIMAL - Amount owed to supplier"
-        }
-    },
-    "outlets": {
-        "description": "Store locations / retail branches.",
-        "columns": {
-            "id": "INTEGER PRIMARY KEY",
-            "name": "VARCHAR - Outlet name",
-            "code": "VARCHAR - Outlet code",
-            "city": "VARCHAR - Outlet city"
-        }
-    }
+    "sales": ["id", "outlet_id", "customer_id", "sale_date", "total_amount", "status"],
+    "sale_items": ["sale_id", "product_id", "quantity", "unit_price", "line_total"],
+    "products": ["id", "sku", "name", "cost_price", "selling_price", "reorder_level"],
+    "inventory": ["outlet_id", "product_id", "current_stock", "reserved_stock"],
+    "customers": ["id", "first_name", "last_name", "email", "phone"],
+    "suppliers": ["id", "name", "outstanding_payable", "phone", "contact_person"],
+    "outlets": ["id", "name", "code", "city"],
+    "forecast_results": ["outlet_id", "product_id", "model_type", "forecast_json", "mape", "rmse", "mae", "created_at"],
 }
-
-
-# ============================================================================
-# QUERY TEMPLATES - Pre-approved SQL patterns for common questions
-# ============================================================================
 
 QUERY_TEMPLATES = {
     "top_products_by_revenue": {
-        "pattern": r"top\s*(\d+)?\s*products?\s*(by\s+)?(revenue|sales)",
+        "pattern": r"top\s*(\d+)?\s*(selling\s+)?products?|best\s*(selling\s+)?products?",
         "sql": """
-            SELECT p.name, SUM(si.line_total) as revenue, SUM(si.quantity) as units
+            SELECT p.name, ROUND(SUM(si.line_total), 2) AS revenue,
+                   SUM(si.quantity) AS units
             FROM sale_items si
             JOIN sales s ON si.sale_id = s.id
             JOIN products p ON si.product_id = p.id
-            WHERE {date_filter}
+            WHERE s.status = 'completed'
+              AND s.sale_date >= '{start_date}'
+              AND __OUTLET_SCOPE_s__
             GROUP BY p.id, p.name
             ORDER BY revenue DESC
             LIMIT {limit}
         """,
-        "defaults": {"limit": 5, "date_filter": "1=1"}
     },
-    
     "revenue_by_period": {
-        "pattern": r"(total\s+)?(revenue|sales)\s+(last|this)\s+(week|month|year)",
+        "pattern": r"(total\s+)?(revenue|sales)(\s+summary)?\s+(last|this)\s+(week|month|year)",
         "sql": """
-            SELECT SUM(total_amount) as total_revenue,
-                   COUNT(DISTINCT id) as order_count,
-                   ROUND(SUM(total_amount) / COUNT(DISTINCT id), 2) as avg_order_value
-            FROM sales
-            WHERE {date_filter}
+            SELECT ROUND(COALESCE(SUM(s.total_amount), 0), 2) AS total_revenue,
+                   COUNT(DISTINCT s.id) AS order_count,
+                   ROUND(COALESCE(AVG(s.total_amount), 0), 2) AS avg_order_value
+            FROM sales s
+            WHERE s.status = 'completed'
+              AND s.sale_date >= '{start_date}'
+              AND s.sale_date < '{end_date}'
+              AND __OUTLET_SCOPE_s__
         """,
-        "defaults": {"date_filter": "sale_date >= DATE('now', '-30 days')"}
     },
-    
     "daily_sales_trend": {
-        "pattern": r"(daily|day\s*wise)\s*(sales|revenue)\s*(trend)?",
+        "pattern": r"(daily|day\s*wise)\s*(sales|revenue)(\s*trend)?",
         "sql": """
-            SELECT DATE(sale_date) as date,
-                   SUM(total_amount) as revenue,
-                   COUNT(DISTINCT id) as orders
-            FROM sales
-            WHERE sale_date >= DATE('now', '-30 days')
-            GROUP BY DATE(sale_date)
-            ORDER BY date
+            SELECT DATE(s.sale_date) AS sale_day,
+                   ROUND(SUM(s.total_amount), 2) AS revenue,
+                   COUNT(DISTINCT s.id) AS orders
+            FROM sales s
+            WHERE s.status = 'completed'
+              AND s.sale_date >= '{start_date}'
+              AND __OUTLET_SCOPE_s__
+            GROUP BY DATE(s.sale_date)
+            ORDER BY sale_day
         """,
-        "defaults": {}
     },
-    
     "top_customers": {
-        "pattern": r"top\s*(\d+)?\s*customers?\s*(by\s+)?(revenue|spend|value)",
+        "pattern": r"top\s*(\d+)?\s*customers?(\s+by\s+(revenue|spend|value))?",
         "sql": """
-            SELECT c.first_name || ' ' || c.last_name as name, c.email, SUM(s.total_amount) as total_spend,
-                   COUNT(DISTINCT s.id) as order_count
+            SELECT c.first_name || ' ' || c.last_name AS name, c.email,
+                   ROUND(SUM(s.total_amount), 2) AS total_spend,
+                   COUNT(DISTINCT s.id) AS order_count
             FROM sales s
             JOIN customers c ON s.customer_id = c.id
-            WHERE 1=1
+            WHERE s.status = 'completed' AND __OUTLET_SCOPE_s__
             GROUP BY c.id, c.first_name, c.last_name, c.email
             ORDER BY total_spend DESC
             LIMIT {limit}
         """,
-        "defaults": {"limit": 3}
     },
-    
     "low_stock_products": {
-        "pattern": r"low\s*stock|out\s*of\s*stock|reorder|inventory\s*alert",
+        "pattern": r"low\s*stock|out\s*of\s*stock|need(s)?\s+reorder|inventory\s*alert",
         "sql": """
-            SELECT p.name, p.sku, p.current_stock, p.reorder_level
-            FROM products p
-            WHERE p.current_stock <= p.reorder_level
-            ORDER BY (p.current_stock - p.reorder_level)
+            SELECT i.outlet_id, p.name, p.sku, i.current_stock,
+                   i.reserved_stock, p.reorder_level
+            FROM inventory i
+            JOIN products p ON i.product_id = p.id
+            WHERE i.current_stock - i.reserved_stock <= p.reorder_level
+              AND __OUTLET_SCOPE_i__
+            ORDER BY (i.current_stock - i.reserved_stock - p.reorder_level)
+            LIMIT 20
         """,
-        "defaults": {}
     },
-    
     "dead_stock_analysis": {
-        "pattern": r"(dead|stagnant|slow\s*moving)\s*(stock|inventory|products|items)",
+        "pattern": r"(dead|stagnant|slow\s*moving)\s*(stock|inventory|products?|items?)",
         "sql": """
-            SELECT p.name, p.sku, p.current_stock as stock_on_hand, (p.current_stock * p.cost_price) as tied_capital
-            FROM products p
-            WHERE p.current_stock > 0 
-            AND p.id NOT IN (
-                SELECT si.product_id FROM sale_items si
-                JOIN sales s ON si.sale_id = s.id 
-                WHERE s.sale_date >= DATE('now', '-90 days')
-            )
+            SELECT i.outlet_id, p.name, p.sku, i.current_stock AS stock_on_hand,
+                   ROUND(i.current_stock * p.cost_price, 2) AS tied_capital
+            FROM inventory i
+            JOIN products p ON i.product_id = p.id
+            WHERE i.current_stock > 0 AND __OUTLET_SCOPE_i__
+              AND NOT EXISTS (
+                  SELECT 1 FROM sale_items si
+                  JOIN sales s ON si.sale_id = s.id
+                  WHERE si.product_id = p.id
+                    AND s.outlet_id = i.outlet_id
+                    AND s.sale_date >= '{start_date}'
+              )
             ORDER BY tied_capital DESC
-            LIMIT {limit}
+            LIMIT 20
         """,
-        "defaults": {"limit": 20}
     },
-    
     "compare_revenue_periods": {
-        "pattern": r"compare\s+this\s+month\s+to\s+last\s+month|this\s+month\s+vs\s+last\s+month",
+        "pattern": r"compare\s+this\s+month\s+(to|with)\s+last\s+month|this\s+month\s+vs\.?\s+last\s+month",
         "sql": """
-            SELECT 
-                ROUND(SUM(CASE WHEN strftime('%Y-%m', sale_date) = strftime('%Y-%m', 'now') THEN total_amount ELSE 0 END), 2) as this_month_revenue,
-                ROUND(SUM(CASE WHEN strftime('%Y-%m', sale_date) = strftime('%Y-%m', 'now', '-1 month') THEN total_amount ELSE 0 END), 2) as last_month_revenue,
-                COUNT(CASE WHEN strftime('%Y-%m', sale_date) = strftime('%Y-%m', 'now') THEN 1 END) as this_month_orders,
-                COUNT(CASE WHEN strftime('%Y-%m', sale_date) = strftime('%Y-%m', 'now', '-1 month') THEN 1 END) as last_month_orders
-            FROM sales
-            WHERE sale_date >= DATE('now', '-65 days')
+            SELECT
+              ROUND(SUM(CASE WHEN s.sale_date >= '{current_start}' THEN s.total_amount ELSE 0 END), 2) AS this_month_revenue,
+              ROUND(SUM(CASE WHEN s.sale_date >= '{previous_start}' AND s.sale_date < '{current_start}' THEN s.total_amount ELSE 0 END), 2) AS last_month_revenue,
+              SUM(CASE WHEN s.sale_date >= '{current_start}' THEN 1 ELSE 0 END) AS this_month_orders,
+              SUM(CASE WHEN s.sale_date >= '{previous_start}' AND s.sale_date < '{current_start}' THEN 1 ELSE 0 END) AS last_month_orders
+            FROM sales s
+            WHERE s.status = 'completed' AND s.sale_date >= '{previous_start}'
+              AND __OUTLET_SCOPE_s__
         """,
-        "defaults": {}
     },
-
     "underperforming_outlets": {
-        "pattern": r"(which|what)\s+(outlet|store)s?\s+(is|are)\s+underperforming|underperforming\s+(outlet|store)s?",
+        "pattern": r"underperforming\s+(outlets?|stores?)|(which|what)\s+(outlets?|stores?).*underperforming",
         "sql": """
-            SELECT o.id as outlet_id, o.name as outlet_name,
-                   ROUND(SUM(s.total_amount), 2) as total_revenue,
-                   COUNT(DISTINCT s.id) as order_count,
-                   ROUND(AVG(s.total_amount), 2) as avg_order_value
+            SELECT o.id AS outlet_id, o.name AS outlet_name,
+                   ROUND(SUM(s.total_amount), 2) AS total_revenue,
+                   COUNT(DISTINCT s.id) AS order_count,
+                   ROUND(AVG(s.total_amount), 2) AS avg_order_value
             FROM outlets o
             JOIN sales s ON s.outlet_id = o.id
-            WHERE s.sale_date >= DATE('now', '-30 days')
+            WHERE s.status = 'completed' AND s.sale_date >= '{start_date}'
+              AND __OUTLET_SCOPE_s__
             GROUP BY o.id, o.name
             ORDER BY total_revenue ASC
             LIMIT 3
         """,
-        "defaults": {}
     },
-
-    "slowest_inventory": {
-        "pattern": r"slowest[- ]?moving\s*(inventory|product|item)s?|what('?s| is)\s+(my\s+)?slowest[- ]?moving",
-        "sql": """
-            SELECT p.id as product_id, p.name as product_name, p.sku, p.current_stock,
-                   COALESCE(SUM(si.quantity), 0) as units_sold_last_90_days
-            FROM products p
-            LEFT JOIN sale_items si ON p.id = si.product_id
-            LEFT JOIN sales s ON si.sale_id = s.id AND s.sale_date >= DATE('now', '-90 days')
-            WHERE p.current_stock > 0
-            GROUP BY p.id, p.name, p.sku, p.current_stock
-            ORDER BY units_sold_last_90_days ASC, p.current_stock DESC
-            LIMIT {limit}
-        """,
-        "defaults": {"limit": 5}
-    },
-
     "supplier_debt": {
-        "pattern": r"(which|what)\s+supplier\s+do\s+i\s+owe\s+(the\s+)?most\s+to|supplier\s+debt|who\s+do\s+i\s+owe\s+(the\s+)?most\s+to",
+        "pattern": r"supplier\s+debt|supplier.*owe|who\s+do\s+i\s+owe",
         "sql": """
-            SELECT id, name as supplier_name, outstanding_payable, phone, contact_person
+            SELECT id, name AS supplier_name, outstanding_payable, phone, contact_person
             FROM suppliers
+            WHERE is_active = TRUE
             ORDER BY outstanding_payable DESC
             LIMIT 5
         """,
-        "defaults": {}
     },
-
     "aov_trend": {
-        "pattern": r"average\s+order\s+value\s+trend|aov\s+trend|what('?s| is)\s+(my\s+)?average\s+order\s+value\s+trend",
+        "pattern": r"average\s+order\s+value\s+trend|aov\s+trend",
         "sql": """
-            SELECT strftime('%Y-%m', sale_date) as month,
-                   ROUND(SUM(total_amount) / COUNT(DISTINCT id), 2) as average_order_value,
-                   COUNT(DISTINCT id) as order_count,
-                   ROUND(SUM(total_amount), 2) as total_revenue
-            FROM sales
-            WHERE sale_date >= DATE('now', '-6 months')
-            GROUP BY strftime('%Y-%m', sale_date)
-            ORDER BY month ASC
+            SELECT DATE(s.sale_date) AS sale_day,
+                   ROUND(AVG(s.total_amount), 2) AS average_order_value,
+                   COUNT(DISTINCT s.id) AS order_count
+            FROM sales s
+            WHERE s.status = 'completed' AND s.sale_date >= '{start_date}'
+              AND __OUTLET_SCOPE_s__
+            GROUP BY DATE(s.sale_date)
+            ORDER BY sale_day
         """,
-        "defaults": {}
-    }
+    },
+    "latest_forecast": {
+        "pattern": r"(sales|demand)?\s*forecast|predict(ed|ion)?\s+(sales|demand)",
+        "sql": """
+            SELECT fr.outlet_id, p.name AS product_name, fr.model_type,
+                   fr.forecast_json, fr.mape, fr.rmse, fr.mae, fr.created_at
+            FROM forecast_results fr
+            LEFT JOIN products p ON fr.product_id = p.id
+            WHERE __OUTLET_SCOPE_fr__
+            ORDER BY fr.created_at DESC
+            LIMIT 10
+        """,
+    },
 }
-
-
-# ============================================================================
-# VALIDATION RULES - Catch common SQL generation errors
-# ============================================================================
 
 VALIDATION_RULES = [
     {
-        "name": "prevent_select_star",
-        "pattern": r"SELECT\s+\*",
-        "message": "Avoid SELECT * - specify columns explicitly",
-        "severity": "warning"
+        "name": "read_only",
+        "pattern": r"\b(DELETE|DROP|TRUNCATE|UPDATE|INSERT|ALTER|CREATE|GRANT|REVOKE)\b",
+        "message": "Only read-only queries are allowed",
+        "severity": "error",
     },
+    {"name": "no_select_star", "pattern": r"SELECT\s+\*", "message": "Columns must be explicit", "severity": "error"},
     {
-        "name": "prevent_delete",
-        "pattern": r"DELETE\s+FROM",
-        "message": "DELETE command blocked - read-only access",
-        "severity": "error"
+        "name": "single_statement",
+        "pattern": r";",
+        "message": "Multiple SQL statements are not allowed",
+        "severity": "error",
     },
-    {
-        "name": "prevent_drop",
-        "pattern": r"DROP\s+(TABLE|DATABASE|INDEX|VIEW)",
-        "message": "DROP command blocked - destructive operation",
-        "severity": "error"
-    },
-    {
-        "name": "prevent_truncate",
-        "pattern": r"TRUNCATE",
-        "message": "TRUNCATE blocked - destructive operation",
-        "severity": "error"
-    },
-    {
-        "name": "prevent_update",
-        "pattern": r"UPDATE\s+\w+\s+SET",
-        "message": "UPDATE command blocked - read-only access",
-        "severity": "error"
-    },
-    {
-        "name": "prevent_insert",
-        "pattern": r"INSERT\s+INTO",
-        "message": "INSERT command blocked - read-only access",
-        "severity": "error"
-    },
-    {
-        "name": "check_table_exists",
-        "pattern": r"FROM\s+(\w+)",
-        "allowed_tables": ["sales", "products", "customers", "inventory", "invoices", "alerts", "sale_items", "users", "suppliers", "product_categories", "outlets"],
-        "message": "Unknown table referenced",
-        "severity": "error"
-    }
 ]
 
 
+def _month_start(value: date) -> date:
+    return value.replace(day=1)
+
+
 class SemanticLayer:
-    """
-    Semantic layer for improving LLM-to-SQL accuracy.
-    
-    Usage:
-        layer = SemanticLayer()
-        enhanced_prompt = layer.enhance_prompt(user_query)
-        sql = layer.match_template(user_query)
-        validation = layer.validate_sql(generated_sql)
-    """
-    
-    def __init__(self):
+    def __init__(self) -> None:
         self.definitions = BUSINESS_DEFINITIONS
         self.schema = SCHEMA_DESCRIPTIONS
         self.templates = QUERY_TEMPLATES
         self.rules = VALIDATION_RULES
-    
-    def get_schema_context(self) -> str:
-        """
-        Generate schema description for LLM context.
-        """
-        context_parts = ["## Database Schema\n"]
-        
-        for table_name, table_info in self.schema.items():
-            context_parts.append(f"### Table: {table_name}")
-            context_parts.append(f"Description: {table_info['description']}")
-            context_parts.append("Columns:")
-            for col_name, col_desc in table_info['columns'].items():
-                context_parts.append(f"  - {col_name}: {col_desc}")
-            context_parts.append("")
-        
-        return "\n".join(context_parts)
-    
-    def get_business_terms_context(self) -> str:
-        """
-        Generate business terms glossary for LLM context.
-        """
-        context_parts = ["## Business Terms Glossary\n"]
-        context_parts.append("When users ask about these terms, use the following SQL expressions:\n")
-        
-        for term, sql_expr in self.definitions.items():
-            context_parts.append(f"- **{term}**: `{sql_expr}`")
-        
-        return "\n".join(context_parts)
-    
-    def enhance_prompt(self, user_query: str, include_schema: bool = True) -> str:
-        """
-        Enhance the system prompt with semantic layer context.
-        """
-        parts = [
-            "You are an AI assistant for ERIS, an Indian retail intelligence system.",
-            "When generating SQL queries, follow these rules strictly:",
-            "",
-        ]
-        
-        if include_schema:
-            parts.append(self.get_schema_context())
-        
-        parts.append(self.get_business_terms_context())
-        
-        parts.extend([
-            "",
-            "## Important SQL Rules:",
-            "1. Only use tables: sales, products, customers, inventory, sale_items, suppliers",
-            "2. Always specify columns explicitly (no SELECT *)",
-            "3. Use DATE() for date comparisons",
-            "4. Use COALESCE for nullable columns (tax_amount, discount_amount)",
-            "5. For date columns, use 'sale_date' not 'date'",
-            "6. Join products table when you need product names",
-            "",
-            f"User Query: {user_query}",
-        ])
-        
-        return "\n".join(parts)
-    
-    def match_template(self, query: str) -> Optional[Tuple[str, dict]]:
-        """
-        Check if query matches a pre-approved template.
-        Returns (template_name, filled_sql) if matched, None otherwise.
-        """
-        query_lower = query.lower()
-        
-        for template_name, template_info in self.templates.items():
-            match = re.search(template_info['pattern'], query_lower)
-            if match:
-                # Fill in template with defaults
-                sql = template_info['sql'].strip()
-                for key, default_value in template_info['defaults'].items():
-                    # Try to extract values from query
-                    if key == 'limit':
-                        limit_match = re.search(r'top\s*(\d+)', query_lower)
-                        value = int(limit_match.group(1)) if limit_match else default_value
-                    elif key == 'date_filter':
-                        if 'last month' in query_lower:
-                            value = "strftime('%Y-%m', sale_date) = strftime('%Y-%m', 'now', '-1 month')"
-                        elif 'last week' in query_lower:
-                            value = "sale_date >= DATE('now', '-7 days')"
-                        elif 'this month' in query_lower:
-                            value = "strftime('%Y-%m', sale_date) = strftime('%Y-%m', 'now')"
-                        elif 'this year' in query_lower:
-                            value = "strftime('%Y', sale_date) = strftime('%Y', 'now')"
-                        else:
-                            value = default_value
-                    else:
-                        value = default_value
-                    
-                    sql = sql.replace('{' + key + '}', str(value))
-                
-                logger.info(f"Matched template: {template_name}")
-                return (template_name, sql)
-        
+
+    def match_template(self, query: str) -> Optional[tuple[str, str]]:
+        query_lower = query.lower().strip()
+        today = date.today()
+        current_month = _month_start(today)
+        previous_month = _month_start(current_month - timedelta(days=1))
+
+        for name, template in self.templates.items():
+            if not re.search(template["pattern"], query_lower):
+                continue
+
+            limit_match = re.search(r"top\s*(\d+)", query_lower)
+            limit = min(max(int(limit_match.group(1)), 1), 20) if limit_match else 5
+            start_date = today - timedelta(days=30)
+            end_date = today + timedelta(days=1)
+            if "yesterday" in query_lower:
+                start_date, end_date = today - timedelta(days=1), today
+            elif "today" in query_lower:
+                start_date = today
+            elif "last week" in query_lower:
+                start_date, end_date = today - timedelta(days=14), today - timedelta(days=7)
+            elif "this week" in query_lower:
+                start_date = today - timedelta(days=7)
+            elif "last month" in query_lower and name == "revenue_by_period":
+                start_date, end_date = previous_month, current_month
+            elif "this month" in query_lower:
+                start_date = current_month
+            elif "this year" in query_lower:
+                start_date = today.replace(month=1, day=1)
+            elif name in {"dead_stock_analysis", "aov_trend"}:
+                start_date = today - timedelta(days=90 if name == "dead_stock_analysis" else 180)
+
+            sql = (
+                template["sql"]
+                .format(
+                    limit=limit,
+                    start_date=start_date.isoformat(),
+                    end_date=end_date.isoformat(),
+                    current_start=current_month.isoformat(),
+                    previous_start=previous_month.isoformat(),
+                )
+                .strip()
+            )
+            logger.info("Matched AI query template: %s", name)
+            return name, sql
         return None
-    
-    def inject_outlet_filter(
-        self,
-        sql: str,
-        outlet_ids: list,
-    ) -> tuple:
-        """
-        Inject outlet scoping into a template SQL string so users can only
-        see data for outlets they are authorised to access.
 
-        Strategy:
-          - Templates that reference the `sales` table via alias `s` get:
-              AND s.outlet_id IN (:o0, :o1, ...)
-          - Templates that reference `sales` without alias get:
-              AND outlet_id IN (:o0, :o1, ...)
-          - Templates that don't touch `sales` at all (suppliers, products) are
-            left unmodified — they are not outlet-scoped in the current schema.
-
-        Params are expanded as individual named placeholders (:o0, :o1, ...)
-        rather than a single tuple param, for compatibility with both SQLite
-        (used in tests) and PostgreSQL (production).
-
-        Returns (scoped_sql, params_dict).
-        """
+    @staticmethod
+    def inject_outlet_filter(sql: str, outlet_ids: list[int]) -> tuple[str, dict[str, int]]:
+        marker_pattern = re.compile(r"__OUTLET_SCOPE_(\w+)__")
+        aliases = set(marker_pattern.findall(sql))
+        if not aliases:
+            return sql, {}
         if not outlet_ids:
-            # Sentinel: no accessible outlets — return zero rows
-            outlet_ids = [-1]
+            return marker_pattern.sub("1=0", sql), {}
 
-        # Build individual named params: {o0: 1, o1: 2, ...}
-        param_keys = [f"o{i}" for i in range(len(outlet_ids))]
-        params = {k: v for k, v in zip(param_keys, outlet_ids)}
-        placeholders = ", ".join(f":{k}" for k in param_keys)
-
-        # Does the SQL reference the sales table?
-        references_sales = bool(re.search(r"\bFROM\s+sales\b|\bJOIN\s+sales\b", sql, re.IGNORECASE))
-        if not references_sales:
-            return sql, params
-
-        # Determine whether sales is aliased as 's'
-        uses_alias_s = bool(re.search(r"\bFROM\s+sales\s+s\b|\bJOIN\s+sales\s+s\b", sql, re.IGNORECASE))
-        filter_clause = f"s.outlet_id IN ({placeholders})" if uses_alias_s else f"outlet_id IN ({placeholders})"
-
-        # Insert before the first GROUP BY / ORDER BY / LIMIT
-        for keyword in (r"\bGROUP\s+BY\b", r"\bORDER\s+BY\b", r"\bLIMIT\b"):
-            m = re.search(keyword, sql, re.IGNORECASE)
-            if m:
-                pos = m.start()
-                sql = sql[:pos] + f"AND {filter_clause}\n            " + sql[pos:]
-                return sql, params
-
-        # No GROUP/ORDER/LIMIT — append at end
-        sql = sql.rstrip() + f"\nAND {filter_clause}"
+        params = {f"outlet_{index}": outlet_id for index, outlet_id in enumerate(outlet_ids)}
+        placeholders = ", ".join(f":{key}" for key in params)
+        for alias in aliases:
+            sql = sql.replace(f"__OUTLET_SCOPE_{alias}__", f"{alias}.outlet_id IN ({placeholders})")
         return sql, params
 
-    def validate_sql(self, sql: str) -> tuple:
-        """
-        Validate generated SQL against security rules.
-        Returns (is_valid, list of issues).
-        """
-        issues = []
-        sql_upper = sql.upper()
-        
+    def validate_sql(self, sql: str) -> tuple[bool, list[dict[str, str]]]:
+        issues: list[dict[str, str]] = []
+        if not sql.lstrip().upper().startswith("SELECT"):
+            issues.append({"rule": "select_only", "message": "Query must start with SELECT", "severity": "error"})
         for rule in self.rules:
-            if rule['name'] == 'check_table_exists':
-                # Special handling for table validation
-                tables_found = re.findall(r'FROM\s+(\w+)', sql, re.IGNORECASE)
-                for table in tables_found:
-                    if table.lower() not in rule['allowed_tables']:
-                        issues.append({
-                            'rule': rule['name'],
-                            'message': f"{rule['message']}: {table}",
-                            'severity': rule['severity']
-                        })
-            else:
-                if re.search(rule['pattern'], sql_upper):
-                    issues.append({
-                        'rule': rule['name'],
-                        'message': rule['message'],
-                        'severity': rule['severity']
-                    })
-        
-        has_errors = any(issue['severity'] == 'error' for issue in issues)
-        return (not has_errors, issues)
-    
-    def calculate_confidence(self, query: str, generated_sql: str) -> Tuple[int, str]:
-        """
-        Calculate confidence score for generated SQL.
-        Returns (confidence_percentage, reasoning).
-        """
-        score = 70  # Base score
-        reasons = []
-        
-        # Check if matched template
-        template_match = self.match_template(query)
-        if template_match:
-            score += 20
-            reasons.append("Matched pre-approved template")
-        
-        # Check if uses known tables
-        tables_found = re.findall(r'FROM\s+(\w+)', generated_sql, re.IGNORECASE)
-        known_tables = {'sales', 'products', 'customers', 'inventory', 'sale_items', 'suppliers', 'outlets'}
-        if all(t.lower() in known_tables for t in tables_found):
-            score += 5
-            reasons.append("Uses verified tables")
-        else:
-            score -= 20
-            reasons.append("Uses unknown tables")
-        
-        # Check if uses business terms correctly
-        for term in self.definitions:
-            if term in query.lower():
-                if self.definitions[term] in generated_sql:
-                    score += 2
-                    reasons.append(f"Correctly uses '{term}' definition")
-        
-        # Validation check
-        is_valid, issues = self.validate_sql(generated_sql)
-        if not is_valid:
-            score -= 30
-            reasons.append(f"Validation issues: {len(issues)}")
-        
-        # Cap score
-        score = max(0, min(100, score))
-        
-        reasoning = "; ".join(reasons) if reasons else "Standard generation"
-        return (score, reasoning)
+            if re.search(rule["pattern"], sql, re.IGNORECASE):
+                issues.append(rule.copy())
+
+        allowed = set(self.schema)
+        referenced = re.findall(r"\b(?:FROM|JOIN)\s+([a-z_][a-z0-9_]*)", sql, re.IGNORECASE)
+        for table in referenced:
+            if table.lower() not in allowed:
+                issues.append({"rule": "known_tables", "message": f"Unknown table: {table}", "severity": "error"})
+        return not any(item["severity"] == "error" for item in issues), issues
 
 
-# Singleton instance
 semantic_layer = SemanticLayer()

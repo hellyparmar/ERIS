@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, String, DateTime, func, JSON
 from .base import Base
 
+
 class AuditLogEntry(Base):
     __tablename__ = "audit_log_entries"
     id = Column(Integer, primary_key=True, index=True)

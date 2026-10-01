@@ -3,58 +3,38 @@ Forecasting V1 Router - Asynchronous sales and inventory forecasting.
 """
 
 import json
+import logging
 from datetime import datetime, timedelta
 from enum import Enum
 from typing import List, Optional, Dict, Any
 
 import numpy as np
-from celery.result import AsyncResult
-from fastapi import APIRouter, Depends, Query, HTTPException, status, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, HTTPException, status
 from pydantic import BaseModel
-from sqlalchemy import select, and_
+from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
 
-WeatherResponse = Dict[str, Any]
-
-from app.api.celery_app import celery_app
-from app.api.deps import get_current_user, require_role, get_current_active_user
-from app.core.roles import MANAGER, user_role
-from app.database import get_db
+from app.api.deps import get_current_user, get_outlet_scope, require_role
+from app.database import get_db_sync_dependency
 from app.models.users import User
 from app.models.outlet import Outlet
-from app.models.models_v6 import Product
-from app.models.sales import SaleTransaction
+from app.models.commerce import Product, SaleItem
+from app.models.commerce import Sale as SaleTransaction
 from app.models.inventory import Inventory
 from app.models.forecast import ForecastResult
-import redis as _redis
-forecast_redis_client = _redis.Redis(host='localhost', port=6379, db=0, decode_responses=True, socket_connect_timeout=0.1, socket_timeout=0.1)
-try:
-    from app.ml.forecasting.lstm_forecaster import LSTMForecaster
-except ImportError:
-    LSTMForecaster = None
-class DummyTask:
-    def apply_async(self, args):
-        class DummyResult:
-            id = "mock-id"
-        return DummyResult()
-    def run(self, *args, **kwargs):
-        return {"predicted_values": [0.0]}
+from app.services.background_jobs import create_job, get_job, run_job
+from app.tasks.forecasting_tasks import run_ensemble_forecast
 
-try:
-    from app.tasks.forecasting_tasks import run_ensemble_forecast
-except ImportError:
-    run_ensemble_forecast = DummyTask()
+logger = logging.getLogger(__name__)
 
-run_prophet_forecast = DummyTask()
-run_lstm_forecast = DummyTask()
-retrain_forecast_models = DummyTask()
-
-router = APIRouter(prefix="/forecasting", tags=["Forecasting"])
+router = APIRouter(
+    prefix="/forecasting",
+    tags=["Forecasting"],
+    dependencies=[Depends(get_current_user)],
+)
 
 
 class ModelType(str, Enum):
-    PROPHET = "prophet"
-    LSTM = "lstm"
     ENSEMBLE = "ensemble"
 
 
@@ -105,12 +85,17 @@ class TaskStatusResponse(BaseModel):
 
 def _get_outlet_with_access_check(outlet_id: int, current_user: User, db: Session) -> Outlet:
     """Get outlet and check user access permissions."""
-    stmt = select(Outlet).where(Outlet.id == outlet_id)
+    stmt = select(Outlet).where(
+        Outlet.id == outlet_id,
+        Outlet.organization_id == current_user.organization_id,
+        Outlet.is_deleted.is_(False),
+    )
     outlet = db.execute(stmt).scalar_one_or_none()
     if not outlet:
         raise HTTPException(status_code=404, detail="Outlet not found")
 
     from app.core.data_isolation import require_outlet_access
+
     if not require_outlet_access(current_user, outlet_id):
         raise HTTPException(status_code=403, detail="Access denied to this outlet")
 
@@ -130,69 +115,32 @@ def _calculate_mape(actual: np.ndarray, predicted: np.ndarray) -> float:
 def _get_last_30d_actuals(outlet_id: int, product_id: Optional[int], db: Session) -> np.ndarray:
     """Get actual sales data for the last 30 days."""
     cutoff = datetime.utcnow() - timedelta(days=30)
-    stmt = select(SaleTransaction.quantity).where(
-        and_(
-            SaleTransaction.outlet_id == outlet_id,
-            SaleTransaction.transaction_date >= cutoff,
+    stmt = (
+        select(SaleItem.quantity)
+        .join(SaleTransaction, SaleTransaction.id == SaleItem.sale_id)
+        .where(
+            and_(
+                SaleTransaction.outlet_id == outlet_id,
+                SaleTransaction.sale_date >= cutoff,
+            )
         )
     )
     if product_id is not None:
-        stmt = stmt.where(SaleTransaction.product_id == product_id)
+        stmt = stmt.where(SaleItem.product_id == product_id)
 
     results = db.execute(stmt).scalars().all()
     return np.array(results) if results else np.array([])
 
 
-def _build_cache_key(model_type: str, outlet_id: int, product_id: Optional[int], horizon: int) -> str:
-    """Build Redis cache key for forecast results."""
-    product_key = str(product_id) if product_id is not None else "general"
-    return f"forecast:{outlet_id}:{product_key}:{horizon}:{model_type}"
-
-
-def _get_cached_forecast(cache_key: str) -> Optional[Dict[str, Any]]:
-    """Retrieve cached forecast from Redis."""
-    if not forecast_redis_client:
-        return None
-    try:
-        raw = forecast_redis_client.get(cache_key)
-        if raw:
-            return json.loads(raw)
-    except Exception:
-        return None
-    return None
-
-
-def _save_forecast_result(
-    outlet_id: int,
-    product_id: Optional[int],
-    model_type: str,
-    forecast_data: Dict[str, Any],
-    mape: float,
-    db: Session,
-) -> None:
-    """Save forecast result to database."""
-    forecast_record = ForecastResult(
-        outlet_id=outlet_id,
-        product_id=product_id,
-        model_type=model_type,
-        forecast_json=json.dumps(forecast_data),
-        mape=mape,
-        rmse=None,
-        mae=None,
-    )
-    db.add(forecast_record)
-    db.commit()
-
-
-@router.get("/sales", response_model=ForecastResponse)
+@router.post("/sales", response_model=ForecastResponse)
 async def get_sales_forecast(
-    request: Request,
+    background_tasks: BackgroundTasks,
     outlet_id: int = Query(..., description="Outlet ID"),
     horizon: int = Query(7, description="Forecast horizon in days (7,14,30)"),
-    model: ModelType = Query(ModelType.PROPHET, description="Forecasting model (prophet, ensemble; lstm requires PyTorch)"),
-    product_id: Optional[int] = Query(None, description="Product ID (required for LSTM/ensemble)"),
+    model: ModelType = Query(ModelType.ENSEMBLE, description="Forecasting model"),
+    product_id: Optional[int] = Query(None, description="Product ID for product-level forecasting"),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_sync_dependency),
 ) -> ForecastResponse:
     """Generate sales forecast using specified model."""
     _get_outlet_with_access_check(outlet_id, current_user, db)
@@ -200,28 +148,21 @@ async def get_sales_forecast(
     if horizon not in [7, 14, 30]:
         raise HTTPException(status_code=400, detail="Horizon must be 7, 14, or 30 days")
 
-    if model in [ModelType.LSTM, ModelType.ENSEMBLE] and product_id is None:
-        raise HTTPException(status_code=400, detail="product_id is required for LSTM and ensemble forecasts")
+    if model != ModelType.ENSEMBLE:
+        raise HTTPException(status_code=400, detail="The supported production model is ensemble")
 
-    if model == ModelType.LSTM and (LSTMForecaster is None or getattr(run_lstm_forecast, 'is_dummy', False)):
-        raise HTTPException(
-            status_code=501,
-            detail="LSTM deep learning forecaster requires PyTorch (torch), which is not enabled in this deployment. Supported models: prophet, ensemble."
-        )
-
-    cache_key = _build_cache_key(model.value, outlet_id, product_id, horizon)
-    cached = _get_cached_forecast(cache_key)
-    if cached:
-        return ForecastResponse(
-            task_id="cached",
-            status="complete",
-            message="Forecast retrieved from cache"
-        )
-
-    task = run_ensemble_forecast.apply_async(args=[outlet_id, product_id, horizon])
+    task_id = create_job(owner_user_id=current_user.id, outlet_id=outlet_id)
+    background_tasks.add_task(
+        run_job,
+        task_id,
+        run_ensemble_forecast,
+        outlet_id,
+        product_id,
+        horizon,
+    )
 
     return ForecastResponse(
-        task_id=task.id,
+        task_id=task_id,
         status="pending",
         message="Forecast computation has started. Check /api/v1/forecasting/status/{task_id}",
     )
@@ -232,14 +173,20 @@ async def get_inventory_depletion(
     outlet_id: int = Query(..., description="Outlet ID"),
     product_ids: List[int] = Query(..., description="List of product IDs"),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_sync_dependency),
 ) -> InventoryDepletionResponse:
     """Calculate inventory depletion forecasts and reorder recommendations."""
     _get_outlet_with_access_check(outlet_id, current_user, db)
 
     results: List[InventoryDepletionItem] = []
     for product_id in product_ids:
-        product = db.execute(select(Product).where(Product.id == product_id)).scalar_one_or_none()
+        product = db.execute(
+            select(Product).where(
+                Product.id == product_id,
+                Product.organization_id == current_user.organization_id,
+                Product.is_deleted.is_(False),
+            )
+        ).scalar_one_or_none()
         if not product:
             continue
 
@@ -252,27 +199,27 @@ async def get_inventory_depletion(
             )
         ).scalar_one_or_none()
 
-        current_stock = inventory.stock_level if inventory else 0
-        forecast = run_lstm_forecast.run(outlet_id, product_id, 30)
-        daily_demand = float(np.mean(forecast["predicted_values"])) if forecast["predicted_values"] else 0.0
+        current_stock = inventory.current_stock if inventory else 0
+        actuals = _get_last_30d_actuals(outlet_id, product_id, db)
+        daily_demand = float(actuals.sum() / 30) if actuals.size else 0.0
 
-        days_until_stockout = float('inf')
+        days_until_stockout = float("inf")
         if daily_demand > 0:
             days_until_stockout = max(0.0, current_stock / daily_demand)
 
-        reorder_date = (
-            datetime.utcnow() + timedelta(days=max(0.0, days_until_stockout - 3))
-        ).strftime("%Y-%m-%d")
+        reorder_date = (datetime.utcnow() + timedelta(days=max(0.0, days_until_stockout - 3))).strftime("%Y-%m-%d")
 
-        results.append(InventoryDepletionItem(
-            product_id=product_id,
-            product_name=product.name,
-            current_stock=int(current_stock),
-            daily_demand_forecast=round(daily_demand, 2),
-            days_until_stockout=round(days_until_stockout, 1) if np.isfinite(days_until_stockout) else None,
-            reorder_recommended_by_date=reorder_date,
-            urgency_score=100 - min(100, days_until_stockout * 3) if np.isfinite(days_until_stockout) else 0,
-        ))
+        results.append(
+            InventoryDepletionItem(
+                product_id=product_id,
+                product_name=product.name,
+                current_stock=int(current_stock),
+                daily_demand_forecast=round(daily_demand, 2),
+                days_until_stockout=round(days_until_stockout, 1) if np.isfinite(days_until_stockout) else None,
+                reorder_recommended_by_date=reorder_date,
+                urgency_score=100 - min(100, days_until_stockout * 3) if np.isfinite(days_until_stockout) else 0,
+            )
+        )
 
     results.sort(key=lambda item: item.urgency_score, reverse=True)
     return InventoryDepletionResponse(outlet_id=outlet_id, products=results)
@@ -282,19 +229,27 @@ async def get_inventory_depletion(
 async def get_forecast_scenarios(
     outlet_id: int = Query(..., description="Outlet ID"),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_sync_dependency),
 ) -> ForecastScenariosResponse:
     """Generate forecast scenarios based on historical sales data."""
     _get_outlet_with_access_check(outlet_id, current_user, db)
 
     cutoff = datetime.utcnow() - timedelta(days=365)
-    stmt = select(SaleTransaction.quantity).where(
-        and_(
-            SaleTransaction.outlet_id == outlet_id,
-            SaleTransaction.transaction_date >= cutoff,
+    stmt = (
+        select(
+            func.date(SaleTransaction.sale_date),
+            func.sum(SaleItem.quantity),
+        )
+        .join(SaleItem, SaleItem.sale_id == SaleTransaction.id)
+        .where(
+            and_(
+                SaleTransaction.outlet_id == outlet_id,
+                SaleTransaction.sale_date >= cutoff,
+            )
         )
     )
-    results = db.execute(stmt).scalars().all()
+    stmt = stmt.group_by(func.date(SaleTransaction.sale_date)).order_by(func.date(SaleTransaction.sale_date))
+    results = [float(row[1] or 0) for row in db.execute(stmt).all()]
     if not results:
         raise HTTPException(status_code=404, detail="No sales data available")
 
@@ -331,18 +286,21 @@ async def get_forecast_scenarios(
 
 @router.post("/retrain", response_model=ForecastResponse)
 async def retrain_models(
+    background_tasks: BackgroundTasks,
     outlet_id: int = Query(..., description="Outlet ID"),
     current_user: User = Depends(require_role("admin", "manager")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_sync_dependency),
 ) -> ForecastResponse:
     """Retrain forecasting models with latest data."""
     from app.core.data_isolation import require_outlet_access
+
     if not require_outlet_access(current_user, outlet_id):
         raise HTTPException(status_code=403, detail="Cannot retrain models for another outlet")
 
-    task = retrain_forecast_models.apply_async(args=[outlet_id])
+    task_id = create_job(owner_user_id=current_user.id, outlet_id=outlet_id)
+    background_tasks.add_task(run_job, task_id, run_ensemble_forecast, outlet_id, None, 30)
     return ForecastResponse(
-        task_id=task.id,
+        task_id=task_id,
         status="retraining_started",
         message="Model retraining is running in the background.",
     )
@@ -353,7 +311,7 @@ async def get_forecast_accuracy(
     outlet_id: Optional[int] = Query(None, description="Filter by outlet ID"),
     model_type: Optional[str] = Query(None, description="Filter by model type"),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_sync_dependency),
 ) -> ForecastAccuracyResponse:
     """Get forecast accuracy metrics for the last 90 days."""
     cutoff = datetime.utcnow() - timedelta(days=90)
@@ -362,8 +320,9 @@ async def get_forecast_accuracy(
     if outlet_id is not None:
         _get_outlet_with_access_check(outlet_id, current_user, db)
         stmt = stmt.where(ForecastResult.outlet_id == outlet_id)
-    elif user_role(current_user) == MANAGER:
-        stmt = stmt.where(ForecastResult.outlet_id == current_user.outlet_id)
+    else:
+        allowed_outlets = get_outlet_scope(current_user, db)
+        stmt = stmt.where(ForecastResult.outlet_id.in_(allowed_outlets or [-1]))
 
     if model_type:
         stmt = stmt.where(ForecastResult.model_type == model_type)
@@ -404,59 +363,60 @@ async def get_forecast_accuracy(
 async def get_forecast_task_status(
     task_id: str,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_sync_dependency),
 ) -> TaskStatusResponse:
     """Check the status of a forecasting task."""
-    result = AsyncResult(task_id, app=celery_app)
-    state = result.state
-    status_map = {
-        "PENDING": "pending",
-        "STARTED": "running",
-        "RETRY": "running",
-        "SUCCESS": "complete",
-        "FAILURE": "failed",
-        "REVOKED": "failed",
-    }
-    execution_status = status_map.get(state, "pending")
+    job = get_job(task_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Forecast job not found or expired")
+    if job.get("owner_user_id") != current_user.id:
+        raise HTTPException(status_code=404, detail="Forecast job not found or expired")
+    execution_status = job["status"]
+    raw_state = execution_status.upper()
 
     response = TaskStatusResponse(
         task_id=task_id,
         status=execution_status,
-        raw_state=state,
+        raw_state=raw_state,
     )
 
-    if result.ready():
-        if state == "SUCCESS" and isinstance(result.result, dict):
+    if execution_status in {"complete", "failed"}:
+        job_result = job.get("result")
+        if execution_status == "complete" and isinstance(job_result, dict):
             # Fetch the actual forecast data from the database
-            outlet_id = result.result.get("outlet_id")
-            product_id = result.result.get("product_id")
-            
+            outlet_id = job_result.get("outlet_id")
+            product_id = job_result.get("product_id")
+
             if outlet_id is not None:
+                _get_outlet_with_access_check(int(outlet_id), current_user, db)
                 # Get the latest forecasts for this outlet/product combination
-                records = db.query(ForecastResult).filter(
-                    ForecastResult.outlet_id == outlet_id,
-                    ForecastResult.product_id == product_id
-                ).order_by(ForecastResult.created_at.desc()).limit(10).all()
-                
+                records = (
+                    db.query(ForecastResult)
+                    .filter(ForecastResult.outlet_id == outlet_id, ForecastResult.product_id == product_id)
+                    .order_by(ForecastResult.created_at.desc())
+                    .limit(10)
+                    .all()
+                )
+
                 models_data = {}
                 metrics_data = {}
                 for rec in records:
                     if rec.model_type not in models_data:
                         try:
                             models_data[rec.model_type] = json.loads(rec.forecast_json)
-                        except:
+                        except (TypeError, ValueError, json.JSONDecodeError):
                             models_data[rec.model_type] = []
                         metrics_data[rec.model_type] = {
                             "mape": rec.mape,
                             "rmse": rec.rmse,
                             "mae": rec.mae,
                         }
-                
+
                 # Format into a merged array for the frontend Recharts
                 merged_forecasts = []
                 # Use ensemble as the base for dates
                 ensemble_data = models_data.get("ensemble", [])
-                
+
                 for i, row in enumerate(ensemble_data):
                     date_val = row.get("date")
                     merged_point = {
@@ -464,193 +424,35 @@ async def get_forecast_task_status(
                         "forecast": row.get("forecast"),
                         "lower_bound": row.get("lower_bound"),
                         "upper_bound": row.get("upper_bound"),
-                        "isHistorical": False
+                        "isHistorical": False,
                     }
-                    
+
                     if "prophet" in models_data and i < len(models_data["prophet"]):
                         merged_point["prophet"] = models_data["prophet"][i].get("forecast")
                         merged_point["prophetLower"] = models_data["prophet"][i].get("lower_bound")
                         merged_point["prophetUpper"] = models_data["prophet"][i].get("upper_bound")
                     if "xgboost" in models_data and i < len(models_data["xgboost"]):
                         merged_point["xgboost"] = models_data["xgboost"][i].get("forecast")
-                    if "lstm" in models_data and i < len(models_data["lstm"]):
-                        merged_point["lstm"] = models_data["lstm"][i].get("forecast")
-                        
                     merged_forecasts.append(merged_point)
 
-                response.result = {
-                    "task_result": result.result,
-                    "forecasts": merged_forecasts,
-                    "metrics": metrics_data
-                }
+                response.result = {"task_result": job_result, "forecasts": merged_forecasts, "metrics": metrics_data}
             else:
-                response.result = result.result
+                response.result = job_result
         else:
-            response.result = str(result.result)
+            response.result = {"status": "failed", "message": "Forecast generation failed"}
 
     return response
 
 
-@router.get("/causal-analysis")
-async def analyze_causal_drivers(
-    outlet_id: str = Query(..., description="Outlet ID"),
-    days: int = Query(90, ge=30, le=365, description="Number of days to analyze"),
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
-):
-    """
-    Perform causal analysis to identify what factors actually drive sales changes.
-    
-    Requires DoWhy library. Returns HTTP 501 if DoWhy / C-extensions are not enabled in this deployment.
-    """
-    try:
-        from app.services.causal_analysis import CausalAnalysisService, DOWHY_AVAILABLE
-        
-        if not DOWHY_AVAILABLE:
-            raise HTTPException(
-                status_code=501,
-                detail="Causal analysis requires the DoWhy library with active C-extensions, which is not enabled in this deployment environment."
-            )
-
-        service = CausalAnalysisService(db)
-        result = service.analyze_sales_drivers(outlet_id, days)
-        
-        if result.get("status") == "error" and ("DoWhy" in result.get("message", "") or "unavailable" in result.get("message", "")):
-            raise HTTPException(
-                status_code=501,
-                detail="Causal analysis requires the DoWhy library with active C-extensions, which is not enabled in this deployment environment."
-            )
-        
-        return result
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Causal analysis error: {str(e)}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Causal analysis failed: {str(e)}"
-        )
-
-
-@router.get("/anomaly-explanation")
-async def explain_sales_anomaly(
-    outlet_id: str = Query(..., description="Outlet ID"),
-    date: str = Query(..., description="Date of anomaly (YYYY-MM-DD format)"),
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
-):
-    """
-    Explain the causal factors behind a sales anomaly.
-    
-    Requires DoWhy library. Returns HTTP 501 if DoWhy / C-extensions are not enabled in this deployment.
-    """
-    try:
-        from app.services.causal_analysis import CausalAnalysisService, DOWHY_AVAILABLE
-        
-        if not DOWHY_AVAILABLE:
-            raise HTTPException(
-                status_code=501,
-                detail="Anomaly explanation requires the DoWhy library with active C-extensions, which is not enabled in this deployment environment."
-            )
-
-        service = CausalAnalysisService(db)
-        result = service.get_anomaly_explanation(outlet_id, date)
-        
-        if result.get("status") == "error" and ("DoWhy" in result.get("message", "") or "unavailable" in result.get("message", "")):
-            raise HTTPException(
-                status_code=501,
-                detail="Anomaly explanation requires the DoWhy library with active C-extensions, which is not enabled in this deployment environment."
-            )
-        
-        return result
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Anomaly explanation error: {str(e)}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Anomaly explanation failed: {str(e)}"
-        )
-
-from app.services.forecasting import build_forecast
-from app.services.anomaly_detection import detect_revenue_anomalies, detect_product_anomalies
-import logging
-logger = logging.getLogger(__name__)
-from app.services.weather_service import WeatherService
-
-def get_weather_service() -> WeatherService:
-    return WeatherService()
-
-class LocationRequest(BaseModel):
-    city: str
-    country_code: str = "IN"
-
-class WeatherImpactResponse(BaseModel):
-    location: str
-    weather_condition: str
-    temperature: float
-    impact_score: float
-    impact_description: str
-    retail_impact: str
-
-@router.get("/forecast")
-async def revenue_forecast(
-    store_id: Optional[int] = Query(
-        default=None,
-        description="Filter to a specific store. Omit for all stores."
-    ),
-    horizon: int = Query(
-        default=30,
-        ge=7,
-        le=90,
-        description="Forecast horizon in days (7–90). Default: 30."
-    ),
-    lookback: int = Query(
-        default=180,
-        ge=30,
-        le=730,
-        description="Training window in days. Default: 180."
-    ),
-    db: Session = Depends(get_db),
-):
-    """
-    ## ARIMA(7,1,1) Revenue Forecast
-
-    Generates a `horizon`-day revenue forecast trained on historical invoice data.
-
-    ### Model selection
-    | Active sale days | Model used |
-    |---|---|
-    | < 14 | Naive flat-line average (no 500 error) |
-    | ≥ 14 | ARIMA(7,1,1) with 95% confidence intervals |
-    """
-    try:
-        result = build_forecast(
-            db=db,
-            store_id=store_id,
-            horizon=horizon,
-            lookback_days=lookback,
-        )
-        return {"success": True, **result}
-
-    except Exception as e:
-        logger.exception("Unhandled error in revenue_forecast")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Forecast engine error: {str(e)}",
-        )
-
-
-
 # ── P5-T3: Z-Score Anomaly Detection ─────────────────────────────────────────
+
 
 @router.get("/anomalies")
 async def revenue_anomalies(
-    store_id: int = Query(default=1, description="Store ID (default: 1)"),
+    outlet_id: int = Query(default=1, description="Outlet ID"),
     lookback_days: int = Query(default=90, ge=30, le=365),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_sync_dependency),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Detect anomalous revenue days using z-score analysis.
@@ -660,305 +462,45 @@ async def revenue_anomalies(
     from app.services.anomaly_detection import detect_revenue_anomalies
 
     try:
-        anomalies = detect_revenue_anomalies(db, store_id, lookback_days)
+        _get_outlet_with_access_check(outlet_id, current_user, db)
+        anomalies = detect_revenue_anomalies(db, outlet_id, lookback_days)
         return {
             "success": True,
             "total_anomalies": len(anomalies),
             "lookback_days": lookback_days,
-            "anomalies": anomalies
+            "anomalies": anomalies,
         }
-    except Exception as e:
+    except HTTPException:
+        raise
+    except Exception:
         logger.exception("Error in anomaly detection")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error evaluating anomalies: {str(e)}",
+            detail="Error evaluating anomalies",
         )
 
 
 @router.get("/product-anomalies")
 async def product_demand_anomalies(
-    store_id: int = Query(default=1),
+    outlet_id: int = Query(default=1, description="Outlet ID"),
     lookback_days: int = Query(default=30, ge=7, le=180),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_sync_dependency),
+    current_user: User = Depends(get_current_user),
 ):
     """Detect products with anomalously high or low demand (z-score analysis)"""
     from app.services.anomaly_detection import detect_product_anomalies
 
     try:
-        anomalies = detect_product_anomalies(db, store_id, lookback_days)
+        _get_outlet_with_access_check(outlet_id, current_user, db)
+        anomalies = detect_product_anomalies(db, outlet_id, lookback_days)
         return {
             "success": True,
             "total_anomalies": len(anomalies),
             "lookback_days": lookback_days,
-            "anomalies": anomalies
+            "anomalies": anomalies,
         }
-    except Exception as e:
+    except HTTPException:
+        raise
+    except Exception:
         logger.exception("Product anomaly error")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-
-@router.get(
-    "/weather/current",
-    response_model=WeatherResponse,
-    summary="Get current weather",
-    description="Fetch current weather data for a specific location"
-)
-async def get_current_weather(
-    city: str = Query(..., description="City name"),
-    country_code: str = Query("IN", description="ISO 3166 country code")
-):
-    """
-    Get current weather for a location
-    
-    **Parameters:**
-    - `city`: City name (e.g., 'Mumbai', 'Delhi')
-    - `country_code`: ISO 3166 country code (default: 'IN' for India)
-    
-    **Returns:**
-    Current weather data including temperature, humidity, wind speed, etc.
-    """
-    try:
-        service = get_weather_service()
-        weather = service.get_current_weather(city, country_code)
-        
-        if 'is_mock' in weather:
-            logger.warning(f"Using mock data for {city}, {country_code}")
-        
-        return weather
-        
-    except Exception as e:
-        logger.error(f"Error fetching weather for {city}: {e}")
-        raise HTTPException(status_code=500, detail=f"Error fetching weather: {str(e)}")
-
-
-@router.get(
-    "/weather/current/coordinates",
-    response_model=WeatherResponse,
-    summary="Get current weather by coordinates",
-    description="Fetch current weather data by latitude/longitude"
-)
-async def get_current_weather_coordinates(
-    latitude: float = Query(..., ge=-90, le=90),
-    longitude: float = Query(..., ge=-180, le=180)
-):
-    """
-    Get current weather for coordinates
-    
-    **Parameters:**
-    - `latitude`: Latitude (-90 to 90)
-    - `longitude`: Longitude (-180 to 180)
-    
-    **Returns:**
-    Current weather data for the specified coordinates
-    """
-    try:
-        service = get_weather_service()
-        weather = service.get_current_weather_by_coordinates(latitude, longitude)
-        return weather
-        
-    except Exception as e:
-        logger.error(f"Error fetching weather for ({latitude}, {longitude}): {e}")
-        raise HTTPException(status_code=500, detail=f"Error fetching weather: {str(e)}")
-
-
-@router.get(
-    "/weather/forecast",
-    response_model=WeatherResponse,
-    summary="Get 5-day weather forecast",
-    description="Fetch 5-day weather forecast for a location"
-)
-async def get_weather_forecast(
-    city: str = Query(..., description="City name"),
-    country_code: str = Query("IN", description="ISO 3166 country code"),
-    days: int = Query(5, ge=1, le=5, description="Number of days (max 5)")
-):
-    """
-    Get weather forecast for next N days
-    
-    **Parameters:**
-    - `city`: City name
-    - `country_code`: ISO 3166 country code
-    - `days`: Number of forecast days (1-5, default: 5)
-    
-    **Returns:**
-    Weather forecast data with 3-hour intervals
-    """
-    try:
-        service = get_weather_service()
-        forecast = service.get_forecast(city, country_code, days)
-        return forecast
-        
-    except Exception as e:
-        logger.error(f"Error fetching forecast for {city}: {e}")
-        raise HTTPException(status_code=500, detail=f"Error fetching forecast: {str(e)}")
-
-
-@router.post(
-    "/weather/multi-location",
-    summary="Get weather for multiple retail locations",
-    description="Fetch weather for multiple store locations in one request"
-)
-async def get_multi_location_weather(
-    locations: List[LocationRequest],
-    current_user: User = Depends(get_current_active_user),
-):
-    """
-    Get weather for multiple locations
-    
-    **Request body:** List of location objects with city and country_code
-    
-    **Returns:**
-    Dictionary mapping location strings to weather data
-    
-    **Example request:**
-    ```json
-    [
-      {"city": "Mumbai", "country_code": "IN"},
-      {"city": "Delhi", "country_code": "IN"},
-      {"city": "Bangalore", "country_code": "IN"}
-    ]
-    ```
-    """
-    try:
-        service = get_weather_service()
-        location_tuples = [(loc.city, loc.country_code) for loc in locations]
-        weather_data = service.get_weather_for_retail_locations(location_tuples)
-        return weather_data
-        
-    except Exception as e:
-        logger.error(f"Error fetching multi-location weather: {e}")
-        raise HTTPException(status_code=500, detail=f"Error fetching weather: {str(e)}")
-
-
-@router.post(
-    "/weather/impact-analysis",
-    response_model=WeatherImpactResponse,
-    summary="Analyze weather impact on retail",
-    description="Calculate weather impact score for demand forecasting"
-)
-async def analyze_weather_impact(
-    city: str = Query(..., description="City name"),
-    country_code: str = Query("IN", description="ISO 3166 country code"),
-    current_user: User = Depends(get_current_active_user),
-):
-    """
-    Analyze weather impact on retail demand
-    
-    **Parameters:**
-    - `city`: City name
-    - `country_code`: ISO 3166 country code
-    
-    **Returns:**
-    Weather impact score (0.0-2.0) and interpretation for retail demand
-    
-    **Impact Scores:**
-    - < 0.8: Negative impact (bad weather reduces foot traffic)
-    - 0.8-1.2: Neutral/Positive impact
-    - > 1.2: Strong positive impact
-    """
-    try:
-        service = get_weather_service()
-        weather = service.get_current_weather(city, country_code)
-        
-        impact_score = service.calculate_weather_impact(
-            weather['condition'],
-            weather['temperature']
-        )
-        
-        # Generate description
-        if impact_score < 0.8:
-            description = "Negative impact - Consider lower stock expectations"
-            retail_impact = "Reduced foot traffic expected"
-        elif impact_score < 1.0:
-            description = "Slightly negative - Minor impact on demand"
-            retail_impact = "Slight reduction in customer visits"
-        elif impact_score <= 1.1:
-            description = "Neutral - Normal retail activity"
-            retail_impact = "Normal shopping patterns"
-        else:
-            description = "Positive impact - Good shopping weather"
-            retail_impact = "Increased foot traffic expected"
-        
-        return WeatherImpactResponse(
-            location=weather['location'],
-            weather_condition=weather['condition'],
-            temperature=weather['temperature'],
-            impact_score=impact_score,
-            impact_description=description,
-            retail_impact=retail_impact
-        )
-        
-    except Exception as e:
-        logger.error(f"Error analyzing weather impact: {e}")
-        raise HTTPException(status_code=500, detail=f"Error analyzing weather: {str(e)}")
-
-
-@router.get(
-    "/weather/one-call",
-    summary="Get comprehensive weather data (One Call API)",
-    description="Fetch current, hourly, daily forecasts and alerts"
-)
-async def get_one_call_weather(
-    latitude: float = Query(..., ge=-90, le=90),
-    longitude: float = Query(..., ge=-180, le=180),
-    exclude: Optional[str] = Query(None, description="Comma-separated data to exclude (current,hourly,daily,alerts)")
-):
-    """
-    Get comprehensive weather data using One Call API
-    
-    **Note:** Requires paid OpenWeatherMap tier
-    
-    **Parameters:**
-    - `latitude`: Latitude
-    - `longitude`: Longitude
-    - `exclude`: Optional comma-separated list of data to exclude
-    
-    **Returns:**
-    Comprehensive weather data including current, hourly, daily forecasts and alerts
-    """
-    try:
-        service = get_weather_service()
-        
-        exclude_list = None
-        if exclude:
-            exclude_list = [e.strip() for e in exclude.split(',')]
-        
-        weather = service.get_one_call_weather(latitude, longitude, exclude_list)
-        return weather
-        
-    except Exception as e:
-        logger.error(f"Error fetching One Call weather: {e}")
-        raise HTTPException(status_code=500, detail=f"Error fetching weather: {str(e)}")
-
-
-@router.get(
-    "/weather/health",
-    summary="Check weather service health",
-    description="Verify weather API connectivity"
-)
-async def health_check():
-    """
-    Check weather service health and API key status
-    
-    **Returns:**
-    Status information about the weather service
-    """
-    try:
-        service = get_weather_service()
-        
-        return {
-            "status": "healthy",
-            "service": "OpenWeatherMap",
-            "api_configured": not service._mock_mode,
-            "units": service.units,
-            "timestamp": datetime.now().isoformat()
-        }
-        
-    except Exception as e:
-        logger.error(f"Health check failed: {e}")
-        return {
-            "status": "unhealthy",
-            "error": str(e),
-            "timestamp": datetime.now().isoformat()
-        }
+        raise HTTPException(status_code=500, detail="Product anomaly analysis failed")

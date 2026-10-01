@@ -9,23 +9,9 @@ MANAGER = "manager"
 VIEWER = "viewer"
 CANONICAL_ROLES = (ADMIN, MANAGER, VIEWER)
 
-_ALIASES = {
-    "admin": ADMIN,
-    "super_admin": ADMIN,
-    "superadmin": ADMIN,
-    "administrator": ADMIN,
-    "manager": MANAGER,
-    "area_manager": MANAGER,
-    "outlet_manager": MANAGER,
-    "staff": MANAGER,
-    "analyst": VIEWER,
-    "viewer": VIEWER,
-    "guest": VIEWER,
-}
-
 
 def normalize_role(value: Any) -> str:
-    """Return one of admin/manager/viewer while accepting legacy role names."""
+    """Return one of admin/manager/viewer, defaulting unknown values to viewer."""
     if value is None:
         return VIEWER
     if isinstance(value, Enum):
@@ -37,8 +23,8 @@ def normalize_role(value: Any) -> str:
             value = enum_value
         elif isinstance(role_name, str):
             value = role_name
-    key = str(value).strip().lower().replace(" ", "_")
-    return _ALIASES.get(key, key)
+    key = str(value).strip().lower()
+    return key if key in CANONICAL_ROLES else VIEWER
 
 
 def user_role(user: Any) -> str:

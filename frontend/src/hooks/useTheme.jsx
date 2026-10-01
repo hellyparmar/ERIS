@@ -7,28 +7,33 @@
  */
 
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { APP_CONFIG } from '../lib/constants';
 
 const ThemeContext = createContext();
 
 export const ThemeProvider = ({ children }) => {
-    const [theme, setTheme] = useState('dark');
+    const [theme, setThemeState] = useState(() => localStorage.getItem('theme') || 'dark');
 
     useEffect(() => {
         const root = window.document.documentElement;
-        root.classList.remove('light');
-        root.classList.add('dark');
-        localStorage.setItem('theme', 'dark');
+        const resolved = theme === 'system'
+            ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+            : theme;
+        root.setAttribute('data-theme', resolved);
+        root.classList.toggle('dark', resolved === 'dark');
+        root.classList.toggle('light', resolved === 'light');
+        localStorage.setItem('theme', theme);
+    }, [theme]);
+
+    const toggleTheme = useCallback(() => setThemeState((value) => value === 'dark' ? 'light' : 'dark'), []);
+    const setSpecificTheme = useCallback((newTheme) => {
+        if (['light', 'dark', 'system'].includes(newTheme)) setThemeState(newTheme);
     }, []);
 
-    const toggleTheme = useCallback(() => {}, []);
-    const setSpecificTheme = useCallback((newTheme) => {}, []);
-
     const value = {
-        theme: 'dark',
+        theme,
         toggleTheme,
         setTheme: setSpecificTheme,
-        isDark: true
+        isDark: theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
     };
 
     return (

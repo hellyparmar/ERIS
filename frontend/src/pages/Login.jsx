@@ -46,7 +46,7 @@ export default function Login() {
     { icon: TrendingUp, text: 'AI-powered sales forecasting with Prophet ML' },
     { icon: BarChart3,  text: 'Multi-outlet analytics across all locations' },
     { icon: Shield,     text: 'GST compliance tracking and invoice automation' },
-    { icon: Zap,        text: 'RAG-based AI assistant with live data context' },
+    { icon: Zap,        text: 'Outlet-scoped AI assistant grounded in ERIS data' },
   ];
 
   return (

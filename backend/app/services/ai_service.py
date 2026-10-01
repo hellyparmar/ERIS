@@ -1,368 +1,246 @@
-import os
-import random
+"""Grounded, asynchronous AI provider orchestration for ERIS."""
+
+from __future__ import annotations
+
+import asyncio
 import logging
-import json
-import requests
-from typing import Dict, Any, Optional
-import google.generativeai as genai
-from groq import Groq
-from openai import OpenAI
-from dotenv import load_dotenv
-from pathlib import Path
+import os
+from typing import Any, Optional
 
-# Load environment variables — try project root .env first, then fallback
-_root_env = Path(__file__).parent.parent.parent / ".env"
-_api_env = Path(__file__).parent.parent / ".env"
-load_dotenv(_root_env, override=False)  # load root .env
-load_dotenv(_api_env, override=False)   # load api/.env (merges, no override)
+import httpx
 
-# Configure logging
+
 logger = logging.getLogger(__name__)
 
-from app.database import AsyncSessionLocal
-from sqlalchemy import text
+
+def _enabled(value: Optional[str], default: bool = False) -> bool:
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
 
 class AIService:
-    """
-    Multi-Provider AI Service
-    Routes requests between Groq (Primary), Gemini (Secondary), OpenRouter (Backup), and Ollama (Offline).
-    """
-    
-    def __init__(self):
-        # Load API Keys
-        self.groq_key = os.getenv("GROQ_API_KEY")
-        self.gemini_key = os.getenv("GEMINI_API_KEY")
-        self.openrouter_key = os.getenv("OPENROUTER_API_KEY")
-        self.ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-        
-        # Initialize Clients
-        self.groq_client = Groq(api_key=self.groq_key) if self.groq_key else None
-        
-        if self.gemini_key:
-            genai.configure(api_key=self.gemini_key)
-            
-        self.openrouter_client = OpenAI(
-            base_url="https://openrouter.ai/api/v1",
-            api_key=self.openrouter_key
-        ) if self.openrouter_key else None
+    """Answer retail questions using real ERIS data and optional LLM providers.
 
-        # Routing Weights
-        self.weights = {
-            "openrouter": 1.0, # 100% Traffic (User Preference: Llama 3)
-            "groq": 0.0,
-            "gemini": 0.0
+    Ollama is the preferred, fully local provider. Groq and OpenRouter are
+    optional OpenAI-compatible fallbacks. Provider failures never replace real
+    data with invented business figures.
+    """
+
+    def __init__(self) -> None:
+        self.use_ollama = _enabled(os.getenv("USE_OLLAMA"), default=True)
+        self.ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
+        self.ollama_model = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
+        self.groq_key = os.getenv("GROQ_API_KEY", "").strip()
+        self.groq_model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+        self.openrouter_key = os.getenv("OPENROUTER_API_KEY", "").strip()
+        self.openrouter_model = os.getenv("OPENROUTER_MODEL", "openrouter/free")
+        self.timeout = float(os.getenv("AI_REQUEST_TIMEOUT_SECONDS", "60"))
+
+    def configured_providers(self) -> list[str]:
+        providers: list[str] = []
+        if self.use_ollama:
+            providers.append("ollama")
+        if self.groq_key:
+            providers.append("groq")
+        if self.openrouter_key:
+            providers.append("openrouter")
+        return providers
+
+    async def provider_status(self, probe_ollama: bool = False) -> dict[str, bool]:
+        status = {
+            "ollama": self.use_ollama,
+            "groq": bool(self.groq_key),
+            "openrouter": bool(self.openrouter_key),
+            "semantic_layer": True,
         }
-
-    def _get_provider(self, context_length: str = "short") -> str:
-        """
-        Determines which provider to use based on availability and priority.
-        """
-        statuses = self.get_provider_status()
-        
-        # Priority order: ollama (local), groq (fast), openrouter, gemini
-        for prov in ["ollama", "groq", "openrouter", "gemini"]:
-            if statuses.get(prov):
-                return prov
-                
-        return "mock"
+        if probe_ollama and self.use_ollama:
+            try:
+                async with httpx.AsyncClient(timeout=2) as client:
+                    response = await client.get(f"{self.ollama_base_url}/api/tags")
+                status["ollama"] = response.is_success
+            except httpx.HTTPError:
+                status["ollama"] = False
+        return status
 
     async def generate_response(
         self,
         message: str,
         system_prompt: str,
-        session_history: list = [],
+        session_history: Optional[list] = None,
         execute_templates: bool = True,
-        outlet_ids: list = None,
-    ) -> Dict[str, Any]:
-        """
-        Main entry point to get AI response.
-        Includes database results when a semantic-layer template matches.
+        outlet_ids: Optional[list[int]] = None,
+    ) -> dict[str, Any]:
+        """Generate a response, grounding matched business questions in SQL."""
+        query_result, database_context = None, ""
+        if execute_templates:
+            query_result, database_context = await asyncio.to_thread(self._execute_grounded_query, message, outlet_ids)
 
-        outlet_ids -- list of outlet IDs the requesting user may access
-                      (from get_outlet_scope). Templates that touch `sales`
-                      are scoped to these IDs before execution.
-        """
-        # Determine paths based on simple heuristics
-        import re
-        msg_lower = message.lower()
-        needs_vector = bool(re.search(r"why|explain|reason|policy|terms|description|notes|impact|what caused", msg_lower))
-        needs_sql = True  # Always try structured matching as primary
-
-        # Try to match and execute template query
-        database_context = ""
-        query_result_data = None
-        if execute_templates and needs_sql:
-            try:
-                from app.services.semantic_layer import semantic_layer
-                from app.services.query_executor import query_executor
-
-                template_match = semantic_layer.match_template(message)
-                if template_match:
-                    template_name, template_sql = template_match
-                    logger.info(f"Template matched: {template_name}")
-
-                    from app.database import get_db_sync
-                    if outlet_ids is not None:
-                        scoped_sql, _scope_params = semantic_layer.inject_outlet_filter(
-                            template_sql, outlet_ids
-                        )
-                        logger.info(
-                            f"Executing scoped query outlet_ids={outlet_ids}"
-                        )
-                        with get_db_sync() as db:
-                            result = query_executor.execute_template_query_with_session(
-                                scoped_sql, semantic_layer, db, params=_scope_params
-                            )
-                    else:
-                        with get_db_sync() as db:
-                            result = query_executor.execute_template_query_with_session(
-                                template_sql, semantic_layer, db
-                            )
-
-                    if result.get("success"):
-                        database_context = query_executor.format_results_for_llm(result)
-                        query_result_data = {
-                            "success": True,
-                            "data": result.get("data", []),
-                            "row_count": result.get("row_count", 0),
-                            "execution_time_ms": result.get("execution_time_ms", 0),
-                            "template_matched": template_name
-                        }
-                        logger.info(f"Database results: {result.get('row_count')} rows")
-                    else:
-                        logger.warning(f"Query execution failed: {result.get('error')}")
-
-            except Exception as e:
-                logger.warning(f"Template execution disabled or failed: {str(e)}")
-        
-        # Try to get unstructured context from vector DB
-        vector_context = ""
-        if needs_vector:
-            try:
-                from app.services.hybrid_rag import vector_rag_service
-                rag_results = vector_rag_service.search(message, top_k=3)
-                if rag_results:
-                    context_texts = [r["document"] for r in rag_results]
-                    vector_context = "\n".join(context_texts)
-                    logger.info("Successfully retrieved vector context")
-            except Exception as e:
-                logger.error(f"Vector RAG failed: {e}")
-        
-        # Inject database context into system prompt
         if database_context:
-            system_prompt += f"\n\nREAL DATABASE RESULTS:\n{database_context}"
-            
-        if vector_context:
-            system_prompt += f"\n\nKNOWLEDGE BASE CONTEXT (Unstructured Data):\n{vector_context}"
-        
-        # specialized logic for long context queries could go here
-        # Get base provider
-        provider = self._get_provider(context_length="short" if len(message) < 5000 else "long")
-        
-        statuses = self.get_provider_status()
-        
-        # Build priority queue of available providers
-        available_providers = [p for p in ["ollama", "groq", "openrouter", "gemini"] if statuses.get(p)]
-        if not available_providers:
-            available_providers = ["mock"]
-            
-        # Ensure the selected provider is first
-        if provider in available_providers:
-            available_providers.remove(provider)
-            available_providers.insert(0, provider)
-            
-        last_error = None
-        for p in available_providers:
+            system_prompt += f"\n\nVERIFIED DATABASE RESULTS:\n{database_context}"
+
+        providers = self.configured_providers()
+        if not providers:
+            if query_result:
+                return self._grounded_fallback(query_result)
+            return {
+                "text": "No AI provider is configured. Start Ollama locally or configure Groq or OpenRouter.",
+                "action": None,
+                "provider": "unavailable",
+                "query_result": query_result,
+            }
+
+        last_provider = None
+        for provider in providers:
+            last_provider = provider
             try:
-                resp = await self._call_provider(p, message, system_prompt, session_history)
-                resp["query_result"] = query_result_data
-                return resp
-            except Exception as e:
-                logger.error(f"Provider {p} failed: {e}. Failing over...")
-                last_error = e
-                
-        # If all fail, return generic message without exposing raw exception
-        logger.error(f"All AI providers failed. Last error: {last_error}")
+                response = await self._call_provider(provider, message, system_prompt, session_history or [])
+                response["query_result"] = query_result
+                return response
+            except Exception as exc:
+                logger.warning("AI provider %s failed: %s", provider, exc)
+
+        logger.error("All configured AI providers failed; last attempted provider=%s", last_provider)
+        if query_result:
+            return self._grounded_fallback(query_result)
         return {
-            "text": "All AI providers are currently unavailable. Please try again later.",
+            "text": "All configured AI providers are currently unavailable. Please try again later.",
             "action": None,
             "provider": "error",
-            "query_result": query_result_data
+            "query_result": query_result,
         }
 
-    async def _call_provider(self, provider: str, message: str, system_prompt: str, history: list) -> Dict[str, Any]:
-        """
-        Dispatches call to specific provider implementation.
-        """
-        logger.info(f"Routing request to: {provider}")
-        
-        if provider == "groq":
-            return self._call_groq(message, system_prompt, history)
-        elif provider == "gemini":
-            return self._call_gemini(message, system_prompt, history)
-        elif provider == "openrouter":
-            return self._call_openrouter(message, system_prompt, history)
-        elif provider == "ollama":
-            return self._call_ollama(message, system_prompt, history)
-        elif provider == "mock":
-            return await self._call_mock_provider(message, system_prompt, history)
+    @staticmethod
+    def _grounded_fallback(query_result: dict[str, Any]) -> dict[str, Any]:
+        rows = query_result.get("data", [])
+        if not rows:
+            text = "The verified database query returned no matching results."
         else:
-            raise ValueError("Unknown provider")
-
-
-
-    def _call_openrouter(self, message: str, system_prompt: str, history: list) -> Dict[str, Any]:
-        if not self.openrouter_client: raise Exception("OpenRouter not configured")
-        
-        # Robust list of verified free models (Llama 3 family and strong backups)
-        models = [
-            "openrouter/free", # Auto-select best free model
-            "meta-llama/llama-3.3-70b-instruct:free",
-            "meta-llama/llama-3.2-3b-instruct:free",
-            "nousresearch/hermes-3-llama-3.1-405b:free",
-            "openai/gpt-oss-120b:free",
-            "qwen/qwen3-coder:free"
-        ]
-        
-        last_error = None
-        
-        for model in models:
-            try:
-                # print(f"Trying OpenRouter model: {model}")
-                completion = self.openrouter_client.chat.completions.create(
-                    model=model,
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": message}
-                    ],
-                    extra_headers={
-                        "HTTP-Referer": "http://localhost:5173", # Recommended by OpenRouter
-                        "X-Title": "ERIS AI Assistant"
-                    }
-                )
-                
-                raw_text = completion.choices[0].message.content
-                text, action_data = self._extract_action(raw_text)
-                
-                # Simplify provider name for UI
-                model_name = model.split('/')[1].split(':')[0] if '/' in model else model
-                return {"text": text, "action": action_data, "provider": f"OpenRouter ({model_name})"}
-                
-            except Exception as e:
-                # print(f"Model {model} failed: {e}")
-                last_error = e
-                continue
-        
-        # If all models fail
-        raise last_error or Exception("All OpenRouter models failed")
-
-    def _extract_action(self, text: str) -> tuple[str, Optional[Dict]]:
-        """
-        Extracts structured JSON actions from identifying tags.
-        """
-        import re
-        action_payload = None
-        clean_text = text
-        
-        # Regex for <<ACTION>>...<<END_ACTION>>
-        match = re.search(r"<<ACTION>>(.*?)<<END_ACTION>>", text, re.DOTALL)
-        if match:
-            try:
-                action_json = match.group(1)
-                action_payload = json.loads(action_json)
-                clean_text = text.replace(match.group(0), "").strip()
-            except Exception as e:
-                logger.error(f"Failed to parse action: {e}")
-                
-        return clean_text, action_payload
-
-    def _call_groq(self, message: str, system_prompt: str, history: list) -> Dict[str, Any]:
-        if not self.groq_client: raise Exception("Groq not configured")
-        
-        # Construct messages
-        messages = [{"role": "system", "content": system_prompt}]
-        # Convert history format if needed (assuming incoming is compatible)
-        # Simplified for brevity -> assuming history is [{"role": "user", "content": ...}]
-        # ... logic to convert history ...
-        messages.append({"role": "user", "content": message})
-        
-        completion = self.groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=messages,
-            temperature=0.7,
-            max_tokens=1024,
-            top_p=1,
-            stream=False,
-            stop=None,
-        )
-        
-        raw_text = completion.choices[0].message.content
-        text, action = self._extract_action(raw_text)
-        
-        return {"text": text, "action": action, "provider": "Groq Llama 3.3"}
-
-    def _call_gemini(self, message: str, system_prompt: str, history: list) -> Dict[str, Any]:
-        if not self.gemini_key: raise Exception("Gemini not configured")
-        
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        # Gemini handles conversation history differently (object based), implementing simplified version
-        full_prompt = f"{system_prompt}\n\nUser: {message}" 
-        
-        response = model.generate_content(full_prompt)
-        text, action = self._extract_action(response.text)
-        
-        return {"text": text, "action": action, "provider": "Gemini 1.5 Flash"}
-
-
-
-    def _call_ollama(self, message: str, system_prompt: str, history: list) -> Dict[str, Any]:
-        # Simple REST call to local Ollama
-        payload = {
-            "model": "llama3",
-            "prompt": f"{system_prompt}\n\nUser: {message}",
-            "stream": False
-        }
-        
-        try:
-            response = requests.post(f"{self.ollama_base_url}/api/generate", json=payload)
-            if response.status_code == 200:
-                raw_text = response.json().get("response", "")
-                text, action = self._extract_action(raw_text)
-                return {"text": text, "action": action, "provider": "Ollama (Local)"}
-            else:
-                raise Exception(f"Ollama Error: {response.text}")
-        except Exception as e:
-            raise Exception(f"Ollama connection failed: {e}")
-
-    async def _call_mock_provider(self, message: str, system_prompt: str, history: list) -> Dict[str, Any]:
-        """
-        Strict fallback that raises an exception when no LLMs are configured.
-        Delegates error messaging to the try-catch block in generate_response
-        per REQ-AI-02 to explicitly state unavailability without fabricating data.
-        """
-        raise Exception("No AI providers configured or available.")
-
-    def get_provider_status(self) -> Dict[str, bool]:
-        """
-        Returns the availability status of all providers.
-        'mock' is always True — it is the built-in Demo Mode that requires no API key.
-        """
-        # Check if Ollama is actually reachable
-        ollama_alive = False
-        try:
-            import requests as _req
-            r = _req.get(f"{self.ollama_base_url}/api/tags", timeout=1)
-            ollama_alive = r.status_code == 200
-        except Exception:
-            pass
-
+            lines = [f"I found {len(rows)} verified result{'s' if len(rows) != 1 else ''} in ERIS:"]
+            for index, row in enumerate(rows[:8], 1):
+                summary = ", ".join(f"{key.replace('_', ' ')}: {value}" for key, value in row.items())
+                lines.append(f"{index}. {summary}")
+            if len(rows) > 8:
+                lines.append(f"Showing 8 of {len(rows)} results.")
+            text = "\n".join(lines)
         return {
-            "groq": bool(self.groq_client),
-            "gemini": bool(self.gemini_key),
-            "openrouter": bool(self.openrouter_client),
-            "ollama": ollama_alive,
-            "mock": True  # Always available — no API key required (Demo Mode)
+            "text": text,
+            "provider": "ERIS semantic layer",
+            "query_result": query_result,
         }
 
-# Singleton Instance
+    @staticmethod
+    def _execute_grounded_query(message: str, outlet_ids: Optional[list[int]]) -> tuple[Optional[dict[str, Any]], str]:
+        try:
+            from app.database import get_db_sync
+            from app.services.query_executor import query_executor
+            from app.services.semantic_layer import semantic_layer
+
+            template_match = semantic_layer.match_template(message)
+            if not template_match:
+                return None, ""
+
+            template_name, template_sql = template_match
+            scoped_sql, scope_params = semantic_layer.inject_outlet_filter(template_sql, outlet_ids or [])
+            with get_db_sync() as db:
+                result = query_executor.execute_template_query_with_session(
+                    scoped_sql, semantic_layer, db, params=scope_params
+                )
+            if not result.get("success"):
+                logger.warning("Grounding query %s failed", template_name)
+                return None, ""
+
+            query_result = {
+                "success": True,
+                "data": result.get("data", []),
+                "row_count": result.get("row_count", 0),
+                "execution_time_ms": result.get("execution_time_ms", 0),
+                "template_matched": template_name,
+            }
+            return query_result, query_executor.format_results_for_llm(result)
+        except Exception as exc:
+            logger.warning("Database grounding failed: %s", exc)
+            return None, ""
+
+    async def _call_provider(self, provider: str, message: str, system_prompt: str, history: list) -> dict[str, Any]:
+        if provider == "ollama":
+            return await self._call_ollama(message, system_prompt, history)
+        if provider == "groq":
+            return await self._call_openai_compatible(
+                provider="Groq",
+                url="https://api.groq.com/openai/v1/chat/completions",
+                api_key=self.groq_key,
+                model=self.groq_model,
+                message=message,
+                system_prompt=system_prompt,
+                history=history,
+            )
+        if provider == "openrouter":
+            return await self._call_openai_compatible(
+                provider="OpenRouter",
+                url="https://openrouter.ai/api/v1/chat/completions",
+                api_key=self.openrouter_key,
+                model=self.openrouter_model,
+                message=message,
+                system_prompt=system_prompt,
+                history=history,
+                extra_headers={"HTTP-Referer": "https://github.com/hellyparmar/ERIS", "X-Title": "ERIS"},
+            )
+        raise ValueError("Unsupported AI provider")
+
+    @staticmethod
+    def _messages(system_prompt: str, message: str, history: list) -> list[dict[str, str]]:
+        messages: list[dict[str, str]] = [{"role": "system", "content": system_prompt}]
+        for item in history[-12:]:
+            role = "assistant" if item.get("role") in {"assistant", "model"} else "user"
+            content = item.get("content")
+            if not content and item.get("parts"):
+                content = item["parts"][0]
+            if isinstance(content, str) and content.strip():
+                messages.append({"role": role, "content": content.strip()})
+        messages.append({"role": "user", "content": message})
+        return messages
+
+    async def _call_openai_compatible(
+        self,
+        *,
+        provider: str,
+        url: str,
+        api_key: str,
+        model: str,
+        message: str,
+        system_prompt: str,
+        history: list,
+        extra_headers: Optional[dict[str, str]] = None,
+    ) -> dict[str, Any]:
+        headers = {"Authorization": f"Bearer {api_key}", **(extra_headers or {})}
+        payload = {
+            "model": model,
+            "messages": self._messages(system_prompt, message, history),
+            "temperature": 0.2,
+            "max_tokens": 900,
+        }
+        timeout = httpx.Timeout(self.timeout, connect=2)
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            response = await client.post(url, headers=headers, json=payload)
+        if not response.is_success:
+            raise RuntimeError(f"{provider} returned HTTP {response.status_code}")
+        raw_text = response.json()["choices"][0]["message"]["content"] or ""
+        return {"text": raw_text.strip(), "provider": f"{provider} ({model})"}
+
+    async def _call_ollama(self, message: str, system_prompt: str, history: list) -> dict[str, Any]:
+        payload = {
+            "model": self.ollama_model,
+            "messages": self._messages(system_prompt, message, history),
+            "stream": False,
+        }
+        timeout = httpx.Timeout(self.timeout, connect=2)
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            response = await client.post(f"{self.ollama_base_url}/api/chat", json=payload)
+        if not response.is_success:
+            raise RuntimeError(f"Ollama returned HTTP {response.status_code}")
+        raw_text = response.json().get("message", {}).get("content", "")
+        return {"text": raw_text.strip(), "provider": f"Ollama ({self.ollama_model})"}
+
+
 ai_service = AIService()

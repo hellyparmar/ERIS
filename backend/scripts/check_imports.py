@@ -2,11 +2,12 @@
 check_imports.py - Static verification that every import reachable from app.main
 actually resolves to a real name in its target module.
 
-Note: Run this BEFORE every rebuild / docker rebuild: python scripts/check_imports.py
+Run this before every backend build: python scripts/check_imports.py
 Exits non-zero and prints every offending file/import if anything is broken.
-This does not require Postgres, Redis, or any installed dependency - it only
+This does not require PostgreSQL or any installed dependency - it only
 parses the Python source with the ast module.
 """
+
 import ast
 import sys
 from pathlib import Path

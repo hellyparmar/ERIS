@@ -1,95 +1,53 @@
-# Security Closure & Credential Inventory
+# ERIS Security Status and Historical-Incident Checklist
 
-This document tracks every credential, token, and secret that has ever been present or referenced across the ERIS codebase and repository history.
+## Current-tree status
 
-> **Status Notice**: Active code reads credentials from environment variables and
-> required secrets fail fast when missing or set to `CHANGE_ME`. Historical
-> findings remain incidents until the associated services are rotated and the
-> GitGuardian records are resolved; cleaning the current tree does not revoke a
-> credential or remove it from Git history.
+The active application contains no committed runtime credentials. Critical configuration is read from environment variables, and startup fails when `DATABASE_URL` or `JWT_SECRET_KEY` is missing or still set to a placeholder. The demo-user password is also required explicitly through `ERIS_SEED_PASSWORD`.
 
----
+Supported secret-bearing variables are limited to:
 
-## 1. Credential Checklist & Rotation Status
+| Variable | Required | Purpose |
+|---|---:|---|
+| `DATABASE_URL` | Yes | SQLite locally or PostgreSQL in production |
+| `JWT_SECRET_KEY` | Yes | JWT signing key; use at least 32 random bytes |
+| `ERIS_SEED_PASSWORD` | Seed only | Password chosen by the operator for synthetic demo users |
+| `GROQ_API_KEY` | No | Optional hosted AI fallback |
+| `OPENROUTER_API_KEY` | No | Optional hosted AI fallback |
 
-| # | Credential / Secret | Where It Lived in Repo History | Rotated (Y/N) | Env Var Name Now Used | Purpose / Usage Context |
-|---|---------------------|--------------------------------|---------------|-----------------------|-------------------------|
-| 1 | **Database Password** | `backend/app/services/query_executor.py`, `backend/app/database.py` (commits `492088a`, `fb38a65`, `4017deb`) | [ ] | `DATABASE_URL`, `POSTGRES_PASSWORD` | PostgreSQL production database connection string and password. |
-| 2 | **JWT Secret Key** | Historical hardcoded defaults in authentication/configuration modules | [ ] | `JWT_SECRET_KEY` (alias `JWT_SECRET`) | HS256 HMAC signing key for user authentication tokens. |
-| 3 | **Encryption / Fernet Key** | Fallback key generation / dummy strings in `backend/app/api/utils/encryption.py`, `backend/app/api/integrations/zoho_auth.py` | [ ] | `ENCRYPTION_KEY` | Symmetric 32-byte Fernet key for encrypting sensitive tenant/integration tokens at rest. |
-| 4 | **n8n / Webhook Secret** | Historical Compose, workflow, and webhook-router defaults | [ ] | `N8N_WEBHOOK_SECRET` | Header secret token (`X-Webhook-Secret`) authenticating incoming automated trigger requests. |
-| 5 | **Groq API Key** | `backend/app/services/ai_service.py`, `backend/app/routers/forecasting.py`, `.env.example` | [ ] | `GROQ_API_KEY` | Fast LLM inference endpoint (Llama / Mixtral models). |
-| 6 | **Gemini API Key** | `backend/app/services/ai_service.py`, `research/notebooks/ai_assistant_evaluation.ipynb`, `.env.example` | [ ] | `GEMINI_API_KEY` | Google Gemini AI assistant and natural language SQL query generation. |
-| 7 | **OpenRouter API Key** | `backend/app/services/ai_service.py`, `.env.example` | [ ] | `OPENROUTER_API_KEY` | Multi-model fallback gateway for retail intelligence queries. |
-| 8 | **OpenAI API Key** | `backend/app/services/ai_service.py`, `backend/app/core/config.py`, `.env.example` | [ ] | `OPENAI_API_KEY` | OpenAI GPT model fallback for conversational retail analysis. |
-| 9 | **Anthropic API Key** | `backend/app/core/config.py`, `.env.example` | [ ] | `ANTHROPIC_API_KEY` | Claude API integration for analytics reasoning. |
-| 10 | **Zoho OAuth Client Secret & Refresh Token** | `backend/app/api/integrations/zoho_client.py`, `backend/app/api/integrations/zoho_auth.py` | [ ] | `ZOHO_CLIENT_SECRET`, `ZOHO_REFRESH_TOKEN` | OAuth2 credentials for syncing Zoho Inventory and Books. |
-| 11 | **MSG91 / WhatsApp API Key** | `backend/app/services/message_service.py`, `backend/app/services/whatsapp.py`, `.env.example` | [ ] | `MSG91_API_KEY`, `WHATSAPP_API_TOKEN` | SMS / WhatsApp transactional alerts and customer notification dispatch. |
-| 12 | **OpenWeather API Key** | `backend/app/services/weather_service.py`, `.env.example` | [ ] | `OPENWEATHER_API_KEY` | External factor demand forecasting weather enrichment. |
-| 13 | **Supabase Project URL / Browser Key** | `frontend/.env.example` in repository history | [ ] | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` | Remove if Supabase is not used; otherwise rotate/restrict the key and verify row-level policies. |
+Ollama needs no API key. Removed integrations—including Gemini, OpenAI SDK, Zoho, Odoo, n8n, WhatsApp, Supabase, and weather enrichment—are not part of the runtime and their old variables must not be reintroduced.
 
----
+## Why GitGuardian may still email
 
-## 2. History Scrubbing (`git filter-repo`) Reference Commands
+GitGuardian reports include historical commits, test-like values, and findings in other repositories. Cleaning the current branch cannot revoke a credential, erase an old Git object, or close an incident in the GitGuardian dashboard.
 
-> **DO NOT RUN AUTOMATICALLY.** Run these only after coordinating rotation of credentials and establishing team backup.
+For each historical incident:
 
-### A. Prepare Replacements File
-Create a `filter-replacements.txt` file listing all exposed strings mapped to redactions:
-```text
-<OLD_DB_PASSWORD>==>REDACTED_ROTATE_THIS_PASSWORD
-<OLD_SECRET_KEY>==>REDACTED_ROTATE_THIS_KEY
-```
+1. Identify the service and exact exposed value without posting it in an issue or commit.
+2. If the value could ever have been valid, revoke/rotate it at the provider first.
+3. Update the deployment environment with the replacement.
+4. Mark the GitGuardian incident resolved only after verification. Use “false positive” only for an unmistakable non-secret test placeholder.
+5. Treat findings shown for `helly-portfolio` or `vibe-vault` as separate repository work; ERIS changes cannot resolve them.
 
-### B. Run `git filter-repo`
+## Repository-history rewriting
+
+History rewriting is intentionally not automated. It changes commit IDs and requires force-pushing every affected branch/tag and re-cloning all copies. Rotation is still required even after a rewrite because a copied secret cannot be made secret again.
+
+If you decide to rewrite history, first create an offline backup, coordinate all repository users, use `git filter-repo` with exact known values, scan all refs, then force-push. Never place exposed values in a tracked replacements file.
+
+## Automated controls
+
+- `.github/workflows/secret-scan.yml` runs Gitleaks and `detect-secrets` on pushes and pull requests.
+- `.secrets.baseline` records reviewed findings only; it is not a list of secrets to ignore casually.
+- `.pre-commit-config.yaml` offers the same scanners locally.
+- `.gitleaks.toml` allowlists only unmistakable test/config placeholders.
+- `.env`, local databases, build output, and model artifacts are ignored.
+- Test credentials follow `AGENTS.md` and use conspicuously fake values.
+
+Local current-tree verification:
+
 ```bash
-# 1. Ensure working directory is clean
-git status
-
-# 2. Rewrite history across all branches and tags
-git filter-repo --replace-text filter-replacements.txt --force
-
-# 3. Clean up filter-repo backup references
-rm -rf .git/filter-repo
+git ls-files -z | xargs -0 detect-secrets-hook --baseline .secrets.baseline
+gitleaks detect --config .gitleaks.toml --no-banner
 ```
 
-### C. Verify History Cleanliness
-```bash
-# Verify the string no longer appears anywhere in commit history
-git log --all -S "<OLD_PASSWORD>" --oneline
-
-# Run full gitleaks history check
-gitleaks detect --log-opts="--all" --config .gitleaks.toml
-```
-
-### D. Force Push Instructions
-```bash
-# Re-add remote origin (git-filter-repo clears remotes for safety)
-git remote add origin https://github.com/hellyparmar/ERIS.git
-
-# Force-push the rewritten history to all branches and tags
-git push origin --force --all
-git push origin --force --tags
-```
-
-### E. Team Re-Clone Instructions
-Every contributor and deployment server must re-clone to avoid re-introducing old commits:
-```bash
-# Archive or remove old local clone
-mv eris_project eris_project_backup
-
-# Fresh clone from remote
-git clone https://github.com/hellyparmar/ERIS.git
-cd ERIS
-```
-
----
-
-## 3. Runtime Fail-Fast Enforcement
-
-The application verifies critical configuration at boot before starting any server workers:
-- **`DATABASE_URL`**: Verified non-empty, valid connection schema, and refuses `CHANGE_ME` / placeholder values.
-- **`JWT_SECRET_KEY` / `JWT_SECRET`**: Verified non-empty and refuses placeholder values.
-- **`ENCRYPTION_KEY`**: Verified non-empty, 32-byte Fernet key, and refuses placeholder values.
-
-If any of these conditions are violated, ERIS immediately terminates with an explicit `RuntimeError`.
+Gitleaks scans Git history in CI. A current-tree pass does not prove that historical provider keys were rotated; that remains an account-owner action.

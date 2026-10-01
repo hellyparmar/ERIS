@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { FileText, Download, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
-import { useToast } from '../components/ui/Toast';
+import { useToast } from '../contexts/ToastContext';
 import { api } from '../lib/api';
 import '../styles/fresh-design.css';
 
@@ -19,11 +19,11 @@ const GSTInvoice = () => {
         setLoading(true);
         try {
             const [dataRes, validRes] = await Promise.all([
-                api.gst.getGSTR1(month, year),
-                api.gst.validateGSTR1(month, year)
+                api.get('/api/v1/gst/gstr1', { params: { month, year } }),
+                api.get('/api/v1/gst/gstr1/validate', { params: { month, year } })
             ]);
-            if (dataRes.data?.success) setGstr1Data(dataRes.data.data);
-            if (validRes.data?.success) setValidation(validRes.data.data);
+            setGstr1Data(dataRes.data);
+            setValidation(validRes.data);
         } catch {
             addToast('Failed to fetch GSTR-1 data', 'error');
         } finally {
@@ -62,7 +62,7 @@ const GSTInvoice = () => {
                         )}
                     </div>
                 </div>
-                <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>Generate and manage GST invoices</p>
+                <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>Generate a database-backed GSTR-1 period summary</p>
             </div>
 
             <div className="fresh-section">
@@ -112,7 +112,7 @@ const GSTInvoice = () => {
                             { label: 'Taxable Value', value: `₹${gstr1Data.b2c_summary?.taxable_value?.toLocaleString()}` },
                             { label: 'CGST', value: `₹${gstr1Data.b2c_summary?.cgst?.toFixed(2)}` },
                             { label: 'SGST', value: `₹${gstr1Data.b2c_summary?.sgst?.toFixed(2)}` },
-                            { label: 'Total Tax', value: `₹${gstr1Data.total_liability?.total_tax?.toFixed(2)}` },
+                            { label: 'Total Tax', value: `₹${gstr1Data.total_liability?.total_gst?.toFixed(2)}` },
                         ].map(({ label, value }) => (
                             <div key={label} className="fresh-metric">
                                 <div className="fresh-metric-value">{value}</div>
@@ -123,7 +123,7 @@ const GSTInvoice = () => {
 
                     <div className="fresh-section">
                         <div className="fresh-section-header">
-                            <span className="fresh-section-title">B2C Sales — {gstr1Data.filing_period}</span>
+                            <span className="fresh-section-title">B2C Sales — {gstr1Data.period}</span>
                         </div>
                         <table className="fresh-table">
                             <thead>
@@ -156,7 +156,7 @@ const GSTInvoice = () => {
                                 <tr>
                                     <th>HSN</th>
                                     <th>Description</th>
-                                    <th className="num">GST Rate</th>
+                                    <th className="num">GST Amount</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -164,7 +164,7 @@ const GSTInvoice = () => {
                                     <tr key={h.hsn_code}>
                                         <td style={{ fontFamily: 'monospace', color: 'var(--accent)' }}>{h.hsn_code}</td>
                                         <td>{h.description}</td>
-                                        <td className="num"><span className="fresh-badge yellow">{h.igst_rate}%</span></td>
+                                        <td className="num"><span className="fresh-badge yellow">₹{Number(h.gst_amount || 0).toFixed(2)}</span></td>
                                     </tr>
                                 ))}
                             </tbody>

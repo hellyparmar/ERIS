@@ -20,6 +20,7 @@ from pydantic import BaseModel
 # Enums & constants
 # ──────────────────────────────────────────────
 
+
 class TaxSlab(str, Enum):
     """
     India GST rate slabs effective 22 September 2025.
@@ -27,10 +28,11 @@ class TaxSlab(str, Enum):
         NIL / 5% / 18% / 40% (luxury/demerit goods)
     Source: GST Council 55th meeting decision, effective 22-Sep-2025.
     """
-    EXEMPT        = "0"
-    FIVE          = "5"
-    EIGHTEEN      = "18"
-    FORTY         = "40"   # replaces 28% for luxury / demerit goods
+
+    EXEMPT = "0"
+    FIVE = "5"
+    EIGHTEEN = "18"
+    FORTY = "40"  # replaces 28% for luxury / demerit goods
 
 
 class GSTType(str, Enum):
@@ -41,6 +43,7 @@ class GSTType(str, Enum):
 # ──────────────────────────────────────────────
 # Dataclass / models
 # ──────────────────────────────────────────────
+
 
 class TaxCalculationResult(BaseModel):
     taxable_value: Decimal
@@ -82,40 +85,39 @@ class LineItemTaxBreakdown(BaseModel):
 # 12% and 28% are ABOLISHED. Correct slabs: 0 / 5 / 18 / 40.
 CATEGORY_GST_RATES: Dict[str, float] = {
     # NIL rated
-    "groceries": 0, "vegetables": 0, "fruits": 0, "dairy": 0,
-
+    "groceries": 0,
+    "vegetables": 0,
+    "fruits": 0,
+    "dairy": 0,
     # 5% slab
-    "food": 5,           # packaged food (most categories)
-    "beverages": 5,      # non-alcoholic (incl. packaged water, juices)
-    "snacks": 5,         # namkeen, packaged snacks (Council clarified → 5%)
-    "pharma": 5,         # medicines (most life-saving)
-
+    "food": 5,  # packaged food (most categories)
+    "beverages": 5,  # non-alcoholic (incl. packaged water, juices)
+    "snacks": 5,  # namkeen, packaged snacks (Council clarified → 5%)
+    "pharma": 5,  # medicines (most life-saving)
     # 18% slab (was 12% for some, moved up / reclassified)
-    "clothing": 18,      # previously 12%; reclassified Sep 2025
-    "footwear": 18,      # previously 12%; reclassified Sep 2025
+    "clothing": 18,  # previously 12%; reclassified Sep 2025
+    "footwear": 18,  # previously 12%; reclassified Sep 2025
     "electronics": 18,
     "mobile": 18,
     "furniture": 18,
-    "toys": 18,          # previously 12%; reclassified Sep 2025
-    "stationery": 18,    # previously 12%; reclassified Sep 2025
+    "toys": 18,  # previously 12%; reclassified Sep 2025
+    "stationery": 18,  # previously 12%; reclassified Sep 2025
     "cleaning": 18,
-
     # 40% slab (replaces 28% for luxury / demerit goods)
     "luxury": 40,
     "tobacco": 40,
-
     "default": 18,
 }
 
 # HSN → GST rate fallback catalogue (post-22-Sep-2025)
 HSN_GST_RATES: Dict[str, float] = {
-    "8471": 18,   # computers
-    "8517": 18,   # mobile phones
+    "8471": 18,  # computers
+    "8517": 18,  # mobile phones
     "847190": 18,
     "997331": 18,
-    "0401": 0,    # milk (NIL)
-    "6109": 18,   # T-shirts (was 12%, now 18%)
-    "3004": 5,    # pharmaceuticals
+    "0401": 0,  # milk (NIL)
+    "6109": 18,  # T-shirts (was 12%, now 18%)
+    "3004": 5,  # pharmaceuticals
     "9999": 18,
 }
 
@@ -123,6 +125,7 @@ HSN_GST_RATES: Dict[str, float] = {
 # ──────────────────────────────────────────────
 # Core calculator (preserves original GSTCalculator contract)
 # ──────────────────────────────────────────────
+
 
 class GSTCalculator:
     @staticmethod
@@ -171,8 +174,10 @@ class GSTCalculator:
 
         if rate == Decimal("0"):
             return TaxCalculationResult(
-                taxable_value=total, gst_rate=rate,
-                is_interstate=is_interstate, grand_total=total,
+                taxable_value=total,
+                gst_rate=rate,
+                is_interstate=is_interstate,
+                grand_total=total,
             )
 
         tv = GSTCalculator._round((total / (Decimal("100") + rate)) * 100)
@@ -246,10 +251,14 @@ class GSTCalculator:
     ) -> Tuple[List[LineItemTaxBreakdown], Dict[str, Decimal]]:
         breakdowns: List[LineItemTaxBreakdown] = []
         totals: Dict[str, Decimal] = {
-            "subtotal": Decimal("0"), "discount": Decimal("0"),
-            "taxable": Decimal("0"), "cgst": Decimal("0"),
-            "sgst": Decimal("0"), "igst": Decimal("0"),
-            "cess": Decimal("0"), "total_tax": Decimal("0"),
+            "subtotal": Decimal("0"),
+            "discount": Decimal("0"),
+            "taxable": Decimal("0"),
+            "cgst": Decimal("0"),
+            "sgst": Decimal("0"),
+            "igst": Decimal("0"),
+            "cess": Decimal("0"),
+            "total_tax": Decimal("0"),
             "grand_total": Decimal("0"),
         }
 
@@ -293,8 +302,11 @@ calculate_line_items = GSTCalculator.calculate_line_items
 
 
 def calculate_line_item_gst(
-    unit_price: float, quantity: int, gst_rate: float,
-    discount_pct: float = 0.0, inter_state: bool = False,
+    unit_price: float,
+    quantity: int,
+    gst_rate: float,
+    discount_pct: float = 0.0,
+    inter_state: bool = False,
 ) -> Dict[str, float]:
     """Backward-compat wrapper matching old gst_invoice_service API."""
     b = GSTCalculator.calculate_line_item(

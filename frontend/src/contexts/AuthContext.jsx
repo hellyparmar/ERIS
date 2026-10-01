@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { api, apiClient } from '../lib/api';
-import { useAuthStore } from '../hooks/useAuthStore';
 import { normalizeUser } from '../lib/roles';
 
 const AuthContext = createContext(null);
@@ -27,8 +26,6 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('eris-auth');
     localStorage.removeItem('eris-user');
     localStorage.removeItem('eris-token');
-
-    useAuthStore.getState().logout();
 
     if (window.location.pathname !== '/login') {
       window.location.href = '/login';
@@ -57,8 +54,6 @@ export function AuthProvider({ children }) {
 
       setToken(access_token);
       setUser(userData);
-      useAuthStore.getState().setToken(access_token);
-      useAuthStore.getState().setUser(userData);
       setIsAuthenticated(true);
 
       return { success: true, user: userData };
@@ -91,8 +86,6 @@ export function AuthProvider({ children }) {
             setToken(storedToken);
             const userData = normalizeUser(response.data);
             setUser(userData);
-            useAuthStore.getState().setToken(storedToken);
-            useAuthStore.getState().setUser(userData);
             setIsAuthenticated(true);
           } catch (error) {
             localStorage.removeItem('eris-token');
@@ -100,7 +93,6 @@ export function AuthProvider({ children }) {
             localStorage.removeItem('eris-user');
             setToken(null);
             setUser(null);
-            useAuthStore.getState().logout();
             setIsAuthenticated(false);
           }
         }
@@ -108,7 +100,6 @@ export function AuthProvider({ children }) {
         console.error('Session restore error:', error);
         setToken(null);
         setUser(null);
-        useAuthStore.getState().logout();
         setIsAuthenticated(false);
       } finally {
         setIsLoading(false);

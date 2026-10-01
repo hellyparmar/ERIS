@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 
 # ── Load environment variables ────────────────────────────────────────────────
 # Load from multiple possible locations for flexibility
-for env_file in ['.env', '../.env', '../../.env']:
+for env_file in [".env", "../.env", "../../.env"]:
     env_path = os.path.join(os.path.dirname(__file__), env_file)
     if os.path.exists(env_path):
         load_dotenv(env_path)
@@ -27,15 +27,7 @@ for env_file in ['.env', '../.env', '../../.env']:
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 # ── Import models so that Base.metadata knows about every table ───────────────
-from app.models import Base   # noqa: F401 - must import after sys.path patch
-# Individual imports ensure all mapper classes are registered
-# import app.models.organization  # noqa: F401
-# import app.models.users         # noqa: F401  # Commented out to avoid duplicate User table
-# import app.models.product       # noqa: F401  # Commented out to avoid duplicate Product table
-# import app.models.customers     # noqa: F401
-# import app.models.invoicing     # noqa: F401  # Commented out to avoid duplicate Invoice table
-# import app.models.sale          # noqa: F401  # Commented out to avoid duplicate Sale table
-# import app.models.alert         # noqa: F401
+from app.models import Base  # noqa: E402 - imported after the backend path is registered
 
 # ── Alembic Config ────────────────────────────────────────────────────────────
 config = context.config
@@ -50,12 +42,12 @@ target_metadata = Base.metadata
 def get_database_url() -> str:
     """
     Get DATABASE_URL from environment and validate it is set.
-    
+
     Raises:
         RuntimeError: If DATABASE_URL is not set or has invalid format
     """
     database_url = os.getenv("DATABASE_URL", "").strip()
-    
+
     if not database_url:
         error_msg = (
             "\n" + "=" * 70 + "\n"
@@ -68,12 +60,12 @@ def get_database_url() -> str:
             "=" * 70 + "\n"
         )
         raise RuntimeError(error_msg)
-    
+
     # Convert async dialects to sync for migrations (must be synchronous)
-    if 'postgresql+asyncpg://' in database_url:
-        database_url = database_url.replace('postgresql+asyncpg://', 'postgresql://')
-    elif 'sqlite+aiosqlite:///' in database_url:
-        database_url = database_url.replace('sqlite+aiosqlite:///', 'sqlite:///')
+    if "postgresql+asyncpg://" in database_url:
+        database_url = database_url.replace("postgresql+asyncpg://", "postgresql://")
+    elif "sqlite+aiosqlite:///" in database_url:
+        database_url = database_url.replace("sqlite+aiosqlite:///", "sqlite:///")
 
     # Validate format (should start with postgresql://, postgresql+asyncpg://, or sqlite:///)
     if not database_url.startswith(("postgresql://", "postgresql+asyncpg://", "sqlite:///")):
@@ -81,7 +73,7 @@ def get_database_url() -> str:
             f"Invalid DATABASE_URL format. Must start with 'postgresql://', "
             f"'postgresql+asyncpg://', or 'sqlite:///', got: {database_url[:50]}..."
         )
-    
+
     return database_url
 
 

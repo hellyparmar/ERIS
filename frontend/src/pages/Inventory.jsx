@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Download, X, AlertCircle } from 'lucide-react';
-import api, { authAPI } from '../lib/api';
+import api from '../lib/api';
 import { useToast } from '../contexts/ToastContext';
 import ComplianceStatusChip from '../components/patterns/ComplianceStatusChip';
 import SEO from '../components/SEO';
@@ -32,12 +32,12 @@ export default function Inventory() {
   const [updateNotes, setUpdateNotes] = useState('');
   
   const [modalOpen, setModalOpen] = useState(false);
-  const [movementData, setMovementData] = useState([]);
+  const [movementInventory, setMovementInventory] = useState(null);
   const [selectedMovementProduct, setSelectedMovementProduct] = useState(null);
 
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [addForm, setAddForm] = useState({
-    name: '', category: 'Starters', sku: '', unit_price: '', cost_price: '', current_stock: '', reorder_point: ''
+    name: '', category: 'Starters', sku: '', unit_price: '', cost_price: '', current_stock: '', reorder_point: '', outlet_id: ''
   });
   const [addError, setAddError] = useState('');
 
@@ -52,14 +52,12 @@ export default function Inventory() {
   const { data: userData } = useQuery({
     queryKey: ['user'],
     queryFn: async () => {
-      const response = await authAPI.getUser();
+      const response = await api.get('/api/v1/auth/me');
       return response.data;
     },
   });
   
   const isSuperAdmin = userData?.role === 'admin';
-  const userOutletId = userData?.outlet_id;
-
   const { data: inventoryData, isLoading: inventoryLoading, error: inventoryError, refetch: refetchInventory } = useQuery({
     queryKey: ['inventory', selectedOutlet],
     queryFn: async () => {
@@ -105,13 +103,13 @@ export default function Inventory() {
   });
 
   const { data: movementDataAPI } = useQuery({
-    queryKey: ['stock-movement', selectedInventory?.id || selectedInventory?.inventory_id],
+    queryKey: ['stock-movement', movementInventory?.id || movementInventory?.inventory_id],
     queryFn: async () => {
-      const id = selectedInventory.id || selectedInventory.inventory_id;
+      const id = movementInventory.id || movementInventory.inventory_id;
       const response = await api.get(`/api/v1/inventory/${id}/movement`);
       return response.data;
     },
-    enabled: !!selectedInventory,
+    enabled: !!movementInventory,
   });
 
   const updateStockMutation = useMutation({
@@ -149,12 +147,13 @@ export default function Inventory() {
         cost_price: parseFloat(addForm.cost_price) || 0,
         current_stock: parseInt(addForm.current_stock) || 0,
         reorder_point: parseInt(addForm.reorder_point) || 10,
+        outlet_id: parseInt(addForm.outlet_id),
       };
       const res = await api.post('/api/v1/inventory/create', payload);
       if (res.data?.success) {
         showToast('Menu item added successfully', 'success');
         setAddModalOpen(false);
-        setAddForm({ name: '', category: 'Starters', sku: '', unit_price: '', cost_price: '', current_stock: '', reorder_point: '' });
+        setAddForm({ name: '', category: 'Starters', sku: '', unit_price: '', cost_price: '', current_stock: '', reorder_point: '', outlet_id: '' });
         queryClient.invalidateQueries({ queryKey: ['inventory'] });
         queryClient.invalidateQueries({ queryKey: ['inventory-summary'] });
       } else {
@@ -162,6 +161,22 @@ export default function Inventory() {
       }
     } catch (err) {
       setAddError(err.response?.data?.detail || err.message || 'An error occurred');
+    }
+  };
+
+  const exportInventory = async () => {
+    try {
+      const response = await api.get('/api/v1/reports/inventory/download', {
+        params: { format: 'xlsx' }, responseType: 'blob',
+      });
+      const url = URL.createObjectURL(response.data);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = 'eris_inventory.xlsx';
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      showToast(error.response?.data?.detail || 'Inventory export failed', 'error');
     }
   };
 
@@ -184,7 +199,7 @@ export default function Inventory() {
       filtered = filtered.filter(item => (item.quantity ?? item.current_stock) < (item.reorder_level ?? item.product?.reorder_point));
     }
     return filtered;
-  }, [inventoryData, searchQuery, selectedCategory, selectedOutlet, showLowStockOnly, isSuperAdmin, userOutletId]);
+  }, [inventoryData, searchQuery, selectedCategory, selectedOutlet, showLowStockOnly]);
 
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 15;
@@ -252,24 +267,22 @@ export default function Inventory() {
               <ComplianceStatusChip status={lowStockCount > 0 ? 'warning' : 'success'} level="L1" />
             </div>
             <p style={{ fontSize: '11px', color: 'var(--c-ink-muted)', margin: '4px 0 0' }}>
-              {totalProducts} ingredients &middot; {totalAlerts} active alerts &middot; {lowStockCount} low stock
+              {totalProducts} inventory records &middot; {totalAlerts} active alerts &middot; {lowStockCount} low stock
             </p>
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
-            <button className="action-btn">
+            <button className="action-btn" onClick={exportInventory}>
               <Download size={12} />
-              Export CSV
+              Export Excel
             </button>
-            <button className="action-btn primary" onClick={() => setAddModalOpen(true)}>
-              Add Menu Item
-            </button>
+            {isSuperAdmin && <button className="action-btn primary" onClick={() => setAddModalOpen(true)}>Add Product</button>}
           </div>
         </div>
 
         {/* 1. TOP STAT ROW */}
         <div className="kpi-strip">
           <div className="kpi-cell">
-            <div className="kpi-label">Total Ingredients</div>
+            <div className="kpi-label">Inventory Records</div>
             <div className="kpi-value brown">
               {renderSummaryValue(apiTotal, summaryLoading)}
             </div>
@@ -315,10 +328,7 @@ export default function Inventory() {
                           <span className={`feed-tag ${severityClass}`}>{severityTag}</span>
                         </div>
                       </div>
-                      <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-                        <button className="action-btn">Resolve</button>
-                        <button className="action-btn primary">Create Reorder</button>
-                      </div>
+                      <button className="action-btn" onClick={() => navigate('/alerts')}>View Alert</button>
                     </div>
                   );
                 })}
@@ -332,7 +342,7 @@ export default function Inventory() {
           <div className="filter-bar">
             <input 
               type="text" 
-              placeholder="Search ingredient name or SKU..."
+              placeholder="Search product name or SKU..."
               value={searchQuery} 
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{ flex: 1, minWidth: '200px' }}
@@ -467,7 +477,7 @@ export default function Inventory() {
                             <button 
                               onClick={() => {
                                 setSelectedMovementProduct(item.product?.name || item.product_name || item.name);
-                                setMovementData(movementDataAPI || []);
+                                setMovementInventory(item);
                                 setModalOpen(true);
                               }} 
                               className="action-btn"
@@ -598,9 +608,9 @@ export default function Inventory() {
                 </button>
               </div>
               <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
-                {movementData.length > 0 ? (
+                {(movementDataAPI || []).length > 0 ? (
                   <ResponsiveContainer width="100%" height={400}>
-                    <AreaChart data={movementData}>
+                    <AreaChart data={[...(movementDataAPI || [])].reverse()}>
                       <defs>
                         <linearGradient id="colorQty" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="#8B5E3C" stopOpacity={0.25} />
@@ -614,7 +624,7 @@ export default function Inventory() {
                         background: 'var(--c-canvas)', border: '1px solid var(--c-border)',
                         borderRadius: 'var(--radius)', color: 'var(--c-ink)',
                       }} formatter={(value) => [value, 'Quantity']} />
-                      <Area type="monotone" dataKey="quantity" stroke="#8B5E3C" strokeWidth={2} fillOpacity={1} fill="url(#colorQty)" />
+                      <Area type="monotone" dataKey="stock_after" stroke="#8B5E3C" strokeWidth={2} fillOpacity={1} fill="url(#colorQty)" />
                     </AreaChart>
                   </ResponsiveContainer>
                 ) : (
@@ -630,7 +640,7 @@ export default function Inventory() {
           </div>
         )}
 
-        <Modal open={addModalOpen} onClose={() => setAddModalOpen(false)} title="Add Menu Item">
+        <Modal open={addModalOpen} onClose={() => setAddModalOpen(false)} title="Add Product">
           <form onSubmit={handleAddSubmit}>
             {addError && <div style={{ color: 'var(--c-critical)', marginBottom: 12, fontSize: 13 }}>{addError}</div>}
             
@@ -672,9 +682,17 @@ export default function Inventory() {
               <input type="number" required value={addForm.reorder_point} onChange={e => setAddForm({ ...addForm, reorder_point: e.target.value })} style={{ width: '100%', padding: '6px 12px' }} />
             </div>
 
+            <div style={{ marginBottom: 24 }}>
+              <label style={{ display: 'block', fontSize: 12, marginBottom: 4 }}>Initial Outlet *</label>
+              <select required value={addForm.outlet_id} onChange={e => setAddForm({ ...addForm, outlet_id: e.target.value })} style={{ width: '100%' }}>
+                <option value="">Select outlet</option>
+                {Array.isArray(outletsData) && outletsData.map(outlet => <option key={outlet.id} value={outlet.id}>{outlet.name}</option>)}
+              </select>
+            </div>
+
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
               <button type="button" onClick={() => setAddModalOpen(false)} className="action-btn">Cancel</button>
-              <button type="submit" className="action-btn primary">Add Item</button>
+              <button type="submit" className="action-btn primary">Add Product</button>
             </div>
           </form>
         </Modal>

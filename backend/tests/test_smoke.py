@@ -8,13 +8,10 @@ Verifies critical paths:
 5. Startup fail-fast validation for missing or placeholder secrets
 """
 
-import os
 import pytest
-from fastapi.testclient import TestClient
 
 from app.main import validate_required_env_vars, is_placeholder_secret
 from app.models.outlet import Outlet
-from app.models.models_v6 import Sale
 from app.models.users import UserOutletAccess
 
 _TEST_ADMIN_PW = "test-admin-pw"
@@ -22,10 +19,7 @@ _TEST_ADMIN_PW = "test-admin-pw"
 
 def test_login_success(client, seed_users):
     """Smoke test: Login with seeded admin credentials returns a valid JWT token."""
-    res = client.post(
-        "/api/v1/auth/login",
-        data={"username": "admin", "password": _TEST_ADMIN_PW}
-    )
+    res = client.post("/api/v1/auth/login", data={"username": "admin", "password": _TEST_ADMIN_PW})
     assert res.status_code == 200, f"Login failed: {res.text}"
     body = res.json()
     assert "access_token" in body
@@ -76,8 +70,15 @@ def test_list_sales(client, admin_token, db, seed_users):
 
 def test_forecast_request(client, admin_token, db):
     """Smoke test: Forecast anomalies endpoint responds with success."""
+    outlet = Outlet(name="Forecast Test Outlet", city="Mumbai", is_active=True)
+    db.add(outlet)
+    db.commit()
+    db.refresh(outlet)
     headers = {"Authorization": f"Bearer {admin_token}"}
-    res = client.get("/api/v1/forecasting/anomalies?store_id=1&lookback_days=90", headers=headers)
+    res = client.get(
+        f"/api/v1/forecasting/anomalies?outlet_id={outlet.id}&lookback_days=90",
+        headers=headers,
+    )
     assert res.status_code == 200, f"Forecast anomalies failed: {res.text}"
     body = res.json()
     assert body.get("success") is True
@@ -85,6 +86,7 @@ def test_forecast_request(client, admin_token, db):
 
 
 # ── Secret Validation & Fail-Fast Smoke Tests ─────────────────────────────────
+
 
 def test_placeholder_detector():
     """Verify placeholder secret detection flags common dummy values."""
@@ -105,7 +107,6 @@ def test_startup_refuses_placeholder_jwt_secret(monkeypatch):
     monkeypatch.setenv("JWT_SECRET_KEY", "CHANGE_ME")
     monkeypatch.setenv("JWT_SECRET", "CHANGE_ME")
     monkeypatch.setenv("DATABASE_URL", "sqlite:///./test.db")
-    monkeypatch.setenv("ENCRYPTION_KEY", "TU9DS19FTkNSWVBUSU9OX0tFWV9GT1JfVEVTVFNfX18=")  # pragma: allowlist secret
     with pytest.raises(RuntimeError, match="Missing or placeholder required environment variables"):
         validate_required_env_vars()
 
@@ -114,15 +115,5 @@ def test_startup_refuses_placeholder_database_url(monkeypatch):
     """App startup validation must raise RuntimeError if DATABASE_URL is a placeholder."""
     monkeypatch.setenv("DATABASE_URL", "CHANGE_ME")
     monkeypatch.setenv("JWT_SECRET_KEY", "MOCK_JWT_SIGNING_KEY_FOR_TESTS")  # pragma: allowlist secret
-    monkeypatch.setenv("ENCRYPTION_KEY", "TU9DS19FTkNSWVBUSU9OX0tFWV9GT1JfVEVTVFNfX18=")  # pragma: allowlist secret
-    with pytest.raises(RuntimeError, match="Missing or placeholder required environment variables"):
-        validate_required_env_vars()
-
-
-def test_startup_refuses_placeholder_encryption_key(monkeypatch):
-    """App startup validation must raise RuntimeError if ENCRYPTION_KEY is a placeholder."""
-    monkeypatch.setenv("DATABASE_URL", "sqlite:///./test.db")
-    monkeypatch.setenv("JWT_SECRET_KEY", "MOCK_JWT_SIGNING_KEY_FOR_TESTS")  # pragma: allowlist secret
-    monkeypatch.setenv("ENCRYPTION_KEY", "CHANGE_ME")
     with pytest.raises(RuntimeError, match="Missing or placeholder required environment variables"):
         validate_required_env_vars()

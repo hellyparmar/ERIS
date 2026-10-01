@@ -1,9 +1,5 @@
-"""
-seed.py - Canonical database & RAG knowledge seed entrypoint.
+"""Seed the ERIS database with deterministic synthetic portfolio data."""
 
-Run this script to seed the database and ingest RAG knowledge:
-python scripts/seed.py
-"""
 import sys
 from pathlib import Path
 
@@ -14,23 +10,21 @@ import asyncio
 import logging
 from app.database import AsyncSessionLocal
 from app.seed_database import seed_database
-from app.seed_rag import seed_unstructured_data
 
 logging.basicConfig(level=logging.INFO)
+
 
 async def main():
     try:
         async with AsyncSessionLocal() as session:
             stats = await seed_database(session, skip_if_exists=False)
             print("Seed Stats:", stats)
-            
-            print("Starting RAG ingestion...")
-            await seed_unstructured_data()
-            
-            sys.exit(0 if stats.get('status') in ('success', 'skipped') else 1)
+
+            sys.exit(0 if stats.get("status") in ("success", "skipped") else 1)
     except Exception as e:
         print("Error:", e)
         sys.exit(1)
+
 
 if __name__ == "__main__":
     asyncio.run(main())

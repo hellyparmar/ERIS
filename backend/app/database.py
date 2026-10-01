@@ -1,8 +1,9 @@
-from sqlalchemy import text
+from sqlalchemy import create_engine as _create_engine, text
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession, AsyncEngine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.engine import make_url
 from contextlib import contextmanager
+from fastapi import Request
 import logging
 import os
 
@@ -11,11 +12,21 @@ from app.models.base import Base
 
 logger = logging.getLogger(__name__)
 
-database_url = settings.DATABASE_URL
+configured_database_url = settings.DATABASE_URL
 
 # Convert local SQLite URLs to the async-compatible aiosqlite driver
-if database_url.startswith("sqlite://") and not database_url.startswith("sqlite+aiosqlite://"):
-    database_url = database_url.replace("sqlite://", "sqlite+aiosqlite://", 1)
+if configured_database_url.startswith("sqlite://") and not configured_database_url.startswith("sqlite+aiosqlite://"):
+    database_url = configured_database_url.replace("sqlite://", "sqlite+aiosqlite://", 1)
+elif configured_database_url.startswith(("postgresql://", "postgres://", "postgresql+asyncpg://")):
+    postgres_url = make_url(configured_database_url.replace("postgres://", "postgresql://", 1))
+    query = dict(postgres_url.query)
+    ssl_mode = query.pop("sslmode", None)
+    query.pop("channel_binding", None)
+    if ssl_mode:
+        query["ssl"] = ssl_mode
+    database_url = postgres_url.set(drivername="postgresql+asyncpg", query=query).render_as_string(hide_password=False)
+else:
+    database_url = configured_database_url
 
 url = make_url(database_url)
 engine_kwargs = {
@@ -25,26 +36,18 @@ engine_kwargs = {
 
 # Handle PostgreSQL async engine
 if url.drivername.startswith("postgresql"):
-    # Add asyncpg-specific SSL handling for local development
-    if os.getenv("ENVIRONMENT", "development") == "development":
-        # Disable SSL for local development unless explicitly enabled
-        if not database_url.endswith("?ssl=prefer"):
-            database_url = database_url.split("?")[0] + "?ssl=prefer" if "sslmode" not in database_url else database_url
-    
-    engine_kwargs.update({
-        "pool_size": int(os.getenv("DB_POOL_SIZE", "20")),
-        "max_overflow": int(os.getenv("DB_MAX_OVERFLOW", "30")),
-        "pool_recycle": int(os.getenv("DB_POOL_RECYCLE", "3600")),  # Recycle connections after 1 hour
-        "pool_pre_ping": True,  # Verify connections before using them
-    })
-    
+    engine_kwargs.update(
+        {
+            "pool_size": int(os.getenv("DB_POOL_SIZE", "5")),
+            "max_overflow": int(os.getenv("DB_MAX_OVERFLOW", "5")),
+            "pool_recycle": int(os.getenv("DB_POOL_RECYCLE", "3600")),  # Recycle connections after 1 hour
+            "pool_pre_ping": True,  # Verify connections before using them
+        }
+    )
+
     # Add echo for SQL debugging
     if os.getenv("DEBUG", "false").lower() == "true":
         engine_kwargs["echo"] = True
-else:
-    # SQLite configuration
-    pass
-
 # Create async engine for PostgreSQL with asyncpg driver or SQLite for tests
 engine: AsyncEngine = create_async_engine(
     database_url,
@@ -60,14 +63,33 @@ AsyncSessionLocal = async_sessionmaker(
     autocommit=False,
 )
 
-__all__ = ["engine", "AsyncSessionLocal", "SessionLocal", "get_db", "get_sync_session", "get_db_sync", "get_db_readonly", "healthcheck_db", "init_db", "get_db_dependency", "get_db_sync_dependency"]
+__all__ = [
+    "engine",
+    "AsyncSessionLocal",
+    "SessionLocal",
+    "get_db",
+    "get_sync_session",
+    "get_db_sync",
+    "get_db_readonly",
+    "healthcheck_db",
+    "init_db",
+    "get_db_dependency",
+    "get_db_sync_dependency",
+]
 
 # Module-level synchronous session factory for sync-only tasks
-from sqlalchemy import create_engine as _create_engine
-_sync_url = database_url.replace("postgresql+asyncpg://", "postgresql://").replace("sqlite+aiosqlite://", "sqlite://")
+
+_sync_url = (
+    configured_database_url.replace("postgres://", "postgresql://", 1)
+    .replace("postgresql+asyncpg://", "postgresql://")
+    .replace("sqlite+aiosqlite://", "sqlite://")
+)
 if "ssl=" in _sync_url:
     _sync_url = _sync_url.replace("ssl=", "sslmode=")
-_sync_engine = _create_engine(_sync_url, pool_pre_ping=True)
+_sync_engine_kwargs = {"pool_pre_ping": True}
+if _sync_url.startswith("sqlite:"):
+    _sync_engine_kwargs["connect_args"] = {"check_same_thread": False}
+_sync_engine = _create_engine(_sync_url, **_sync_engine_kwargs)
 SessionLocal = sessionmaker(
     bind=_sync_engine,
     autoflush=False,
@@ -76,11 +98,11 @@ SessionLocal = sessionmaker(
 )
 AsyncSessionLocal_alias = AsyncSessionLocal
 
+
 def get_sync_session():
     """Get synchronous session - only use for sync-only contexts (tasks, CLI, etc.)"""
     return SessionLocal()
 
-from fastapi import Request, HTTPException
 
 async def get_db(request: Request = None):
     """
@@ -106,6 +128,7 @@ async def get_db_dependency() -> AsyncSession:
     async with AsyncSessionLocal() as session:
         return session
 
+
 @contextmanager
 def get_db_sync():
     """
@@ -126,13 +149,15 @@ def get_db_sync():
         if db:
             db.close()
 
-def get_db_sync_dependency(request: Request = None):
+
+async def get_db_sync_dependency(request: Request = None):
     """Dependency for synchronous FastAPI endpoints"""
     db = get_sync_session()
     try:
         yield db
     finally:
         db.close()
+
 
 @contextmanager
 def get_db_readonly():
@@ -144,6 +169,7 @@ def get_db_readonly():
     finally:
         if db:
             db.close()
+
 
 async def healthcheck_db() -> bool:
     """
@@ -159,12 +185,22 @@ async def healthcheck_db() -> bool:
         logger.error(f"Database health check failed: {e}")
         return False
 
+
 async def init_db():
     try:
         from app.models import (  # noqa
-            User, Outlet, Product, Inventory, SaleTransaction,
-            Supplier, PurchaseOrder, Invoice, Alert, Forecast, ChatMessage
+            User,
+            Outlet,
+            Product,
+            Inventory,
+            SaleTransaction,
+            Supplier,
+            Invoice,
+            Alert,
+            ForecastResult,
+            ChatMessage,
         )
+
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
         logger.info("Database tables created/verified")
@@ -174,4 +210,3 @@ async def init_db():
         else:
             logger.error(f"Failed to initialize database: {e}")
             raise
-

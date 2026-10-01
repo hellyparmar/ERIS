@@ -4,7 +4,7 @@ Calculates 30-day rolling baseline, flags drops (z < -2) and spikes (z > 3)
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any
 
 from sqlalchemy import text
@@ -12,25 +12,22 @@ from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
-SPIKE_THRESHOLD = 3.0    # z-score for spike
-DROP_THRESHOLD = -2.0    # z-score for drop
+SPIKE_THRESHOLD = 3.0  # z-score for spike
+DROP_THRESHOLD = -2.0  # z-score for drop
 
 
-def detect_revenue_anomalies(
-    db: Session,
-    store_id: int = 1,
-    lookback_days: int = 90
-) -> List[Dict[str, Any]]:
+def detect_revenue_anomalies(db: Session, outlet_id: int = 1, lookback_days: int = 90) -> List[Dict[str, Any]]:
     """
     Detect anomalous revenue days using z-score analysis.
-    
+
     Returns a list of anomaly dicts with:
       - date, revenue, z_score, anomaly_type (spike|drop), severity
     """
-    cutoff = datetime.utcnow() - timedelta(days=lookback_days)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=lookback_days)
 
     try:
-        rows = db.execute(text("""
+        rows = db.execute(
+            text("""
             SELECT
                 DATE(sale_date) as day,
                 SUM(total_amount) as daily_revenue
@@ -38,22 +35,12 @@ def detect_revenue_anomalies(
             WHERE sale_date >= :cutoff AND outlet_id = :outlet_id
             GROUP BY day
             ORDER BY day ASC
-        """), {"cutoff": cutoff, "outlet_id": store_id}).fetchall()
-    except Exception:
-        # Fallback: use invoices table if sales unavailable
-        try:
-            rows = db.execute(text("""
-                SELECT
-                    DATE(created_at) as day,
-                    SUM(total_amount) as daily_revenue
-                FROM invoices
-                WHERE created_at >= :cutoff
-                GROUP BY day
-                ORDER BY day ASC
-            """), {"cutoff": cutoff}).fetchall()
-        except Exception as e:
-            logger.warning(f"Anomaly detection: no data source found: {e}")
-            return []
+        """),
+            {"cutoff": cutoff, "outlet_id": outlet_id},
+        ).fetchall()
+    except Exception as exc:
+        logger.warning("Revenue anomaly query failed: %s", exc)
+        return []
 
     if not rows:
         return []
@@ -68,7 +55,7 @@ def detect_revenue_anomalies(
     # Calculate global mean and stddev
     mean = sum(revenues) / n
     variance = sum((x - mean) ** 2 for x in revenues) / n
-    std = variance ** 0.5
+    std = variance**0.5
 
     if std == 0:
         return []
@@ -86,35 +73,34 @@ def detect_revenue_anomalies(
         else:
             continue
 
-        anomalies.append({
-            "date": day,
-            "revenue": round(rev, 2),
-            "mean_revenue": round(mean, 2),
-            "std_dev": round(std, 2),
-            "z_score": round(z, 3),
-            "anomaly_type": anomaly_type,
-            "severity": severity,
-            "deviation_pct": round(((rev - mean) / mean * 100) if mean else 0, 1),
-            "message": (
-                f"Revenue spike of ₹{rev:,.0f} on {day} — {abs(z):.1f}σ above mean"
-                if anomaly_type == "spike"
-                else f"Revenue drop to ₹{rev:,.0f} on {day} — {abs(z):.1f}σ below mean"
-            )
-        })
+        anomalies.append(
+            {
+                "date": day,
+                "revenue": round(rev, 2),
+                "mean_revenue": round(mean, 2),
+                "std_dev": round(std, 2),
+                "z_score": round(z, 3),
+                "anomaly_type": anomaly_type,
+                "severity": severity,
+                "deviation_pct": round(((rev - mean) / mean * 100) if mean else 0, 1),
+                "message": (
+                    f"Revenue spike of ₹{rev:,.0f} on {day} — {abs(z):.1f}σ above mean"
+                    if anomaly_type == "spike"
+                    else f"Revenue drop to ₹{rev:,.0f} on {day} — {abs(z):.1f}σ below mean"
+                ),
+            }
+        )
 
     return sorted(anomalies, key=lambda x: abs(x["z_score"]), reverse=True)
 
 
-def detect_product_anomalies(
-    db: Session,
-    store_id: int = 1,
-    lookback_days: int = 30
-) -> List[Dict[str, Any]]:
+def detect_product_anomalies(db: Session, outlet_id: int = 1, lookback_days: int = 30) -> List[Dict[str, Any]]:
     """Detect products with anomalous quantity sold (sudden spikes or drops)"""
-    cutoff = datetime.utcnow() - timedelta(days=lookback_days)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=lookback_days)
 
     try:
-        rows = db.execute(text("""
+        rows = db.execute(
+            text("""
             SELECT
                 p.id, p.name, p.category_id,
                 SUM(si.quantity) as total_qty,
@@ -126,7 +112,9 @@ def detect_product_anomalies(
             WHERE s.sale_date >= :cutoff AND s.outlet_id = :outlet_id
             GROUP BY p.id, p.name, p.category_id
             ORDER BY total_qty DESC
-        """), {"cutoff": cutoff, "outlet_id": store_id}).fetchall()
+        """),
+            {"cutoff": cutoff, "outlet_id": outlet_id},
+        ).fetchall()
     except Exception as e:
         logger.warning(f"Product anomaly detection error: {e}")
         return []
@@ -149,14 +137,16 @@ def detect_product_anomalies(
         qty = float(r[3] or 0)
         z = (qty - mean) / std
         if abs(z) > 2.5:
-            anomalies.append({
-                "product_id": r[0],
-                "product_name": r[1],
-                "category": r[2],
-                "total_quantity_sold": float(qty),
-                "z_score": round(z, 2),
-                "anomaly_type": "high_demand" if z > 0 else "low_demand",
-                "message": f"{'Unusually high' if z > 0 else 'Unusually low'} demand for {r[1]}: {qty:.0f} units vs avg {mean:.0f}"
-            })
+            anomalies.append(
+                {
+                    "product_id": r[0],
+                    "product_name": r[1],
+                    "category": r[2],
+                    "total_quantity_sold": float(qty),
+                    "z_score": round(z, 2),
+                    "anomaly_type": "high_demand" if z > 0 else "low_demand",
+                    "message": f"{'Unusually high' if z > 0 else 'Unusually low'} demand for {r[1]}: {qty:.0f} units vs avg {mean:.0f}",
+                }
+            )
 
     return sorted(anomalies, key=lambda x: abs(x["z_score"]), reverse=True)

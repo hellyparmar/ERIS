@@ -23,14 +23,12 @@ const Forecasts = lazy(() => import('./pages/Forecasts.jsx'));
 const Alerts = lazy(() => import('./pages/Alerts.jsx'));
 const AIAssistant = lazy(() => import('./pages/AIAssistant.jsx'));
 const Invoices = lazy(() => import('./pages/Invoices.jsx'));
-const CustomerInsights = lazy(() => import('./pages/CustomerInsights.jsx'));
 const Settings = lazy(() => import('./pages/Settings.jsx'));
 const Suppliers = lazy(() => import('./pages/Suppliers.jsx'));
 const Sales = lazy(() => import('./pages/Sales.jsx'));
 const GSTInvoice = lazy(() => import('./pages/GSTInvoice.jsx'));
 
 const Outlets = lazy(() => import('./pages/Outlets.jsx'));
-const CausalAnalysis = lazy(() => import('./pages/CausalAnalysis.jsx'));
 const NotFound = lazy(() => import('./pages/NotFound.jsx'));
 
 const LoadingSpinner = () => (
@@ -60,14 +58,12 @@ function AppLayout() {
             <Route path="/alerts" element={<ProtectedRoute roles={ALL_ROLES}><Alerts /></ProtectedRoute>} />
             <Route path="/ai-assistant" element={<ProtectedRoute roles={ALL_ROLES}><AIAssistant /></ProtectedRoute>} />
             <Route path="/invoices" element={<ProtectedRoute roles={ALL_ROLES}><Invoices /></ProtectedRoute>} />
-            <Route path="/customer-insights" element={<ProtectedRoute roles={ADMIN_AND_MANAGER}><CustomerInsights /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute roles={ALL_ROLES}><Settings /></ProtectedRoute>} />
             <Route path="/suppliers" element={<ProtectedRoute roles={ADMIN_ONLY}><Suppliers /></ProtectedRoute>} />
             <Route path="/sales" element={<ProtectedRoute roles={ALL_ROLES}><Sales /></ProtectedRoute>} />
             <Route path="/gst-invoice" element={<ProtectedRoute roles={ALL_ROLES}><GSTInvoice /></ProtectedRoute>} />
 
             <Route path="/outlets" element={<ProtectedRoute roles={ADMIN_AND_MANAGER}><Outlets /></ProtectedRoute>} />
-            <Route path="/causal-analysis" element={<ProtectedRoute roles={ADMIN_AND_MANAGER}><CausalAnalysis /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
       </Suspense>

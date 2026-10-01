@@ -13,7 +13,8 @@ from sqlalchemy.sql import Select
 from app.core.roles import ADMIN, user_role
 
 
-T = TypeVar('T')
+T = TypeVar("T")
+
 
 class OutletDataAccess:
     """
@@ -40,16 +41,14 @@ class OutletDataAccess:
         if role_name == ADMIN:
             return None  # Admin can access all outlets
 
-        if hasattr(user, 'outlet_access') and user.outlet_access:
+        if hasattr(user, "outlet_access") and user.outlet_access:
             return [access.outlet_id for access in user.outlet_access]
-        if getattr(user, 'outlet_id', None):
-            return [user.outlet_id]
 
         # Default: no access
         return []
 
     @staticmethod
-    def apply_outlet_filter(query: Query[T], user, outlet_column: str = 'outlet_id') -> Query[T]:
+    def apply_outlet_filter(query: Query[T], user, outlet_column: str = "outlet_id") -> Query[T]:
         """
         Apply outlet-based filtering to a SQLAlchemy query.
 
@@ -72,14 +71,14 @@ class OutletDataAccess:
             return query.filter(False)
 
         # Get the model class from the query
-        model_class = query.column_descriptions[0]['entity']
+        model_class = query.column_descriptions[0]["entity"]
 
         # Filter to allowed outlets
         outlet_filter = getattr(model_class, outlet_column).in_(allowed_outlet_ids)
         return query.filter(outlet_filter)
 
     @staticmethod
-    def apply_outlet_filter_select(stmt: Select, user, outlet_column: str = 'outlet_id') -> Select:
+    def apply_outlet_filter_select(stmt: Select, user, outlet_column: str = "outlet_id") -> Select:
         """
         Apply outlet-based filtering to a SQLAlchemy select statement.
 
@@ -105,7 +104,7 @@ class OutletDataAccess:
         # This is a simplified approach - in practice you might need to be more specific
         entity = None
         for column in stmt.columns:
-            if hasattr(column, 'table'):
+            if hasattr(column, "table"):
                 entity = column.table
                 break
 
@@ -114,6 +113,7 @@ class OutletDataAccess:
             return stmt.where(outlet_filter)
 
         return stmt
+
 
 def require_outlet_access(user, requested_outlet_id: Optional[int] = None) -> bool:
     """

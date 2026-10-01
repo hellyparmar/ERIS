@@ -86,7 +86,7 @@ export default function Dashboard() {
 
   return (
     <>
-      <SEO title="Dashboard" description="Real-time retail analytics" />
+      <SEO title="Dashboard" description="Database-backed retail analytics" />
       <div>
 
         <div style={{ marginBottom: 'var(--sp-6)' }}>

@@ -29,7 +29,8 @@ export default [
       ...js.configs.recommended.rules,
       'react-hooks/rules-of-hooks': 'error',
       'react-hooks/exhaustive-deps': 'warn',
-      'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+      // Context modules intentionally co-locate their provider and consumer hook.
+      'react-refresh/only-export-components': 'off',
       // eslint-plugin-react will be added during the frontend cleanup phase;
       // core no-unused-vars cannot recognize identifiers referenced only by JSX.
       'no-unused-vars': 'off',

@@ -2,11 +2,12 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
 import {
-  Search, Plus, Eye, Trash2, X, Printer, ChevronUp, ChevronDown,
-  CheckCircle2, Clock, AlertTriangle, FileText, Download, ChevronLeft, ChevronRight
+  Search, Plus, Eye, X, Printer, ChevronUp, ChevronDown,
+  CheckCircle2, Download, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import SEO from '../components/SEO';
-import { useToast } from '../components/ui/Toast';
+import { useToast } from '../contexts/ToastContext';
+import { useAuth } from '../contexts/AuthContext';
 
 const PER_PAGE = 10;
 
@@ -18,18 +19,32 @@ function StatusBadge({ status }) {
     pending: { label: 'Pending', cls: 'warning' },
     overdue: { label: 'Overdue', cls: 'critical' },
     draft:   { label: 'Draft',   cls: 'neutral' },
+    cancelled: { label: 'Cancelled', cls: 'neutral' },
   };
   const s = map[status] || map.draft;
   return <div className={`badge ${s.cls}`}>{s.label}</div>;
 }
 
-function ViewModal({ invoice, contacts, onClose }) {
+function downloadBlob(response, fallbackName) {
+  const disposition = response.headers?.['content-disposition'] || '';
+  const match = disposition.match(/filename="?([^";]+)"?/i);
+  const url = URL.createObjectURL(new Blob([response.data]));
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = match?.[1] || fallbackName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
+function ViewModal({ invoice, customers, onClose }) {
   if (!invoice) return null;
-  const supplier = contacts?.find(c => c.id === invoice.supplier_id);
+  const customer = customers?.find(c => c.id === invoice.customer_id);
   const items = invoice.items || [];
   const subtotal = items.reduce((s,i) => s + i.unit_price * i.quantity, 0);
-  const tax = invoice.tax_amount || subtotal * 0.18;
-  const total = invoice.total || subtotal + tax;
+  const tax = invoice.tax_amount ?? 0;
+  const total = invoice.total ?? subtotal + tax;
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 24 }}
       onClick={onClose}>
@@ -46,7 +61,7 @@ function ViewModal({ invoice, contacts, onClose }) {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, fontSize: '13px' }}>
               <div><div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--c-ink-muted)', marginBottom: 2 }}>Invoice #</div><div style={{ fontFamily: 'var(--f-mono)', color: 'var(--c-brown)', fontWeight: 600 }}>{invoice.invoice_number}</div></div>
               <div><div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--c-ink-muted)', marginBottom: 4 }}>Status</div><StatusBadge status={invoice.status}/></div>
-              <div><div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--c-ink-muted)', marginBottom: 2 }}>Supplier</div><div>{supplier?.name||'—'}</div></div>
+              <div><div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--c-ink-muted)', marginBottom: 2 }}>Customer</div><div>{invoice.customer_name || customer?.name || 'Walk-in Customer'}</div></div>
               <div><div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--c-ink-muted)', marginBottom: 2 }}>Issue Date</div><div>{new Date(invoice.issue_date).toLocaleDateString()}</div></div>
               <div><div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--c-ink-muted)', marginBottom: 2 }}>Due Date</div><div>{new Date(invoice.due_date).toLocaleDateString()}</div></div>
             </div>
@@ -91,7 +106,10 @@ function ViewModal({ invoice, contacts, onClose }) {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', padding: '12px 20px', borderTop: '1px solid var(--c-border)', background: 'var(--c-canvas-raised)' }}>
-          <button className="action-btn" onClick={onClose}><Printer size={13} style={{ marginRight: 6 }} />Print</button>
+          <button className="action-btn" onClick={async()=>{
+            const response = await api.get(`/api/v1/gst/invoices/${invoice.id}/pdf`, { responseType: 'blob' });
+            downloadBlob(response, `${invoice.invoice_number}.pdf`);
+          }}><Printer size={13} style={{ marginRight: 6 }} />Download PDF</button>
           <button className="action-btn primary" onClick={onClose}>Close</button>
         </div>
       </div>
@@ -99,26 +117,23 @@ function ViewModal({ invoice, contacts, onClose }) {
   );
 }
 
-function CreateModal({ contacts, onClose }) {
+function CreateModal({ customers, outlets, onClose }) {
   const qc = useQueryClient();
   const { addToast } = useToast();
   const [errorMsg, setErrorMsg] = useState('');
   const [form, setForm] = useState({
-    supplier_id:'', outlet_id:'1',
-    issue_date: new Date().toISOString().split('T')[0],
+    customer_id:'', outlet_id:String(outlets?.[0]?.id || ''),
     due_date: (() => { const d=new Date(); d.setDate(d.getDate()+30); return d.toISOString().split('T')[0]; })(),
-    items:[{description:'',quantity:1,unit_price:0}],
-    tax_rate:18, notes:''
+    items:[{description:'',quantity:1,unit_price:0,gst_rate:18}],
+    discount:0, notes:''
   });
   const mutation = useMutation({
     mutationFn: async (data) => {
       const items = data.items.filter(i=>i.description&&i.quantity&&i.unit_price);
-      const subtotal = items.reduce((s,i)=>s+(i.quantity*i.unit_price),0);
-      const tax_amount = subtotal*(data.tax_rate/100);
       return api.post('/api/v1/gst/invoices', {
-        supplier_id:parseInt(data.supplier_id), outlet_id:parseInt(data.outlet_id)||1,
-        invoice_number:`INV-${Date.now()}`, issue_date:data.issue_date, due_date:data.due_date,
-        items, tax_rate:data.tax_rate, tax_amount, total:subtotal+tax_amount, status:'pending', notes:data.notes
+        customer_id:data.customer_id ? parseInt(data.customer_id) : null,
+        outlet_id:parseInt(data.outlet_id), due_date:data.due_date ? `${data.due_date}T23:59:59` : null,
+        items, discount:data.discount, notes:data.notes
       });
     },
     onSuccess: (data)=>{ 
@@ -136,7 +151,7 @@ function CreateModal({ contacts, onClose }) {
   });
   const setItem = (idx,field,val) => setForm(p=>{ const it=[...p.items]; it[idx]={...it[idx],[field]:val}; return {...p,items:it}; });
   const subtotal = form.items.reduce((s,i)=>s+(parseFloat(i.unit_price||0)*parseFloat(i.quantity||0)),0);
-  const tax = subtotal*(form.tax_rate/100);
+  const tax = form.items.reduce((sum,item)=>sum+(Number(item.quantity||0)*Number(item.unit_price||0)*Number(item.gst_rate||0)/100),0);
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 24 }}
       onClick={onClose}>
@@ -152,19 +167,18 @@ function CreateModal({ contacts, onClose }) {
             {errorMsg && <div style={{ color: 'var(--c-critical)', fontSize: 13 }}>{errorMsg}</div>}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <span style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--c-ink-muted)' }}>Supplier *</span>
-                <select value={form.supplier_id} onChange={e=>setForm(p=>({...p,supplier_id:e.target.value}))} required>
-                  <option value="">Select supplier</option>
-                  {contacts?.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+                <span style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--c-ink-muted)' }}>Customer</span>
+                <select value={form.customer_id} onChange={e=>setForm(p=>({...p,customer_id:e.target.value}))}>
+                  <option value="">Walk-in customer</option>
+                  {customers?.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <span style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--c-ink-muted)' }}>Outlet ID</span>
-                <input value={form.outlet_id} onChange={e=>setForm(p=>({...p,outlet_id:e.target.value}))} placeholder="1"/>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <span style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--c-ink-muted)' }}>Issue Date</span>
-                <input type="date" value={form.issue_date} onChange={e=>setForm(p=>({...p,issue_date:e.target.value}))}/>
+                <span style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--c-ink-muted)' }}>Outlet *</span>
+                <select value={form.outlet_id} onChange={e=>setForm(p=>({...p,outlet_id:e.target.value}))} required>
+                  <option value="">Select outlet</option>
+                  {outlets?.map(outlet=><option key={outlet.id} value={outlet.id}>{outlet.name}</option>)}
+                </select>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <span style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--c-ink-muted)' }}>Due Date</span>
@@ -175,16 +189,17 @@ function CreateModal({ contacts, onClose }) {
               <div className="zone-label" style={{ marginBottom: 8 }}>Line Items</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {form.items.map((item,idx)=>(
-                  <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 70px 100px 80px auto', gap: 8, alignItems: 'center' }}>
+                  <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 70px 100px 70px 80px auto', gap: 8, alignItems: 'center' }}>
                     <input placeholder="Description" value={item.description} onChange={e=>setItem(idx,'description',e.target.value)}/>
                     <input type="number" placeholder="Qty" min="1" step="0.01" value={item.quantity} onChange={e=>setItem(idx,'quantity',parseFloat(e.target.value)||0)}/>
                     <input type="number" placeholder="Unit price" min="0" step="0.01" value={item.unit_price} onChange={e=>setItem(idx,'unit_price',parseFloat(e.target.value)||0)}/>
+                    <input type="number" aria-label="GST rate" title="GST rate (%)" min="0" max="28" step="0.1" value={item.gst_rate} onChange={e=>setItem(idx,'gst_rate',parseFloat(e.target.value)||0)}/>
                     <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--c-dark)', textAlign: 'right', fontFamily: 'var(--f-mono)' }}>{fmt(item.quantity*item.unit_price)}</div>
                     {form.items.length>1 && <button type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-critical)' }} onClick={()=>setForm(p=>({...p,items:p.items.filter((_,i)=>i!==idx)}))}><X size={14}/></button>}
                   </div>
                 ))}
                 <button type="button" className="action-btn" style={{ alignSelf: 'flex-start', borderStyle: 'dashed' }}
-                  onClick={()=>setForm(p=>({...p,items:[...p.items,{description:'',quantity:1,unit_price:0}]}))}>
+                  onClick={()=>setForm(p=>({...p,items:[...p.items,{description:'',quantity:1,unit_price:0,gst_rate:18}]}))}>
                   <Plus size={13} style={{ marginRight: 6 }} /> Add Item
                 </button>
               </div>
@@ -194,14 +209,17 @@ function CreateModal({ contacts, onClose }) {
                 <span>Subtotal</span><span style={{ fontFamily: 'var(--f-mono)' }}>{fmt(subtotal)}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13, color: 'var(--c-ink-muted)' }}>
-                <span>Tax Rate (%)</span>
+                <span>GST</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <input type="number" style={{ width: 60, padding: '2px 6px' }} min="0" max="100" step="0.1" value={form.tax_rate} onChange={e=>setForm(p=>({...p,tax_rate:parseFloat(e.target.value)||0}))}/>
                   <span style={{ fontFamily: 'var(--f-mono)' }}>{fmt(tax)}</span>
                 </div>
               </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13, color: 'var(--c-ink-muted)' }}>
+                <span>Discount</span>
+                <input type="number" style={{ width: 100, padding: '2px 6px' }} min="0" max={subtotal} step="0.01" value={form.discount} onChange={e=>setForm(p=>({...p,discount:parseFloat(e.target.value)||0}))}/>
+              </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15, fontWeight: 700, color: 'var(--c-dark)', borderTop: '1px solid var(--c-border)', paddingTop: 10, marginTop: 4 }}>
-                <span>Total</span><span style={{ fontFamily: 'var(--f-mono)' }}>{fmt(subtotal+tax)}</span>
+                <span>Total</span><span style={{ fontFamily: 'var(--f-mono)' }}>{fmt(subtotal+tax-form.discount)}</span>
               </div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -274,6 +292,8 @@ function InvoiceDueChart({ invoices }) {
 }
 
 export default function Invoices() {
+  const { user } = useAuth();
+  const canWrite = user?.role === 'admin' || user?.role === 'manager';
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('all');
   const [dateFrom, setDateFrom] = useState('');
@@ -288,22 +308,31 @@ export default function Invoices() {
   // Handle ?action=new
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('action') === 'new') {
+    if (canWrite && params.get('action') === 'new') {
       setCreating(true);
     }
-  }, []);
+  }, [canWrite]);
 
   const { data: invoices=[], isLoading } = useQuery({
     queryKey:['invoices'],
     queryFn: async()=>{ const r=await api.get('/api/v1/gst/invoices'); return r.data.invoices ?? []; }
   });
-  const { data: contacts=[] } = useQuery({
-    queryKey:['suppliers'],
-    queryFn: async()=>{ const r=await api.get('/api/v1/suppliers/'); return r.data?.data?.suppliers || r.data?.suppliers || []; }
+  const { data: customers=[] } = useQuery({
+    queryKey:['customers'],
+    queryFn: async()=>{ const r=await api.get('/api/v1/customers/'); return r.data?.data?.customers || []; }
+  });
+  const { data: outlets=[] } = useQuery({
+    queryKey:['outlets'],
+    queryFn: async()=>{ const r=await api.get('/api/v1/outlets/'); return r.data?.data || r.data || []; }
   });
 
-  const deleteMut = useMutation({ mutationFn: id=>Promise.reject(new Error("Deleting GST invoices is not allowed")), onError: (e)=>alert(e.message) });
   const paidMut   = useMutation({ mutationFn: id=>api.post(`/api/v1/gst/invoices/${id}/pay`), onSuccess:()=>qc.invalidateQueries({queryKey:['invoices']}) });
+  const cancelMut = useMutation({ mutationFn: id=>api.patch(`/api/v1/gst/invoices/${id}/cancel`), onSuccess:()=>qc.invalidateQueries({queryKey:['invoices']}) });
+
+  const exportInvoices = async () => {
+    const response = await api.post('/api/v1/reports/export/invoices', { format: 'excel' }, { responseType: 'blob' });
+    downloadBlob(response, 'invoices_report.xlsx');
+  };
 
   const handleSort = useCallback((col) => {
     if (sortCol===col) setSortDir(d=>d==='asc'?'desc':'asc');
@@ -315,9 +344,9 @@ export default function Invoices() {
 
   const filtered = useMemo(()=>{
     let list = invoices.filter(inv=>{
-      const sup = contacts.find(c=>c.id===inv.supplier_id);
+      const customer = customers.find(c=>c.id===inv.customer_id);
       const q = search.toLowerCase();
-      if (q && !inv.invoice_number?.toLowerCase().includes(q) && !sup?.name?.toLowerCase().includes(q)) return false;
+      if (q && !inv.invoice_number?.toLowerCase().includes(q) && !inv.customer_name?.toLowerCase().includes(q) && !customer?.name?.toLowerCase().includes(q)) return false;
       if (status!=='all' && inv.status!==status) return false;
       const d = new Date(inv.issue_date);
       if (dateFrom && d<new Date(dateFrom)) return false;
@@ -331,7 +360,7 @@ export default function Invoices() {
       return sortDir==='asc' ? (av>bv?1:-1) : (av<bv?1:-1);
     });
     return list;
-  },[invoices,contacts,search,status,dateFrom,dateTo,sortCol,sortDir]);
+  },[invoices,customers,search,status,dateFrom,dateTo,sortCol,sortDir]);
 
   const stats = useMemo(()=>({
     paid:    {val:invoices.filter(i=>i.status==='paid').reduce((s,i)=>s+(i.total||0),0),    cnt:invoices.filter(i=>i.status==='paid').length},
@@ -354,7 +383,7 @@ export default function Invoices() {
           background: var(--c-brown-glow) !important;
         }
       `}</style>
-      <SEO title="Invoices Directory" description="Track invoices, due cycles, tax values, and vendors" />
+      <SEO title="Customer Invoices" description="Track customer invoices, GST, due dates, and payments" />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 0, minHeight: 'calc(100vh - 50px)', background: 'var(--c-canvas)' }}>
         
         {/* Header */}
@@ -371,8 +400,8 @@ export default function Invoices() {
             <p style={{ fontSize: '11px', color: 'var(--c-ink-muted)', margin: '4px 0 0' }}>Manage sales and track payments</p>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button className="action-btn" style={{ padding: '6px 12px' }}><Download size={13} style={{ marginRight: 6 }} />Export</button>
-            <button className="action-btn primary" onClick={()=>setCreating(true)}><Plus size={13} style={{ marginRight: 6 }} />New Invoice</button>
+            <button className="action-btn" style={{ padding: '6px 12px' }} onClick={exportInvoices}><Download size={13} style={{ marginRight: 6 }} />Export</button>
+            {canWrite && <button className="action-btn primary" onClick={()=>setCreating(true)}><Plus size={13} style={{ marginRight: 6 }} />New Invoice</button>}
           </div>
         </div>
 
@@ -398,10 +427,11 @@ export default function Invoices() {
             ))}
           </div>
 
-          {/* Filter Ba          <div className="filter-bar">
+          {/* Filters */}
+          <div className="filter-bar">
             <div style={{ flex: 1, minWidth: 200, position: 'relative' }}>
               <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--c-ink-muted)' }}/>
-              <input placeholder="Search invoice ID, supplier…" value={search} onChange={e=>{setSearch(e.target.value);setPage(1);}}
+              <input placeholder="Search invoice or customer…" value={search} onChange={e=>{setSearch(e.target.value);setPage(1);}}
                 style={{ paddingLeft: 30, fontSize: 12 }}/>
               {search && <button onClick={()=>setSearch('')} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-ink-muted)' }}><X size={13}/></button>}
             </div>
@@ -419,7 +449,7 @@ export default function Invoices() {
                 <X size={13} style={{ marginRight: 6 }} /> Reset
               </button>
             )}
-          </div>  </div>
+          </div>
 
           {/* Table */}
           <div style={{ overflowX: 'auto' }}>
@@ -428,7 +458,7 @@ export default function Invoices() {
                 <tr>
                   {[
                     {col:'invoice_number',label:'Invoice #', align:'left'},
-                    {col:'supplier_id',   label:'Supplier', align:'left'},
+                    {col:'customer_name', label:'Customer', align:'left'},
                     {col:'issue_date',    label:'Issue Date', align:'left'},
                     {col:'due_date',      label:'Due Date', align:'left'},
                     {col:'total',         label:'Total', align:'right'},
@@ -461,7 +491,7 @@ export default function Invoices() {
                     </div>
                   </td></tr>
                 ) : pageRows.map((inv, idx)=>{
-                  const sup = contacts.find(c=>c.id===inv.supplier_id);
+                  const customer = customers.find(c=>c.id===inv.customer_id);
                   const due = new Date(inv.due_date);
                   const today = new Date();
                   const daysLeft = Math.ceil((due-today)/(1000*60*60*24));
@@ -470,7 +500,7 @@ export default function Invoices() {
                   return (
                     <tr key={inv.id} className="invoices-row" style={{ cursor: 'pointer' }} onClick={()=>setViewing(inv)}>
                       <td><span className="mono" style={{ fontWeight: 600, color: 'var(--c-brown)' }}>{inv.invoice_number}</span></td>
-                      <td><span style={{ fontWeight: 600 }}>{sup?.name||'—'}</span></td>
+                       <td><span style={{ fontWeight: 600 }}>{inv.customer_name || customer?.name || 'Walk-in Customer'}</span></td>
                       <td style={{ color: 'var(--c-ink-muted)' }}>{new Date(inv.issue_date).toLocaleDateString()}</td>
                       <td style={{ color: isOverdue?'var(--c-critical)':isWarning?'var(--c-brown)':'var(--c-ink-muted)', fontWeight: isOverdue||isWarning?600:400 }}>{new Date(inv.due_date).toLocaleDateString()}</td>
                       <td className="mono" style={{ textAlign: 'right', fontWeight: 600 }}>{fmt(inv.total)}</td>
@@ -479,8 +509,8 @@ export default function Invoices() {
                       <td style={{ textAlign: 'center' }} onClick={e=>e.stopPropagation()}>
                         <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
                           <button className="action-btn" style={{ padding: '4px 8px' }} title="View" onClick={()=>setViewing(inv)}><Eye size={13}/></button>
-                          {inv.status!=='paid'&&<button className="action-btn" style={{ padding: '4px 8px', color: 'var(--c-sage)' }} title="Mark Paid" onClick={()=>{ if(confirm('Mark as paid?')) paidMut.mutate(inv.id); }}><CheckCircle2 size={13}/></button>}
-                          <button className="action-btn" style={{ padding: '4px 8px', color: 'var(--c-critical)' }} title="Delete" onClick={()=>{ if(confirm('Delete invoice?')) deleteMut.mutate(inv.id); }}><Trash2 size={13}/></button>
+                          {canWrite&&inv.status!=='paid'&&<button className="action-btn" style={{ padding: '4px 8px', color: 'var(--c-sage)' }} title="Mark Paid" onClick={()=>{ if(confirm('Mark as paid?')) paidMut.mutate(inv.id); }}><CheckCircle2 size={13}/></button>}
+                           {canWrite&&inv.status!=='paid'&&inv.status!=='cancelled'&&<button className="action-btn" style={{ padding: '4px 8px', color: 'var(--c-critical)' }} title="Cancel" onClick={()=>{ if(confirm('Cancel invoice?')) cancelMut.mutate(inv.id); }}>Cancel</button>}
                         </div>
                       </td>
                     </tr>
@@ -510,8 +540,8 @@ export default function Invoices() {
 
       </div>
 
-      {viewing  && <ViewModal invoice={viewing} contacts={contacts} onClose={()=>setViewing(null)}/>}
-      {creating && <CreateModal contacts={contacts} onClose={()=>setCreating(false)}/>}
+      {viewing  && <ViewModal invoice={viewing} customers={customers} onClose={()=>setViewing(null)}/>}
+      {canWrite && creating && <CreateModal customers={customers} outlets={outlets} onClose={()=>setCreating(false)}/>}
     </>
   );
 }

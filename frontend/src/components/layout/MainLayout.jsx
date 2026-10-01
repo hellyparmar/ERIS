@@ -9,7 +9,6 @@ const hideHeaderPaths = ['/login', '/signup'];
 const MainLayout = ({ children }) => {
   const location = useLocation();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const showHeader = !hideHeaderPaths.includes(location.pathname);
 
@@ -31,27 +30,6 @@ const MainLayout = ({ children }) => {
         <Sidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
       </div>
 
-      {sidebarOpen && (
-        <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
-          zIndex: 45,
-        }}
-        onClick={() => setSidebarOpen(false)}
-      />)}
-
-      <div id="sidebar-mobile" style={{
-        position: 'fixed', left: 0, top: 0, height: '100vh', zIndex: 50,
-        transform: sidebarOpen ? 'translateX(0)' : 'translateX(-100%)',
-        transition: 'transform 0.2s ease',
-      }}>
-        <style>{`
-          @media (min-width: 768px) {
-            #sidebar-mobile { display: none !important; }
-          }
-        `}</style>
-        <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      </div>
-
       <div style={{
         flex: 1, display: 'flex', flexDirection: 'column',
         minWidth: 0, paddingBottom: 60,
@@ -64,7 +42,7 @@ const MainLayout = ({ children }) => {
           }
         `}</style>
 
-        {showHeader && <Header onMenuClick={() => setSidebarOpen(v => !v)} />}
+        {showHeader && <Header />}
 
         <main style={{
           flex: 1, padding: 'var(--sp-6)',
@@ -88,10 +66,7 @@ const MainLayout = ({ children }) => {
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         }}>
           <span>&copy; {new Date().getFullYear()} ERIS</span>
-          <div style={{ display: 'flex', gap: 16 }}>
-            <span style={{ cursor: 'default' }}>Privacy Policy</span>
-            <span style={{ cursor: 'default' }}>Terms of Service</span>
-          </div>
+          <span>Open-source portfolio build</span>
         </footer>
       </div>
 

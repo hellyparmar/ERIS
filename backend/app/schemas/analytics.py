@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional
 
+
 class MetricData(BaseModel):
     totalRevenue: float = Field(..., description="Total revenue for the organization")
     avgDailySales: float = Field(..., description="Average daily sales volume over the last 30 days")
@@ -17,13 +18,14 @@ class MetricData(BaseModel):
                 "inventoryValue": 85000.0,
                 "stockoutRisk": 12.0,
                 "alertCount": 5,
-                "criticalAlertCount": 1
+                "criticalAlertCount": 1,
             }
         }
     }
 
+
 class AlertItem(BaseModel):
-    id: int = Field(..., description="Unique ID of the alert")
+    id: str = Field(..., description="Unique ID of the alert")
     severity: str = Field(..., description="Severity level (critical, warning, info)")
     message: str = Field(..., description="Descriptive alert message")
     timestamp: str = Field(..., description="ISO 8601 timestamp of when the alert was created")
@@ -34,10 +36,11 @@ class AlertItem(BaseModel):
                 "id": 101,
                 "severity": "critical",
                 "message": "Stock for Product 'Laptop Pro' is critically low (2 remaining).",
-                "timestamp": "2024-03-24T10:30:00Z"
+                "timestamp": "2024-03-24T10:30:00Z",
             }
         }
     }
+
 
 class AlertsResponse(BaseModel):
     alerts: List[AlertItem] = Field(..., description="List of unacknowledged alerts")
@@ -47,17 +50,13 @@ class AlertsResponse(BaseModel):
         "json_schema_extra": {
             "example": {
                 "alerts": [
-                    {
-                        "id": 101,
-                        "severity": "critical",
-                        "message": "Stock low",
-                        "timestamp": "2024-03-24T10:30:00Z"
-                    }
+                    {"id": 101, "severity": "critical", "message": "Stock low", "timestamp": "2024-03-24T10:30:00Z"}
                 ],
-                "total": 1
+                "total": 1,
             }
         }
     }
+
 
 class ChartPoint(BaseModel):
     date: str = Field(..., description="The date for this data point (YYYY-MM-DD)")
@@ -65,6 +64,7 @@ class ChartPoint(BaseModel):
     predicted: Optional[float] = Field(None, description="Predicted sales value from AI model")
     lowerBound: Optional[float] = Field(None, description="Lower bound of the prediction interval")
     upperBound: Optional[float] = Field(None, description="Upper bound of the prediction interval")
+
 
 class ChartDataResponse(BaseModel):
     data: List[ChartPoint] = Field(..., description="Time-series data for historical and forecasted sales")
@@ -75,13 +75,15 @@ class ChartDataResponse(BaseModel):
             "example": {
                 "data": [
                     {"date": "2024-03-01", "actual": 5000.0, "predicted": None},
-                    {"date": "2024-04-01", "actual": None, "predicted": 5200.0, "lowerBound": 4800.0, "upperBound": 5600.0}
+                    {
+                        "date": "2024-04-01",
+                        "actual": None,
+                        "predicted": 5200.0,
+                        "lowerBound": 4800.0,
+                        "upperBound": 5600.0,
+                    },
                 ],
-                "metadata": {
-                    "historical_days": 30,
-                    "forecast_days": 15,
-                    "organization_id": "org_123"
-                }
+                "metadata": {"historical_days": 30, "forecast_days": 15, "organization_id": "org_123"},
             }
         }
     }

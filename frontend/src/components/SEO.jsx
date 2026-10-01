@@ -1,7 +1,7 @@
 import { Helmet } from 'react-helmet-async';
 
 const defaultTitle = 'ERIS — Enterprise Retail Intelligence System';
-const defaultDesc = 'Real-time analytics, ML forecasting, AI assistant, and GST compliance for multi-store retail operations. Built with Python, React, and PostgreSQL.';
+const defaultDesc = 'Retail analytics, measured ML forecasting, a grounded AI assistant, and GST reporting for multi-outlet operations.';
 
 export default function SEO({
   title,

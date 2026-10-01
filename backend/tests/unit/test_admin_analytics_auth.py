@@ -1,17 +1,19 @@
 """
-Test Authentication on Admin and Analytics Routers
+Test authentication on Settings and Analytics routers.
 
-Verifies that both admin.py and analytics.py correctly resolve authenticated
+Verifies that settings.py and analytics.py correctly resolve authenticated
 users via app.api.deps.get_current_user using the JWT username 'sub' claim,
 returning 200 OK (not 401 Unauthorized).
 """
 
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 import pytest
 from tests.conftest import _TEST_ADMIN_PW
+
 
 @pytest.fixture
 def auth_headers(client, seed_users):
@@ -22,13 +24,13 @@ def auth_headers(client, seed_users):
     assert token, "No access_token received"
     return {"Authorization": f"Bearer {token}"}
 
-def test_admin_users_endpoint_authenticated(client, auth_headers):
-    """Admin /users endpoint should return 200 with valid admin token"""
-    res = client.get("/api/v1/admin/users", headers=auth_headers)
+
+def test_settings_profile_endpoint_authenticated(client, auth_headers):
+    """Settings profile should return the authenticated user."""
+    res = client.get("/api/v1/settings/profile", headers=auth_headers)
     assert res.status_code == 200
-    users = res.json()
-    assert isinstance(users, list)
-    assert len(users) > 0
+    assert res.json()["email"] == "admin@test.com"
+
 
 def test_analytics_dashboard_summary_authenticated(client, auth_headers):
     """Analytics /dashboard/summary endpoint should return 200 with valid token"""
@@ -37,9 +39,10 @@ def test_analytics_dashboard_summary_authenticated(client, auth_headers):
     data = res.json()
     assert "summary_text" in data
 
+
 def test_unauthenticated_requests_fail(client, seed_users):
     """Requests without authorization header must fail with 401"""
-    res_admin = client.get("/api/v1/admin/users")
-    assert res_admin.status_code == 401
+    res_settings = client.get("/api/v1/settings/profile")
+    assert res_settings.status_code == 401
     res_analytics = client.get("/api/v1/analytics/dashboard/summary")
     assert res_analytics.status_code == 401
