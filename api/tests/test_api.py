@@ -261,3 +261,10 @@ def test_auto_refresh_shifts_stale_demo(seeded):
         # the test database has manual/imported sales by now, so real data must never be shifted
         assert not is_untouched_demo(db)
         assert db.scalar(select(func.max(Sale.sale_date))) >= date.today() - timedelta(days=1)
+
+
+def test_login_lockout_after_repeated_failures(client):
+    for _ in range(5):
+        assert client.post("/api/auth/login", json={"email": "locked@eris.demo", "password": "nope"}).status_code == 401
+    r = client.post("/api/auth/login", json={"email": "locked@eris.demo", "password": "nope"})
+    assert r.status_code == 429

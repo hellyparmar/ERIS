@@ -61,9 +61,26 @@ Series: daily revenue (total, outlet, category) or daily units (product), up to 
 | Prophet | weekly + yearly seasonality and the festival calendar as holidays; with < 2 years of history a smoother yearly term and stiffer trend prevent over-fitting a single season |
 | Ensemble | mean of the two best non-baseline models |
 
-**Selection:** each model is fit on all but the last 28 days and scored on them (WAPE, MAPE, MAE, RMSE, bias).
-The lowest WAPE wins; the winner is refit on the full series. **Intervals:** the 10th/90th percentiles of the
-winner's relative back-test errors give an empirical 80% range — honest about how accurate the model really was.
+**Selection:** every candidate is scored on two consecutive 28-day folds at the end of the history (each fold
+trained only on data before it; WAPE, MAPE, MAE, RMSE, bias). The ensemble of the two best is scored too.
+Prophet is the incumbent and is replaced only when a challenger's WAPE is more than 10% lower; the winner is refit
+on the full series. **Intervals:** the 10th/90th percentiles of the winner's relative back-test errors give an
+empirical 80% range — honest about how accurate the model really was.
+
+**Why this rule:** a rolling-origin study (`python -m app.evaluation`, results in
+[FORECAST_EVALUATION.md](FORECAST_EVALUATION.md)) compared selection strategies on 26 series × 3 origins:
+
+| Strategy | Mean WAPE |
+|---|---|
+| Seasonal naive baseline | 18.96% |
+| Pick best on one 28-day window | 15.97% |
+| Pick best on two 28-day folds | 15.73% |
+| Two folds + Prophet incumbent, 10% switch margin (used) | 15.27% |
+| Always Prophet | 15.25% |
+
+Picking the winner of a single short window chases noise; the incumbent rule keeps Prophet's strong average while
+still switching when another model is clearly better for a particular series (and when Prophet fails or history
+is too short).
 
 **Stock plan (product forecasts):** days of cover = stock ÷ forecast daily demand; projected stock-out = first day
 cumulative forecast exceeds stock; order quantity = forecast over (lead time + 7 days) + safety stock − stock,

@@ -34,7 +34,22 @@ def _make_engine(url: str):
             conn.exec_driver_sql("BEGIN")
 
         return engine
-    return create_engine(url, pool_pre_ping=True, pool_size=10, max_overflow=20)
+    _register_numpy_adapters()
+    return create_engine(url, pool_pre_ping=True, pool_size=10, max_overflow=20, insertmanyvalues_page_size=5000)
+
+
+def _register_numpy_adapters() -> None:
+    """Let psycopg2 accept NumPy scalars (pandas/NumPy results flow into inserts and filters)."""
+    try:
+        import numpy as np
+        from psycopg2.extensions import AsIs, register_adapter
+    except ImportError:
+        return
+    for t in (np.int8, np.int16, np.int32, np.int64, np.uint8, np.uint16, np.uint32, np.uint64):
+        register_adapter(t, lambda v: AsIs(int(v)))
+    for t in (np.float16, np.float32, np.float64):
+        register_adapter(t, lambda v: AsIs(repr(float(v))))
+    register_adapter(np.bool_, lambda v: AsIs(bool(v)))
 
 
 engine = _make_engine(settings.DATABASE_URL)

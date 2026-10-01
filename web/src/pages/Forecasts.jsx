@@ -43,7 +43,7 @@ export default function Forecasts() {
 
   return (
     <>
-      <PageHead title="Forecasts" subtitle="Demand and revenue forecasts. Several models are back-tested on the most recent 4 weeks and the most accurate one is used." />
+      <PageHead title="Forecasts" subtitle="Demand and revenue forecasts. Four models are back-tested on the last 8 weeks of every series and the most reliable one is used." />
       <Card>
         <div className="row" style={{ alignItems: 'flex-end', gap: 14 }}>
           <Field label="Forecast"><Seg options={SCOPES} value={scope} onChange={setScope} label="Scope" /></Field>

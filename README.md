@@ -39,8 +39,10 @@ It ships with a realistic demo company, **Urban Harvest Foods** (a food & bevera
 
 - **Forecasting with model selection** — Seasonal-naive baseline, Holt-Winters (statsmodels), recursive gradient
   boosting on lag + calendar + festival features (scikit-learn) and Prophet with an Indian festival calendar.
-  Every series is back-tested on the latest 4 weeks; the lowest-WAPE model (or an ensemble of the best two) is used,
-  and the 80% interval comes from that model's real back-test errors.
+  Every series is back-tested on two 4-week folds; Prophet is kept unless another model (or an ensemble of the
+  best two) beats it by more than 10%, and the 80% interval comes from the chosen model's real back-test errors.
+  A rolling-origin study over 26 series ([docs/FORECAST_EVALUATION.md](docs/FORECAST_EVALUATION.md)) shows
+  **~20% lower error than the seasonal-naive baseline** (15.3% vs 19.0% WAPE).
 - **Inventory optimisation** — reorder point = demand × lead time + safety stock (1.65σ√L ≈ 95% service level),
   order-up-to = lead time + review period, pending POs counted as incoming stock.
 - **Market-basket analysis** — support, confidence and lift for product pairs.
@@ -122,8 +124,16 @@ Everything has a sensible default; see [`api/.env.example`](api/.env.example). M
 ## Development
 
 ```bash
-cd api && pip install -r requirements-dev.txt && ruff check app tests && pytest -q   # 23 API tests
+cd api && pip install -r requirements-dev.txt && ruff check app tests && pytest -q   # 24 API tests
+# run the same suite on PostgreSQL:  TEST_DATABASE_URL=postgresql+psycopg2://user:pass@localhost/eris_test pytest -q
 cd web && npm run lint && npm run build
+```
+
+Forecast evaluation (rolling-origin back-test of all models, ~3 minutes) and the analysis notebook:
+
+```bash
+cd api && python -m app.evaluation          # writes docs/FORECAST_EVALUATION.md, CSV and charts
+jupyter notebook ../notebooks/forecast_evaluation.ipynb
 ```
 
 API documentation is available at `http://localhost:8000/docs` (OpenAPI / Swagger).
@@ -138,7 +148,8 @@ api/                 FastAPI backend
   app/seed/          demo data generator
   tests/             end-to-end API tests
 web/                 React frontend (pages/, components/, lib/)
-docs/                architecture & methodology
+notebooks/           demand-pattern analysis & forecast model evaluation
+docs/                architecture, methodology, evaluation report
 ```
 
 ## About

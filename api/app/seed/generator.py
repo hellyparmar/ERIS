@@ -106,6 +106,40 @@ def _footfall_event_factor(event: tuple[str, int] | None) -> float:
     return 1.15
 
 
+def _bulk_insert(db: Session, model, rows: list[dict]) -> None:
+    """Fast bulk load: COPY on PostgreSQL, chunked executemany elsewhere."""
+    if not rows:
+        return
+    if db.get_bind().dialect.name == "postgresql":
+        import csv
+        import io
+
+        cols = list(rows[0].keys())
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        for r in rows:
+            w.writerow(["\\N" if r[c] is None else r[c] for c in cols])
+        buf.seek(0)
+        cur = db.connection().connection.cursor()
+        cur.copy_expert(f"COPY {model.__tablename__} ({', '.join(cols)}) FROM STDIN WITH (FORMAT csv, NULL '\\N')", buf)
+        return
+    for i in range(0, len(rows), 20000):
+        db.execute(insert(model), rows[i:i + 20000])
+
+
+def _sync_sequences(db: Session) -> None:
+    """Rows were bulk-inserted with explicit ids; move PostgreSQL id sequences past them."""
+    if db.get_bind().dialect.name != "postgresql":
+        return
+    from sqlalchemy import text
+
+    for table in ("customers", "sales", "sale_items", "purchase_orders", "purchase_order_items", "inventory",
+                  "stock_movements", "products", "outlets", "suppliers", "categories", "users", "organization"):
+        db.execute(text(f"SELECT setval(pg_get_serial_sequence('{table}', 'id'), "
+                        f"COALESCE((SELECT MAX(id) FROM {table}), 0) + 1, false)"))
+    db.commit()
+
+
 def reset_all(db: Session) -> None:
     for model in (
         ChatMessage,
@@ -355,11 +389,8 @@ def generate_demo_data(db: Session, days: int = 540, seed: int = 42, end_date: d
                 })
 
     log(f"  simulated {len(sale_rows):,} sales / {len(item_rows):,} line items ({time.time() - t0:.1f}s)")
-    chunk = 20000
-    for i in range(0, len(sale_rows), chunk):
-        db.execute(insert(Sale), sale_rows[i:i + chunk])
-    for i in range(0, len(item_rows), chunk):
-        db.execute(insert(SaleItem), item_rows[i:i + chunk])
+    _bulk_insert(db, Sale, sale_rows)
+    _bulk_insert(db, SaleItem, item_rows)
     db.commit()
     log(f"  sales written ({time.time() - t0:.1f}s)")
 
@@ -431,6 +462,7 @@ def generate_demo_data(db: Session, days: int = 540, seed: int = 42, end_date: d
     db.execute(insert(PurchaseOrderItem), po_item_rows)
     db.commit()
 
+    _sync_sequences(db)
     counts = {
         "outlets": len(outlets), "products": len(products), "suppliers": len(suppliers),
         "customers": len(customer_rows), "sales": len(sale_rows), "sale_items": len(item_rows),

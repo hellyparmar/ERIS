@@ -1,6 +1,8 @@
+import threading
+import time
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -22,11 +24,35 @@ def user_dict(u: User) -> dict:
     }
 
 
+# Brute-force protection: 5 failed attempts per email + client within 15 minutes locks that pair out.
+MAX_FAILURES, WINDOW_SECONDS = 5, 15 * 60
+_failures: dict[tuple[str, str], list[float]] = {}
+_failures_lock = threading.Lock()
+
+
+def _recent_failures(key: tuple[str, str]) -> list[float]:
+    now = time.time()
+    with _failures_lock:
+        hits = [t for t in _failures.get(key, []) if now - t < WINDOW_SECONDS]
+        _failures[key] = hits
+        return hits
+
+
 @router.post("/auth/login")
-def login(body: LoginIn, db: Session = Depends(get_db)):
-    user = db.scalar(select(User).where(func.lower(User.email) == body.email.strip().lower()))
+def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
+    email = body.email.strip().lower()
+    key = (email, request.client.host if request.client else "?")
+    hits = _recent_failures(key)
+    if len(hits) >= MAX_FAILURES:
+        wait = int(WINDOW_SECONDS - (time.time() - hits[0])) // 60 + 1
+        raise HTTPException(429, f"Too many failed sign-in attempts. Try again in {wait} minute(s).")
+    user = db.scalar(select(User).where(func.lower(User.email) == email))
     if user is None or not verify_password(body.password, user.password_hash):
+        with _failures_lock:
+            _failures.setdefault(key, []).append(time.time())
         raise HTTPException(401, "Incorrect email or password")
+    with _failures_lock:
+        _failures.pop(key, None)
     if not user.is_active:
         raise HTTPException(403, "This account has been deactivated")
     user.last_login_at = datetime.now()

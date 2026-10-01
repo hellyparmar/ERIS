@@ -18,6 +18,7 @@ from app.state import seeding_state, set_seeding
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("eris")
+DEFAULT_SECRET = "dev-only-secret-change-me-in-production-0123456789"
 WEB_DIST = Path(__file__).resolve().parents[2] / "web" / "dist"
 
 
@@ -26,6 +27,10 @@ def _bootstrap() -> None:
     from app.models import User
     from app.seed.refresh import shift_demo_dates
 
+    if settings.JWT_SECRET_KEY == DEFAULT_SECRET or len(settings.JWT_SECRET_KEY) < 32:
+        if settings.ENVIRONMENT == "production":
+            raise RuntimeError("Set a strong JWT_SECRET_KEY (32+ random characters) before running in production")
+        log.warning("Using a development JWT secret - set JWT_SECRET_KEY for any shared deployment")
     create_tables()
     with SessionLocal() as db:
         has_users = db.scalar(select(func.count(User.id))) or 0

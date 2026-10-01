@@ -1,7 +1,7 @@
 """Demand & revenue forecasting.
 
-Four models compete on every series; each is back-tested on a hold-out window (the most recent
-`TEST_DAYS` days) and the model with the lowest WAPE wins ("auto"). Prediction intervals come from the
+Four models compete on every series; each is back-tested on the most recent 2 x `TEST_DAYS` days (two
+consecutive folds) and the model - or the ensemble of the best two - with the lowest WAPE wins ("auto"). Prediction intervals come from the
 winning model's empirical back-test errors, so they reflect how accurate the model really was.
 
 * Seasonal naive - "same weekday last weeks" baseline every model must beat
@@ -34,6 +34,8 @@ logging.getLogger("prophet").setLevel(logging.ERROR)
 logging.getLogger("prophet.plot").setLevel(logging.CRITICAL)
 
 TEST_DAYS = 28
+INCUMBENT = "prophet"
+SWITCH_MARGIN = 0.10  # a challenger must cut back-test WAPE by >10% to replace the incumbent
 MAX_HISTORY_DAYS = 730
 MODEL_LABELS = {
     "seasonal_naive": "Seasonal naive (baseline)",
@@ -226,17 +228,21 @@ def run_forecast(series: pd.Series, horizon: int, model: str = "auto") -> dict:
         raise ValueError("Not enough sales history to forecast (need at least 3 weeks of data)")
 
     test_days = min(TEST_DAYS, max(7, n // 5))
-    train, test = series.iloc[:-test_days], series.iloc[-test_days:]
+    # Two consecutive validation folds when history allows: choosing on ~8 weeks of errors is far more
+    # stable than on a single 4-week window.
+    n_folds = 2 if n - 2 * test_days >= 120 else 1
+    folds = [(n - (k + 1) * test_days, n - k * test_days) for k in range(n_folds - 1, -1, -1)]
     if n < 120 and "prophet" in models:
         models.remove("prophet")  # Prophet needs a longer history to be reliable
     candidates = models if model == "auto" else sorted({model, "seasonal_naive"}, key=models.index)
+    actual = np.concatenate([series.values[a:b] for a, b in folds])
 
     evaluation, test_preds = [], {}
     for name in candidates:
         t0 = time.time()
         try:
-            pred = MODEL_FUNCS[name](train, test_days)
-            m = _metrics(test.values, pred)
+            pred = np.concatenate([MODEL_FUNCS[name](series.iloc[:a], b - a) for a, b in folds])
+            m = _metrics(actual, pred)
             m.update(model=name, label=MODEL_LABELS[name], seconds=round(time.time() - t0, 2))
             evaluation.append(m)
             test_preds[name] = pred
@@ -251,20 +257,31 @@ def run_forecast(series: pd.Series, horizon: int, model: str = "auto") -> dict:
     members = [e["model"] for e in sorted(scored, key=lambda e: e["wape"]) if e["model"] != "seasonal_naive"][:2]
     if model == "auto" and len(members) == 2:
         pred = (test_preds[members[0]] + test_preds[members[1]]) / 2
-        m = _metrics(test.values, pred)
+        m = _metrics(actual, pred)
         m.update(model="ensemble", label=f"Ensemble ({MODEL_LABELS[members[0]].split(' (')[0]} + "
                                          f"{MODEL_LABELS[members[1]].split(' (')[0]})", seconds=0.0)
         evaluation.append(m)
         scored.append(m)
         test_preds["ensemble"] = pred
-    best = model if model != "auto" and model in test_preds else min(scored, key=lambda e: e["wape"])["model"]
+    if model != "auto" and model in test_preds:
+        best = model
+    else:
+        # Incumbent rule: back-test scores are noisy, so keep the model with the strongest long-run record
+        # (Prophet, see docs/FORECAST_EVALUATION.md) unless a challenger is clearly better.
+        top = min(scored, key=lambda e: e["wape"])
+        incumbent = next((e for e in scored if e["model"] == INCUMBENT), None)
+        best = top["model"]
+        if incumbent and top is not incumbent and top["wape"] > incumbent["wape"] * (1 - SWITCH_MARGIN):
+            best = INCUMBENT
     for e in evaluation:
         e["selected"] = e["model"] == best
 
-    # Empirical 80% interval from back-test relative errors of the chosen model.
-    actual, pred = test.values, test_preds[best]
+    # Empirical 80% interval from all back-test relative errors of the chosen model.
+    pred = test_preds[best]
     rel = (actual - pred) / np.where(pred > 0, pred, 1)
     lo_q, hi_q = np.quantile(rel, 0.1), np.quantile(rel, 0.9)
+    test = series.iloc[folds[-1][0]:]
+    actual, pred = test.values, pred[-test_days:]
 
     if best == "ensemble":
         final = (MODEL_FUNCS[members[0]](series, horizon) + MODEL_FUNCS[members[1]](series, horizon)) / 2
@@ -282,7 +299,7 @@ def run_forecast(series: pd.Series, horizon: int, model: str = "auto") -> dict:
     ]
     label = next(e["label"] for e in evaluation if e["model"] == best)
     return {"model": best, "model_label": label, "evaluation": evaluation,
-            "forecast": forecast, "backtest": backtest, "test_days": test_days}
+            "forecast": forecast, "backtest": backtest, "test_days": test_days * n_folds}
 
 
 def forecast_series(db: Session, spec: SeriesSpec, horizon: int = 30, model: str = "auto",
@@ -357,10 +374,10 @@ def _insights(r: dict, spec: SeriesSpec) -> list[str]:
     base = next((e for e in r["evaluation"] if e["model"] == "seasonal_naive" and e.get("wape") is not None), None)
     if base and sel["model"] != "seasonal_naive" and base["wape"]:
         gain = (base["wape"] - sel["wape"]) / base["wape"] * 100
-        out.append(f"{sel['label']} was most accurate in back-testing (WAPE {sel['wape']:.1f}%), "
+        out.append(f"{sel['label']} was selected after back-testing on the last 8 weeks (WAPE {sel['wape']:.1f}%), "
                    f"{gain:.0f}% better than the naive baseline.")
     else:
-        out.append(f"{sel['label']} was most accurate in back-testing (WAPE {sel['wape']:.1f}%).")
+        out.append(f"{sel['label']} was selected after back-testing (WAPE {sel['wape']:.1f}%).")
     return out
 
 
