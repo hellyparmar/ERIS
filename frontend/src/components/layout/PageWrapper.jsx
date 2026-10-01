@@ -40,8 +40,6 @@ export const PageHeader = ({
 
     return animate ? (
         <div
-            }
-            }
         >
             {headerContent}
         </div>

@@ -14,7 +14,6 @@ const ThemeToggle = ({ className = "" }) => {
         <button
             onClick={toggleTheme}
             className={`relative p-2 rounded-lg bg-secondary hover:bg-secondary/80 transition-colors ${className}`}
-            }
             aria-label={`Switch to ${isDark ? 'light' : 'dark'} mode`}
             title={`Switch to ${isDark ? 'light' : 'dark'} mode`}
         >

@@ -1,3 +1,5 @@
+import React from 'react';
+
 /**
  * Performance Monitoring Utility
  * Tracks and reports key performance metrics
@@ -50,6 +52,7 @@ class PerformanceMonitor {
         if (import.meta.env.PROD) {
             this.sendToAnalytics('page_load', this.metrics.pageLoad);
         }
+    }
 
     measureRouteChange(routeName) {
         const startTime = performance.now();
@@ -124,6 +127,7 @@ class PerformanceMonitor {
                 } else if (entry.entryType === 'paint') {
                     this.trackPaint(entry);
                 }
+            }
         });
 
         observer.observe({ entryTypes: ['resource', 'paint', 'navigation'] });
@@ -148,6 +152,7 @@ class PerformanceMonitor {
                     size,
                 });
             }
+        }
     }
 
     trackPaint(entry) {
@@ -161,6 +166,7 @@ class PerformanceMonitor {
                 startTime: entry.startTime,
             });
         }
+    }
 
     // Track custom metrics
     trackCustomMetric(name, value, unit = 'ms') {
@@ -181,6 +187,7 @@ class PerformanceMonitor {
                 unit,
             });
         }
+    }
 
     // Send to analytics service
     sendToAnalytics(eventName, data) {
@@ -203,6 +210,7 @@ class PerformanceMonitor {
                 // Silently fail
             });
         }
+    }
 
     // Get all metrics
     getMetrics() {
@@ -230,6 +238,7 @@ class PerformanceMonitor {
             TBT: navigation ? navigation.domContentLoadedEventEnd - navigation.domContentLoadedEventStart : null,
         };
     }
+}
 
 // Create singleton instance
 const performanceMonitor = new PerformanceMonitor();

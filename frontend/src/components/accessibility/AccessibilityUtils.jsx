@@ -1,7 +1,7 @@
-"""
-WCAG 2.1 Accessibility Utilities
-Comprehensive accessibility support for R - DIOS frontend
-"""
+/**
+ * WCAG 2.1 Accessibility Utilities
+ * Comprehensive accessibility support for the ERIS frontend
+ */
 
 import React from 'react';
 
@@ -114,6 +114,7 @@ export const useFocusTrap = (isActive) => {
                     e.preventDefault();
                     firstElement.focus();
                 }
+            }
         };
 
         // Focus first element

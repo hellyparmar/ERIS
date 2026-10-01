@@ -1,3 +1,5 @@
+import React from 'react';
+
 /**
  * Real-time Updates Service
  * Manages WebSocket connections for live data updates
@@ -66,6 +68,7 @@ class RealtimeService {
             console.log(`Attempting reconnect in ${delay}ms...`);
             setTimeout(() => this.connect().catch(() => {}), delay);
         }
+    }
 
     /**
      * Send heartbeat to keep connection alive
@@ -80,6 +83,7 @@ class RealtimeService {
         if (this.heartbeatInterval) {
             clearInterval(this.heartbeatInterval);
         }
+    }
 
     /**
      * Subscribe to data updates
@@ -118,6 +122,7 @@ class RealtimeService {
                     timestamp: Date.now()
                 });
             }
+        }
     }
 
     /**
@@ -141,6 +146,7 @@ class RealtimeService {
                 }
             });
         }
+    }
 
     /**
      * Send message through WebSocket
@@ -152,6 +158,7 @@ class RealtimeService {
             // Queue message if not connected
             this.messageQueue.push(message);
         }
+    }
 
     /**
      * Flush queued messages when connection is established
@@ -161,6 +168,7 @@ class RealtimeService {
             const message = this.messageQueue.shift();
             this.send(message);
         }
+    }
 
     /**
      * Disconnect WebSocket
@@ -184,6 +192,7 @@ class RealtimeService {
             queuedMessages: this.messageQueue.length
         };
     }
+}
 
 // Export singleton instance
 export const realtimeService = new RealtimeService();

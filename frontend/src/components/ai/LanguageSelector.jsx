@@ -40,7 +40,6 @@ const LanguageSelector = ({ currentLanguage, scriptMode, onScriptToggle, onLangu
                 <>
                     <div className="w-px h-6 bg-gray-300 dark:bg-gray-600" />
                     <button
-                        }
                         onClick={onScriptToggle}
                         className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${scriptMode === 'roman'
                             ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'

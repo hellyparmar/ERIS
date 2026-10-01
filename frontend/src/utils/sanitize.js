@@ -168,6 +168,7 @@ export const sanitizeFilename = (filename) => {
         // Remove path separators
         .replace(/[/\\]/g, '')
         // Remove dangerous characters
+        // eslint-disable-next-line no-control-regex -- intentionally strips control characters
         .replace(/[<>:"|?*\x00-\x1f]/g, '')
         // Limit length
         .substring(0, 255)

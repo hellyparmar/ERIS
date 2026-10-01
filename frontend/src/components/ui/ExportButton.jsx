@@ -1,6 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Download, FileSpreadsheet, FileText, X, ChevronDown, File } from 'lucide-react';
-import { exportToCSV, exportToExcel, exportToPDF } from '@/lib/api';
+
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 /**
  * ExportButton Component

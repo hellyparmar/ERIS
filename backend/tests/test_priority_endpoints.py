@@ -3,6 +3,8 @@ import asyncio
 import json
 import uuid
 
+import pytest
+
 BASE_URL = "http://localhost:8000/api/v1"
 
 async def test_priority_endpoints():
@@ -18,7 +20,10 @@ async def test_priority_endpoints():
             "organization_name": f"Test Org {uuid.uuid4().hex[0:4]}",
             "role": "ADMIN"
         }
-        res = await client.post(f"{BASE_URL}/auth/register", json=reg_payload)
+        try:
+            res = await client.post(f"{BASE_URL}/auth/register", json=reg_payload)
+        except httpx.ConnectError:
+            pytest.skip(f"Integration test: requires a running API server at {BASE_URL}")
         if res.status_code in [200, 201]:
             print("✅ Auth Register: Success")
         else:

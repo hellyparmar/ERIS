@@ -12,6 +12,7 @@ export function register(config) {
             registerValidSW(swUrl, config);
         });
     }
+}
 
 function registerValidSW(swUrl, config) {
     navigator.serviceWorker
@@ -44,6 +45,7 @@ function registerValidSW(swUrl, config) {
                             if (config && config.onSuccess) {
                                 config.onSuccess(registration);
                             }
+                        }
                     }
                 };
             };
@@ -63,6 +65,7 @@ export function unregister() {
                 console.error(error.message);
             });
     }
+}
 
 /**
  * Check if service worker is updated
@@ -73,6 +76,7 @@ export function checkForUpdates() {
             registration.update();
         });
     }
+}
 
 /**
  * Skip waiting and activate new service worker immediately
@@ -81,3 +85,4 @@ export function skipWaiting() {
     if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
         navigator.serviceWorker.controller.postMessage({ type: 'SKIP_WAITING' });
     }
+}

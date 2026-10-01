@@ -5,7 +5,7 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  globalIgnores(['dist', 'node_modules', 'storybook-static']),
   {
     files: ['**/*.{js,jsx}'],
     extends: [
@@ -23,7 +23,22 @@ export default defineConfig([
       },
     },
     rules: {
-      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]', caughtErrors: 'none' }],
+      'react-refresh/only-export-components': 'warn',
+      // React Compiler-oriented rules from eslint-plugin-react-hooks v7: surface as warnings, not blockers
+      'react-hooks/set-state-in-effect': 'warn',
+      'react-hooks/immutability': 'warn',
+      'react-hooks/static-components': 'warn',
+      'react-hooks/preserve-manual-memoization': 'warn',
+      'react-hooks/purity': 'warn',
     },
+  },
+  {
+    files: ['vite.config.js', 'tailwind.config.js', 'postcss.config.js'],
+    languageOptions: { globals: globals.node },
+  },
+  {
+    files: ['public/service-worker.js'],
+    languageOptions: { globals: globals.serviceworker },
   },
 ])

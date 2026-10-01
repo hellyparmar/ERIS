@@ -80,8 +80,6 @@ const LiveRetailMap = () => {
                     {pulses.map(pulse => (
                         <div
                             key={pulse.id}
-                            }
-                            }
                             className={`absolute w-8 h-8 rounded-full ${pulse.color} blur-sm`}
                             style={{
                                 left: pulse.x,
@@ -93,8 +91,6 @@ const LiveRetailMap = () => {
                     {pulses.map(pulse => (
                         <div
                             key={`dot-${pulse.id}`}
-                            }
-                            }
                             className={`absolute w-2 h-2 rounded-full bg-white shadow-lg`}
                             style={{
                                 left: pulse.x,

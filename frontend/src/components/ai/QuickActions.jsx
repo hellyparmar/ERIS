@@ -95,7 +95,6 @@ const QuickActions = ({ onActionClick, currentLanguage }) => {
             {currentActions.map((action, index) => (
                 <button
                     key={index}
-                    }
                     onClick={() => onActionClick(action.query)}
                     className="flex items-center gap-3 p-3 bg-white/5 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-lg hover:shadow-md dark:hover:shadow-blue-500/20 dark:hover:border-blue-500/50 transition-all text-left group"
                 >
