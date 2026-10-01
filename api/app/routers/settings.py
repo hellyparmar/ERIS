@@ -1,0 +1,109 @@
+import threading
+
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
+
+from app.config import settings
+from app.db import SessionLocal, get_db
+from app.models import Customer, Organization, Outlet, Product, PurchaseOrder, Sale, SaleItem, Supplier, User
+from app.schemas import OrganizationIn
+from app.security import get_current_user, require_admin
+from app.services import analytics as A
+from app.services import forecasting as F
+from app.services.assistant import llm
+from app.state import seeding_state
+
+router = APIRouter(prefix="/api/settings", tags=["settings"])
+
+
+def org_dict(org: Organization) -> dict:
+    return {k: getattr(org, k) for k in ("id", "name", "industry", "currency", "currency_symbol", "timezone", "email",
+                                         "phone", "address", "tax_id", "low_stock_cover_days")}
+
+
+@router.get("/organization")
+def get_org(_: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    org = db.scalar(select(Organization))
+    if org is None:
+        raise HTTPException(404, "Organization not set up")
+    return org_dict(org)
+
+
+@router.put("/organization")
+def update_org(body: OrganizationIn, _: User = Depends(require_admin), db: Session = Depends(get_db)):
+    org = db.scalar(select(Organization))
+    if org is None:
+        org = Organization(**body.model_dump())
+        db.add(org)
+    else:
+        for k, v in body.model_dump().items():
+            setattr(org, k, v)
+    db.commit()
+    return org_dict(org)
+
+
+@router.get("/system")
+def system_info(_: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    counts = {
+        "outlets": db.scalar(select(func.count(Outlet.id))),
+        "products": db.scalar(select(func.count(Product.id))),
+        "suppliers": db.scalar(select(func.count(Supplier.id))),
+        "customers": db.scalar(select(func.count(Customer.id))),
+        "sales": db.scalar(select(func.count(Sale.id))),
+        "sale_items": db.scalar(select(func.count(SaleItem.id))),
+        "purchase_orders": db.scalar(select(func.count(PurchaseOrder.id))),
+        "users": db.scalar(select(func.count(User.id))),
+    }
+    by_source = dict(db.execute(select(Sale.source, func.count(Sale.id)).group_by(Sale.source)).all())
+    return {
+        "app": settings.APP_NAME,
+        "database": "SQLite" if settings.is_sqlite else "PostgreSQL",
+        "counts": counts,
+        "sales_by_source": by_source,
+        "data_from": (A.first_sale_date(db) or None),
+        "data_to": (A.latest_sale_date(db) or None),
+        "forecast_models": F.available_models(),
+        "assistant": llm.status(),
+        "seeding": seeding_state(),
+    }
+
+
+def _run_seed(days: int) -> None:
+    from app.seed.generator import generate_demo_data
+    from app.state import set_seeding
+
+    set_seeding(True, "Generating demo data...")
+    try:
+        with SessionLocal() as db:
+            generate_demo_data(db, days=days, seed=settings.SEED_RANDOM_STATE,
+                               log=lambda m: set_seeding(True, m.strip()))
+        F.clear_cache()
+        set_seeding(False, "Demo data ready")
+    except Exception as exc:  # pragma: no cover - surfaced through status
+        set_seeding(False, f"Demo data generation failed: {exc}")
+
+
+@router.post("/demo-data")
+def regenerate_demo(_: User = Depends(require_admin)):
+    """Wipe everything and regenerate the demo organization (runs in the background, ~1 minute)."""
+    if seeding_state()["running"]:
+        raise HTTPException(409, "Demo data generation is already running")
+    threading.Thread(target=_run_seed, args=(settings.SEED_DAYS,), daemon=True).start()
+    return {"started": True, "message": "Generating demo data. You will be signed out when it finishes - log in "
+                                        "again with the demo accounts."}
+
+
+@router.post("/clear-transactions")
+def clear_transactions(admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    """Start fresh with your own data: removes all sales, purchase orders, stock levels and customers but keeps
+    outlets, products, suppliers and users."""
+    from sqlalchemy import delete
+
+    from app.models import ChatMessage, InventoryItem, PurchaseOrderItem, StockMovement
+
+    for model in (ChatMessage, StockMovement, PurchaseOrderItem, PurchaseOrder, SaleItem, Sale, InventoryItem, Customer):
+        db.execute(delete(model))
+    db.commit()
+    F.clear_cache()
+    return {"ok": True}
