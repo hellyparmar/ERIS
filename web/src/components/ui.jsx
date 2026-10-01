@@ -1,0 +1,247 @@
+import { useEffect, useMemo, useState } from 'react'
+import { AlertTriangle, ArrowDownRight, ArrowUpRight, ChevronLeft, ChevronRight, Info, Inbox, X, XCircle } from 'lucide-react'
+import { formatValue, pct, titleCase } from '../lib/format'
+
+export function Card({ title, subtitle, actions, children, className = '', flush = false }) {
+  return (
+    <section className={`card ${flush ? 'flush' : ''} ${className}`}>
+      {(title || actions) && (
+        <div className="card-head">
+          <div>
+            {title && <h2>{title}</h2>}
+            {subtitle && <p>{subtitle}</p>}
+          </div>
+          {actions && <div className="row">{actions}</div>}
+        </div>
+      )}
+      {children}
+    </section>
+  )
+}
+
+export function PageHead({ title, subtitle, children }) {
+  return (
+    <div className="page-head">
+      <div>
+        <h1>{title}</h1>
+        {subtitle && <p>{subtitle}</p>}
+      </div>
+      {children && <div className="page-actions">{children}</div>}
+    </div>
+  )
+}
+
+export function Delta({ value, inverse = false, suffix = '' }) {
+  if (value === null || value === undefined) return <span className="muted small">no comparison</span>
+  const good = inverse ? value < 0 : value >= 0
+  const Icon = value >= 0 ? ArrowUpRight : ArrowDownRight
+  return (
+    <span className={`delta ${good ? 'up' : 'down'}`}>
+      <Icon size={14} aria-hidden="true" />
+      {pct(value)}{suffix}
+    </span>
+  )
+}
+
+export function Kpi({ label, value, change, hint, icon: Icon, loading }) {
+  return (
+    <div className="card kpi">
+      <div className="kpi-label">{Icon && <Icon size={16} aria-hidden="true" />}{label}</div>
+      {loading ? <div className="skeleton" style={{ height: 32, width: '70%' }} /> : <div className="kpi-value">{value}</div>}
+      <div className="kpi-foot">{change !== undefined && <Delta value={change} />}{hint && <span>{hint}</span>}</div>
+    </div>
+  )
+}
+
+const STATUS = {
+  ok: ['good', 'In stock'], low: ['warn', 'Low'], out_of_stock: ['bad', 'Out of stock'], no_stock: ['', 'Not stocked'],
+  completed: ['good', 'Completed'], void: ['bad', 'Void'], ordered: ['info', 'Ordered'], received: ['good', 'Received'],
+  cancelled: ['', 'Cancelled'], overdue: ['bad', 'Overdue'], critical: ['bad', 'Critical'], soon: ['warn', 'Soon'],
+  active: ['good', 'Active'], inactive: ['', 'Inactive'], admin: ['info', 'Admin'], manager: ['good', 'Manager'], staff: ['', 'Staff'],
+}
+
+export function StatusBadge({ status }) {
+  const [tone, label] = STATUS[status] || ['', titleCase(status)]
+  return <span className={`badge ${tone}`}>{label}</span>
+}
+
+export function Badge({ tone = '', children }) {
+  return <span className={`badge ${tone}`}>{children}</span>
+}
+
+export function Spinner({ label }) {
+  return <div className="center"><div className="row"><div className="spinner" />{label && <span className="muted">{label}</span>}</div></div>
+}
+
+export function Empty({ title = 'Nothing here yet', children, icon: Icon = Inbox }) {
+  return <div className="empty"><Icon aria-hidden="true" /><b>{title}</b>{children && <div className="small">{children}</div>}</div>
+}
+
+export function ErrorState({ error, onRetry }) {
+  return (
+    <div className="empty">
+      <XCircle aria-hidden="true" />
+      <b>Could not load this data</b>
+      <div className="small">{error?.message}</div>
+      {onRetry && <button className="btn sm" onClick={onRetry}>Try again</button>}
+    </div>
+  )
+}
+
+export function Query({ q, children, loading }) {
+  if (q.isLoading) return loading || <Spinner />
+  if (q.isError) return <ErrorState error={q.error} onRetry={q.refetch} />
+  return children(q.data)
+}
+
+export function Modal({ title, onClose, children, footer, wide = false }) {
+  useEffect(() => {
+    const onKey = (e) => e.key === 'Escape' && onClose()
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+  return (
+    <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div className={`modal ${wide ? 'wide' : ''}`} role="dialog" aria-modal="true" aria-label={title}>
+        <div className="modal-head"><h2>{title}</h2><button className="btn ghost icon" onClick={onClose} aria-label="Close"><X /></button></div>
+        <div className="modal-body">{children}</div>
+        {footer && <div className="modal-foot">{footer}</div>}
+      </div>
+    </div>
+  )
+}
+
+export function Drawer({ title, onClose, children, actions }) {
+  useEffect(() => {
+    const onKey = (e) => e.key === 'Escape' && onClose()
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+  return (
+    <>
+      <div className="drawer-overlay" onClick={onClose} />
+      <aside className="drawer" role="dialog" aria-modal="true" aria-label={title}>
+        <div className="modal-head" style={{ background: 'var(--surface)' }}>
+          <h2>{title}</h2>
+          <div className="row">{actions}<button className="btn ghost icon" onClick={onClose} aria-label="Close"><X /></button></div>
+        </div>
+        <div className="drawer-body">{children}</div>
+      </aside>
+    </>
+  )
+}
+
+export function Tabs({ tabs, value, onChange }) {
+  return (
+    <div className="tabs" role="tablist">
+      {tabs.map((t) => (
+        <button key={t.id} role="tab" aria-selected={value === t.id} className={value === t.id ? 'on' : ''} onClick={() => onChange(t.id)}>
+          {t.icon && <t.icon size={15} aria-hidden="true" />}{t.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+export function Seg({ options, value, onChange, label }) {
+  return (
+    <div className="seg" role="group" aria-label={label}>
+      {options.map((o) => (
+        <button key={o.value} className={value === o.value ? 'on' : ''} aria-pressed={value === o.value} onClick={() => onChange(o.value)}>{o.label}</button>
+      ))}
+    </div>
+  )
+}
+
+export function Field({ label, children, hint, className = '' }) {
+  return <label className={`field ${className}`}><span>{label}</span>{children}{hint && <small>{hint}</small>}</label>
+}
+
+export function AlertItem({ alert }) {
+  const Icon = alert.severity === 'info' ? Info : AlertTriangle
+  return (
+    <div className={`alert ${alert.severity}`}>
+      <Icon aria-hidden="true" />
+      <div><b>{alert.title}</b><p>{alert.message}</p></div>
+    </div>
+  )
+}
+
+/**
+ * Data table with optional client-side sorting.
+ * columns: [{ key, label, format, align, render(row), sortable, width }]
+ */
+export function DataTable({ columns, rows, onRowClick, empty = 'No records found', sortable = true, initialSort, maxHeight }) {
+  const [sort, setSort] = useState(initialSort || null)
+  const sorted = useMemo(() => {
+    if (!sort || !rows) return rows || []
+    const { key, dir } = sort
+    return [...rows].sort((a, b) => {
+      const x = a[key]; const y = b[key]
+      if (x === y) return 0
+      if (x === null || x === undefined) return 1
+      if (y === null || y === undefined) return -1
+      return (x > y ? 1 : -1) * (dir === 'asc' ? 1 : -1)
+    })
+  }, [rows, sort])
+  if (!rows?.length) return <Empty title={empty} />
+  const isNum = (c) => c.align === 'right' || ['currency', 'number', 'percent', 'percent_plain'].includes(c.format)
+  return (
+    <div className="table-wrap" style={maxHeight ? { maxHeight, overflowY: 'auto' } : undefined}>
+      <table className="table">
+        <thead>
+          <tr>
+            {columns.map((c) => {
+              const canSort = sortable && c.sortable !== false && !c.render
+              return (
+                <th key={c.key} className={`${isNum(c) ? 'num' : ''} ${canSort ? 'sortable' : ''}`} style={{ width: c.width }}
+                  onClick={canSort ? () => setSort((s) => ({ key: c.key, dir: s?.key === c.key && s.dir === 'desc' ? 'asc' : 'desc' })) : undefined}
+                  aria-sort={sort?.key === c.key ? (sort.dir === 'asc' ? 'ascending' : 'descending') : undefined}>
+                  {c.label}{sort?.key === c.key ? (sort.dir === 'asc' ? ' ↑' : ' ↓') : ''}
+                </th>
+              )
+            })}
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map((r, i) => (
+            <tr key={r.id ?? i} className={onRowClick ? 'clickable' : ''} onClick={onRowClick ? () => onRowClick(r) : undefined}>
+              {columns.map((c) => (
+                <td key={c.key} className={isNum(c) ? 'num' : ''}>
+                  {c.render ? c.render(r) : c.format === 'status' ? <StatusBadge status={r[c.key]} /> : formatValue(r[c.key], c.format)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+export function Pager({ page, pages, total, onPage, label = 'records' }) {
+  return (
+    <div className="pager">
+      <span>{total?.toLocaleString('en-IN')} {label}</span>
+      <div className="row">
+        <button className="btn sm icon" disabled={page <= 1} onClick={() => onPage(page - 1)} aria-label="Previous page"><ChevronLeft /></button>
+        <span>Page {page} of {pages}</span>
+        <button className="btn sm icon" disabled={page >= pages} onClick={() => onPage(page + 1)} aria-label="Next page"><ChevronRight /></button>
+      </div>
+    </div>
+  )
+}
+
+export function useDebounced(value, ms = 300) {
+  const [v, setV] = useState(value)
+  useEffect(() => {
+    const t = setTimeout(() => setV(value), ms)
+    return () => clearTimeout(t)
+  }, [value, ms])
+  return v
+}
+
+export function Meter({ value, max, color = 'var(--s1)' }) {
+  const w = max ? Math.max(2, Math.min(100, (value / max) * 100)) : 0
+  return <div className="bar-meter" aria-hidden="true"><i style={{ width: `${w}%`, background: color }} /></div>
+}

@@ -401,7 +401,7 @@ def generate_demo_data(db: Session, days: int = 540, seed: int = 42, end_date: d
         for o_idx, o in enumerate(outlets):
             for s in suppliers:
                 order_date = end_date - timedelta(days=week * 7 + int(rng.integers(0, 3)))
-                if order_date < outlet_meta[o_idx]["opened"]:
+                if order_date < outlet_meta[o_idx]["opened"] or (order_date - start_date).days < 14:
                     continue
                 window = units_sold[o_idx, :, max(0, (order_date - start_date).days - 14):(order_date - start_date).days]
                 weekly = window.mean(axis=1) * 7 if window.size else np.zeros(n_products)

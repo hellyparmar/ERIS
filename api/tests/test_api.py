@@ -232,3 +232,32 @@ def test_assistant_answers_core_questions(client, admin):
     assert r["intent"] == "sales_summary" and "Koregaon Park" in r["answer"]
     history = client.get("/api/assistant/history", headers=admin).json()
     assert len(history) >= 2
+
+
+def test_assistant_uses_llm_when_rules_are_unsure(client, admin, monkeypatch):
+    """With a local LLM available, low-confidence questions are routed through it (mocked here)."""
+    from app.services.assistant import llm
+
+    monkeypatch.setattr(llm, "status", lambda force=False: {"available": True, "model": "mock", "provider": "ollama", "error": None})
+    monkeypatch.setattr(llm, "classify", lambda q, o, c: {"intent": "top_products", "period": "last 7 days", "outlets": ["Bandra"],
+                                                          "category": None, "product": None, "top_n": 3, "horizon_days": None})
+    monkeypatch.setattr(llm, "general_answer", lambda q, facts, org: "Mocked advice")
+    r = client.post("/api/assistant/chat", headers=admin, json={"message": "gimme the stars of bandra lately"}).json()
+    assert r["engine"] == "rules+llm" and r["intent"] == "top_products"
+    assert "Bandra" in r["answer"] and "last 7 days" in r["answer"]
+    r = client.post("/api/assistant/chat", headers=admin, json={"message": "tell me a joke"}).json()
+    assert r["intent"] in ("general", "top_products")
+
+
+def test_auto_refresh_shifts_stale_demo(seeded):
+    from datetime import timedelta
+
+    from sqlalchemy import func, select
+
+    from app.models import Sale
+    from app.seed.refresh import is_untouched_demo
+
+    with SessionLocal() as db:
+        # the test database has manual/imported sales by now, so real data must never be shifted
+        assert not is_untouched_demo(db)
+        assert db.scalar(select(func.max(Sale.sale_date))) >= date.today() - timedelta(days=1)

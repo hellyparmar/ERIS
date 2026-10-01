@@ -420,6 +420,7 @@ def product_stock_plan(db: Session, product_id: int, forecast: dict, outlet_ids:
         "lead_time_days": lead,
         "safety_stock": round(safety, 1),
         "recommended_order_qty": recommended,
+        "reorder_by": (date.fromisoformat(stockout) - timedelta(days=lead + 1)).isoformat() if stockout else None,
         "unit": p.unit,
     }
 

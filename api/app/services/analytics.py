@@ -191,7 +191,14 @@ def revenue_series(db: Session, rng: DateRange, outlet_ids: list[int] | None = N
     if granularity in ("week", "month"):
         rule = "W-MON" if granularity == "week" else "MS"
         label = "left" if granularity == "week" else None
-        df = (df.set_index("d").resample(rule, label=label or "left", closed="left").sum().reset_index())
+        counts = df.set_index("d").resample(rule, label=label or "left", closed="left")["revenue"].count()
+        df = df.set_index("d").resample(rule, label=label or "left", closed="left").sum().reset_index()
+        # Drop partial weeks at either edge (they look like false dips); keep a partial current month.
+        full = 7 if granularity == "week" else None
+        if full and len(df) > 2:
+            keep = counts.values >= full
+            keep[1:-1] = True
+            df = df[keep]
     return [
         {"date": r.d.date().isoformat(), "revenue": round(float(r.revenue), 2), "orders": int(r.orders),
          "units": round(float(r.units), 1), "profit": round(float(r.profit), 2)}

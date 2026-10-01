@@ -426,7 +426,8 @@ def forecast(c: Ctx) -> dict:
             ans += (f" Recommended order: **{plan['recommended_order_qty']} {plan['unit']}** "
                     f"(covers lead time of {plan['lead_time_days']} days + 1 week, with safety stock).")
         else:
-            ans += " No reorder needed right now."
+            ans += (f" No order needed yet - place one by **{plan['reorder_by']}** to avoid running out."
+                    if plan["reorder_by"] else " No reorder needed right now.")
     blocks.append(table("Model back-test (lower error is better)",
                         [("label", "Model", "text"), ("wape", "WAPE %", "number"), ("mape", "MAPE %", "number"),
                          ("mae", "MAE", "number")], [e for e in fc["evaluation"] if e.get("wape") is not None]))

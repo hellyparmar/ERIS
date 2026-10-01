@@ -152,3 +152,8 @@ deployment_versions/*
 !.env.*.example
 !.gitkeep
 Thumbs.db
+
+# ERIS v2
+web/node_modules/
+web/dist/
+api/data/

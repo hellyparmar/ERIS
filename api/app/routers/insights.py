@@ -27,7 +27,7 @@ def dashboard(period: str = "30d", outlet_id: int | None = None, start: date | N
               user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     outlet_ids = scoped_outlet_ids(user, outlet_id)
     rng = _range(db, period, start, end)
-    recent = db.scalars(select(Sale).where(*([Sale.outlet_id.in_(outlet_ids)] if outlet_ids else []))
+    recent = db.scalars(select(Sale).where(Sale.status == "completed", *([Sale.outlet_id.in_(outlet_ids)] if outlet_ids else []))
                         .order_by(Sale.sold_at.desc(), Sale.id.desc()).limit(8)).all()
     forecast = None
     try:
