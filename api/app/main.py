@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import func, select
 
+from app import clock
 from app.config import settings
 from app.db import SessionLocal, create_tables
 from app.routers import auth, catalog, imports, insights, inventory, outlets, partners, sales
@@ -33,6 +34,7 @@ def _bootstrap() -> None:
         log.warning("Using a development JWT secret - set JWT_SECRET_KEY for any shared deployment")
     create_tables()
     with SessionLocal() as db:
+        clock.load_from_db(db)
         has_users = db.scalar(select(func.count(User.id))) or 0
         if has_users:
             try:

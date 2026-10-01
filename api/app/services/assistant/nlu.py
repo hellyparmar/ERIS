@@ -13,6 +13,7 @@ from datetime import date, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app import clock
 from app.models import Category, Outlet, Product
 from app.services.analytics import DateRange
 
@@ -137,7 +138,7 @@ def parse_periods(text: str, anchor: date) -> list[tuple[DateRange, str]]:
             found.append((m.start(), _clip(r, anchor), label))
 
     for m in re.finditer(r"\b(today|aaj)\b", t):
-        add(m, DateRange(anchor, anchor), "today" if anchor == date.today() else f"{anchor:%d %b %Y} (latest data)")
+        add(m, DateRange(anchor, anchor), "today" if anchor == clock.today() else f"{anchor:%d %b %Y} (latest data)")
     for m in re.finditer(r"\byesterday\b", t):
         d = anchor - timedelta(days=1)
         add(m, DateRange(d, d), f"yesterday ({d:%d %b})")

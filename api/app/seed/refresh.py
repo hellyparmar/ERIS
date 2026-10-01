@@ -7,11 +7,12 @@ intact. Real data is never modified.
 from __future__ import annotations
 
 import logging
-from datetime import date, timedelta
+from datetime import timedelta
 
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
+from app import clock
 from app.config import settings
 from app.models import Sale
 
@@ -39,7 +40,7 @@ def shift_demo_dates(db: Session) -> int:
     latest = db.scalar(select(func.max(Sale.sale_date)))
     if latest is None or not is_untouched_demo(db):
         return 0
-    gap = (date.today() - timedelta(days=1) - latest).days
+    gap = (clock.today() - timedelta(days=1) - latest).days
     days = (gap // 7) * 7
     if days <= 0:
         return 0

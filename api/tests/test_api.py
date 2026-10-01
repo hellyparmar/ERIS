@@ -268,3 +268,55 @@ def test_login_lockout_after_repeated_failures(client):
         assert client.post("/api/auth/login", json={"email": "locked@eris.demo", "password": "nope"}).status_code == 401
     r = client.post("/api/auth/login", json={"email": "locked@eris.demo", "password": "nope"})
     assert r.status_code == 429
+
+
+def test_ollama_client_against_simulated_server(monkeypatch):
+    """Exercise the real HTTP client code with responses shaped like Ollama's /api/tags and /api/chat."""
+    import json
+
+    import httpx
+
+    from app.services.assistant import llm
+
+    class Resp:
+        def __init__(self, data):
+            self._data = data
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return self._data
+
+    calls = []
+
+    def fake_get(url, timeout):
+        assert url.endswith("/api/tags")
+        return Resp({"models": [{"name": "llama3.2:3b"}, {"name": "nomic-embed-text:latest"}]})
+
+    def fake_post(url, json, timeout):  # noqa: A002 - mirrors httpx signature
+        calls.append(json)
+        assert url.endswith("/api/chat") and json["stream"] is False and json["model"] == "llama3.2:3b"
+        content = '{"intent": "forecast", "period": null, "outlets": [], "category": "Bakery", "product": null, ' \
+                  '"top_n": null, "horizon_days": 14}' if json.get("format") == "json" else "Focus on bakery."
+        return Resp({"message": {"role": "assistant", "content": content}})
+
+    monkeypatch.setattr(llm.settings, "LLM_ENABLED", True)
+    monkeypatch.setattr(httpx, "get", fake_get)
+    monkeypatch.setattr(httpx, "post", fake_post)
+    llm._status["checked"] = 0.0
+    st = llm.status(force=True)
+    assert st["available"] and st["model"] == "llama3.2:3b"
+    data = llm.classify("what will bakery do in two weeks", ["Bandra"], ["Bakery"])
+    assert data["intent"] == "forecast" and data["horizon_days"] == 14
+    assert calls[0]["format"] == "json" and calls[0]["messages"][0]["role"] == "system"
+    assert llm.general_answer("tips?", "facts", "Org") == "Focus on bakery."
+    assert json.loads(json.dumps(calls[-1]))["options"]["temperature"] == 0.1
+
+    def down(*a, **k):
+        raise httpx.ConnectError("refused")
+
+    monkeypatch.setattr(httpx, "get", down)
+    llm._status["checked"] = 0.0
+    assert llm.status(force=True)["available"] is False
+    llm._status["checked"] = 0.0

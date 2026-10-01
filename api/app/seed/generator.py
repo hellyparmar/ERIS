@@ -20,6 +20,7 @@ import numpy as np
 from sqlalchemy import delete, insert
 from sqlalchemy.orm import Session
 
+from app import clock
 from app.models import (
     Category,
     ChatMessage,
@@ -172,7 +173,7 @@ def generate_demo_data(db: Session, days: int = 540, seed: int = 42, end_date: d
     """Wipe the database and generate the demo organization. Returns row counts."""
     t0 = time.time()
     rng = np.random.default_rng(seed)
-    end_date = end_date or (date.today() - timedelta(days=1))
+    end_date = end_date or (clock.today() - timedelta(days=1))
     start_date = end_date - timedelta(days=days - 1)
 
     reset_all(db)

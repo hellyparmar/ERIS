@@ -10,6 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app import clock
 from app.models import CHANNELS, PAYMENT_METHODS, Customer, Outlet, Product, Sale, SaleItem, StockMovement, User
 from app.services.inventory import change_stock
 
@@ -80,8 +81,8 @@ def create_sale(db: Session, data: SaleInput, user: User | None, source: str = "
     if data.channel not in CHANNELS:
         raise HTTPException(400, f"channel must be one of {', '.join(CHANNELS)}")
 
-    sold_at = data.sold_at or datetime.now().replace(microsecond=0)
-    if sold_at > datetime.now().replace(microsecond=0) + timedelta(minutes=5):
+    sold_at = data.sold_at or clock.now()
+    if sold_at > clock.now() + timedelta(minutes=5):
         raise HTTPException(400, "Sale date/time cannot be in the future")
 
     customer = None

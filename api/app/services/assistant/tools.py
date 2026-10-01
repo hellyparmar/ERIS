@@ -7,6 +7,7 @@ from datetime import date, timedelta
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app import clock
 from app.models import InventoryItem, Organization, Outlet, Product, PurchaseOrder, Supplier
 from app.services import analytics as A
 from app.services import forecasting as F
@@ -647,7 +648,7 @@ def purchase_orders(c: Ctx) -> dict:
         q = q.where(PurchaseOrder.outlet_id.in_(c.outlet_ids))
     rows = []
     for po, s, o in c.db.execute(q.order_by(PurchaseOrder.expected_date)).all():
-        overdue = po.expected_date is not None and po.expected_date < date.today()
+        overdue = po.expected_date is not None and po.expected_date < clock.today()
         rows.append({"po_number": po.po_number, "supplier": s.name, "outlet": o.name, "order_date": po.order_date.isoformat(),
                      "expected_date": po.expected_date.isoformat() if po.expected_date else None,
                      "total_cost": po.total_cost, "status": "overdue" if overdue else "ordered"})

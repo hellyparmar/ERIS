@@ -13,6 +13,7 @@ import pandas as pd
 from sqlalchemy import Select, case, distinct, extract, func, select
 from sqlalchemy.orm import Session
 
+from app import clock
 from app.models import Category, Customer, Outlet, Product, Sale, SaleItem
 
 COMPLETED = Sale.status == "completed"
@@ -68,7 +69,7 @@ def latest_sale_date(db: Session) -> date | None:
 def anchor_date(db: Session) -> date:
     """The 'today' analytics are relative to: the last day with sales data, never in the future."""
     latest = latest_sale_date(db)
-    today = date.today()
+    today = clock.today()
     return min(latest, today) if latest else today
 
 

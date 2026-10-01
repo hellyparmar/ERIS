@@ -46,6 +46,17 @@ class OrganizationIn(BaseModel):
     tax_id: str | None = Field(default=None, max_length=32)
     low_stock_cover_days: int = Field(default=7, ge=1, le=60)
 
+    @field_validator("timezone")
+    @classmethod
+    def valid_tz(cls, v: str) -> str:
+        from zoneinfo import ZoneInfo
+
+        try:
+            ZoneInfo(v)
+        except Exception:
+            raise ValueError("Unknown time zone - use an IANA name such as Asia/Kolkata") from None
+        return v
+
 
 class OutletIn(BaseModel):
     code: str = Field(min_length=2, max_length=16, pattern=r"^[A-Za-z0-9-]+$")

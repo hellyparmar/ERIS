@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
+from app import clock
 from app.db import get_db
 from app.models import Customer, Outlet, Product, Sale, SaleItem, User
 from app.routers.common import csv_response, get_or_404, page_response, paginate
@@ -71,7 +72,7 @@ def export_sales(outlet_id: int | None = None, start: date | None = None, end: d
                  user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Line-level export in the same format as the sales import template."""
     if not start or not end:
-        end = end or date.today()
+        end = end or clock.today()
         start = start or end - timedelta(days=30)
     if (end - start).days > 400:
         raise HTTPException(400, "Export at most ~13 months at a time")
@@ -101,7 +102,7 @@ def get_sale(sale_id: int, user: User = Depends(get_current_user), db: Session =
 def record_sale(body: SaleIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     ensure_outlet_access(user, body.outlet_id)
     sold_at = body.sold_at.replace(tzinfo=None) if body.sold_at else None
-    if sold_at and user.role == "staff" and sold_at.date() < date.today() - timedelta(days=1):
+    if sold_at and user.role == "staff" and sold_at.date() < clock.today() - timedelta(days=1):
         raise HTTPException(403, "Staff can only record sales for today or yesterday")
     sale = create_sale(db, SaleInput(
         outlet_id=body.outlet_id, sold_at=sold_at, payment_method=body.payment_method, channel=body.channel,

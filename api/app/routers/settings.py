@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app import clock
 from app.config import settings
 from app.db import SessionLocal, get_db
 from app.models import Customer, Organization, Outlet, Product, PurchaseOrder, Sale, SaleItem, Supplier, User
@@ -40,6 +41,7 @@ def update_org(body: OrganizationIn, _: User = Depends(require_admin), db: Sessi
         for k, v in body.model_dump().items():
             setattr(org, k, v)
     db.commit()
+    clock.set_timezone(org.timezone)
     return org_dict(org)
 
 

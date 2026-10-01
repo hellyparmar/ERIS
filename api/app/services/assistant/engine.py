@@ -8,6 +8,7 @@ from datetime import date, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app import clock
 from app.models import ChatMessage, Organization, User
 from app.security import scoped_outlet_ids
 from app.services import analytics as A
@@ -91,7 +92,7 @@ def answer(db: Session, user: User, message: str) -> dict:
     anchor = A.anchor_date(db)
     # Relative dates ("today", "yesterday") follow the real calendar while data is current; with stale
     # data (e.g. an old demo database) they are relative to the last day that has sales.
-    today = date.today()
+    today = clock.today()
     ref = today if anchor >= today - timedelta(days=1) else anchor
     index = EntityIndex(db)
     parsed = parse(db, message, ref, index)

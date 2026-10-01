@@ -1,11 +1,12 @@
 """Stock levels, adjustments, transfers, purchase orders and reorder suggestions."""
 from collections import defaultdict
-from datetime import date, timedelta
+from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
+from app import clock
 from app.db import get_db
 from app.models import (
     Category,
@@ -202,7 +203,7 @@ def po_dict(po: PurchaseOrder, detail: bool = False) -> dict:
          "order_date": po.order_date.isoformat(), "expected_date": po.expected_date.isoformat() if po.expected_date else None,
          "received_date": po.received_date.isoformat() if po.received_date else None, "total_cost": po.total_cost,
          "notes": po.notes, "items_count": len(po.items),
-         "overdue": po.status == "ordered" and po.expected_date is not None and po.expected_date < date.today()}
+         "overdue": po.status == "ordered" and po.expected_date is not None and po.expected_date < clock.today()}
     if detail:
         d["items"] = [{"product_id": i.product_id, "sku": i.product.sku, "product": i.product.name, "unit": i.product.unit,
                        "quantity": i.quantity, "unit_cost": i.unit_cost, "line_total": round(i.quantity * i.unit_cost, 2)}
@@ -214,7 +215,7 @@ def _create_po(db: Session, body: PurchaseOrderIn, user: User) -> PurchaseOrder:
     ensure_outlet_access(user, body.outlet_id)
     supplier = get_or_404(db, Supplier, body.supplier_id, "Supplier")
     get_or_404(db, Outlet, body.outlet_id, "Outlet")
-    today = date.today()
+    today = clock.today()
     count = db.scalar(select(func.count(PurchaseOrder.id))) or 0
     po = PurchaseOrder(po_number=f"PO-{today:%y%m}-{count + 1:05d}", supplier_id=supplier.id, outlet_id=body.outlet_id,
                        status="ordered", order_date=today,
@@ -250,7 +251,7 @@ def list_pos(status: str | None = None, supplier_id: int | None = None, outlet_i
     if outlet_ids:
         q = q.where(PurchaseOrder.outlet_id.in_(outlet_ids))
     if status == "overdue":
-        q = q.where(PurchaseOrder.status == "ordered", PurchaseOrder.expected_date < date.today())
+        q = q.where(PurchaseOrder.status == "ordered", PurchaseOrder.expected_date < clock.today())
     elif status:
         q = q.where(PurchaseOrder.status == status)
     if supplier_id:
@@ -296,7 +297,7 @@ def receive_po(po_id: int, body: ReceiveIn, user: User = Depends(require_manager
             change_stock(db, po.outlet_id, item.product_id, qty, "purchase", user.id, po.po_number, "Goods received")
         total += qty * costs[item.product_id]
     po.status = "received"
-    po.received_date = date.today()
+    po.received_date = clock.today()
     po.total_cost = round(total, 2)
     db.commit()
     return po_dict(po, detail=True)

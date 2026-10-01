@@ -1,11 +1,11 @@
 import threading
 import time
-from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app import clock
 from app.db import get_db
 from app.models import Outlet, User
 from app.routers.common import get_or_404
@@ -55,7 +55,7 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
         _failures.pop(key, None)
     if not user.is_active:
         raise HTTPException(403, "This account has been deactivated")
-    user.last_login_at = datetime.now()
+    user.last_login_at = clock.now()
     db.commit()
     return {"access_token": create_access_token(user), "token_type": "bearer", "user": user_dict(user)}
 

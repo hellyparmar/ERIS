@@ -1,11 +1,12 @@
 """Business alerts computed live from the data (nothing to configure or keep in sync)."""
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import timedelta
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app import clock
 from app.models import InventoryItem, Outlet, Product, PurchaseOrder, Sale
 from app.services import analytics as A
 from app.services.holidays import upcoming_events
@@ -40,7 +41,7 @@ def compute_alerts(db: Session, outlet_ids: list[int] | None = None) -> list[dic
 
     # 2. Overdue purchase orders
     q = select(func.count(PurchaseOrder.id)).where(PurchaseOrder.status == "ordered",
-                                                   PurchaseOrder.expected_date < date.today())
+                                                   PurchaseOrder.expected_date < clock.today())
     if outlet_ids:
         q = q.where(PurchaseOrder.outlet_id.in_(outlet_ids))
     overdue = db.scalar(q) or 0
