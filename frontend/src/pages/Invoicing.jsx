@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Download, Send, AlertCircle } from 'lucide-react';
-import PaginationControls from '../ui/PaginationControls';
+import PaginationControls from '../components/ui/PaginationControls';
 
 export default function Invoicing() {
   const [invoices, setInvoices] = useState([]);

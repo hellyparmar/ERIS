@@ -1,0 +1,2 @@
+/* Shared page styles; tokens and components come from design-system.css and eris-components.css (loaded in main.jsx). */
+@import "./eris-components.css";
