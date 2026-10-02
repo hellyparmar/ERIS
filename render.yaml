@@ -25,3 +25,6 @@ services:
         value: "false"
       - key: MALLOC_ARENA_MAX  # keeps memory well inside the free plan's 512 MB
         value: "2"
+      # If the web app is also hosted on Vercel (VITE_API_URL pointing here), allow its address:
+      # - key: CORS_ORIGINS
+      #   value: https://your-project.vercel.app

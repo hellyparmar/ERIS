@@ -14,6 +14,15 @@ def test_health(client):
     assert client.get("/api/health").json()["status"] == "ok"
 
 
+def test_cors_for_a_separately_hosted_web_app(client, admin):
+    # an allowed origin can call the API and read export file names; an unknown origin gets no CORS headers
+    ok = client.get("/api/reports/sales-daily/export?format=csv", headers={**admin, "Origin": "http://localhost:5173"})
+    assert ok.headers.get("access-control-allow-origin") == "http://localhost:5173"
+    assert "content-disposition" in ok.headers.get("access-control-expose-headers", "").lower()
+    other = client.get("/api/health", headers={"Origin": "https://evil.example"})
+    assert "access-control-allow-origin" not in other.headers
+
+
 def test_login_rejects_bad_password(client):
     r = client.post("/api/auth/login", json={"email": "admin@eris.demo", "password": "wrong"})
     assert r.status_code == 401

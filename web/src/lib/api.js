@@ -1,6 +1,10 @@
 // Thin fetch wrapper: adds the JWT, renews it with the refresh token when it expires, parses JSON and turns
 // API errors into readable messages.
 const TOKEN_KEY = 'eris-token'
+// Where the API lives. Empty (default): the same server that serves this app, or the Vite dev proxy.
+// Set VITE_API_URL at build time when the web app is hosted separately (e.g. Vercel + API on Render).
+export const API_BASE = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '')
+const apiUrl = (path) => new URL(path.startsWith('/api') ? path : `/api${path}`, API_BASE || window.location.origin)
 const REFRESH_KEY = 'eris-refresh'
 
 const read = (k) => { try { return localStorage.getItem(k) } catch { return null } }
@@ -17,7 +21,7 @@ async function renewSession() {
   const refresh = read(REFRESH_KEY)
   if (!refresh) return false
   if (!refreshing) {
-    refreshing = fetch('/api/auth/refresh', {
+    refreshing = fetch(apiUrl('/auth/refresh'), {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: refresh }),
     }).then(async (res) => {
       if (!res.ok) return false
@@ -50,7 +54,7 @@ function errorMessage(data, status) {
 }
 
 export async function api(path, { method = 'GET', body, params, raw = false, form, retried = false } = {}) {
-  const url = new URL(path.startsWith('/api') ? path : `/api${path}`, window.location.origin)
+  const url = apiUrl(path)
   Object.entries(params || {}).forEach(([k, v]) => {
     if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, v)
   })
@@ -78,6 +82,11 @@ export async function api(path, { method = 'GET', body, params, raw = false, for
     return res
   }
   const data = res.status === 204 ? null : await res.json().catch(() => null)
+  if (!res.ok && data === null && [404, 405, 502, 503, 504].includes(res.status)) {
+    // not an ERIS answer: no API behind this address (e.g. a static host without VITE_API_URL) or it is starting
+    throw new ApiError(`The ERIS API is not reachable at ${url.origin} (HTTP ${res.status}). It may still be starting - `
+      + 'try again in a minute.', res.status)
+  }
   if (!res.ok) throw new ApiError(errorMessage(data, res.status), res.status, data)
   return data
 }

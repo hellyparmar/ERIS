@@ -140,7 +140,7 @@ def _design(train: pd.Series, horizon: int, exog: pd.DataFrame | None) -> np.nda
 
 def _xgboost(train: pd.Series, horizon: int, exog: pd.DataFrame | None = None) -> np.ndarray:
     """Recursive XGBoost on scale-free lags + calendar/festival + exogenous features (M5-style)."""
-    from xgboost import XGBRegressor
+    import xgboost as xgb  # native API: same model as XGBRegressor without needing scikit-learn
 
     y = train.clip(lower=0).astype(float).values
     other = _design(train, horizon, exog)
@@ -149,12 +149,14 @@ def _xgboost(train: pd.Series, horizon: int, exog: pd.DataFrame | None = None) -
         lags, level = _lag_row(y, t)
         X.append(lags + list(other[t]))
         target.append(y[t] / level)
-    model = XGBRegressor(**XGB_PARAMS, n_jobs=2, verbosity=0)
-    model.fit(np.array(X), np.array(target))
+    params = {k: v for k, v in XGB_PARAMS.items() if k not in ("n_estimators", "random_state")}
+    params.update(objective="reg:squarederror", seed=XGB_PARAMS["random_state"], nthread=2, verbosity=0)
+    model = xgb.train(params, xgb.DMatrix(np.array(X), label=np.array(target)),
+                      num_boost_round=XGB_PARAMS["n_estimators"])
     ext = np.concatenate([y, np.zeros(horizon)])
     for t in range(len(y), len(y) + horizon):
         lags, level = _lag_row(ext, t)
-        ext[t] = max(0.0, float(model.predict(np.array([lags + list(other[t])]))[0]) * level)
+        ext[t] = max(0.0, float(model.inplace_predict(np.array([lags + list(other[t])]))[0]) * level)
     return ext[len(y):]
 
 

@@ -25,7 +25,7 @@ Every number traces back to the data.
 | **AI assistant** | Answers questions such as *"Why was Outlet 3 revenue lower this week?"*, *"Which items may go out of stock in the next 14 days?"* and *"What forecast model performed best for beverages?"*. It maps each question to a validated intent template (no generated SQL), respects outlet permissions, and shows its data source, filters, timing, model version and caveats. Definition and how-to questions are answered from the project docs by retrieval. Optional local LLM through Ollama. **Grounding check: 27/27 intents and 19/19 answers match independent SQL.** |
 | **Anomalies and drivers** | Robust z-score detection of unusual outlet-days and suspicious bill lines: **precision 0.79, recall 0.73** against the 26 anomalies injected into the data. A "why did revenue change?" analysis splits the change exactly into bills × average bill, then by outlet and category, and estimates the calendar, promotion, stockout and rainfall contributions. |
 | **Data pipeline** | A deterministic generator (seed 42): 2 years of bill lines with seasonality, festivals, weather, promotions, price elasticity, substitutions and stockouts, plus full provenance. CSV import with column mapping, a dry run, duplicate handling, an error report, an atomic commit and import history. |
-| **Engineering** | FastAPI with SQLAlchemy 2 and Alembic on SQLite or PostgreSQL; React 19. JWT access and refresh tokens, 4 roles with application-level outlet scoping, and an automatic audit log. 88 API tests on SQLite and PostgreSQL, 10 Playwright end-to-end tests, and CI. |
+| **Engineering** | FastAPI with SQLAlchemy 2 and Alembic on SQLite or PostgreSQL; React 19. JWT access and refresh tokens, 4 roles with application-level outlet scoping, and an automatic audit log. 95 API tests on SQLite and PostgreSQL, 10 Playwright end-to-end tests, and CI. |
 
 ## Screenshots
 
@@ -84,20 +84,29 @@ DATABASE_URL=postgresql+psycopg2://eris:eris@postgres:5432/eris docker compose -
 docker compose --profile ai up --build    # adds Ollama; then: docker compose exec ollama ollama pull llama3.2:3b
 ```
 
-### Free hosted demo (Render)
+### Hosted demo (Render, optionally with Vercel)
 
-[`render.yaml`](render.yaml) deploys the Docker image to Render's free plan: on render.com choose **New → Blueprint**
-and pick this repository. A random `JWT_SECRET_KEY` is generated. The free plan has no persistent disk, so the
-demo data is regenerated on every start (about a minute) and edits are lost when the service sleeps; set
-`DATABASE_URL` to a PostgreSQL database for a lasting deployment. The full two-year demo uses about 340 MB of RAM
-in use (the plan allows 512 MB). Any host that runs Docker images and sets `$PORT` (Fly.io, Railway) works the
-same way.
+ERIS needs a long-running server (background demo generation, a database, forecasting libraries of about
+550 MB), so the API is hosted as a Docker web service, not as serverless functions.
 
-### Local (Python 3.11+, Node 20+)
+- **Render (whole app):** [`render.yaml`](render.yaml) deploys the Docker image to Render's free plan: on
+  render.com choose **New → Blueprint** and pick this repository. A random `JWT_SECRET_KEY` is generated. The free
+  plan has no persistent disk, so the demo data is regenerated on every start (about a minute) and edits are lost
+  when the service sleeps; set `DATABASE_URL` to a PostgreSQL database for a lasting deployment. The two-year demo
+  uses about 340 MB of RAM (the plan allows 512 MB). Any host that runs Docker images and sets `$PORT` (Fly.io,
+  Railway) works the same way.
+- **Vercel (web app only, optional):** [`vercel.json`](vercel.json) builds just `web/` as a static site and
+  [`.vercelignore`](.vercelignore) keeps `api/` out, so Vercel never tries to bundle the Python API. In the Vercel
+  project set the environment variable `VITE_API_URL` to the Render address (e.g. `https://eris-demo.onrender.com`),
+  and on Render set `CORS_ORIGINS` to the Vercel address (or `CORS_ORIGIN_REGEX` to allow preview deployments,
+  e.g. `https://your-project-[a-z0-9-]+\.vercel\.app`). Without `VITE_API_URL` the site loads but says the API
+  cannot be reached.
+
+### Local (Python 3.11+, Node 22+)
 
 ```bash
 cd api && python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+pip install -r requirements.txt -c constraints.txt   # constraints.txt = the exact versions CI tested
 uvicorn app.main:app --reload --port 8000          # creates the schema (Alembic) and the demo data on first start
 
 cd web && npm install && npm run dev               # http://localhost:5173 (proxies /api to :8000)
@@ -197,19 +206,27 @@ Every setting has a default; see [`api/.env.example`](api/.env.example).
 ## Development and verification
 
 ```bash
+./check.sh                                              # the same checks as CI: API lint + tests, web lint + build
+TEST_DATABASE_URL=postgresql+psycopg2://eris:eris@localhost:5432/eris_test E2E=1 ./check.sh   # + PostgreSQL + e2e
+
 cd api
-pip install -r requirements-dev.txt
-ruff check app tests && pytest -q                       # 88 tests
-TEST_DATABASE_URL=postgresql+psycopg2://eris:eris@localhost:5432/eris_test pytest -q   # same suite on PostgreSQL
+pip install -r requirements-dev.txt -c constraints.txt
+ruff check app tests && pytest -q                       # 95 tests
 python -m app.evaluation                                # forecast evaluation   -> docs/FORECAST_EVALUATION.md
 python -m app.assistant_eval                            # assistant grounding   -> docs/ASSISTANT_EVALUATION.md
 
-cd web && npm run lint && npm run build
 cd e2e && npm install && npx playwright install chromium && npm test   # starts its own API on a fresh database
 ```
 
-The OpenAPI docs are at `http://localhost:8000/docs`. CI (`.github/workflows/ci.yml`) runs four jobs: the API
-tests on SQLite, the API tests on PostgreSQL 16, web lint and build, and the Playwright e2e suite.
+The OpenAPI docs are at `http://localhost:8000/docs`. CI (`.github/workflows/ci.yml`) runs five jobs: the API
+tests on SQLite, the API tests on PostgreSQL 16, web lint and build, a Docker image build and start-up check, and
+the Playwright e2e suite.
+
+**Dependencies.** `api/requirements.txt` lists what ERIS needs; `api/constraints.txt` pins the exact versions the
+suite passed with, and CI, the Docker image and Render install exactly those. To move to newer versions run
+`api/scripts/update_constraints.sh` (it installs into a clean environment and rewrites the file only if lint and
+tests pass). Dependabot opens monthly update pull requests that CI checks. `tests/test_models.py` fails if any
+forecasting model cannot run, so a missing library cannot silently disable a model.
 
 ## Project structure
 

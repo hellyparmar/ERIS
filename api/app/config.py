@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 14
 
     CORS_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173"
+    # optional pattern for extra web origins, e.g. Vercel previews: https://my-project-[a-z0-9-]+\.vercel\.app
+    CORS_ORIGIN_REGEX: str | None = None
 
     # Demo data: generated automatically the first time the API starts on an empty database.
     SEED_DEMO_DATA: bool = True

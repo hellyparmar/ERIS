@@ -6,7 +6,7 @@ the work and how it is verified. Deviations from the recommended stack are liste
 
 Verification shorthand:
 
-- **T**: pytest API tests (`api/tests`, 88 tests, SQLite and PostgreSQL).
+- **T**: pytest API tests (`api/tests`, 95 tests, SQLite and PostgreSQL).
 - **E**: Playwright end-to-end tests (`e2e/`).
 - **Ev**: evaluation scripts and reports.
 

@@ -85,8 +85,10 @@ app = FastAPI(
     version="3.0.0",
     lifespan=lifespan,
 )
-app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins, allow_credentials=True,
-                   allow_methods=["*"], allow_headers=["*"])
+# CORS matters only when the web app is hosted on another origin (e.g. Vercel with VITE_API_URL pointing here)
+app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins, allow_origin_regex=settings.CORS_ORIGIN_REGEX,
+                   allow_credentials=True, allow_methods=["*"], allow_headers=["*"],
+                   expose_headers=["Content-Disposition"])  # lets the browser read export file names
 
 for r in (auth, settings_router, outlets, catalog, partners, inventory, sales, imports, insights, records):
     app.include_router(r.router)

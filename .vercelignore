@@ -1,0 +1,10 @@
+# Vercel hosts only the static web app (web/). The Python API runs as a long-lived server (Docker / Render):
+# leaving api/ out stops Vercel from packaging it as a serverless function (too large, and it needs a
+# persistent process and database).
+api
+e2e
+docs
+notebooks
+Dockerfile
+docker-compose.yml
+render.yaml

@@ -6,7 +6,7 @@ import pytest
 
 _tmp = tempfile.mkdtemp(prefix="eris-test-")
 # Set TEST_DATABASE_URL to run the suite against PostgreSQL (the database is wiped).
-os.environ["DATABASE_URL"] = os.environ.get("TEST_DATABASE_URL", f"sqlite:///{_tmp}/test.db")
+os.environ["DATABASE_URL"] = os.environ.get("TEST_DATABASE_URL") or f"sqlite:///{_tmp}/test.db"  # empty = unset
 os.environ["SEED_DEMO_DATA"] = "false"
 os.environ["LLM_ENABLED"] = "false"
 
