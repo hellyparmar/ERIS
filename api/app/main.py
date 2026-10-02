@@ -44,7 +44,15 @@ def _bootstrap() -> None:
                 log.exception("demo date refresh failed")
             return
     if not settings.SEED_DEMO_DATA:
-        log.warning("Empty database and SEED_DEMO_DATA=false: run `python -m app.seed` or create an admin user.")
+        if settings.INITIAL_ADMIN_EMAIL and settings.INITIAL_ADMIN_PASSWORD:
+            from app.manage import create_admin
+
+            create_admin(settings.INITIAL_ADMIN_EMAIL, settings.INITIAL_ADMIN_PASSWORD, "Administrator")
+            log.info("Created the first admin %s", settings.INITIAL_ADMIN_EMAIL)
+        else:
+            log.warning("Empty database and SEED_DEMO_DATA=false: create the first admin with "
+                        "`python -m app.manage create-admin --email you@example.com` (or set INITIAL_ADMIN_EMAIL "
+                        "and INITIAL_ADMIN_PASSWORD), or generate demo data with `python -m app.seed`.")
         return
 
     def seed() -> None:

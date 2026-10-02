@@ -4,6 +4,7 @@ from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app import clock
@@ -225,14 +226,19 @@ def _create_po(db: Session, body: PurchaseOrderIn, user: User) -> PurchaseOrder:
     supplier = get_or_404(db, Supplier, body.supplier_id, "Supplier")
     get_or_404(db, Outlet, body.outlet_id, "Outlet")
     today = clock.today()
-    count = db.scalar(select(func.count(PurchaseOrder.id))) or 0
-    po = PurchaseOrder(po_number=f"PO-{today:%y%m}-{count + 1:05d}", supplier_id=supplier.id, outlet_id=body.outlet_id,
+
+    def next_number() -> str:
+        count = db.scalar(select(func.count(PurchaseOrder.id))) or 0
+        number = f"PO-{today:%y%m}-{count + 1:05d}"
+        while db.scalar(select(PurchaseOrder.id).where(PurchaseOrder.po_number == number)):
+            count += 1
+            number = f"PO-{today:%y%m}-{count + 1:05d}"
+        return number
+
+    po = PurchaseOrder(po_number=next_number(), supplier_id=supplier.id, outlet_id=body.outlet_id,
                        status="ordered", order_date=today,
                        expected_date=body.expected_date or today + timedelta(days=supplier.lead_time_days),
                        notes=body.notes, created_by=user.id)
-    while db.scalar(select(PurchaseOrder.id).where(PurchaseOrder.po_number == po.po_number)):
-        count += 1
-        po.po_number = f"PO-{today:%y%m}-{count + 1:05d}"
     total = 0.0
     merged: dict[int, list] = {}
     for line in body.items:
@@ -246,8 +252,16 @@ def _create_po(db: Session, body: PurchaseOrderIn, user: User) -> PurchaseOrder:
         po.items.append(PurchaseOrderItem(product_id=p.id, quantity=qty, unit_cost=cost))
         total += qty * cost
     po.total_cost = round(total, 2)
-    db.add(po)
-    db.flush()
+    for attempt in range(6):
+        try:
+            with db.begin_nested():  # a PO number taken at the same moment only undoes this insert
+                db.add(po)
+                db.flush()
+            break
+        except IntegrityError:
+            if attempt == 5:
+                raise HTTPException(409, "Could not allocate a purchase order number, please retry") from None
+            po.po_number = next_number()
     return po
 
 

@@ -25,7 +25,7 @@ Every number traces back to the data.
 | **AI assistant** | Answers questions such as *"Why was Outlet 3 revenue lower this week?"*, *"Which items may go out of stock in the next 14 days?"* and *"What forecast model performed best for beverages?"*. It maps each question to a validated intent template (no generated SQL), respects outlet permissions, and shows its data source, filters, timing, model version and caveats. Definition and how-to questions are answered from the project docs by retrieval. Optional local LLM through Ollama. **Grounding check: 27/27 intents and 19/19 answers match independent SQL.** |
 | **Anomalies and drivers** | Robust z-score detection of unusual outlet-days and suspicious bill lines: **precision 0.79, recall 0.73** against the 26 anomalies injected into the data. A "why did revenue change?" analysis splits the change exactly into bills × average bill, then by outlet and category, and estimates the calendar, promotion, stockout and rainfall contributions. |
 | **Data pipeline** | A deterministic generator (seed 42): 2 years of bill lines with seasonality, festivals, weather, promotions, price elasticity, substitutions and stockouts, plus full provenance. CSV import with column mapping, a dry run, duplicate handling, an error report, an atomic commit and import history. |
-| **Engineering** | FastAPI with SQLAlchemy 2 and Alembic on SQLite or PostgreSQL; React 19. JWT access and refresh tokens, 4 roles with application-level outlet scoping, and an automatic audit log. 80 API tests on SQLite and PostgreSQL, 9 Playwright end-to-end tests, and CI. |
+| **Engineering** | FastAPI with SQLAlchemy 2 and Alembic on SQLite or PostgreSQL; React 19. JWT access and refresh tokens, 4 roles with application-level outlet scoping, and an automatic audit log. 85 API tests on SQLite and PostgreSQL, 9 Playwright end-to-end tests, and CI. |
 
 ## Screenshots
 
@@ -179,7 +179,7 @@ Every setting has a default; see [`api/.env.example`](api/.env.example).
 ```bash
 cd api
 pip install -r requirements-dev.txt
-ruff check app tests && pytest -q                       # 80 tests
+ruff check app tests && pytest -q                       # 85 tests
 TEST_DATABASE_URL=postgresql+psycopg2://eris:eris@localhost:5432/eris_test pytest -q   # same suite on PostgreSQL
 python -m app.evaluation                                # forecast evaluation   -> docs/FORECAST_EVALUATION.md
 python -m app.assistant_eval                            # assistant grounding   -> docs/ASSISTANT_EVALUATION.md

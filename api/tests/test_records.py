@@ -13,8 +13,12 @@ def test_reports_list_preview_and_export(client, admin, viewer):
     assert "gst-summary" not in {r["key"] for r in client.get("/api/reports", headers=viewer).json()}
     assert client.get("/api/reports/gst-summary", headers=viewer).status_code == 403
 
-    p = client.get("/api/reports/sales-daily?period=7d", headers=admin).json()
-    assert p["total_rows"] == 7 * 5 and len(p["rows"][0]) == len(p["columns"])
+    from datetime import date, timedelta
+
+    start, end = date.today() - timedelta(days=36), date.today() - timedelta(days=30)  # inside the seeded history
+    p = client.get(f"/api/reports/sales-daily?start={start}&end={end}", headers=admin).json()
+    # one row per outlet-day with sales (an injected closure day has none)
+    assert 7 * 4 <= p["total_rows"] <= 7 * 5 and len(p["rows"][0]) == len(p["columns"])
     csv = client.get("/api/reports/outlets/export?format=csv&period=30d", headers=admin)
     assert csv.status_code == 200 and csv.text.startswith("Code,Outlet") and csv.text.count("\n") >= 6
 

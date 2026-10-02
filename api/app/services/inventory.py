@@ -17,8 +17,11 @@ def stock_status(quantity: float, reorder_level: float) -> str:
 
 
 def get_or_create_item(db: Session, outlet_id: int, product_id: int) -> InventoryItem:
+    # Lock the stock row (PostgreSQL) and reload it, so two simultaneous sales of the last unit cannot both
+    # succeed: the second waits for the first to commit and then sees the reduced quantity.
     item = db.scalar(select(InventoryItem).where(InventoryItem.outlet_id == outlet_id,
-                                                 InventoryItem.product_id == product_id))
+                                                 InventoryItem.product_id == product_id)
+                     .with_for_update().execution_options(populate_existing=True))
     if item is None:
         product = db.get(Product, product_id)
         item = InventoryItem(outlet_id=outlet_id, product_id=product_id, quantity=0,

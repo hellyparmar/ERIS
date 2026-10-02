@@ -164,12 +164,19 @@ def create_sale(db: Session, data: SaleInput, user: User | None, source: str = "
         qty_total += qty
     sale.subtotal, sale.discount = round(subtotal, 2), round(discount, 2)
     sale.tax_amount, sale.total, sale.items_count = round(tax_total, 2), round(total, 2), qty_total
-    db.add(sale)
-    try:
-        db.flush()
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(409, "Invoice number conflict, please retry") from None
+    for attempt in range(6):
+        try:
+            with db.begin_nested():  # savepoint: a number clash only undoes this insert
+                db.add(sale)
+                db.flush()
+            break
+        except IntegrityError:
+            if data.invoice_no:
+                raise HTTPException(409, f"Invoice {data.invoice_no} already exists") from None
+            if attempt == 5:
+                raise HTTPException(409, "Could not allocate an invoice number, please retry") from None
+            # another bill took this number at the same moment - take the next free one
+            sale.invoice_no = next_invoice_no(db, outlet, sold_at)
 
     if update_stock:
         for product, qty, *_ in built:

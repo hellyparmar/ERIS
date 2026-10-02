@@ -2,6 +2,7 @@
 from collections.abc import Iterator
 from pathlib import Path
 
+from fastapi import Request
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
@@ -17,7 +18,8 @@ def _make_engine(url: str):
         db_path = url.split("///", 1)[-1]
         if db_path and db_path != ":memory:":
             Path(db_path).parent.mkdir(parents=True, exist_ok=True)
-        engine = create_engine(url, connect_args={"check_same_thread": False})
+        # timeout: how long a writer waits for SQLite's single write lock before giving up
+        engine = create_engine(url, connect_args={"check_same_thread": False, "timeout": 30})
 
         @event.listens_for(engine, "connect")
         def _sqlite_pragmas(dbapi_conn, _):
@@ -31,7 +33,11 @@ def _make_engine(url: str):
 
         @event.listens_for(engine, "begin")
         def _sqlite_begin(conn):
-            conn.exec_driver_sql("BEGIN")
+            # Write requests take the write lock when their transaction starts (BEGIN IMMEDIATE) and queue for it.
+            # A plain BEGIN would read first and then fail with "database is locked" when another request wrote
+            # in between (SQLite cannot upgrade a stale read snapshot in WAL mode).
+            immediate = conn.get_execution_options().get("sqlite_immediate")
+            conn.exec_driver_sql("BEGIN IMMEDIATE" if immediate else "BEGIN")
 
         return engine
     _register_numpy_adapters()
@@ -54,10 +60,17 @@ def _register_numpy_adapters() -> None:
 
 engine = _make_engine(settings.DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+_write_engine = engine.execution_options(sqlite_immediate=True)
 
 
-def get_db() -> Iterator[Session]:
-    db = SessionLocal()
+READ_MOSTLY_POSTS = {"/api/auth/login", "/api/auth/refresh"}
+
+
+def get_db(request: Request) -> Iterator[Session]:
+    """Session for one request. Requests that change data use write transactions from the start on SQLite."""
+    # sign-in only records the last-login time (best effort), so it must not queue behind long writes
+    writes = request.method not in ("GET", "HEAD", "OPTIONS") and request.url.path not in READ_MOSTLY_POSTS
+    db = SessionLocal(bind=_write_engine) if writes and settings.is_sqlite else SessionLocal()
     try:
         yield db
     finally:

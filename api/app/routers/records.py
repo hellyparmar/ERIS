@@ -93,10 +93,13 @@ def list_invoices(q: str | None = None, outlet_id: int | None = None, page: int 
 
 
 @router.post("/invoices", status_code=201)
-def issue_invoice(data: InvoiceIn, user: User = Depends(require_writer), db: Session = Depends(get_db)):
+def issue_invoice(data: InvoiceIn, response: Response, user: User = Depends(require_writer),
+                  db: Session = Depends(get_db)):
     sale = get_or_404(db, Sale, data.sale_id, "Sale")
     ensure_outlet_access(user, sale.outlet_id)
     inv, created = INV.create_invoice(db, sale, user, data.buyer_gstin)
+    if not created:
+        response.status_code = 200  # the sale already had an invoice: return it unchanged
     return {**INV.invoice_dict(inv, detail=True), "created": created}
 
 

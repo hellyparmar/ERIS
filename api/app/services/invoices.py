@@ -19,6 +19,7 @@ from datetime import datetime
 
 from fastapi import HTTPException
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app import clock
@@ -73,7 +74,21 @@ def create_invoice(db: Session, sale: Sale, user: User | None, buyer_gstin: str 
                   buyer_gstin=buyer_gstin, place_of_supply=pos, supply_type="intra_state" if intra else "inter_state",
                   taxable_value=round(sale.total - tax, 2), cgst=cgst, sgst=sgst, igst=igst, total=round(sale.total, 2),
                   is_demo=True, created_by=user.id if user else None)
-    db.add(inv)
+    for attempt in range(6):
+        try:
+            with db.begin_nested():
+                db.add(inv)
+                db.flush()
+            break
+        except IntegrityError:
+            # the same sale was invoiced at the same moment (return that invoice), or the number was taken
+            existing = db.scalar(select(Invoice).where(Invoice.sale_id == sale.id))
+            if existing:
+                db.commit()
+                return existing, False
+            if attempt == 5:
+                raise HTTPException(409, "Could not allocate an invoice number, please retry") from None
+            inv.number = _next_number(db, outlet, sale.sold_at)
     db.commit()
     db.refresh(inv)
     return inv, True

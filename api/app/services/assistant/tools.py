@@ -139,6 +139,10 @@ def business_overview(c: Ctx) -> dict:
     c.use(rng, "last 7 days")
     k = A.kpis_with_comparison(c.db, rng, c.outlet_ids)
     cur, ch = k["current"], k["change_pct"]
+    if not cur["orders"]:
+        return result(f"No sales have been recorded at {c.scope_label} in the last 7 days. Record bills on the Sales "
+                      "page or import your sales history (Data import) and I can summarise how business is going.",
+                      [], ["How do I import sales?", "What should I reorder?"])
     outlets = A.outlet_performance(c.db, rng, c.outlet_ids)
     cats = A.category_breakdown(c.db, rng, c.outlet_ids)
     alerts = compute_alerts(c.db, c.outlet_ids)
@@ -311,6 +315,8 @@ def sales_trend(c: Ctx) -> dict:
                               product_id=c.parsed.product_ids[0] if c.parsed.product_ids else None)
     if not series or not any(s["revenue"] for s in series):
         return result(f"There are no sales for {c.scope_label} in {label}.")
+    first_sale = next((i for i, x in enumerate(series) if x["revenue"] > 0), 0)
+    series = series[first_sale:]  # start the trend where the data starts
     complete = series[:-1] if gran == "month" and len(series) > 2 and c.anchor.day < 25 else series
     best = max(complete, key=lambda s: s["revenue"])
     worst = min([s for s in complete if s["revenue"] > 0] or complete, key=lambda s: s["revenue"])
@@ -320,8 +326,9 @@ def sales_trend(c: Ctx) -> dict:
 
     first, last = complete[0]["revenue"], complete[-1]["revenue"]
     what = c.parsed.product_names[0] if c.parsed.product_ids else (c.parsed.category_name or "Revenue")
+    change = trend_word(A.pct_change(last, first))
     ans = (f"**{what}** trend for {c.scope_label} over {label} (by {gran}): from {c.f.money(first)} to "
-           f"{c.f.money(last)} (**{trend_word(A.pct_change(last, first))}**). Best {gran}: **{lbl(best['date'])}** "
+           f"{c.f.money(last)}{f' (**{change}**)' if change else ''}. Best {gran}: **{lbl(best['date'])}** "
            f"({c.f.money(best['revenue'])}); weakest: **{lbl(worst['date'])}** ({c.f.money(worst['revenue'])}).")
     if gran == "month" and len(series) > 1 and complete is not series:
         ans += " (The current month is still in progress, so it is excluded from the comparison.)"
@@ -551,7 +558,7 @@ def reorder(c: Ctx) -> dict:
     for r in rows:
         by_supplier[r["supplier"] or "No supplier"] = by_supplier.get(r["supplier"] or "No supplier", 0) + r["estimated_cost"]
     ans = (f"I recommend reordering **{len(rows)} items** at {c.scope_label} (estimated cost **{c.f.money(total)}**). "
-           f"**{len(crit)}** are critical - stock will run out before a new delivery can arrive.\n\n"
+           f"**{len(crit)}** are critical - already out of stock or running out before a new delivery can arrive.\n\n"
            + "\n".join(f"- **{r['product']}** ({r['outlet']}): order **{r['suggested_qty']} {r['unit']}** - "
                        f"{c.f.num(r['current_stock'])} left, selling ~{r['avg_daily_demand']:.1f}/day"
                        for r in rows[:8]))
@@ -580,6 +587,11 @@ def customers(c: Ctx) -> dict:
                  "last_purchase_days": int(r.recency), "orders": int(r.frequency), "spend": round(float(r.monetary), 2),
                  "segment": r.segment} for r in risk.itertuples()]
         n_risk = int((df["segment"] == "At Risk").sum())
+        if not rows:
+            return result("No customers are at risk right now - every regular has visited recently. (At-risk customers "
+                          "are those who used to buy often but have not come back for a while.)", [],
+                          ["Show customer segments", "Who are my top customers?"],
+                          {"notes": [f"{len(df)} identified customer(s) in the last 12 months."]})
         ans = (f"**{n_risk}** valuable customers are **at risk** - they used to buy often but haven't visited recently. "
                f"Here are the highest-spending ones to win back (a personal call or a targeted offer works best):")
         return result(ans, [table("Customers to win back", [("name", "Customer", "text"), ("phone", "Phone", "text"),

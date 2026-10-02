@@ -24,6 +24,12 @@ def main() -> None:
     parser.add_argument("--seed", type=int, help=f"random seed (default {settings.SEED_RANDOM_STATE})")
     parser.add_argument("--end-date", help="last day of data, YYYY-MM-DD (default: yesterday)")
     a = parser.parse_args()
+    from app.seed.generator import MIN_DAYS
+
+    if a.days is not None and a.days < MIN_DAYS:
+        parser.error(f"--days must be at least {MIN_DAYS}")
+    if a.outlets is not None and not 1 <= a.outlets <= 7:
+        parser.error("--outlets must be between 1 and 7")
     migrate()
     kwargs = seed_kwargs(a.days, a.outlets, a.seed, a.end_date)
     print(f"Generating demo data {kwargs} into {settings.DATABASE_URL} ...")

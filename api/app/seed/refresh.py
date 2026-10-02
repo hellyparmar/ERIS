@@ -48,16 +48,23 @@ def shift_demo_dates(db: Session) -> int:
     latest = db.scalar(select(func.max(Sale.sale_date)))
     if latest is None or not is_untouched_demo(db):
         return 0
+    from app.models import DatasetInfo
+
+    ds = db.scalar(select(DatasetInfo).order_by(DatasetInfo.id.desc()))
+    if settings.SEED_END_DATE or (ds and (ds.parameters or {}).get("fixed_end_date")):
+        return 0  # the dataset was generated to end on a chosen date: keep it there
     gap = (clock.today() - timedelta(days=1) - latest).days
     days = (gap // 7) * 7
     if days <= 0:
         return 0
+    sqlite = db.get_bind().dialect.name == "sqlite"
+
     def shift(table: str, date_cols: list[str], dt_cols: list[str], n: int) -> None:
         sets = []
         for col in date_cols:
-            sets.append(f"{col} = date({col}, '{n:+d} days')" if settings.is_sqlite else f"{col} = {col} + ({n})")
+            sets.append(f"{col} = date({col}, '{n:+d} days')" if sqlite else f"{col} = {col} + ({n})")
         for col in dt_cols:
-            sets.append(f"{col} = datetime({col}, '{n:+d} days')" if settings.is_sqlite
+            sets.append(f"{col} = datetime({col}, '{n:+d} days')" if sqlite
                         else f"{col} = {col} + interval '{n} days'")
         db.execute(text(f"UPDATE {table} SET {', '.join(sets)}"))
 

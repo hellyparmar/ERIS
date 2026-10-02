@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     SEED_OUTLETS: int = 5  # 1-7 outlets in the demo company
     SEED_RANDOM_STATE: int = 42
     SEED_END_DATE: str | None = None  # YYYY-MM-DD; default = yesterday (business time zone)
+    # Start without demo data: the first admin is created from these on an empty database
+    INITIAL_ADMIN_EMAIL: str | None = None
+    INITIAL_ADMIN_PASSWORD: str | None = None
 
     # Optional local LLM (free, open source) via Ollama: https://ollama.com
     # The assistant works fully without it (built-in analytics engine);

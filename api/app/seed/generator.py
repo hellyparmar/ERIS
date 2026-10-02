@@ -66,6 +66,7 @@ DEMO_PASSWORDS = {"admin": "Admin@123", "manager": "Manager@123", "staff": "Staf
 WEEKDAY_FACTOR = np.array([0.88, 0.86, 0.90, 0.95, 1.06, 1.24, 1.16])  # Mon..Sun
 HOUR_WEIGHTS_WEEKDAY = np.array([3, 5, 6, 7, 8, 7, 5, 4, 5, 7, 9, 10, 8, 4], dtype=float)  # 08:00..21:00
 HOUR_WEIGHTS_WEEKEND = np.array([2, 4, 6, 8, 9, 8, 7, 6, 7, 8, 9, 9, 7, 4], dtype=float)
+MIN_DAYS = 90  # price changes, anomalies and churn are placed at least 60 days into the history
 FUTURE_DAYS = 90  # weather climatology and planned promotions are generated this far ahead (known future inputs)
 PROMO_ELASTICITY = 2.0  # demand multiplier = (1 - discount) ^ -elasticity
 PRICE_ELASTICITY = 1.0
@@ -219,9 +220,12 @@ def simulate_weather(rng: np.random.Generator, cities: list[str], start: date, d
 def generate_demo_data(db: Session, days: int = 730, seed: int = 42, end_date: date | None = None,
                        n_outlets: int = 5, log=print) -> dict:
     """Wipe the database and generate the demo organization. Returns row counts."""
+    if days < MIN_DAYS:
+        raise ValueError(f"The demo needs at least {MIN_DAYS} days of history (got {days})")
     t0 = time.time()
     n_outlets = max(1, min(MAX_OUTLETS, n_outlets))
     rng = np.random.default_rng(seed)
+    fixed_end = end_date is not None
     end_date = end_date or (clock.today() - timedelta(days=1))
     start_date = end_date - timedelta(days=days - 1)
     reset_all(db)
@@ -229,7 +233,8 @@ def generate_demo_data(db: Session, days: int = 730, seed: int = 42, end_date: d
     dataset = DatasetInfo(data_source="synthetic", generator_version=GENERATOR_VERSION, random_seed=seed,
                           generated_at=clock.now(), period_start=start_date, period_end=end_date,
                           parameters={"days": days, "outlets": n_outlets, "future_days": FUTURE_DAYS,
-                                      "promo_elasticity": PROMO_ELASTICITY, "price_elasticity": PRICE_ELASTICITY})
+                                      "promo_elasticity": PROMO_ELASTICITY, "price_elasticity": PRICE_ELASTICITY,
+                                      "fixed_end_date": fixed_end})
     db.add(dataset)
     org = Organization(**catalog.ORGANIZATION, low_stock_cover_days=7,
                        tax_id=demo_gstin(catalog.ORGANIZATION["state_code"], seed), tax_id_is_demo=True)
