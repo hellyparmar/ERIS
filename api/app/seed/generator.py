@@ -696,7 +696,8 @@ def generate_demo_data(db: Session, days: int = 730, seed: int = 42, end_date: d
                     unit_cost = round(float(final_cost[p_idx] * price_mult[p_idx, o_i]), 2)
                     total += q * unit_cost
                     po_item_rows.append({"id": po_item_id, "order_id": po_id, "product_id": products[p_idx].id,
-                                         "quantity": float(q), "unit_cost": unit_cost})
+                                         "quantity": float(q), "unit_cost": unit_cost,
+                                         "received_quantity": float(q) if status == "received" else 0.0})
                 po_rows.append({
                     "id": po_id, "po_number": f"PO-{order_date:%y%m}-{po_id:05d}", "supplier_id": s.id,
                     "outlet_id": o.id, "status": status, "order_date": order_date, "expected_date": expected,

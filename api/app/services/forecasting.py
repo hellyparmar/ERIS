@@ -34,6 +34,7 @@ from sqlalchemy.orm import Session
 
 from app import clock
 from app.models import (
+    OPEN_PO_STATUSES,
     Category,
     ForecastResult,
     ForecastRun,
@@ -561,8 +562,10 @@ def reorder_suggestions(db: Session, outlet_ids: list[int] | None = None, limit:
             trend = min(max(recent / prior, 0.7), 1.4) if prior > 0 else 1.0
             stats[(o, p)] = (float(s.mean() * (0.5 + 0.5 * trend)), float(s.std()))
 
-    incoming_q = select(PurchaseOrder.outlet_id, PurchaseOrderItem.product_id, func.sum(PurchaseOrderItem.quantity)).join(
-        PurchaseOrder, PurchaseOrder.id == PurchaseOrderItem.order_id).where(PurchaseOrder.status == "ordered").group_by(
+    outstanding = PurchaseOrderItem.quantity - func.coalesce(PurchaseOrderItem.received_quantity, 0)
+    incoming_q = select(PurchaseOrder.outlet_id, PurchaseOrderItem.product_id, func.sum(outstanding)).join(
+        PurchaseOrder, PurchaseOrder.id == PurchaseOrderItem.order_id).where(
+        PurchaseOrder.status.in_(OPEN_PO_STATUSES)).group_by(
         PurchaseOrder.outlet_id, PurchaseOrderItem.product_id)
     incoming = {(o, p): float(v) for o, p, v in db.execute(incoming_q).all()}
 
@@ -625,10 +628,13 @@ def stockout_risk(db: Session, days: int = 14, outlet_ids: list[int] | None = No
         trend = min(max(recent / prior, 0.7), 1.4) if prior > 0 else 1.0
         rates[(o, p)] = float(s.mean() * (0.5 + 0.5 * trend))
     incoming = {}
-    for o, p, qty, exp in db.execute(select(PurchaseOrder.outlet_id, PurchaseOrderItem.product_id,
-                                            PurchaseOrderItem.quantity, PurchaseOrder.expected_date).join(
-            PurchaseOrder, PurchaseOrder.id == PurchaseOrderItem.order_id).where(PurchaseOrder.status == "ordered")):
-        incoming.setdefault((o, p), []).append((exp, float(qty)))
+    for o, p, qty, exp in db.execute(select(
+            PurchaseOrder.outlet_id, PurchaseOrderItem.product_id,
+            PurchaseOrderItem.quantity - func.coalesce(PurchaseOrderItem.received_quantity, 0),
+            PurchaseOrder.expected_date).join(PurchaseOrder, PurchaseOrder.id == PurchaseOrderItem.order_id).where(
+            PurchaseOrder.status.in_(OPEN_PO_STATUSES))):
+        if qty > 0:
+            incoming.setdefault((o, p), []).append((exp, float(qty)))
     inv_q = select(InventoryItem, Product, Outlet).join(Product, Product.id == InventoryItem.product_id).join(
         Outlet, Outlet.id == InventoryItem.outlet_id).where(Product.is_active.is_(True), Outlet.is_active.is_(True))
     if outlet_ids:

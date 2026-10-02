@@ -209,7 +209,7 @@ flowchart LR
   K --> P
 ```
 
-- **No free-form SQL.** The question is mapped to an intent and its filters, and one of about 26 fixed
+- **No free-form SQL.** The question is mapped to an intent and its filters, and one of 29 fixed
   analysis functions runs: the same code that powers the dashboards. Outlet scoping is applied before any query.
 - **Provenance on every answer:**
   - data source (counts by source, generator version and seed);
@@ -241,6 +241,6 @@ flowchart LR
 
 | Layer | What |
 |---|---|
-| API (pytest, 66 tests) | Business rules, imports, roles, refresh tokens, audit, invoices, reports, forecasting, anomalies, drivers, assistant. Runs on SQLite and PostgreSQL (CI job `api-postgres`). |
+| API (pytest, 80 tests) | Business rules, imports, roles, refresh tokens, audit, invoices, reports, forecasting, anomalies, drivers, assistant. Runs on SQLite and PostgreSQL (CI job `api-postgres`). |
 | End-to-end (Playwright, `e2e/`) | Every page as admin; sale → invoice → PDF; import with column mapping; assistant provenance; report downloads; viewer read-only; area manager outlet switching; token refresh; phone layout |
 | Model evaluations | `python -m app.evaluation` (forecasting), `python -m app.assistant_eval` (assistant grounding), anomaly precision and recall (Anomalies & drivers page, notebook) |

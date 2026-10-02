@@ -122,7 +122,7 @@ function SupplierForm({ supplier, onClose }) {
 
 function OrderList() {
   const { outletId } = useApp()
-  const [status, setStatus] = useState('ordered')
+  const [status, setStatus] = useState('open')
   const [page, setPage] = useState(1)
   const [detail, setDetail] = useState(null)
   const params = { status, outlet_id: outletId, page, page_size: 25 }
@@ -131,7 +131,7 @@ function OrderList() {
     <Card flush>
       <div className="row" style={{ padding: 12, borderBottom: '1px solid var(--border)' }}>
         <select className="select" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1) }} aria-label="Status">
-          <option value="ordered">Open</option><option value="overdue">Overdue</option><option value="received">Received</option><option value="cancelled">Cancelled</option><option value="">All</option>
+          <option value="open">Open (incl. part-delivered)</option><option value="partial">Part-delivered</option><option value="overdue">Overdue</option><option value="received">Received</option><option value="closed">Closed short</option><option value="cancelled">Cancelled</option><option value="">All</option>
         </select>
       </div>
       {q.isLoading ? <Spinner /> : q.isError ? <ErrorState error={q.error} /> : (
@@ -157,45 +157,52 @@ function PODrawer({ id, onClose }) {
   const qc = useQueryClient()
   const toast = useToast()
   const q = useQuery({ queryKey: ['po', id], queryFn: () => api(`/purchase-orders/${id}`) })
-  const [received, setReceived] = useState(null)
+  const [arriving, setArriving] = useState({})
   const po = q.data
-  const qty = (i) => received?.[i.product_id] ?? i.quantity
+  const open = po && ['ordered', 'partial'].includes(po.status)
+  const qty = (i) => arriving[i.product_id] ?? i.outstanding
   const receive = useMutation({
-    mutationFn: () => api(`/purchase-orders/${id}/receive`, { method: 'POST', body: { items: po.items.map((i) => ({ product_id: i.product_id, quantity: Number(qty(i)) })) } }),
-    onSuccess: () => { toast('Goods received - stock updated', 'success'); qc.invalidateQueries() },
+    mutationFn: () => api(`/purchase-orders/${id}/receive`, { method: 'POST', body: { items: po.items.filter((i) => i.outstanding > 0).map((i) => ({ product_id: i.product_id, quantity: Number(qty(i)) || 0 })) } }),
+    onSuccess: (r) => {
+      toast(r.status === 'partial' ? 'Delivery recorded - the rest of the order is still expected' : 'Goods received - order complete', 'success')
+      setArriving({})
+      qc.invalidateQueries()
+    },
     onError: (e) => toast(e.message, 'error'),
   })
   const cancel = useMutation({
     mutationFn: () => api(`/purchase-orders/${id}/cancel`, { method: 'POST' }),
-    onSuccess: () => { toast('Purchase order cancelled', 'success'); qc.invalidateQueries() },
+    onSuccess: (r) => { toast(r.status === 'closed' ? 'Order closed - outstanding items are no longer expected' : 'Purchase order cancelled', 'success'); qc.invalidateQueries() },
     onError: (e) => toast(e.message, 'error'),
   })
-  const open = po?.status === 'ordered'
+  const partial = po?.status === 'partial'
   return (
     <Drawer title={po ? po.po_number : 'Purchase order'} onClose={onClose} actions={po && isManager && open && <>
-      <button className="btn sm danger" onClick={() => window.confirm('Cancel this purchase order?') && cancel.mutate()}><XCircle />Cancel</button>
-      <button className="btn sm primary" onClick={() => receive.mutate()} disabled={receive.isPending}><CheckCircle2 />Receive goods</button>
+      <button className="btn sm danger" onClick={() => window.confirm(partial ? 'Close this order? Items not yet delivered will no longer be expected.' : 'Cancel this purchase order?') && cancel.mutate()}><XCircle />{partial ? 'Close order' : 'Cancel'}</button>
+      <button className="btn sm primary" onClick={() => receive.mutate()} disabled={receive.isPending}><CheckCircle2 />Record delivery</button>
     </>}>
       {!po ? <Spinner /> : (
         <>
           <Card><dl className="dl">
-            <dt>Status</dt><dd><StatusBadge status={po.overdue ? 'overdue' : po.status} /></dd>
+            <dt>Status</dt><dd><StatusBadge status={po.overdue ? 'overdue' : po.status} />{po.overdue && partial && <span className="small muted"> (part-delivered)</span>}</dd>
             <dt>Supplier</dt><dd>{po.supplier}</dd><dt>Deliver to</dt><dd>{po.outlet}</dd>
             <dt>Ordered</dt><dd>{date(po.order_date)}</dd><dt>Expected</dt><dd>{date(po.expected_date)}</dd>
-            {po.received_date && <><dt>Received</dt><dd>{date(po.received_date)}</dd></>}
+            {po.received_date && <><dt>{po.status === 'received' ? 'Received' : 'Last delivery'}</dt><dd>{date(po.received_date)}</dd></>}
             {po.notes && <><dt>Notes</dt><dd>{po.notes}</dd></>}
           </dl></Card>
-          <Card flush title={open ? 'Items - adjust quantities if the delivery differs' : 'Items'}>
+          <Card flush title={open ? 'Items - enter what arrived in this delivery' : 'Items'}>
             <DataTable rows={po.items} sortable={false} columns={[
               { key: 'product', label: 'Product', render: (i) => <><b>{i.product}</b><div className="small muted">{i.sku}</div></> },
-              { key: 'quantity', label: open ? 'Received qty' : 'Quantity', align: 'right', render: (i) => open && isManager
-                ? <input className="input" type="number" min="0" step="any" style={{ width: 84 }} value={qty(i)} aria-label="Received quantity"
-                    onChange={(e) => setReceived((r) => ({ ...(r || {}), [i.product_id]: e.target.value }))} />
-                : `${num(i.quantity, 1)} ${i.unit}` },
+              { key: 'quantity', label: 'Ordered', align: 'right', render: (i) => `${num(i.quantity, 1)} ${i.unit}` },
+              { key: 'received_quantity', label: 'Received', align: 'right', render: (i) => num(i.received_quantity, 1) },
+              ...(open ? [{ key: 'arriving', label: 'Arriving now', align: 'right', render: (i) => (i.outstanding > 0 && isManager
+                ? <input className="input" type="number" min="0" max={i.outstanding} step="any" style={{ width: 84 }} value={qty(i)} aria-label={`Quantity of ${i.product} arriving now`}
+                    onChange={(e) => setArriving((r) => ({ ...r, [i.product_id]: e.target.value }))} />
+                : <span className="muted">{i.outstanding > 0 ? num(i.outstanding, 1) : 'done'}</span>) }] : []),
               { key: 'unit_cost', label: 'Unit cost', format: 'currency' },
-              { key: 'line_total', label: 'Total', format: 'currency' },
+              { key: 'line_total', label: 'Ordered value', format: 'currency' },
             ]} />
-            <div className="pager"><span>Order value</span><b style={{ color: 'var(--text)' }}>{money(po.total_cost, { decimals: true })}</b></div>
+            <div className="pager"><span>Order value · received so far</span><b style={{ color: 'var(--text)' }}>{money(po.total_cost, { decimals: true })} · {money(po.received_value, { decimals: true })}</b></div>
           </Card>
         </>
       )}

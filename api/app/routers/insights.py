@@ -224,12 +224,20 @@ def run_dict(r: ForecastRun, detail: bool = False) -> dict:
     return d
 
 
-def _run_visible(user: User, run: ForecastRun) -> bool:
-    """Admins see every run; others only runs limited to outlets they are assigned to (evaluations are org-wide
-    model-quality summaries and visible to everyone)."""
+def _run_visible(user: User, run: ForecastRun, all_outlets: set[int]) -> bool:
+    """Admins see every run; others only runs limited to outlets they are assigned to. A run over all outlets
+    (no outlet filter) is visible to users assigned to every outlet. Evaluations are org-wide model-quality
+    summaries and visible to everyone."""
     if user.role == "admin" or run.run_type == "evaluation":
         return True
-    return bool(run.outlet_ids) and set(run.outlet_ids) <= set(user.outlet_ids)
+    covered = set(run.outlet_ids) if run.outlet_ids else all_outlets
+    return bool(covered) and covered <= set(user.outlet_ids)
+
+
+def _all_outlet_ids(db: Session) -> set[int]:
+    from app.models import Outlet
+
+    return set(db.scalars(select(Outlet.id)).all())
 
 
 @router.get("/forecast/runs")
@@ -239,7 +247,8 @@ def forecast_runs(run_type: str = "forecast", page: int = Query(1, ge=1), page_s
     if user.role == "admin" or run_type == "evaluation":
         rows, total = paginate(db, q, page, page_size)
         return page_response([run_dict(r[0]) for r in rows], total, page, page_size)
-    visible = [r for r in db.scalars(q.limit(2000)).all() if _run_visible(user, r)]
+    all_ids = _all_outlet_ids(db)
+    visible = [r for r in db.scalars(q.limit(2000)).all() if _run_visible(user, r, all_ids)]
     chunk = visible[(page - 1) * page_size: page * page_size]
     return page_response([run_dict(r) for r in chunk], len(visible), page, page_size)
 
@@ -247,7 +256,7 @@ def forecast_runs(run_type: str = "forecast", page: int = Query(1, ge=1), page_s
 @router.get("/forecast/runs/{run_id}")
 def forecast_run(run_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     run = get_or_404(db, ForecastRun, run_id, "Forecast run")
-    if not _run_visible(user, run):
+    if not _run_visible(user, run, _all_outlet_ids(db)):
         raise HTTPException(403, "This forecast run covers outlets you are not assigned to")
     return run_dict(run, detail=True)
 

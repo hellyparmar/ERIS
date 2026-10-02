@@ -30,6 +30,7 @@ from app.db import Base
 # viewer: read-only dashboards, forecasts, analytics and AI questions
 ROLES = ("admin", "manager", "staff", "viewer")
 MAX_OUTLETS = 7
+OPEN_PO_STATUSES = ("ordered", "partial")  # partial = some goods received, the rest still expected
 SALE_SOURCES = ("synthetic", "manual", "import")
 PAYMENT_METHODS = ("cash", "upi", "card", "credit")
 CHANNELS = ("in_store", "delivery")
@@ -292,10 +293,15 @@ class PurchaseOrderItem(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     order_id: Mapped[int] = mapped_column(ForeignKey("purchase_orders.id", ondelete="CASCADE"), index=True)
     product_id: Mapped[int] = mapped_column(ForeignKey("products.id"))
-    quantity: Mapped[float] = mapped_column(Float)
+    quantity: Mapped[float] = mapped_column(Float)  # ordered
+    received_quantity: Mapped[float] = mapped_column(Float, default=0, server_default="0")
     unit_cost: Mapped[float] = mapped_column(Float)
 
     order: Mapped[PurchaseOrder] = relationship(back_populates="items")
+
+    @property
+    def outstanding(self) -> float:
+        return max(0.0, round(self.quantity - (self.received_quantity or 0.0), 3))
     product: Mapped[Product] = relationship()
 
 

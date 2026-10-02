@@ -11,6 +11,3 @@ Every answer shows where the numbers came from: the data source (synthetic demo 
 
 ## Access control
 Answers only include outlets the signed-in user is allowed to see. A manager asking about another outlet gets results for their own outlets.
-
-## Example questions
-Which outlet had the highest revenue last month? Show the five fastest-growing products. Why was Outlet 3 revenue lower this week? Which items may go out of stock in the next 14 days? Compare weekend sales between outlets. What forecast model performed best for beverages? Summarize the major anomalies this month. What is WAPE? How do I import sales?

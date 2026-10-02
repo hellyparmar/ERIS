@@ -55,9 +55,9 @@ export function Kpi({ label, value, change, hint, icon: Icon, loading }) {
 
 const STATUS = {
   ok: ['good', 'In stock'], low: ['warn', 'Low'], out_of_stock: ['bad', 'Out of stock'], no_stock: ['', 'Not stocked'],
-  completed: ['good', 'Completed'], void: ['bad', 'Void'], ordered: ['info', 'Ordered'], received: ['good', 'Received'],
+  completed: ['good', 'Completed'], void: ['bad', 'Void'], ordered: ['info', 'Ordered'], partial: ['warn', 'Part-delivered'], closed: ['', 'Closed short'], received: ['good', 'Received'],
   cancelled: ['', 'Cancelled'], overdue: ['bad', 'Overdue'], critical: ['bad', 'Critical'], soon: ['warn', 'Soon'],
-  active: ['good', 'Active'], inactive: ['', 'Inactive'], admin: ['info', 'Admin'], manager: ['good', 'Manager'], staff: ['', 'Staff'],
+  active: ['good', 'Active'], inactive: ['', 'Inactive'], admin: ['info', 'Admin'], manager: ['good', 'Manager'], staff: ['', 'Staff'], viewer: ['', 'Viewer'],
 }
 
 export function StatusBadge({ status }) {

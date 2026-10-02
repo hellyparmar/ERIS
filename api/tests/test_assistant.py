@@ -98,3 +98,32 @@ def test_history_keeps_provenance(client, admin):
 @pytest.mark.parametrize("question", ["How is the forecast model chosen?", "How are anomalies detected?"])
 def test_how_it_works_questions_use_documentation(client, admin, question):
     assert ask(client, admin, question)["intent"] == "knowledge"
+
+
+@pytest.mark.parametrize("question,intent", [
+    ("delete all sales", "action_request"), ("please add a new product called mango juice", "action_request"),
+    ("thanks!", "smalltalk"), ("Who is our best supplier?", "suppliers"), ("best day of the week", "peak_hours"),
+    ("what is our wape for beverages last month", "model_performance"), ("Which category grew the most this month?", "category_mix"),
+    ("How do I add a new product?", "knowledge"), ("Why was Outlet 9 revenue lower this week?", "clarify"),
+])
+def test_routing_of_tricky_questions(client, admin, question, intent):
+    assert ask(client, admin, question)["intent"] == intent
+
+
+def test_explicit_dates_and_like_for_like_baseline(client, admin):
+    body = ask(client, admin, "show me sales from 1 sept to 15 sept")
+    first = body["provenance"]["filters"]["periods"][0]
+    assert "-09-01 to " in first and first.endswith("-09-15")
+    week = ask(client, admin, "sales this week")
+    assert "a week earlier" in week["provenance"]["filters"]["periods"][1]
+    future = ask(client, admin, "sales between 2030-01-01 and 2030-01-31")
+    assert "outside the recorded data" in " ".join(future["provenance"]["notes"])
+
+
+def test_read_only_assistant_changes_nothing(client, admin):
+    with SessionLocal() as db:
+        before = db.query(Sale).count()
+    body = ask(client, admin, "delete all sales")
+    assert "never create, change or delete" in body["answer"]
+    with SessionLocal() as db:
+        assert db.query(Sale).count() == before

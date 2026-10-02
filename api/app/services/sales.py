@@ -49,9 +49,12 @@ def normalize_phone(phone: str | None) -> str | None:
 
 
 def find_or_create_customer(db: Session, phone: str | None, name: str | None) -> Customer | None:
+    raw = phone
     phone = normalize_phone(phone)
     if not phone:
         return None
+    if len(phone) != 10:
+        raise HTTPException(400, f"'{raw}' is not a valid 10-digit mobile number")
     customer = db.scalar(select(Customer).where(Customer.phone == phone))
     if customer is None:
         customer = Customer(name=(name or "").strip() or f"Customer {phone[-4:]}", phone=phone)

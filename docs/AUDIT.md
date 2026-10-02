@@ -6,7 +6,7 @@ the work and how it is verified. Deviations from the recommended stack are liste
 
 Verification shorthand:
 
-- **T**: pytest API tests (`api/tests`, 66 tests, SQLite and PostgreSQL).
+- **T**: pytest API tests (`api/tests`, 80 tests, SQLite and PostgreSQL).
 - **E**: Playwright end-to-end tests (`e2e/`).
 - **Ev**: evaluation scripts and reports.
 
@@ -97,7 +97,7 @@ Results are in [FORECAST_EVALUATION.md](FORECAST_EVALUATION.md) and [MODEL_CARD.
 
 | Requirement | Status |
 |---|---|
-| The 7 example questions | All answered. Checked against independent SQL in [ASSISTANT_EVALUATION.md](ASSISTANT_EVALUATION.md): 23/23 intents and 16/16 grounding checks pass. |
+| The 7 example questions | All answered. Checked against independent SQL in [ASSISTANT_EVALUATION.md](ASSISTANT_EVALUATION.md): 27/27 intents and 19/19 grounding checks pass. |
 | Safe architecture: intent, validated parameters, approved query templates, outlet and date filters, structured result | Done. No generated SQL anywhere. |
 | LLM explanation based only on returned data | Ollama is used only to (a) classify unclear questions into the same validated schema, (b) word general advice from a fact summary, and (c) rephrase retrieved documentation, with instructions to use only the given facts or passages |
 | Every answer shows data source, filters, execution time, metrics, model version and insufficient-data notes | Done (provenance block, shown under each answer) |

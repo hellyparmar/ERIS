@@ -20,8 +20,8 @@ from app.services.assistant.tools import Ctx, chart, kpi, result, table, trend_w
 # ------------------------------------------------------------------------------------------ growth
 def growth_products(c: Ctx) -> dict:
     rng, label = c.period(30)
-    prev = rng.previous()
-    c.use(prev, "the previous period")
+    prev, prev_label = _comparison(rng, label)
+    c.use(prev, prev_label)
     n = c.parsed.top_n or 5
     decline = "decline" in c.parsed.flags
     cur = {r["product_id"]: r for r in A.top_products(c.db, rng, c.outlet_ids, 10_000, category_id=c.parsed.category_id)}
@@ -50,7 +50,8 @@ def growth_products(c: Ctx) -> dict:
     rows = rows[:n]
     word = "declining" if decline else "growing"
     ans = (f"The **{len(rows)} fastest-{word} products** at **{c.scope_label}** - **{label}** "
-           f"({rng.start:%d %b} to {rng.end:%d %b}) vs the previous {rng.days} days, by revenue:\n" + "\n".join(
+           f"({rng.start:%d %b} to {rng.end:%d %b}) vs {prev_label} ({prev.start:%d %b} to {prev.end:%d %b}), "
+           "by revenue:\n" + "\n".join(
                f"{i}. **{r['name']}** ({r['category']}): {c.f.money(r['revenue'])} vs {c.f.money(r['previous'])} "
                f"(**{trend_word(r['change_pct'])}**, {c.f.num(r['units'])} vs {c.f.num(r['previous_units'])} units)"
                for i, r in enumerate(rows, 1)))
@@ -65,16 +66,7 @@ def growth_products(c: Ctx) -> dict:
 
 # ------------------------------------------------------------------------------------------ why did it change
 def _comparison(rng: A.DateRange, label: str) -> tuple[A.DateRange, str]:
-    """Like-for-like comparison: the same weekdays a week earlier for periods up to a week, the same days of the
-    previous month for month-to-date / calendar months, otherwise the preceding period of equal length."""
-    if rng.days <= 7:
-        return A.DateRange(rng.start - timedelta(days=7), rng.end - timedelta(days=7)), "the same days a week earlier"
-    if rng.start.day == 1 and rng.days <= 31:
-        prev_end = rng.start - timedelta(days=1)
-        start = prev_end.replace(day=1)
-        end = min(start + timedelta(days=rng.days - 1), prev_end)
-        return A.DateRange(start, end), f"the same days of {start:%B %Y}"
-    return rng.previous(), f"the previous {rng.days} days"
+    return A.comparable_period(rng)
 
 
 def why_change(c: Ctx) -> dict:
@@ -141,7 +133,9 @@ def _risk_line(c: Ctx, r: dict) -> str:
 
 
 def stockout_risk(c: Ctx) -> dict:
-    days = min(max(c.parsed.horizon or 14, 1), 60)
+    asked = c.parsed.horizon or 14
+    days = min(max(asked, 1), 60)
+    c.parsed.horizon = days  # shown in the provenance filters
     rows = F.stockout_risk(c.db, days, c.outlet_ids)
     if c.parsed.category_id:
         ids = set(c.db.scalars(select(Product.id).where(Product.category_id == c.parsed.category_id)).all())
@@ -150,6 +144,8 @@ def stockout_risk(c: Ctx) -> dict:
         rows = [r for r in rows if r["product_id"] in c.parsed.product_ids]
     notes = ["Demand is the average of the last 28 days adjusted for the recent trend; open purchase orders count "
              "as stock on their expected delivery date."]
+    if asked > 60:
+        notes.append(f"Stock-out risk is projected at most 60 days ahead (you asked for {asked}).")
     if not rows:
         return result(f"No items at {c.scope_label} are expected to run out in the next **{days} days** - current "
                       "stock plus open purchase orders covers the expected demand.", [],
@@ -348,6 +344,89 @@ def knowledge_answer(c: Ctx) -> dict:
                   {"sources": sources, "data_source": "ERIS project documentation"})
 
 
+# ------------------------------------------------------------------------------------------ suppliers
+def suppliers(c: Ctx) -> dict:
+    """Supplier reliability: on-time rate of completed orders, lead time, open orders and recent purchases."""
+    from app.models import OPEN_PO_STATUSES, PurchaseOrder, PurchaseOrderItem, Supplier
+
+    since = c.anchor - timedelta(days=89)
+    c.use(A.DateRange(c.anchor - timedelta(days=179), c.anchor), "the last 6 months")
+    q = select(PurchaseOrder).where(PurchaseOrder.order_date >= c.anchor - timedelta(days=180))
+    if c.outlet_ids:
+        q = q.where(PurchaseOrder.outlet_id.in_(c.outlet_ids))
+    orders = c.db.scalars(q).all()
+    spend_q = select(PurchaseOrder.supplier_id, func.sum(PurchaseOrderItem.received_quantity * PurchaseOrderItem.unit_cost)).join(
+        PurchaseOrder, PurchaseOrder.id == PurchaseOrderItem.order_id).where(PurchaseOrder.received_date >= since)
+    if c.outlet_ids:
+        spend_q = spend_q.where(PurchaseOrder.outlet_id.in_(c.outlet_ids))
+    spend = dict(c.db.execute(spend_q.group_by(PurchaseOrder.supplier_id)).all())
+    rows = []
+    for s in c.db.scalars(select(Supplier).where(Supplier.is_active.is_(True)).order_by(Supplier.name)).all():
+        mine = [o for o in orders if o.supplier_id == s.id]
+        done = [o for o in mine if o.status in ("received", "closed") and o.received_date and o.expected_date]
+        on_time = sum(1 for o in done if o.received_date <= o.expected_date)
+        open_orders = [o for o in mine if o.status in OPEN_PO_STATUSES]
+        rows.append({"supplier": s.name, "lead_time_days": s.lead_time_days, "deliveries": len(done),
+                     "on_time_pct": round(on_time / len(done) * 100, 1) if done else None,
+                     "open_orders": len(open_orders),
+                     "late_open": sum(1 for o in open_orders if o.expected_date and o.expected_date < c.anchor),
+                     "purchases_90d": round(float(spend.get(s.id) or 0), 2)})
+    if not rows:
+        return result("No suppliers are set up yet - add them on the Suppliers page.")
+    lines = [f"**Suppliers serving {c.scope_label}** (orders in the last 6 months):"]
+    for r in sorted(rows, key=lambda r: -r["purchases_90d"]):
+        ot = (f"{r['on_time_pct']:.0f}% on time over {r['deliveries']} deliveries" if r["on_time_pct"] is not None
+              else "no completed deliveries")
+        lines.append(f"- **{r['supplier']}**: {ot}, lead time {r['lead_time_days']} days, purchases "
+                     f"{c.f.money(r['purchases_90d'])} in 90 days, {r['open_orders']} open order(s)")
+    rated = sorted([r for r in rows if r["on_time_pct"] is not None and r["deliveries"] >= 3],
+                   key=lambda r: (-r["on_time_pct"], r["lead_time_days"]))
+    if rated:
+        best, worst = rated[0], rated[-1]
+        lines.append(f"\nMost reliable: **{best['supplier']}** ({best['on_time_pct']:.0f}% on time, "
+                     f"{best['lead_time_days']}-day lead time).")
+        if worst is not best:
+            lines[-1] += f" Least reliable: **{worst['supplier']}** ({worst['on_time_pct']:.0f}% on time)."
+    late = [r for r in rows if r["late_open"]]
+    if late:
+        lines.append("Overdue deliveries: " + ", ".join(f"{r['supplier']} ({r['late_open']})" for r in late) + ".")
+    cols = [("supplier", "Supplier", "text"), ("on_time_pct", "On time %", "number"), ("deliveries", "Deliveries", "number"),
+            ("lead_time_days", "Lead time (days)", "number"), ("open_orders", "Open orders", "number"),
+            ("purchases_90d", "Purchases (90 days)", "currency")]
+    return result("\n".join(lines), [table("Suppliers", cols, rows)],
+                  ["Show pending purchase orders", "What should I reorder?"],
+                  {"notes": ["On-time rate = completed orders received on or before their expected date."]})
+
+
+# ------------------------------------------------------------------------------------------ guard rails
+PAGES_FOR = {"invoice": "Sales → open a bill → Issue GST invoice", "sale": "Sales → New sale (or Void on a bill)",
+             "bill": "Sales", "product": "Products", "price": "Products", "stock": "Inventory → Adjust / Transfer",
+             "inventory": "Inventory", "order": "Suppliers & orders or Inventory → Reorder",
+             "purchase": "Suppliers & orders", "supplier": "Suppliers & orders", "customer": "Customers",
+             "user": "Settings → Users & roles", "outlet": "Outlets", "password": "Settings → My profile",
+             "import": "Data import", "data": "Data import or Settings → System & data"}
+
+
+def action_request(c: Ctx) -> dict:
+    import re as _re
+
+    t = c.parsed.text.lower()
+    where = next((page for word, page in PAGES_FOR.items() if _re.search(rf"\b{word}", t)), None)
+    ans = ("I can only **read and analyse** your data - I never create, change or delete anything, so nothing has been "
+           "changed. " + (f"You can do this yourself on **{where}**." if where else "Use the relevant page in the menu "
+                                                                                 "to make changes."))
+    return result(ans, [], ["How is business this week?", "What should I reorder?"],
+                  {"data_source": "none - no data was read or changed"})
+
+
+def smalltalk(c: Ctx) -> dict:
+    t = c.parsed.text.lower()
+    ans = "Goodbye - your data will be here when you're back." if "bye" in t or "night" in t else \
+        "You're welcome! Ask me anything else about your sales, stock or forecasts."
+    return result(ans, [], ["How is business this week?", "Summarize the major anomalies this month"],
+                  {"data_source": "none"})
+
+
 DISPATCH = {
     **T.DISPATCH,
     "growth_products": growth_products,
@@ -357,4 +436,7 @@ DISPATCH = {
     "model_performance": model_performance,
     "anomalies": anomalies,
     "knowledge": knowledge_answer,
+    "suppliers": suppliers,
+    "action_request": action_request,
+    "smalltalk": smalltalk,
 }

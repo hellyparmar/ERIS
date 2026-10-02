@@ -149,6 +149,20 @@ def outside_data(db: Session, r: dict):
     return "outside the recorded data" in notes, "insufficient-data note shown"
 
 
+def date_range_revenue(db: Session, r: dict):
+    period = r["provenance"]["filters"]["periods"][0].split(": ")[1].split(" to ")
+    a, b = date.fromisoformat(period[0]), date.fromisoformat(period[1])
+    return F.money(_revenue(db, a, b)) in r["answer"] and (b - a).days == 14, f"1-15 Sep revenue {F.money(_revenue(db, a, b))}"
+
+
+def read_only(db: Session, r: dict):
+    return "never create, change or delete" in r["answer"], "refuses to change data"
+
+
+def unknown_outlet(db: Session, r: dict):
+    return r["intent"] == "clarify" and "no outlet 9" in r["answer"].lower(), "asks instead of answering for all outlets"
+
+
 def manager_scoped(db: Session, r: dict):
     start, end = _last_month(db)
     other = _revenue(db, start, end, [_outlet(db, "Koregaon Park").id])
@@ -179,6 +193,10 @@ CASES = [
     Case("How is the forecast model chosen?", "knowledge", knowledge_source("forecasting.md")),
     Case("How are anomalies detected?", "knowledge", knowledge_source("anomalies-and-drivers.md")),
     Case("Who will win the cricket world cup?", "general", no_numbers),
+    Case("Show me sales from 1 sept to 15 sept", "sales_summary", date_range_revenue),
+    Case("Delete all sales from last month", "action_request", read_only),
+    Case("Why was Outlet 9 revenue lower this week?", "clarify", unknown_outlet),
+    Case("Who is our most reliable supplier?", "suppliers"),
     Case("Sales in January 2019", "sales_summary", outside_data),
     Case("Revenue at Koregaon Park last month", "sales_summary", manager_scoped, user="priya.and@eris.demo"),
 ]
@@ -194,7 +212,9 @@ def run(db: Session) -> list[dict]:
         prov = r.get("provenance") or {}
         has_prov = bool(prov.get("method")) and (prov.get("data_source") is not None or c.intent == "general")
         grounded, detail = (None, "intent and provenance only")
-        if c.check:
+        if "something went wrong" in r["answer"]:
+            grounded, detail = False, "the analysis raised an error"
+        elif c.check:
             try:
                 grounded, detail = c.check(db, r)
             except Exception as exc:  # a failing check is a failed case, not a crash

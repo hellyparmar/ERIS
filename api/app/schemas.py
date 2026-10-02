@@ -1,7 +1,7 @@
 """Request bodies (responses are plain dicts built by the routers)."""
 from datetime import date, datetime
 
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
 
 class LoginIn(BaseModel):
@@ -51,6 +51,18 @@ class OrganizationIn(BaseModel):
     state: str | None = Field(default=None, max_length=40)
     state_code: str | None = Field(default=None, pattern=r"^\d{2}$")
     low_stock_cover_days: int = Field(default=7, ge=1, le=60)
+
+    @field_validator("tax_id")
+    @classmethod
+    def valid_gstin(cls, v: str | None) -> str | None:
+        from app.services.gst import is_valid_gstin
+
+        if not v or not v.strip():
+            return None
+        v = v.strip().upper()
+        if not is_valid_gstin(v):
+            raise ValueError("GSTIN is not valid (15 characters: state code, PAN, entity, Z, check digit)")
+        return v
 
     @field_validator("timezone")
     @classmethod
@@ -103,6 +115,13 @@ class ProductIn(BaseModel):
     @classmethod
     def upper(cls, v: str) -> str:
         return v.upper()
+
+    @model_validator(mode="after")
+    def price_covers_cost(self) -> "ProductIn":
+        # same rule as the CSV importer; temporary discounts belong in promotions, not in the base price
+        if self.selling_price < self.cost_price:
+            raise ValueError("selling_price is below cost_price")
+        return self
 
 
 class SupplierIn(BaseModel):

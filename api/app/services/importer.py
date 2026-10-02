@@ -426,7 +426,7 @@ def _import_sales(db: Session, rows: list[dict], user: User, result: dict, opts:
             channel = (row.get("channel") or "in_store").lower().replace(" ", "_").replace("-", "_")
             channel = {"store": "in_store", "instore": "in_store", "online": "delivery"}.get(channel, channel)
             phone = normalize_phone(row.get("customer_phone"))
-            if row.get("customer_phone") and (not phone or len(phone) < 10):
+            if row.get("customer_phone") and (not phone or len(phone) != 10):
                 raise ValueError(f"customer_phone '{row.get('customer_phone')}' is not a valid phone number")
         except ValueError as exc:
             _err(result, i, str(exc))
@@ -546,7 +546,7 @@ def _import_customers(db: Session, rows: list[dict], user: User, result: dict, _
         if not name:
             _err(result, i, "name is required")
             continue
-        if not phone or len(phone) < 10:
+        if not phone or len(phone) != 10:
             _err(result, i, f"phone '{row.get('phone', '')}' is not a valid phone number")
             continue
         if ctype not in ("retail", "business"):

@@ -7,7 +7,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app import clock
-from app.models import InventoryItem, Outlet, Product, PurchaseOrder
+from app.models import OPEN_PO_STATUSES, InventoryItem, Outlet, Product, PurchaseOrder
 from app.services import analytics as A
 from app.services.holidays import upcoming_events
 
@@ -40,7 +40,7 @@ def compute_alerts(db: Session, outlet_ids: list[int] | None = None) -> list[dic
                        "link": "/inventory?tab=reorder"})
 
     # 2. Overdue purchase orders
-    q = select(func.count(PurchaseOrder.id)).where(PurchaseOrder.status == "ordered",
+    q = select(func.count(PurchaseOrder.id)).where(PurchaseOrder.status.in_(OPEN_PO_STATUSES),
                                                    PurchaseOrder.expected_date < clock.today())
     if outlet_ids:
         q = q.where(PurchaseOrder.outlet_id.in_(outlet_ids))

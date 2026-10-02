@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app import clock
 from app.db import get_db
 from app.models import (
+    OPEN_PO_STATUSES,
     Category,
     InventoryItem,
     Outlet,
@@ -172,6 +173,7 @@ def create_orders_from_suggestions(body: ReorderCreateIn, user: User = Depends(r
                                    db: Session = Depends(get_db)):
     """Turn selected suggestions into purchase orders, one per outlet & supplier."""
     groups: dict[tuple[int, int], list] = defaultdict(list)
+    skipped: list[str] = []
     for line in body.lines:
         try:
             outlet_id, product_id, qty = int(line["outlet_id"]), int(line["product_id"]), float(line["quantity"])
@@ -182,9 +184,13 @@ def create_orders_from_suggestions(body: ReorderCreateIn, user: User = Depends(r
         ensure_outlet_access(user, outlet_id)
         p = get_or_404(db, Product, product_id, "Product")
         if not p.supplier_id:
-            raise HTTPException(400, f"{p.name} has no supplier - set one on the product first")
+            skipped.append(p.name)  # can't be ordered until a supplier is set - the rest still goes ahead
+            continue
         groups[(outlet_id, p.supplier_id)].append((p, qty))
     if not groups:
+        if skipped:
+            raise HTTPException(400, f"No supplier is set for {', '.join(sorted(set(skipped)))} - set one on the "
+                                     "product first")
         raise HTTPException(400, "Nothing to order")
     created = []
     for (outlet_id, supplier_id), lines in groups.items():
@@ -193,7 +199,7 @@ def create_orders_from_suggestions(body: ReorderCreateIn, user: User = Depends(r
             notes="Created from reorder suggestions"), user)
         created.append(po.po_number)
     db.commit()
-    return {"created": created}
+    return {"created": created, "skipped_no_supplier": sorted(set(skipped))}
 
 
 # ------------------------------------------------------------------------------------------ purchase orders
@@ -203,10 +209,13 @@ def po_dict(po: PurchaseOrder, detail: bool = False) -> dict:
          "order_date": po.order_date.isoformat(), "expected_date": po.expected_date.isoformat() if po.expected_date else None,
          "received_date": po.received_date.isoformat() if po.received_date else None, "total_cost": po.total_cost,
          "notes": po.notes, "items_count": len(po.items),
-         "overdue": po.status == "ordered" and po.expected_date is not None and po.expected_date < clock.today()}
+         "received_value": round(sum((i.received_quantity or 0) * i.unit_cost for i in po.items), 2),
+         "overdue": po.status in OPEN_PO_STATUSES and po.expected_date is not None and po.expected_date < clock.today()}
     if detail:
         d["items"] = [{"product_id": i.product_id, "sku": i.product.sku, "product": i.product.name, "unit": i.product.unit,
-                       "quantity": i.quantity, "unit_cost": i.unit_cost, "line_total": round(i.quantity * i.unit_cost, 2)}
+                       "quantity": i.quantity, "received_quantity": i.received_quantity or 0.0,
+                       "outstanding": i.outstanding if po.status in OPEN_PO_STATUSES else 0.0,
+                       "unit_cost": i.unit_cost, "line_total": round(i.quantity * i.unit_cost, 2)}
                       for i in po.items]
     return d
 
@@ -251,7 +260,9 @@ def list_pos(status: str | None = None, supplier_id: int | None = None, outlet_i
     if outlet_ids:
         q = q.where(PurchaseOrder.outlet_id.in_(outlet_ids))
     if status == "overdue":
-        q = q.where(PurchaseOrder.status == "ordered", PurchaseOrder.expected_date < clock.today())
+        q = q.where(PurchaseOrder.status.in_(OPEN_PO_STATUSES), PurchaseOrder.expected_date < clock.today())
+    elif status == "open":
+        q = q.where(PurchaseOrder.status.in_(OPEN_PO_STATUSES))
     elif status:
         q = q.where(PurchaseOrder.status == status)
     if supplier_id:
@@ -277,38 +288,48 @@ def create_po(body: PurchaseOrderIn, user: User = Depends(require_manager), db: 
 
 @router.post("/purchase-orders/{po_id}/receive")
 def receive_po(po_id: int, body: ReceiveIn, user: User = Depends(require_manager), db: Session = Depends(get_db)):
+    """Record a delivery. `items` are the quantities arriving now (default: everything still outstanding).
+    A short delivery leaves the order open as 'partial'; it is complete when nothing is outstanding."""
     po = get_or_404(db, PurchaseOrder, po_id, "Purchase order")
     ensure_outlet_access(user, po.outlet_id)
-    if po.status != "ordered":
+    if po.status not in OPEN_PO_STATUSES:
         raise HTTPException(400, f"Only open orders can be received (this one is {po.status})")
-    received = {i.product_id: i.quantity for i in po.items}
-    if body.items is not None:
-        given = {line.product_id: line.quantity for line in body.items}
-        unknown = set(given) - set(received)
-        if unknown:
-            raise HTTPException(400, "Received items must be on the purchase order")
-        received = {pid: given.get(pid, 0.0) for pid in received}
-    total = 0.0
-    costs = {i.product_id: i.unit_cost for i in po.items}
-    for item in po.items:
-        qty = received[item.product_id]
-        item.quantity = qty  # record what actually arrived
+    lines = {i.product_id: i for i in po.items}
+    if body.items is None:
+        arriving = {pid: item.outstanding for pid, item in lines.items()}
+    else:
+        arriving: dict[int, float] = {}
+        for line in body.items:
+            if line.product_id not in lines:
+                raise HTTPException(400, "Received items must be on the purchase order")
+            arriving[line.product_id] = arriving.get(line.product_id, 0.0) + line.quantity
+        for pid, qty in arriving.items():
+            item = lines[pid]
+            if qty > item.outstanding + 1e-9:
+                raise HTTPException(400, f"{item.product.name}: {qty:g} received but only {item.outstanding:g} "
+                                         "still outstanding - create a new order for extra goods")
+    if not any(q > 0 for q in arriving.values()):
+        raise HTTPException(400, "Enter the quantity that arrived for at least one item")
+    for pid, qty in arriving.items():
         if qty > 0:
-            change_stock(db, po.outlet_id, item.product_id, qty, "purchase", user.id, po.po_number, "Goods received")
-        total += qty * costs[item.product_id]
-    po.status = "received"
+            item = lines[pid]
+            item.received_quantity = round((item.received_quantity or 0.0) + qty, 3)
+            change_stock(db, po.outlet_id, pid, qty, "purchase", user.id, po.po_number, "Goods received")
     po.received_date = clock.today()
-    po.total_cost = round(total, 2)
+    po.status = "received" if all(i.outstanding <= 0 for i in po.items) else "partial"
     db.commit()
+    db.refresh(po)
     return po_dict(po, detail=True)
 
 
 @router.post("/purchase-orders/{po_id}/cancel")
 def cancel_po(po_id: int, user: User = Depends(require_manager), db: Session = Depends(get_db)):
+    """Cancel an open order. If part of it was already delivered, the order is closed instead: the delivered
+    goods stay in stock and the outstanding quantity is no longer expected."""
     po = get_or_404(db, PurchaseOrder, po_id, "Purchase order")
     ensure_outlet_access(user, po.outlet_id)
-    if po.status != "ordered":
+    if po.status not in OPEN_PO_STATUSES:
         raise HTTPException(400, f"Only open orders can be cancelled (this one is {po.status})")
-    po.status = "cancelled"
+    po.status = "closed" if po.status == "partial" else "cancelled"
     db.commit()
     return po_dict(po)

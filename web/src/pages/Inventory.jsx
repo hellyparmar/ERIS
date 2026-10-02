@@ -174,7 +174,11 @@ function ReorderTab() {
   const cost = chosen.reduce((a, r) => a + picked[r.id].qty * r.unit_cost, 0)
   const m = useMutation({
     mutationFn: () => api('/inventory/reorder', { method: 'POST', body: { lines: chosen.map((r) => ({ outlet_id: r.outlet_id, product_id: r.product_id, quantity: Number(picked[r.id].qty) })) } }),
-    onSuccess: (res) => { toast(`Created ${res.created.length} purchase order(s): ${res.created.join(', ')}`, 'success'); qc.invalidateQueries() },
+    onSuccess: (res) => {
+      toast(`Created ${res.created.length} purchase order(s): ${res.created.join(', ')}`, 'success')
+      if (res.skipped_no_supplier?.length) toast(`Not ordered - no supplier set: ${res.skipped_no_supplier.join(', ')}`, 'error')
+      qc.invalidateQueries()
+    },
     onError: (e) => toast(e.message, 'error'),
   })
   if (q.isLoading) return <Spinner />

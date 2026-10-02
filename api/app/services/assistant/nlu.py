@@ -22,7 +22,7 @@ MONTHS.update({m.lower(): i for i, m in enumerate(calendar.month_abbr) if m})
 MONTHS["sept"] = 9
 
 INTENTS = [
-    "model_performance", "stockout_risk", "why_change", "anomalies", "weekend_compare", "growth_products",
+    "action_request", "smalltalk", "suppliers", "model_performance", "stockout_risk", "why_change", "anomalies", "weekend_compare", "growth_products",
     "knowledge", "business_overview", "sales_summary", "compare_periods", "sales_trend", "top_products", "slow_products",
     "outlet_ranking", "category_mix", "forecast", "stock_status", "reorder", "customers", "peak_hours",
     "payment_mix", "profitability", "purchase_orders", "basket_analysis", "advice", "help", "general",
@@ -36,6 +36,14 @@ GLOSSARY_TERMS = (r"wape|mape|smape|rmse|mae|rfm|abc (analysis|class)|lift|gstin
 
 # (intent, weight, pattern)
 INTENT_PATTERNS: list[tuple[str, float, str]] = [
+    ("action_request", 8, r"^\s*(please\s+|can you\s+|could you\s+)?(delete|remove|erase|drop|update|change|edit|create|"
+                          r"add|insert|void|cancel|refund|reset|clear|modify|rename|record|enter|place|raise|issue|"
+                          r"order)\b(?!\s+me\b)(?!.*\b(how|should|what|which|suggest)\b)"),
+    ("smalltalk", 6, r"^\s*(thanks|thank you|thank u|thx|ty|ok|okay|cool|great|nice|bye|good ?bye|good night|"
+                     r"awesome|perfect|got it)\b[\s!.]*$"),
+    ("suppliers", 4, r"\b(suppliers?|vendors?|distributors?|wholesalers?)\b"),
+    ("model_performance", 5, r"\b(our|the|forecast)\s+(forecast\s+)?(wape|mape|smape|accuracy|error|errors)\b|"
+                             r"\bhow (accurate|good|reliable) (is|are) (the|our)? ?forecasts?\b"),
     ("model_performance", 6, r"\b(models?|algorithms?)\b.*\b(best|perform\w*|accura\w*|won|wins?|chosen|selected|"
                              r"error|wape|better|compare|comparison)\b|\b(best|which|what)\b.*\b(forecast(ing)? )?"
                              r"(models?|algorithms?)\b"),
@@ -71,7 +79,8 @@ INTENT_PATTERNS: list[tuple[str, float, str]] = [
     ("outlet_ranking", 3, r"\b(best|worst|top|rank|ranking|compare|comparison|which)\b.*\b(outlets?|stores?|branch(es)?|shops?|locations?)\b"),
     ("category_mix", 3, r"\b(categor(y|ies)|department|segment mix|sales mix|product mix)\b"),
     ("customers", 3, r"\b(customers?|clients?|shoppers?|loyal(ty)?|churn|at risk|repeat|rfm|segments?)\b"),
-    ("peak_hours", 3, r"\b(peak|busiest|rush|footfall|what time|which (hour|day)|busy (hours?|days?)|slowest (hour|day|time))\b"),
+    ("peak_hours", 3, r"\b(peak|busiest|rush|footfall|what time|which (hour|day)|busy (hours?|days?)|slowest (hour|day|time)|"
+                      r"best (day|days|weekday|time|hours?)|worst (day|weekday)|days? of the week)\b"),
     ("payment_mix", 3, r"\b(payment|upi|cash|card|credit|digital payments?)\b"),
     ("profitability", 3, r"\b(margin|margins|profitab\w*|most profitable|least profitable|markup)\b"),
     ("profitability", 1, r"\bprofit\b"),
@@ -134,6 +143,7 @@ class Parsed:
     category_name: str | None = None
     product_ids: list[int] = field(default_factory=list)
     product_names: list[str] = field(default_factory=list)
+    unknown_outlets: list[str] = field(default_factory=list)  # e.g. "Outlet 7" when there are 5 outlets
     top_n: int | None = None
     horizon: int | None = None
     sort: str = "revenue"
@@ -163,13 +173,84 @@ def _clip(r: DateRange, anchor: date) -> DateRange:
     return DateRange(r.start, min(r.end, anchor))
 
 
+MONTH_WORDS = "|".join(sorted(MONTHS, key=len, reverse=True))
+# one date: 2026-09-15 | 15/09/2026 | 15-09-26 | 15 sept [2026] | sept 15[, 2026]
+DATE_RE = (r"\d{4}-\d{1,2}-\d{1,2}|\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}"
+           rf"|\d{{1,2}}(?:st|nd|rd|th)?\s+(?:of\s+)?(?:{MONTH_WORDS})\b(?:[\s,']+\d{{4}})?"
+           rf"|(?:{MONTH_WORDS})\s+\d{{1,2}}(?:st|nd|rd|th)?\b(?:,?\s+\d{{4}})?")
+
+
+def _infer_year(month: int, day: int, anchor: date) -> int:
+    """A date without a year means the most recent one that is not after the data anchor."""
+    return anchor.year if (month, day) <= (anchor.month, anchor.day) else anchor.year - 1
+
+
+def _parse_date(token: str, anchor: date) -> date | None:
+    token = token.strip().lower()
+    try:
+        m = re.fullmatch(r"(\d{4})-(\d{1,2})-(\d{1,2})", token)
+        if m:
+            return date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+        m = re.fullmatch(r"(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})", token)
+        if m:  # Indian convention: day first
+            y = int(m.group(3))
+            return date(y + 2000 if y < 100 else y, int(m.group(2)), int(m.group(1)))
+        m = re.fullmatch(rf"(\d{{1,2}})(?:st|nd|rd|th)?\s+(?:of\s+)?({MONTH_WORDS})(?:[\s,']+(\d{{4}}))?", token)
+        if m:
+            day, month = int(m.group(1)), MONTHS[m.group(2)]
+            return date(int(m.group(3)) if m.group(3) else _infer_year(month, day, anchor), month, day)
+        m = re.fullmatch(rf"({MONTH_WORDS})\s+(\d{{1,2}})(?:st|nd|rd|th)?(?:,?\s+(\d{{4}}))?", token)
+        if m:
+            day, month = int(m.group(2)), MONTHS[m.group(1)]
+            return date(int(m.group(3)) if m.group(3) else _infer_year(month, day, anchor), month, day)
+    except ValueError:  # 31 Feb, month 13 ...
+        return None
+    return None
+
+
 def parse_periods(text: str, anchor: date) -> list[tuple[DateRange, str]]:
     t = text.lower()
     found: list[tuple[int, DateRange, str]] = []
 
-    def add(m: re.Match, r: DateRange, label: str):
-        if r.start <= anchor:
-            found.append((m.start(), _clip(r, anchor), label))
+    consumed: list[tuple[int, int]] = []  # text spans already used by explicit dates
+
+    def add(m: re.Match, r: DateRange, label: str, pos: int | None = None):
+        if any(a <= m.start() < b for a, b in consumed):
+            return
+        # periods in the future are kept (the answer then says there is no data) rather than silently replaced
+        found.append((m.start() if pos is None else pos, _clip(r, anchor) if r.start <= anchor else r, label))
+
+    # explicit dates: ranges first ("from 1 sept to 15 sept", "between 2026-01-01 and 2026-01-31"), then single days
+    for m in re.finditer(rf"\b(?:from|between)?\s*({DATE_RE})\s*(?:to|till|until|and|-|–)\s*({DATE_RE})", t):
+        a, b = _parse_date(m.group(1), anchor), _parse_date(m.group(len(m.groups()) // 2 + 1), anchor)
+        if a and b:
+            if a > b:
+                a, b = b, a
+            found.append((m.start(), _clip(DateRange(a, b), anchor) if a <= anchor else DateRange(a, b),
+                          f"{a:%d %b %Y} to {b:%d %b %Y}"))
+            consumed.append(m.span())
+    for m in re.finditer(rf"\b(\d{{1,2}})(?:st|nd|rd|th)?\s*(?:to|till|until|-|–)\s*(\d{{1,2}})(?:st|nd|rd|th)?\s+({MONTH_WORDS})"
+                         rf"(?:[\s,']+(\d{{4}}))?\b", t):
+        if any(a <= m.start() < b for a, b in consumed):
+            continue
+        month = MONTHS[m.group(3)]
+        year = int(m.group(4)) if m.group(4) else _infer_year(month, int(m.group(1)), anchor)
+        try:
+            a, b = date(year, month, int(m.group(1))), date(year, month, int(m.group(2)))
+        except ValueError:
+            continue
+        if a > b:
+            a, b = b, a
+        found.append((m.start(), _clip(DateRange(a, b), anchor) if a <= anchor else DateRange(a, b),
+                      f"{a:%d %b %Y} to {b:%d %b %Y}"))
+        consumed.append(m.span())
+    for m in re.finditer(rf"\b({DATE_RE})", t):
+        if any(a <= m.start() < b for a, b in consumed):
+            continue
+        d = _parse_date(m.group(1), anchor)
+        if d:
+            found.append((m.start(), DateRange(d, d), f"{d:%d %b %Y}"))
+            consumed.append(m.span())
 
     for m in re.finditer(r"\b(today|aaj)\b", t):
         add(m, DateRange(anchor, anchor), "today" if anchor == clock.today() else f"{anchor:%d %b %Y} (latest data)")
@@ -205,8 +286,7 @@ def parse_periods(text: str, anchor: date) -> list[tuple[DateRange, str]]:
         add(m, DateRange(anchor - timedelta(days=days - 1), anchor), f"last {n} {unit}{'s' if n > 1 else ''}")
     for m in re.finditer(r"\b(?:last|past)\s+(fortnight)\b", t):
         add(m, DateRange(anchor - timedelta(days=13), anchor), "last 14 days")
-    month_re = "|".join(sorted(MONTHS, key=len, reverse=True))
-    for m in re.finditer(rf"\b({month_re})\b(?:[\s,']+(\d{{4}}|\d{{2}}))?", t):
+    for m in re.finditer(rf"\b({MONTH_WORDS})\b(?:[\s,']+(\d{{4}}|\d{{2}}))?", t):
         word = m.group(1)
         if word in ("may", "mar") and not re.search(rf"\b(in|for|during|of|since|from|vs|and|than)\s+{word}\b|\b{word}\s+\d", t):
             continue  # "may" as a verb / "mar" ambiguity
@@ -269,12 +349,16 @@ class EntityIndex:
     def match_outlets(self, text: str) -> list[Outlet]:
         t = text.lower()
         hits = []
+        self.unknown_refs: list[str] = []
         # "Outlet 3", "store #2", "outlet no. 4", "third outlet": position in the outlet list (ordered by id)
         for m in re.finditer(r"\b(?:outlet|store|branch|shop)s?\s*(?:no\.?|number|#)?\s*(\d)\b|"
                              r"\b(" + "|".join(ORDINALS) + r")\s+(?:outlet|store|branch|shop)\b", t):
             k = int(m.group(1)) if m.group(1) else ORDINALS[m.group(2)]
-            if 1 <= k <= len(self.outlets) and self.outlets[k - 1] not in hits:
-                hits.append(self.outlets[k - 1])
+            if 1 <= k <= len(self.outlets):
+                if self.outlets[k - 1] not in hits:
+                    hits.append(self.outlets[k - 1])
+            else:
+                self.unknown_refs.append(m.group(0).strip())
         for o in self.outlets:
             keys = {o.name.lower(), o.code.lower()}
             first = o.name.lower().split()[0]
@@ -343,6 +427,7 @@ def parse(db: Session, text: str, anchor: date, index: EntityIndex | None = None
         p.flags.add("decline")
 
     outlets = index.match_outlets(t)
+    p.unknown_outlets = list(index.unknown_refs)
     p.outlet_ids = [o.id for o in outlets]
     p.outlet_names = [o.name for o in outlets]
 
@@ -387,6 +472,8 @@ def parse(db: Session, text: str, anchor: date, index: EntityIndex | None = None
         scores["sales_summary"] = 1
     if "stock_status" in scores and "reorder" in scores:
         scores["reorder"] += 1
+    if "growth_products" in scores and re.search(r"\bcategor(y|ies)\b", t):
+        scores["category_mix"] = scores.get("category_mix", 0) + scores["growth_products"] + 1
     if "knowledge" in scores and re.match(r"^\s*how (is|are|does|do|was|were)\b", t):
         scores["knowledge"] += 3  # "how are anomalies detected?" asks how ERIS works, not for the anomalies
     if "knowledge" in scores and (p.periods or p.outlet_ids or p.product_ids):

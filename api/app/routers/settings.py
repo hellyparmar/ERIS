@@ -40,9 +40,12 @@ def update_org(body: OrganizationIn, admin: User = Depends(require_admin), db: S
         org = Organization(**body.model_dump(), tax_id_is_demo=False)
         db.add(org)
     else:
-        if body.tax_id != org.tax_id:
+        data = body.model_dump(exclude_unset=True)  # fields left out keep their current value
+        if data.get("industry") is None:
+            data.pop("industry", None)  # required column
+        if "tax_id" in data and data["tax_id"] != org.tax_id:
             org.tax_id_is_demo = False  # a GSTIN typed in by the user is no longer the generated demo one
-        for k, v in body.model_dump().items():
+        for k, v in data.items():
             setattr(org, k, v)
     db.commit()
     clock.set_timezone(org.timezone)

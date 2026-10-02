@@ -66,3 +66,13 @@ def test_forecast_runs_are_scoped(client, admin, manager):
     assert client.get(f"/api/forecast/runs/{own['run_id']}", headers=manager).status_code == 200
     ids = {r["id"] for r in client.get("/api/forecast/runs", headers=manager).json()["items"]}
     assert own["run_id"] in ids and org["run_id"] not in ids
+
+
+def test_all_outlet_runs_visible_to_users_assigned_everywhere(client, admin):
+    all_ids = [o["id"] for o in client.get("/api/outlets", headers=admin).json()]
+    client.post("/api/users", headers=admin, json={"email": "everywhere@eris.demo", "full_name": "Everywhere",
+                                                    "role": "viewer", "outlet_ids": all_ids, "password": "Password1"})
+    tok = client.post("/api/auth/login", json={"email": "everywhere@eris.demo", "password": "Password1"}).json()
+    everywhere = {"Authorization": f"Bearer {tok['access_token']}"}
+    org = client.get("/api/forecast?scope=total&horizon=7", headers=admin).json()
+    assert client.get(f"/api/forecast/runs/{org['run_id']}", headers=everywhere).status_code == 200

@@ -144,9 +144,23 @@ def kpis(db: Session, rng: DateRange, outlet_ids: list[int] | None = None) -> di
     }
 
 
-def kpis_with_comparison(db: Session, rng: DateRange, outlet_ids: list[int] | None = None) -> dict:
+def comparable_period(rng: DateRange) -> tuple[DateRange, str]:
+    """Like-for-like baseline: the same weekdays a week earlier for periods up to a week, the same days of the
+    previous month for month-to-date / calendar months, otherwise the preceding period of equal length."""
+    if rng.days <= 7:
+        label = "the same day last week" if rng.days == 1 else "the same days a week earlier"
+        return DateRange(rng.start - timedelta(days=7), rng.end - timedelta(days=7)), label
+    if rng.start.day == 1 and rng.days <= 31:
+        prev_end = rng.start - timedelta(days=1)
+        start = prev_end.replace(day=1)
+        return DateRange(start, min(start + timedelta(days=rng.days - 1), prev_end)), f"the same days of {start:%B %Y}"
+    return rng.previous(), f"the previous {rng.days} days"
+
+
+def kpis_with_comparison(db: Session, rng: DateRange, outlet_ids: list[int] | None = None,
+                         previous: DateRange | None = None) -> dict:
     cur = kpis(db, rng, outlet_ids)
-    prev = kpis(db, rng.previous(), outlet_ids)
+    prev = kpis(db, previous or rng.previous(), outlet_ids)
     return {
         "current": cur,
         "previous": prev,

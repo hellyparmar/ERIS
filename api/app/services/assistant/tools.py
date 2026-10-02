@@ -8,7 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app import clock
-from app.models import InventoryItem, Organization, Outlet, Product, PurchaseOrder, Supplier
+from app.models import OPEN_PO_STATUSES, InventoryItem, Organization, Outlet, Product, PurchaseOrder, Supplier
 from app.services import analytics as A
 from app.services import forecasting as F
 from app.services.alerts import compute_alerts
@@ -184,16 +184,18 @@ def sales_summary(c: Ctx) -> dict:
     p = c.parsed
     if p.product_ids:
         return product_performance(c, rng, label)
-    k = A.kpis_with_comparison(c.db, rng, c.outlet_ids) if not p.category_id else None
+    prev, prev_label = A.comparable_period(rng)
+    c.use(prev, prev_label)
+    k = A.kpis_with_comparison(c.db, rng, c.outlet_ids, prev) if not p.category_id else None
     if p.category_id:
         series = A.revenue_series(c.db, rng, c.outlet_ids, "day", category_id=p.category_id)
-        prev = A.revenue_series(c.db, rng.previous(), c.outlet_ids, "day", category_id=p.category_id)
-        rev, prev_rev = sum(s["revenue"] for s in series), sum(s["revenue"] for s in prev)
+        prev_series = A.revenue_series(c.db, prev, c.outlet_ids, "day", category_id=p.category_id)
+        rev, prev_rev = sum(s["revenue"] for s in series), sum(s["revenue"] for s in prev_series)
         units = sum(s["units"] for s in series)
         profit = sum(s["profit"] for s in series)
         ch = A.pct_change(rev, prev_rev)
         ans = (f"**{p.category_name}** sales at {c.scope_label} for {label}: **{c.f.money(rev)}** "
-               f"({trend_word(ch)} vs the previous {rng.days} days), **{c.f.num(units)}** units sold, "
+               f"({trend_word(ch)} vs {prev_label}), **{c.f.num(units)}** units sold, "
                f"gross profit **{c.f.money(profit)}**.")
         tops = A.top_products(c.db, rng, c.outlet_ids, 5, category_id=p.category_id)
         blocks = [{"type": "kpis", "items": [kpi("Revenue", rev, "currency", ch), kpi("Units", units),
@@ -214,7 +216,8 @@ def sales_summary(c: Ctx) -> dict:
            f"**{c.f.num(cur['orders'])}** bills (average bill **{c.f.money(cur['avg_basket'])}**, "
            f"{cur['items_per_basket']:.1f} items per bill).")
     if ch["revenue"] is not None:
-        ans += f" That is **{trend_word(ch['revenue'])}** compared with the previous {'day' if single_day else f'{rng.days} days'}."
+        ans += f" That is **{trend_word(ch['revenue'])}** compared with {prev_label} ({prev.start:%d %b}" + (
+            f" to {prev.end:%d %b})." if not single_day else ").")
     ans += f" Gross profit was **{c.f.money(cur['gross_profit'])}** ({cur['margin_pct']:.1f}% margin)."
     blocks = [{"type": "kpis", "items": [
         kpi("Revenue", cur["revenue"], "currency", ch["revenue"]),
@@ -268,6 +271,8 @@ def compare_periods(c: Ctx) -> dict:
     periods = c.parsed.periods
     if len(periods) >= 2:
         (r1, l1), (r2, l2) = periods[0], periods[1]
+        if r1.start < r2.start:  # "March 2025 vs March 2026": describe the later period against the earlier one
+            (r1, l1), (r2, l2) = (r2, l2), (r1, l1)
     else:
         r1, l1 = c.period(30)
         r2, l2 = r1.previous(), "the previous period"
@@ -669,7 +674,7 @@ def profitability(c: Ctx) -> dict:
 
 def purchase_orders(c: Ctx) -> dict:
     q = select(PurchaseOrder, Supplier, Outlet).join(Supplier, Supplier.id == PurchaseOrder.supplier_id).join(
-        Outlet, Outlet.id == PurchaseOrder.outlet_id).where(PurchaseOrder.status == "ordered")
+        Outlet, Outlet.id == PurchaseOrder.outlet_id).where(PurchaseOrder.status.in_(OPEN_PO_STATUSES))
     if c.outlet_ids:
         q = q.where(PurchaseOrder.outlet_id.in_(c.outlet_ids))
     rows = []
@@ -677,7 +682,7 @@ def purchase_orders(c: Ctx) -> dict:
         overdue = po.expected_date is not None and po.expected_date < clock.today()
         rows.append({"po_number": po.po_number, "supplier": s.name, "outlet": o.name, "order_date": po.order_date.isoformat(),
                      "expected_date": po.expected_date.isoformat() if po.expected_date else None,
-                     "total_cost": po.total_cost, "status": "overdue" if overdue else "ordered"})
+                     "total_cost": po.total_cost, "status": "overdue" if overdue else po.status})
     if "overdue" in c.parsed.flags:
         rows = [r for r in rows if r["status"] == "overdue"]
     if not rows:

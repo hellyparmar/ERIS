@@ -11,7 +11,7 @@ reproducible synthetic dataset. (Python, FastAPI, React, Prophet, XGBoost.)
 
 - Built **ERIS**, an open-source retail analytics platform (FastAPI, SQLAlchemy/Alembic, PostgreSQL or SQLite,
   React) for a 5-outlet chain. It has 17 working pages, 4 roles with outlet-level access control,
-  refresh-token auth and an automatic audit trail. Verified by 66 API tests on SQLite and PostgreSQL and 9
+  refresh-token auth and an automatic audit trail. Verified by 80 API tests on SQLite and PostgreSQL and 9
   Playwright end-to-end tests in CI.
 - Designed a **deterministic synthetic data generator**: 2 years, about 216K bills and 789K line items. It
   models seasonality, Indian festivals, weather, promotion and price elasticity, stockouts with substitution,
@@ -24,12 +24,12 @@ reproducible synthetic dataset. (Python, FastAPI, React, Prophet, XGBoost.)
     WAPE than the seasonal-naive baseline** (17.3% vs 20.2%). The evaluation also showed, and the docs
     report, that XGBoost underperformed on this data.
 - Built a **safe natural-language analytics assistant**.
-  - Rule-based intent and entity parsing maps questions to 26 validated query templates, with no generated
+  - Rule-based intent and entity parsing maps questions to 29 validated answer templates, with no generated
     SQL.
   - TF-IDF retrieval over the project's own documentation answers how-it-works questions.
   - Optional local LLM through Ollama.
   - Every answer shows its data source, filters, timing, model version and caveats.
-  - Scored **23/23 on intent recognition and 16/16 on numbers checked against independent SQL**.
+  - Scored **27/27 on intent recognition and 19/19 on numbers checked against independent SQL**.
 - Implemented **unsupervised anomaly detection**: a weekday-normalised robust z-score with MAD, plus a
   quantity-outlier check on bill lines. It reached **precision 0.79 and recall 0.73** against injected ground
   truth. Added an exact revenue decomposition (traffic × basket, by outlet and category) with estimated

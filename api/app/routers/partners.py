@@ -6,7 +6,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.models import Customer, Product, PurchaseOrder, Sale, SaleItem, Supplier, User
+from app.models import OPEN_PO_STATUSES, Customer, Product, PurchaseOrder, PurchaseOrderItem, Sale, SaleItem, Supplier, User
 from app.routers.common import csv_response, get_or_404, page_response, paginate
 from app.schemas import CustomerIn, SupplierIn
 from app.security import get_current_user, require_manager, require_writer, scoped_outlet_ids
@@ -31,11 +31,13 @@ def list_suppliers(search: str | None = None, _: User = Depends(get_current_user
         Product.is_active.is_(True)).group_by(Product.supplier_id)).all())
     open_po = {sid: (n, v) for sid, n, v in db.execute(select(
         PurchaseOrder.supplier_id, func.count(PurchaseOrder.id), func.sum(PurchaseOrder.total_cost)).where(
-        PurchaseOrder.status == "ordered").group_by(PurchaseOrder.supplier_id)).all()}
+        PurchaseOrder.status.in_(OPEN_PO_STATUSES)).group_by(PurchaseOrder.supplier_id)).all()}
     anchor = A.anchor_date(db)
-    spend = dict(db.execute(select(PurchaseOrder.supplier_id, func.sum(PurchaseOrder.total_cost)).where(
-        PurchaseOrder.status == "received", PurchaseOrder.received_date > anchor - timedelta(days=90)).group_by(
-        PurchaseOrder.supplier_id)).all())
+    received_value = func.sum(func.coalesce(PurchaseOrderItem.received_quantity, 0) * PurchaseOrderItem.unit_cost)
+    spend = dict(db.execute(select(PurchaseOrder.supplier_id, received_value).join(
+        PurchaseOrderItem, PurchaseOrderItem.order_id == PurchaseOrder.id).where(
+        PurchaseOrder.status.in_(("received", "partial", "closed")),
+        PurchaseOrder.received_date > anchor - timedelta(days=90)).group_by(PurchaseOrder.supplier_id)).all())
     out = []
     for s in db.scalars(q).all():
         n, v = open_po.get(s.id, (0, 0))
@@ -50,7 +52,7 @@ def get_supplier(supplier_id: int, _: User = Depends(get_current_user), db: Sess
     products = db.scalars(select(Product).where(Product.supplier_id == s.id).order_by(Product.name)).all()
     orders = db.scalars(select(PurchaseOrder).where(PurchaseOrder.supplier_id == s.id).order_by(
         PurchaseOrder.order_date.desc()).limit(20)).all()
-    received = [o for o in orders if o.status == "received" and o.received_date and o.expected_date]
+    received = [o for o in orders if o.status in ("received", "closed") and o.received_date and o.expected_date]
     on_time = sum(1 for o in received if o.received_date <= o.expected_date)
     return {
         **supplier_dict(s),
@@ -171,7 +173,7 @@ def get_customer(customer_id: int, user: User = Depends(get_current_user), db: S
 def _phone_unique(db: Session, phone: str | None, exclude_id: int | None = None) -> str | None:
     phone = normalize_phone(phone)
     if phone:
-        if len(phone) < 10:
+        if len(phone) != 10:
             raise HTTPException(400, "Phone number must have 10 digits")
         q = select(Customer.id).where(Customer.phone == phone)
         if exclude_id:

@@ -104,8 +104,10 @@ def test_purchase_order_receive_adds_stock(client, admin):
     assert po["status"] == "ordered" and po["total_cost"] > 0
     r = client.post(f"/api/purchase-orders/{po['id']}/receive", headers=admin,
                     json={"items": [{"product_id": 36, "quantity": 9}]})
-    assert r.status_code == 200 and r.json()["status"] == "received"
+    assert r.status_code == 200 and r.json()["status"] == "partial"  # 1 unit still expected
     assert stock_of(3, 36) == 13
+    r = client.post(f"/api/purchase-orders/{po['id']}/receive", headers=admin, json={})
+    assert r.json()["status"] == "received" and stock_of(3, 36) == 14
     assert client.post(f"/api/purchase-orders/{po['id']}/cancel", headers=admin).status_code == 400
 
 
@@ -326,3 +328,41 @@ def test_ollama_client_against_simulated_server(monkeypatch):
     llm._status["checked"] = 0.0
     assert llm.status(force=True)["available"] is False
     llm._status["checked"] = 0.0
+
+
+def test_purchase_order_partial_receiving(client, admin):
+    product_id = 22
+    client.post("/api/inventory/adjust", headers=admin, json={"outlet_id": 1, "product_id": product_id, "mode": "set", "quantity": 10})
+    po = client.post("/api/purchase-orders", headers=admin, json={"supplier_id": 1, "outlet_id": 1,
+                                                                  "items": [{"product_id": product_id, "quantity": 10}]}).json()
+    r = client.post(f"/api/purchase-orders/{po['id']}/receive", headers=admin, json={"items": [{"product_id": product_id, "quantity": 4}]})
+    assert r.status_code == 200 and r.json()["status"] == "partial"
+    assert r.json()["items"][0]["received_quantity"] == 4 and r.json()["items"][0]["outstanding"] == 6
+    assert stock_of(1, product_id) == 14
+    # outstanding quantity still counts as incoming stock and the order stays in the open list
+    assert any(p["id"] == po["id"] for p in client.get("/api/purchase-orders?status=open", headers=admin).json()["items"])
+    over = client.post(f"/api/purchase-orders/{po['id']}/receive", headers=admin,
+                       json={"items": [{"product_id": product_id, "quantity": 7}]})
+    assert over.status_code == 400 and "outstanding" in over.json()["detail"]
+    r = client.post(f"/api/purchase-orders/{po['id']}/receive", headers=admin, json={})
+    assert r.json()["status"] == "received" and stock_of(1, product_id) == 20
+    assert client.post(f"/api/purchase-orders/{po['id']}/receive", headers=admin, json={}).status_code == 400
+    # closing a part-delivered order keeps what arrived
+    po2 = client.post("/api/purchase-orders", headers=admin, json={"supplier_id": 1, "outlet_id": 1,
+                                                                   "items": [{"product_id": product_id, "quantity": 5}]}).json()
+    client.post(f"/api/purchase-orders/{po2['id']}/receive", headers=admin, json={"items": [{"product_id": product_id, "quantity": 2}]})
+    assert client.post(f"/api/purchase-orders/{po2['id']}/cancel", headers=admin).json()["status"] == "closed"
+    assert stock_of(1, product_id) == 22
+
+
+def test_input_validation_rules(client, admin):
+    bad_phone = client.post("/api/sales", headers=admin, json={"outlet_id": 1, "customer_phone": "12",
+                                                               "items": [{"product_id": 22, "quantity": 1}]})
+    assert bad_phone.status_code == 400
+    loss = client.post("/api/products", headers=admin, json={"sku": "LOSS-1", "name": "Below cost", "category_id": 1,
+                                                             "cost_price": 10, "selling_price": 5})
+    assert loss.status_code == 422
+    org = client.get("/api/settings/organization", headers=admin).json()
+    body = {k: org[k] for k in ("name", "timezone", "tax_id", "state", "state_code")}
+    assert client.put("/api/settings/organization", headers=admin, json={**body, "tax_id": "NOTAGSTIN"}).status_code == 422
+    assert client.put("/api/settings/organization", headers=admin, json=body).status_code == 200

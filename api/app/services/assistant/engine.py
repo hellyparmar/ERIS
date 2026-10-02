@@ -112,6 +112,14 @@ def _coverage_notes(db: Session, ctx: Ctx | None) -> list[str]:
     if ctx is None or not ctx.used_periods:
         return []
     notes = []
+    today = clock.today()
+    for rng, _label in ctx.used_periods:
+        if rng.start <= today <= rng.end:
+            notes.append(f"Today ({today:%d %b}) is still in progress - its figures include only the sales recorded so far.")
+            break
+    first_period = ctx.used_periods[0][0]
+    if first_period.days <= 3 and ctx.parsed.intent in ("growth_products", "compare_periods", "category_mix", "why_change"):
+        notes.append(f"The period is only {first_period.days} day(s) long, so percentage changes are noisy.")
     first, last = A.first_sale_date(db), A.latest_sale_date(db)
     outlets = db.scalars(select(Outlet).where(Outlet.id.in_(ctx.outlet_ids))).all() if ctx.outlet_ids else \
         db.scalars(select(Outlet)).all()
@@ -119,7 +127,9 @@ def _coverage_notes(db: Session, ctx: Ctx | None) -> list[str]:
         if first is None:
             notes.append("There is no sales data yet.")
             break
-        if rng.end < first or (last and rng.start > last):
+        if last and rng.start > last and rng.start <= clock.today():
+            notes.append(f"No sales have been recorded after {last} yet.")
+        elif rng.end < first or (last and rng.start > last):
             notes.append(f"{label} ({rng.start} to {rng.end}) is outside the recorded data ({first} to {last}).")
         elif rng.start < first:
             notes.append(f"Data starts on {first}, so {label} is only partly covered.")
@@ -194,7 +204,17 @@ def answer(db: Session, user: User, message: str) -> dict:
     t0 = time.perf_counter()
     if parsed.intent == "general" and message and knowledge.best_match(db, message):
         parsed.intent = "knowledge"  # a documentation question the patterns did not recognise
-    if parsed.intent == "general" or parsed.intent not in DISPATCH:
+    if parsed.unknown_outlets and parsed.intent not in ("knowledge", "help", "smalltalk", "action_request", "general"):
+        # never silently widen "Outlet 7" to all outlets
+        all_outlets = index.outlets
+        visible = [(i, o) for i, o in enumerate(all_outlets, 1) if user_outlets is None or o.id in user_outlets]
+        listing = ", ".join(f"Outlet {i} = {o.name}" for i, o in visible)
+        out = result(f"There is no {', '.join(parsed.unknown_outlets)} - ERIS has {len(all_outlets)} outlet(s). "
+                     f"Your outlets: {listing}. Please ask again with one of these.", [],
+                     [f"Revenue at {visible[0][1].name} last month"] if visible else [],
+                     {"data_source": "outlet list", "notes": ["The question named an outlet that does not exist."]})
+        parsed.intent = "clarify"
+    elif parsed.intent == "general" or parsed.intent not in DISPATCH:
         if not message:
             out = result(HELP_TEXT)
         elif llm_status["available"]:
