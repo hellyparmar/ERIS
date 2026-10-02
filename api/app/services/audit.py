@@ -61,7 +61,8 @@ def _label(obj) -> str:
 @event.listens_for(Session, "before_flush")
 def _record_changes(session: Session, _flush_context, _instances) -> None:
     uid = session.info.get("user_id")
-    if uid is None:  # system work (seeding, background jobs) is not user activity
+    if uid is None or session.info.get("audit_bulk"):
+        # system work (seeding, background jobs) is not user activity; bulk imports write one summary entry
         return
     entries = []
     for obj in list(session.new):
@@ -96,7 +97,24 @@ def _record_changes(session: Session, _flush_context, _instances) -> None:
             summary = f"Changed reorder level for product {obj.product_id} at outlet {obj.outlet_id}"
         elif name == "stock_level" and action == "update":
             continue  # quantity changes are already recorded as stock movements
-        session.add(AuditLog(user_id=uid, action=f"{name}.{action}", entity=name,
-                             entity_id=str(obj.id) if getattr(obj, "id", None) else None,
-                             outlet_id=outlet_id if isinstance(outlet_id, int) else None, summary=summary[:255],
-                             details=changes or None))
+        entry = AuditLog(user_id=uid, action=f"{name}.{action}", entity=name,
+                         entity_id=str(obj.id) if getattr(obj, "id", None) else None,
+                         outlet_id=outlet_id if isinstance(outlet_id, int) else None, summary=summary[:255],
+                         details=changes or None)
+        session.add(entry)
+        if entry.entity_id is None and action == "create":
+            session.info.setdefault("_audit_pending", []).append((entry, obj))
+
+
+@event.listens_for(Session, "after_flush_postexec")
+def _fill_new_ids(session: Session, _flush_context) -> None:
+    """New records get their primary key during the flush; copy it onto their audit entries (and the outlet id
+    for new outlets). Session.commit flushes again until clean, so the update is saved in the same transaction."""
+    pending = session.info.pop("_audit_pending", None)
+    for entry, obj in pending or ():
+        if getattr(obj, "id", None) is not None:
+            entry.entity_id = str(obj.id)
+            if isinstance(obj, Outlet):
+                entry.outlet_id = obj.id
+            elif entry.outlet_id is None and isinstance(getattr(obj, "outlet_id", None), int):
+                entry.outlet_id = obj.outlet_id

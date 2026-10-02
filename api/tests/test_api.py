@@ -133,8 +133,12 @@ def test_sales_import_dry_run_then_commit(client, admin):
     assert r.status_code == 200 and res["error_count"] == 0 and res["created"] == 2 and not res["committed"]
     r = client.post("/api/imports/sales?dry_run=false", headers=admin, files={"file": ("sales.csv", csv, "text/csv")})
     assert r.json()["committed"] and r.json()["created"] == 2, r.json()["errors"]
-    # importing the same file again is rejected as duplicates and nothing is written
+    # importing the same file again skips the bills already in ERIS (idempotent re-upload) ...
     r = client.post("/api/imports/sales?dry_run=false", headers=admin, files={"file": ("sales.csv", csv, "text/csv")})
+    assert r.json()["created"] == 0 and r.json()["skipped_duplicates"] == 2 and len(r.json()["warnings"]) == 2
+    # ... or rejects the whole file when duplicates must not be skipped
+    r = client.post("/api/imports/sales?dry_run=false&skip_duplicates=false", headers=admin,
+                    files={"file": ("sales.csv", csv, "text/csv")})
     assert not r.json()["committed"] and r.json()["error_count"] == 2
 
 

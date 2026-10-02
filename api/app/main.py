@@ -13,7 +13,7 @@ from sqlalchemy import func, select
 from app import clock
 from app.config import settings
 from app.db import SessionLocal, migrate
-from app.routers import auth, catalog, imports, insights, inventory, outlets, partners, sales
+from app.routers import auth, catalog, imports, insights, inventory, outlets, partners, records, sales
 from app.routers import settings as settings_router
 from app.services import audit as _audit  # noqa: F401  (registers the audit hook)
 from app.state import seeding_state, set_seeding
@@ -79,7 +79,7 @@ app = FastAPI(
 app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins, allow_credentials=True,
                    allow_methods=["*"], allow_headers=["*"])
 
-for r in (auth, settings_router, outlets, catalog, partners, inventory, sales, imports, insights):
+for r in (auth, settings_router, outlets, catalog, partners, inventory, sales, imports, insights, records):
     app.include_router(r.router)
 
 

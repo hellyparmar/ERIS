@@ -1,7 +1,8 @@
 """CSV import for sales, products, customers, suppliers and stock levels.
 
-Every import can run as a dry run first: rows are fully validated and the caller gets a per-row error report
-and a preview, without anything being written. A real run is all-or-nothing per file.
+Flow: inspect (headers, suggested column mapping, sample rows) -> dry run (full validation, per-row errors,
+preview, nothing written) -> commit (all-or-nothing per file). Every run is recorded as an ImportJob with its
+error report (downloadable as CSV); committed sales carry the job id so an import can be traced afterwards.
 """
 from __future__ import annotations
 
@@ -15,7 +16,8 @@ from fastapi import HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models import PAYMENT_METHODS, Category, Customer, Outlet, Product, Sale, Supplier, User
+from app.models import PAYMENT_METHODS, Category, Customer, ImportJob, Outlet, Product, Sale, Supplier, User
+from app.services.audit import audit
 from app.services.inventory import set_stock
 from app.services.sales import LineInput, SaleInput, create_sale, normalize_phone
 
@@ -76,7 +78,73 @@ def template_csv(kind: str) -> str:
     return buf.getvalue()
 
 
-def _read_csv(content: bytes) -> list[dict]:
+ALLOWED_EXTENSIONS = (".csv", ".txt", ".tsv")
+
+# alternative header names seen in POS exports, mapped to template columns
+ALIASES: dict[str, set[str]] = {
+    "invoice_no": {"invoice", "invoice_number", "bill_no", "bill_number", "receipt_no", "order_id", "txn_id"},
+    "date": {"sale_date", "bill_date", "invoice_date", "order_date", "transaction_date"},
+    "time": {"sale_time", "bill_time"},
+    "outlet_code": {"outlet", "outlet_name", "store", "store_code", "branch", "location"},
+    "sku": {"product", "product_name", "item", "item_code", "product_code", "barcode"},
+    "quantity": {"qty", "units", "quantity_sold"},
+    "unit_price": {"price", "rate", "mrp", "selling_price"},
+    "discount": {"discount_amount", "disc"},
+    "payment_method": {"payment", "payment_mode", "mode", "tender"},
+    "customer_phone": {"phone", "mobile", "customer_mobile", "contact"},
+    "customer_name": {"customer"},
+    "cost_price": {"cost", "purchase_price"},
+    "tax_rate": {"gst", "gst_rate", "tax"},
+    "reorder_level": {"reorder", "min_stock"},
+    "lead_time_days": {"lead_time"},
+}
+
+
+def check_file(filename: str | None, content: bytes) -> None:
+    """Reject files that are clearly not CSV before parsing them."""
+    name = (filename or "").lower()
+    if content[:4] == b"PK\x03\x04" or name.endswith((".xlsx", ".xls")):
+        raise HTTPException(400, "Excel files are not read directly - use File > Save As > CSV (UTF-8) first")
+    if name and not name.endswith(ALLOWED_EXTENSIONS):
+        raise HTTPException(400, f"Only CSV files are accepted ({', '.join(ALLOWED_EXTENSIONS)})")
+    if b"\x00" in content[:8192]:
+        raise HTTPException(400, "The file looks binary, not a text CSV file")
+
+
+def suggest_mapping(kind: str, headers: list[str]) -> dict[str, str | None]:
+    """{template column: file header or None} using exact names, then known aliases."""
+    norm = {_norm_key(h): h for h in headers}
+    out = {}
+    for col in TEMPLATES[kind]["columns"]:
+        if col in norm:
+            out[col] = norm[col]
+            continue
+        hit = next((norm[a] for a in ALIASES.get(col, ()) if a in norm), None)
+        out[col] = hit
+    return out
+
+
+def apply_mapping(rows: list[dict], mapping: dict[str, str | None] | None) -> list[dict]:
+    """Rename file columns to template columns. Unmapped template columns are left absent."""
+    if not mapping:
+        return rows
+    pairs = [(col, _norm_key(src)) for col, src in mapping.items() if src]
+    return [{**{k: v for k, v in r.items()}, **{col: r.get(src, "") for col, src in pairs}} for r in rows]
+
+
+def inspect_file(kind: str, content: bytes, filename: str | None) -> dict:
+    if kind not in TEMPLATES:
+        raise HTTPException(404, "Unknown import type")
+    check_file(filename, content)
+    rows, headers = _read_csv(content, with_headers=True)
+    mapping = suggest_mapping(kind, headers)
+    missing = [c for c in TEMPLATES[kind]["required"] if not mapping.get(c)]
+    return {"kind": kind, "filename": filename, "headers": headers, "rows": len(rows), "mapping": mapping,
+            "columns": TEMPLATES[kind]["columns"], "required": TEMPLATES[kind]["required"],
+            "missing_required": missing, "sample": rows[:5]}
+
+
+def _read_csv(content: bytes, with_headers: bool = False):
     text = None
     for enc in ("utf-8-sig", "cp1252", "latin-1"):
         try:
@@ -93,6 +161,7 @@ def _read_csv(content: bytes) -> list[dict]:
     reader = csv.DictReader(io.StringIO(text), dialect=dialect)
     if not reader.fieldnames:
         raise HTTPException(400, "The CSV file has no header row")
+    headers = [h.strip() for h in reader.fieldnames if h and h.strip()]
     rows = []
     for raw in reader:
         row = {_norm_key(k): (v or "").strip() for k, v in raw.items() if k is not None}
@@ -100,7 +169,7 @@ def _read_csv(content: bytes) -> list[dict]:
             rows.append(row)
         if len(rows) > MAX_ROWS:
             raise HTTPException(400, f"Files are limited to {MAX_ROWS:,} rows; please split the file")
-    return rows
+    return (rows, headers) if with_headers else rows
 
 
 def _norm_key(k: str) -> str:
@@ -173,50 +242,72 @@ class _Lookup:
         self.suppliers = {s.name.lower(): s for s in db.scalars(select(Supplier)).all()}
 
     def outlet(self, row: dict) -> Outlet:
-        key = (row.get("outlet_code") or row.get("outlet") or row.get("outlet_name") or "").lower()
-        if not key:
+        raw = row.get("outlet_code") or row.get("outlet") or row.get("outlet_name") or ""
+        if not raw:
             raise ValueError("outlet_code is required")
-        o = self.outlets.get(key)
+        o = self.outlets.get(raw.lower())
         if not o:
-            raise ValueError(f"unknown outlet '{key}'")
+            raise ValueError(f"unknown outlet '{raw}'")
         return o
 
     def product(self, row: dict) -> Product:
-        key = (row.get("sku") or row.get("product") or row.get("product_name") or "").lower()
-        if not key:
+        raw = row.get("sku") or row.get("product") or row.get("product_name") or ""
+        if not raw:
             raise ValueError("sku is required")
-        p = self.products.get(key)
+        p = self.products.get(raw.lower())
         if not p:
-            raise ValueError(f"unknown product '{key}' - add it under Products first")
+            raise ValueError(f"unknown product '{raw}' - add it under Products first")
         return p
 
 
 def run_import(db: Session, kind: str, content: bytes, user: User, dry_run: bool = True,
-               update_stock: bool = False) -> dict:
+               update_stock: bool = False, mapping: dict | None = None, filename: str | None = None,
+               skip_duplicates: bool = True) -> dict:
     if kind not in TEMPLATES:
         raise HTTPException(404, "Unknown import type")
-    rows = _read_csv(content)
+    check_file(filename, content)
+    rows = apply_mapping(_read_csv(content), mapping)
     _check_columns(rows, kind)
     handler = {"sales": _import_sales, "products": _import_products, "customers": _import_customers,
                "suppliers": _import_suppliers, "inventory": _import_inventory}[kind]
+
+    job = ImportJob(kind=kind, filename=(filename or "")[:255] or None, status="running", dry_run=dry_run,
+                    total_rows=len(rows), mapping=mapping or None, user_id=user.id)
+    db.add(job)
+    db.commit()
+    job_id = job.id
+
+    committed = False
     result = {"kind": kind, "dry_run": dry_run, "total_rows": len(rows), "created": 0, "updated": 0,
-              "errors": [], "preview": []}
+              "errors": [], "warnings": [], "preview": [], "skipped_duplicates": 0, "job_id": job_id}
+    db.info["audit_bulk"] = True
     try:
-        handler(db, rows, user, result, update_stock)
-        if result["errors"] or dry_run:
-            db.rollback()
-        else:
+        handler(db, rows, user, result, {"update_stock": update_stock, "skip_duplicates": skip_duplicates,
+                                         "import_id": job_id})
+        committed = not dry_run and not result["errors"]
+        if committed:
+            db.flush()  # write the rows while per-row auditing is off
+            del db.info["audit_bulk"]
+            audit(db, user, f"import.{kind}", "import", job_id,
+                  f"Imported {kind} from {filename or 'CSV'}: {result['created']} created, "
+                  f"{result['updated']} updated", {"rows": len(rows), "skipped_duplicates":
+                                                   result["skipped_duplicates"]})
             db.commit()
-    except HTTPException:
-        db.rollback()
-        raise
+        else:
+            db.rollback()
     except Exception:
         db.rollback()
+        db.info.pop("audit_bulk", None)
+        job = db.get(ImportJob, job_id)
+        job.status = "failed"
+        db.commit()
         raise
+    finally:
+        db.info.pop("audit_bulk", None)
+
     result["error_count"] = len(result["errors"])
-    result["errors"] = result["errors"][:MAX_ERRORS]
     result["valid_rows"] = result["total_rows"] - len({e["row"] for e in result["errors"]})
-    result["committed"] = not dry_run and not result["errors"]
+    result["committed"] = committed
     if not dry_run and result["errors"]:
         result["message"] = "Nothing was imported because some rows have errors. Fix them and upload again."
     elif dry_run:
@@ -224,15 +315,95 @@ def run_import(db: Session, kind: str, content: bytes, user: User, dry_run: bool
                              else f"{result['error_count']} row(s) need fixing before import.")
     else:
         result["message"] = f"Import complete: {result['created']} created, {result['updated']} updated."
+    if result["skipped_duplicates"]:
+        result["message"] += f" {result['skipped_duplicates']} duplicate bill(s) already in ERIS will be skipped." \
+            if dry_run else f" {result['skipped_duplicates']} duplicate bill(s) were skipped."
+
+    job = db.get(ImportJob, job_id)
+    job.status = "committed" if committed else ("validated" if dry_run and not result["errors"] else "rejected")
+    job.created_count, job.updated_count = (result["created"], result["updated"])
+    job.error_count = result["error_count"]
+    job.errors = (result["errors"] + result["warnings"])[:5000]
+    db.commit()
+    result["errors"] = result["errors"][:MAX_ERRORS]
+    result["warnings"] = result["warnings"][:MAX_ERRORS]
     return result
 
 
+def error_report_csv(job: ImportJob) -> str:
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["row", "severity", "message"])
+    for e in job.errors or []:
+        w.writerow([e.get("row"), e.get("severity", "error"), e.get("message")])
+    return buf.getvalue()
+
+
+def sample_csv(db: Session, kind: str, with_errors: bool = False) -> str:
+    """A ready-to-import example built from this database's real outlets and products (with deliberate
+    mistakes when `with_errors` is set, to show what validation catches)."""
+    from datetime import timedelta
+
+    from app import clock
+
+    if kind not in TEMPLATES:
+        raise HTTPException(404, "Unknown import type")
+    outlets = db.scalars(select(Outlet).where(Outlet.is_active.is_(True)).order_by(Outlet.id).limit(3)).all()
+    products = db.scalars(select(Product).where(Product.is_active.is_(True)).order_by(Product.id).limit(8)).all()
+    if not outlets or not products:
+        return template_csv(kind)
+    day = clock.today() - timedelta(days=1)
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(TEMPLATES[kind]["columns"])
+    if kind == "sales":
+        stamp = clock.now().strftime("%H%M%S")
+        for b in range(6):
+            o = outlets[b % len(outlets)]
+            for k in range(1 + b % 3):
+                p = products[(b + k) % len(products)]
+                w.writerow([f"SAMPLE-{stamp}-{b + 1}", day.isoformat(), f"{10 + b}:{15 + k:02d}", o.code, p.sku,
+                            1 + (b + k) % 3, "", "", ("upi", "cash", "card")[b % 3], "in_store",
+                            f"98{b:02d}00{stamp}"[:10] if b % 2 == 0 else "", f"Sample Customer {b + 1}" if b % 2 == 0 else ""])
+        if with_errors:
+            o, p = outlets[0], products[0]
+            w.writerow([f"SAMPLE-{stamp}-E1", day.isoformat(), "12:00", o.code, "NO-SUCH-SKU", 1, "", "", "cash",
+                        "in_store", "", ""])
+            w.writerow([f"SAMPLE-{stamp}-E2", day.isoformat(), "12:05", o.code, p.sku, -2, "", "", "cash",
+                        "in_store", "", ""])
+            w.writerow([f"SAMPLE-{stamp}-E3", "31-31-2025", "12:10", o.code, p.sku, 1, "", "", "cash",
+                        "in_store", "", ""])
+            w.writerow([f"SAMPLE-{stamp}-E4", day.isoformat(), "12:15", "XXX-000", p.sku, 1, "", "", "cheque",
+                        "in_store", "", ""])
+            w.writerow([f"SAMPLE-{stamp}-E5", day.isoformat(), "12:20", o.code, p.sku, 1, "", "", "upi",
+                        "in_store", "12345", ""])
+    elif kind == "inventory":
+        for o in outlets:
+            for p in products[:4]:
+                w.writerow([o.code, p.sku, 50, ""])
+        if with_errors:
+            w.writerow([outlets[0].code, "NO-SUCH-SKU", 10, ""])
+            w.writerow([outlets[0].code, products[0].sku, "ten", ""])
+    else:
+        w.writerows(TEMPLATES[kind]["example"])
+        if with_errors:
+            bad = {"products": ["", "Nameless SKU", "Snacks", "pcs", "10", "8", "5", "", ""],
+                   "customers": ["No Phone", "12", "", "", "retail"],
+                   "suppliers": ["Bad Lead Time", "", "", "", "", "soon", ""]}[kind]
+            w.writerow(bad)
+    return buf.getvalue()
+
+
 def _err(result: dict, row_no: int, msg: str) -> None:
-    result["errors"].append({"row": row_no, "message": msg})
+    result["errors"].append({"row": row_no, "severity": "error", "message": msg})
+
+
+def _warn(result: dict, row_no: int, msg: str) -> None:
+    result["warnings"].append({"row": row_no, "severity": "warning", "message": msg})
 
 
 # ------------------------------------------------------------------------------------------ sales
-def _import_sales(db: Session, rows: list[dict], user: User, result: dict, update_stock: bool) -> None:
+def _import_sales(db: Session, rows: list[dict], user: User, result: dict, opts: dict) -> None:
     lk = _Lookup(db)
     bills: "OrderedDict[str, dict]" = OrderedDict()
     for i, row in enumerate(rows, start=2):  # row 1 is the header
@@ -267,6 +438,9 @@ def _import_sales(db: Session, rows: list[dict], user: User, result: dict, updat
         if bill["outlet"].id != outlet.id:
             _err(result, i, f"invoice {key} has rows for different outlets")
             continue
+        if bill["when"].date() != d:
+            _err(result, i, f"invoice {key} has rows with different dates")
+            continue
         bill["lines"].append(LineInput(product.id, qty, price, disc))
 
     existing = set()
@@ -277,7 +451,11 @@ def _import_sales(db: Session, rows: list[dict], user: User, result: dict, updat
 
     for bill in bills.values():
         if bill["invoice_no"] in existing:
-            _err(result, bill["row"], f"invoice {bill['invoice_no']} already exists - skipped duplicate")
+            if opts["skip_duplicates"]:
+                result["skipped_duplicates"] += 1
+                _warn(result, bill["row"], f"invoice {bill['invoice_no']} is already in ERIS - skipped")
+            else:
+                _err(result, bill["row"], f"invoice {bill['invoice_no']} already exists")
             continue
         try:
             with db.begin_nested():
@@ -285,7 +463,8 @@ def _import_sales(db: Session, rows: list[dict], user: User, result: dict, updat
                     outlet_id=bill["outlet"].id, lines=bill["lines"], sold_at=bill["when"],
                     payment_method=bill["payment"], channel=bill["channel"], customer_phone=bill["phone"],
                     customer_name=bill["name"], invoice_no=bill["invoice_no"]), user, source="import",
-                    update_stock=update_stock, commit=False)
+                    update_stock=opts["update_stock"], commit=False)
+                sale.import_id = opts["import_id"]
             result["created"] += 1
             if len(result["preview"]) < 10:
                 result["preview"].append({"invoice_no": sale.invoice_no, "outlet": bill["outlet"].name,
@@ -297,7 +476,7 @@ def _import_sales(db: Session, rows: list[dict], user: User, result: dict, updat
 
 
 # ------------------------------------------------------------------------------------------ master data
-def _import_products(db: Session, rows: list[dict], user: User, result: dict, _update_stock: bool) -> None:
+def _import_products(db: Session, rows: list[dict], user: User, result: dict, _opts: dict) -> None:
     lk = _Lookup(db)
     cats = {c.name.lower(): c for c in db.scalars(select(Category)).all()}
     seen = set()
@@ -359,7 +538,7 @@ def _import_products(db: Session, rows: list[dict], user: User, result: dict, _u
             result["preview"].append({"sku": sku, "name": name, "category": cat_name, "selling_price": price})
 
 
-def _import_customers(db: Session, rows: list[dict], user: User, result: dict, _update_stock: bool) -> None:
+def _import_customers(db: Session, rows: list[dict], user: User, result: dict, _opts: dict) -> None:
     seen = set()
     for i, row in enumerate(rows, start=2):
         name, phone = row.get("name", ""), normalize_phone(row.get("phone"))
@@ -391,7 +570,7 @@ def _import_customers(db: Session, rows: list[dict], user: User, result: dict, _
             result["preview"].append({"name": name, "phone": phone, "type": ctype})
 
 
-def _import_suppliers(db: Session, rows: list[dict], user: User, result: dict, _update_stock: bool) -> None:
+def _import_suppliers(db: Session, rows: list[dict], user: User, result: dict, _opts: dict) -> None:
     seen = set()
     for i, row in enumerate(rows, start=2):
         name = row.get("name", "")
@@ -422,7 +601,7 @@ def _import_suppliers(db: Session, rows: list[dict], user: User, result: dict, _
             result["preview"].append({"name": name, **fields})
 
 
-def _import_inventory(db: Session, rows: list[dict], user: User, result: dict, _update_stock: bool) -> None:
+def _import_inventory(db: Session, rows: list[dict], user: User, result: dict, _opts: dict) -> None:
     lk = _Lookup(db)
     seen = set()
     for i, row in enumerate(rows, start=2):
