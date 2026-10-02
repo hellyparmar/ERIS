@@ -1,7 +1,8 @@
 # ERIS with Docker Compose.
 #
 #   docker compose up --build                      # app on http://localhost:8000 (SQLite, demo data auto-generated)
-#   docker compose --profile postgres up --build   # same, but PostgreSQL instead of SQLite
+#   DATABASE_URL=postgresql+psycopg2://eris:eris@postgres:5432/eris \
+#     docker compose --profile postgres up --build # same, but on PostgreSQL
 #   docker compose --profile ai up --build         # adds a local LLM (Ollama) for the assistant;
 #                                                  # then: docker compose exec ollama ollama pull llama3.2:3b
 services:
@@ -14,8 +15,15 @@ services:
       DATABASE_URL: ${DATABASE_URL:-sqlite:////app/api/data/eris.db}
       OLLAMA_URL: http://ollama:11434
       OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2:3b}
+      SEED_DAYS: ${SEED_DAYS:-730}
+      SEED_OUTLETS: ${SEED_OUTLETS:-5}
+      SEED_RANDOM_STATE: ${SEED_RANDOM_STATE:-42}
     volumes:
       - eris-data:/app/api/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false   # only when the postgres profile is enabled
     restart: unless-stopped
 
   postgres:

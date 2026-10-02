@@ -7,7 +7,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app import clock
-from app.models import InventoryItem, Outlet, Product, PurchaseOrder, Sale
+from app.models import InventoryItem, Outlet, Product, PurchaseOrder
 from app.services import analytics as A
 from app.services.holidays import upcoming_events
 
@@ -65,23 +65,24 @@ def compute_alerts(db: Session, outlet_ids: list[int] | None = None) -> list[dic
                            "message": "Last 7 days compared with the 7 days before. Make sure stock keeps up.",
                            "link": f"/analytics?outlet={o['outlet_id']}"})
 
-    # 4. Latest day vs typical same weekday (last 4 weeks)
-    q = select(Sale.sale_date, func.sum(Sale.total)).where(
-        A.COMPLETED, Sale.sale_date.in_([anchor - timedelta(days=7 * k) for k in range(0, 5)]))
-    if outlet_ids:
-        q = q.where(Sale.outlet_id.in_(outlet_ids))
-    by_day = dict(db.execute(q.group_by(Sale.sale_date)).all())
-    latest = by_day.get(anchor, 0)
-    past = [by_day.get(anchor - timedelta(days=7 * k), 0) for k in range(1, 5)]
-    past = [p for p in past if p > 0]
-    if past and latest:
-        typical = sum(past) / len(past)
-        dev = (latest - typical) / typical * 100
-        if abs(dev) >= 25:
-            alerts.append({"id": "day-anomaly", "severity": "warning" if dev < 0 else "info", "type": "sales",
-                           "title": f"Unusual sales on {anchor:%a %d %b}: {dev:+.0f}%",
-                           "message": f"Revenue was {'below' if dev < 0 else 'above'} the typical {anchor:%A}.",
-                           "link": "/sales"})
+    # 4. Unusual days and suspicious bills from the anomaly detector (last 7 / 14 days)
+    from app.services import anomalies as AN
+
+    recent = [a for a in AN.detect(db, anchor - timedelta(days=6), anchor, outlet_ids) if not a.get("explained_by")]
+    for a in sorted(recent, key=lambda a: -abs(a["impact"]))[:3]:
+        alerts.append({"id": f"anomaly-{a['outlet_id']}-{a['day']}",
+                       "severity": "critical" if a["severity"] == "critical" else "warning", "type": "anomaly",
+                       "title": f"Unusual {'drop' if a['direction'] == 'down' else 'spike'} at {a['outlet']} on "
+                                f"{a['day']}: {a['change_pct']:+.0f}%" if a["change_pct"] is not None else
+                                f"Unusual day at {a['outlet']} on {a['day']}",
+                       "message": AN.explain(db, a), "link": "/insights"})
+    lines = AN.suspicious_lines(db, anchor - timedelta(days=13), anchor, outlet_ids)
+    if lines:
+        x = lines[0]
+        alerts.append({"id": "suspicious-lines", "severity": "warning", "type": "anomaly",
+                       "title": f"{len(lines)} suspicious bill line{'s' if len(lines) > 1 else ''} in the last 14 days",
+                       "message": f"e.g. {x['invoice_no']}: {x['quantity']:g} x {x['product']} (typical "
+                                  f"{x['typical_quantity']:g}) - check for a typing error.", "link": "/insights"})
 
     # 5. Upcoming festivals
     for ev in upcoming_events(anchor + timedelta(days=1), 21):

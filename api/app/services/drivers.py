@@ -228,7 +228,7 @@ def explain_change(db: Session, cur_start: date, cur_end: date, cmp_start: date 
          else calendar.get("note")},
         {"key": "promotions", "label": "Promotions (estimated uplift)",
          "effect": round(p1["uplift"] - p0["uplift"] * scale, 2),
-         "detail": f"uplift ₹{p1['uplift']:,.0f} vs ₹{p0['uplift'] * scale:,.0f}; "
+         "detail": f"uplift {_signed(p1['uplift'])} vs {_signed(p0['uplift'] * scale)}; "
                    f"{len(p1['running'])} vs {len(p0['running'])} promotion(s)"},
         {"key": "stockouts", "label": "Stockouts (estimated lost sales)",
          "effect": round(-(s1["lost_revenue"] - s0["lost_revenue"] * scale), 2),
@@ -248,6 +248,10 @@ def explain_change(db: Session, cur_start: date, cur_end: date, cmp_start: date 
     )
     out["summary"] = _summary(out)
     return out
+
+
+def _signed(v: float) -> str:
+    return f"{'-' if v < 0 else ''}₹{abs(v):,.0f}"
 
 
 def _money(v: float) -> str:
