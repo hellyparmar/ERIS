@@ -148,7 +148,7 @@ def _weather(db: Session, cur: A.DateRange, cmp: A.DateRange, outlet_ids: list[i
         WeatherDaily.day)).all(), columns=["day", "rain"])
     if rain.empty:
         return {"effect": 0.0, "note": "No weather data."}
-    rain = rain.set_index(pd.to_datetime(rain["day"]))["rain"].astype(float)
+    rain = rain.set_index(pd.to_datetime(rain["day"]))["rain"].astype(float).sort_index()  # PostgreSQL: unordered
     hist = _daily(db, start, cmp.start - timedelta(days=1), outlet_ids)
     hist = hist[hist > 0]
     beta = 0.0
@@ -160,10 +160,13 @@ def _weather(db: Session, cur: A.DateRange, cmp: A.DateRange, outlet_ids: list[i
         r = rain.reindex(resid.index).fillna(0.0).clip(upper=60)
         if r.var() > 0:
             beta = float(np.cov(r, resid)[0, 1] / r.var())
-    mean_rain = lambda r: float(rain.loc[pd.Timestamp(r.start):pd.Timestamp(r.end)].mean() or 0.0)  # noqa: E731
+    def mean_rain(r: A.DateRange) -> float:
+        v = rain.loc[pd.Timestamp(r.start):pd.Timestamp(r.end)].mean()
+        return float(v) if pd.notna(v) else 0.0
+
     heavy = lambda r: int((rain.loc[pd.Timestamp(r.start):pd.Timestamp(r.end)] >= AN.HEAVY_RAIN_MM).sum())  # noqa: E731
     r1, r0 = mean_rain(cur), mean_rain(cmp)
-    effect = cur_revenue * (1 - np.exp(-beta * (min(r1, 60) - min(r0, 60)))) if beta else 0.0
+    effect = cur_revenue * (1 - np.exp(-beta * (min(r1, 60) - min(r0, 60)))) if beta and np.isfinite(beta) else 0.0
     return {"effect": round(float(effect), 2), "rain_mm_per_day": [round(r1, 1), round(r0, 1)],
             "heavy_rain_days": [heavy(cur), heavy(cmp)], "pct_per_10mm": round(float(np.exp(beta * 10) - 1) * 100, 1),
             "note": "Association estimated from the past year of data, not a causal effect."}

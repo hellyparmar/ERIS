@@ -19,6 +19,14 @@ from app.seed.generator import DEMO_PASSWORDS, generate_demo_data  # noqa: E402
 
 @pytest.fixture(scope="session", autouse=True)
 def seeded():
+    if os.environ.get("TEST_DATABASE_URL", "").startswith("postgresql"):
+        from sqlalchemy import text
+
+        from app.db import engine
+
+        with engine.begin() as conn:  # start from an empty schema every run
+            conn.execute(text("DROP SCHEMA public CASCADE"))
+            conn.execute(text("CREATE SCHEMA public"))
     migrate()
     with SessionLocal() as db:
         generate_demo_data(db, days=200, seed=7, end_date=date.today() - timedelta(days=1), log=lambda *_: None)
