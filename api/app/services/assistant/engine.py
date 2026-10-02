@@ -29,7 +29,7 @@ def _previous_context(db: Session, user: User) -> dict | None:
 
 
 def _apply_followup(p: Parsed, prev: dict, anchor: date) -> None:
-    """'What about Bandra?' -> repeat the previous question with the new outlet."""
+    """'What about Pune?' -> repeat the previous question with the new outlet."""
     p.intent = prev.get("intent", p.intent)
     p.confidence = max(p.confidence, 0.6)
     if not p.periods and prev.get("periods"):

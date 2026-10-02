@@ -7,7 +7,9 @@ import { useApp } from '../lib/app'
 const DEMO = [
   { role: 'Owner / admin', email: 'admin@eris.demo', password: 'Admin@123', note: 'All outlets, settings and users' },
   { role: 'Outlet manager', email: 'priya.and@eris.demo', password: 'Manager@123', note: 'Andheri West only' },
+  { role: 'Area manager', email: 'arjun.ind@eris.demo', password: 'Manager@123', note: 'Indiranagar + Whitefield' },
   { role: 'Staff', email: 'staff.andheri@eris.demo', password: 'Staff@123', note: 'Billing & stock lookup' },
+  { role: 'Analyst (viewer)', email: 'analyst@eris.demo', password: 'Viewer@123', note: 'Read-only, all outlets' },
 ]
 
 export default function Login() {
@@ -45,10 +47,12 @@ export default function Login() {
             <li>Live dashboard of sales, profit and stock across all outlets</li>
             <li>Demand forecasts that pick the most accurate model automatically</li>
             <li>Reorder suggestions, purchase orders and stock transfers</li>
-            <li>Ask questions like “What should I reorder?” or “Which outlet grew most?”</li>
+            <li>Ask questions like “Why was Outlet 3 revenue lower this week?” - every answer shows its source</li>
+            <li>Unusual days, suspicious bills and the drivers behind every revenue change</li>
           </ul>
+          <p className="small" style={{ color: '#c3c2b7' }}>Runs on a synthetic demo dataset for a fictional chain (Urban Harvest Foods). Demo GST invoices only - not for tax filing.</p>
         </div>
-        <p className="small" style={{ color: '#898781' }}><Bot size={14} style={{ verticalAlign: -2 }} /> Built with open-source tools: FastAPI, scikit-learn, Prophet, React.</p>
+        <p className="small" style={{ color: '#898781' }}><Bot size={14} style={{ verticalAlign: -2 }} /> Built with open-source tools: FastAPI, Prophet, XGBoost, React, optional Ollama.</p>
       </section>
       <section className="login-form">
         <form className="login-card" onSubmit={submit}>
