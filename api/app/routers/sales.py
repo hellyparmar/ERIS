@@ -9,7 +9,7 @@ from app.db import get_db
 from app.models import Customer, Outlet, Product, Sale, SaleItem, User
 from app.routers.common import csv_response, get_or_404, page_response, paginate
 from app.schemas import SaleIn, VoidIn
-from app.security import ensure_outlet_access, get_current_user, require_manager, scoped_outlet_ids
+from app.security import ensure_outlet_access, get_current_user, require_manager, require_writer, scoped_outlet_ids
 from app.services import forecasting as F
 from app.services.sales import LineInput, SaleInput, create_sale, void_sale
 
@@ -99,7 +99,7 @@ def get_sale(sale_id: int, user: User = Depends(get_current_user), db: Session =
 
 
 @router.post("", status_code=201)
-def record_sale(body: SaleIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def record_sale(body: SaleIn, user: User = Depends(require_writer), db: Session = Depends(get_db)):
     ensure_outlet_access(user, body.outlet_id)
     sold_at = body.sold_at.replace(tzinfo=None) if body.sold_at else None
     if sold_at and user.role == "staff" and sold_at.date() < clock.today() - timedelta(days=1):

@@ -9,18 +9,64 @@ ORGANIZATION = {
     "email": "hello@urbanharvest.example",
     "phone": "+91 22 4000 1234",
     "address": "4th Floor, Lotus Corporate Park, Goregaon East, Mumbai 400063",
-    "tax_id": "27AABCU9603R1ZX",
+    "state": "Maharashtra",
+    "state_code": "27",
+    # tax_id: a synthetic, checksum-valid GSTIN is generated from the seed (see services/gst.py) and marked demo.
 }
 
-# code, name, city, address, manager, size factor, monsoon-affected city, opened N days before data end (None = long open)
+# The demo company runs five outlets by default (SEED_OUTLETS, up to 7) - each with a different demand profile.
+# code, name, city, state, state code, address, manager, size, growth/yr, opened N days before data end (None = long open)
 OUTLETS = [
-    ("MUM-AND", "Andheri West", "Mumbai", "Lokhandwala Complex, Andheri West, Mumbai", "Priya Sharma", 1.30, True, None),
-    ("MUM-BAN", "Bandra", "Mumbai", "Hill Road, Bandra West, Mumbai", "Rahul Mehta", 1.15, True, None),
-    ("PUN-KOR", "Koregaon Park", "Pune", "North Main Road, Koregaon Park, Pune", "Sneha Kulkarni", 0.95, True, None),
-    ("BLR-IND", "Indiranagar", "Bengaluru", "100 Feet Road, Indiranagar, Bengaluru", "Arjun Rao", 1.10, False, None),
-    ("AMD-SGH", "SG Highway", "Ahmedabad", "Sindhu Bhavan Road, SG Highway, Ahmedabad", "Kavya Patel", 0.80, False, None),
-    ("BLR-WHF", "Whitefield", "Bengaluru", "ITPL Main Road, Whitefield, Bengaluru", "Vikram Nair", 0.90, False, 210),
+    ("MUM-AND", "Andheri West", "Mumbai", "Maharashtra", "27", "Lokhandwala Complex, Andheri West, Mumbai",
+     "Priya Sharma", 1.30, 0.12, None),   # flagship, steady growth, monsoon city
+    ("PUN-KOR", "Koregaon Park", "Pune", "Maharashtra", "27", "North Main Road, Koregaon Park, Pune",
+     "Sneha Kulkarni", 0.95, 0.16, None),  # fastest-growing established outlet
+    ("BLR-IND", "Indiranagar", "Bengaluru", "Karnataka", "29", "100 Feet Road, Indiranagar, Bengaluru",
+     "Arjun Rao", 1.10, 0.10, None),       # mild climate, high delivery share
+    ("AMD-SGH", "SG Highway", "Ahmedabad", "Gujarat", "24", "Sindhu Bhavan Road, SG Highway, Ahmedabad",
+     "Kavya Patel", 0.85, -0.08, None),    # losing ground to a new competitor
+    ("BLR-WHF", "Whitefield", "Bengaluru", "Karnataka", "29", "ITPL Main Road, Whitefield, Bengaluru",
+     "Vikram Nair", 0.90, 0.10, 240),      # new outlet ramping up
+    ("MUM-BAN", "Bandra", "Mumbai", "Maharashtra", "27", "Hill Road, Bandra West, Mumbai",
+     "Rahul Mehta", 1.15, 0.09, None),     # optional 6th outlet
+    ("HYD-JUB", "Jubilee Hills", "Hyderabad", "Telangana", "36", "Road No. 36, Jubilee Hills, Hyderabad",
+     "Farah Khan", 0.95, 0.12, 420),       # optional 7th outlet
 ]
+
+# Monthly climatology per city: (mean max temperature C by month Jan..Dec, rain probability by month, mean rain mm on
+# a rainy day by month). Approximate public climate normals - used to synthesise daily weather.
+CLIMATE = {
+    "Mumbai": ([30, 31, 32, 33, 34, 32, 30, 29, 30, 32, 33, 32],
+               [0.01, 0.01, 0.01, 0.02, 0.08, 0.6, 0.9, 0.85, 0.6, 0.2, 0.05, 0.01],
+               [2, 2, 2, 3, 10, 28, 35, 25, 18, 10, 5, 2]),
+    "Pune": ([30, 32, 35, 37, 37, 32, 28, 28, 29, 31, 30, 29],
+             [0.01, 0.01, 0.02, 0.05, 0.12, 0.55, 0.8, 0.7, 0.5, 0.25, 0.05, 0.02],
+             [2, 2, 3, 4, 8, 12, 14, 10, 12, 10, 6, 2]),
+    "Bengaluru": ([28, 31, 33, 34, 33, 29, 28, 28, 29, 28, 27, 27],
+                  [0.02, 0.02, 0.05, 0.15, 0.35, 0.4, 0.45, 0.5, 0.55, 0.5, 0.25, 0.08],
+                  [3, 3, 5, 8, 12, 8, 8, 10, 14, 14, 10, 5]),
+    "Ahmedabad": ([29, 31, 36, 40, 42, 38, 33, 32, 34, 36, 33, 30],
+                  [0.0, 0.0, 0.01, 0.01, 0.03, 0.25, 0.65, 0.55, 0.3, 0.05, 0.02, 0.0],
+                  [1, 1, 2, 2, 5, 15, 25, 20, 15, 6, 3, 1]),
+    "Hyderabad": ([29, 32, 36, 38, 39, 34, 31, 30, 31, 31, 29, 28],
+                  [0.01, 0.01, 0.03, 0.06, 0.1, 0.45, 0.6, 0.6, 0.55, 0.3, 0.08, 0.02],
+                  [2, 2, 4, 5, 8, 10, 12, 12, 14, 10, 6, 2]),
+}
+
+# HSN codes (first 4 digits of the Harmonised System chapter heading) used on demo GST invoices.
+HSN = {
+    "BEV-001": "2201", "BEV-002": "2202", "BEV-003": "2009", "BEV-004": "2101", "BEV-005": "2202", "BEV-006": "2201",
+    "BEV-007": "2202", "BEV-008": "2202", "TEA-001": "0902", "TEA-002": "0902", "TEA-003": "0901", "TEA-004": "2101",
+    "TEA-005": "2101", "DAI-001": "0401", "DAI-002": "0403", "DAI-003": "0406", "DAI-004": "0405", "DAI-005": "0406",
+    "DAI-006": "0407", "DAI-007": "0403", "BAK-001": "1905", "BAK-002": "1905", "BAK-003": "1905", "BAK-004": "1905",
+    "BAK-005": "1905", "BAK-006": "1905", "BAK-007": "1905", "SNK-001": "2005", "SNK-002": "1904", "SNK-003": "0802",
+    "SNK-004": "1806", "SNK-005": "0813", "SNK-006": "2106", "SNK-007": "2106", "SNK-008": "1106", "STA-001": "1006",
+    "STA-002": "1101", "STA-003": "0713", "STA-004": "1509", "STA-005": "1512", "STA-006": "1701", "STA-007": "1008",
+    "STA-008": "1104", "FRV-001": "0803", "FRV-002": "0808", "FRV-003": "0702", "FRV-004": "0703", "FRV-005": "0804",
+    "FRV-006": "0804", "FRV-007": "0709", "FRV-008": "0701", "FRZ-001": "0710", "FRZ-002": "2105", "FRZ-003": "1905",
+    "FRZ-004": "1902", "FRZ-005": "2106", "FRZ-006": "2105", "SWT-001": "1704", "SWT-002": "2106", "SWT-003": "0813",
+    "SWT-004": "2106",
+}
 
 # name, contact, phone, email, city, lead time days, payment terms
 SUPPLIERS = [

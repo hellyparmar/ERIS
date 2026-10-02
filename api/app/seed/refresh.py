@@ -27,12 +27,20 @@ SHIFT_COLUMNS = [
     ("customers", [], ["created_at"]),
     ("inventory", [], ["updated_at"]),
     ("outlets", ["opened_on"], []),
+    ("promotions", ["start_date", "end_date"], ["created_at"]),
+    ("price_history", ["effective_from"], []),
+    ("stockout_events", ["start_date", "end_date"], []),
+    ("anomaly_labels", ["day"], []),
+    ("dataset_info", ["period_start", "period_end"], []),
+    ("invoices", [], ["issued_at"]),
+    ("weather_daily", ["day"], []),
 ]
+FAR = 36500  # shift via a far-away date so unique (city, day) keys never collide mid-update
 
 
 def is_untouched_demo(db: Session) -> bool:
     sources = dict(db.execute(select(Sale.source, func.count(Sale.id)).group_by(Sale.source)).all())
-    return bool(sources) and set(sources) == {"demo"}
+    return bool(sources) and set(sources) == {"synthetic"}
 
 
 def shift_demo_dates(db: Session) -> int:
@@ -44,14 +52,24 @@ def shift_demo_dates(db: Session) -> int:
     days = (gap // 7) * 7
     if days <= 0:
         return 0
-    for table, date_cols, dt_cols in SHIFT_COLUMNS:
+    def shift(table: str, date_cols: list[str], dt_cols: list[str], n: int) -> None:
         sets = []
         for col in date_cols:
-            sets.append(f"{col} = date({col}, '+{days} days')" if settings.is_sqlite else f"{col} = {col} + {days}")
+            sets.append(f"{col} = date({col}, '{n:+d} days')" if settings.is_sqlite else f"{col} = {col} + ({n})")
         for col in dt_cols:
-            sets.append(f"{col} = datetime({col}, '+{days} days')" if settings.is_sqlite
-                        else f"{col} = {col} + interval '{days} days'")
+            sets.append(f"{col} = datetime({col}, '{n:+d} days')" if settings.is_sqlite
+                        else f"{col} = {col} + interval '{n} days'")
         db.execute(text(f"UPDATE {table} SET {', '.join(sets)}"))
+
+    for table, date_cols, dt_cols in SHIFT_COLUMNS:
+        if table == "weather_daily":
+            shift(table, date_cols, dt_cols, days + FAR)
+            shift(table, date_cols, dt_cols, -FAR)
+        else:
+            shift(table, date_cols, dt_cols, days)
+    db.execute(text("UPDATE weather_daily SET is_forecast = (day > :y)"), {"y": clock.today() - timedelta(days=1)})
+    db.execute(text("DELETE FROM forecast_results"))
+    db.execute(text("DELETE FROM forecast_runs"))
     db.commit()
     log.info("Demo data shifted forward by %s days to stay current", days)
     return days

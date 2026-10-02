@@ -5,7 +5,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.models import InventoryItem, Outlet, Product, Sale, User
+from app.models import MAX_OUTLETS, InventoryItem, Organization, Outlet, Product, Sale, User, user_outlets
 from app.routers.common import get_or_404
 from app.schemas import OutletIn
 from app.security import ensure_outlet_access, get_current_user, require_admin, scoped_outlet_ids
@@ -15,7 +15,8 @@ router = APIRouter(prefix="/api/outlets", tags=["outlets"])
 
 
 def outlet_dict(o: Outlet) -> dict:
-    return {"id": o.id, "code": o.code, "name": o.name, "city": o.city, "address": o.address, "phone": o.phone,
+    return {"id": o.id, "code": o.code, "name": o.name, "city": o.city, "state": o.state, "state_code": o.state_code,
+            "address": o.address, "phone": o.phone,
             "manager_name": o.manager_name, "opened_on": o.opened_on.isoformat() if o.opened_on else None,
             "is_active": o.is_active}
 
@@ -38,8 +39,9 @@ def list_outlets(with_stats: bool = False, user: User = Depends(get_current_user
         low = dict(db.execute(select(InventoryItem.outlet_id, func.count(InventoryItem.id)).where(
             InventoryItem.reorder_level > 0, InventoryItem.quantity <= InventoryItem.reorder_level).group_by(
             InventoryItem.outlet_id)).all())
-        staff = dict(db.execute(select(User.outlet_id, func.count(User.id)).where(User.is_active.is_(True)).group_by(
-            User.outlet_id)).all())
+        staff = dict(db.execute(select(user_outlets.c.outlet_id, func.count(User.id)).join(
+            User, User.id == user_outlets.c.user_id).where(User.is_active.is_(True)).group_by(
+            user_outlets.c.outlet_id)).all())
         for o in out:
             p = perf.get(o["id"], {})
             o["stats"] = {
@@ -68,10 +70,13 @@ def get_outlet(outlet_id: int, user: User = Depends(get_current_user), db: Sessi
 
 
 @router.post("", status_code=201)
-def create_outlet(body: OutletIn, _: User = Depends(require_admin), db: Session = Depends(get_db)):
+def create_outlet(body: OutletIn, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
     if db.scalar(select(Outlet.id).where(Outlet.code == body.code)):
         raise HTTPException(409, f"Outlet code {body.code} already exists")
-    o = Outlet(**body.model_dump())
+    if (db.scalar(select(func.count(Outlet.id))) or 0) >= MAX_OUTLETS:
+        raise HTTPException(400, f"ERIS supports up to {MAX_OUTLETS} outlets per organization")
+    org = db.scalar(select(Organization))
+    o = Outlet(**body.model_dump(), organization_id=org.id if org else None)
     db.add(o)
     db.flush()
     # Start every product at zero stock so the outlet appears in inventory immediately.
@@ -82,7 +87,7 @@ def create_outlet(body: OutletIn, _: User = Depends(require_admin), db: Session 
 
 
 @router.put("/{outlet_id}")
-def update_outlet(outlet_id: int, body: OutletIn, _: User = Depends(require_admin), db: Session = Depends(get_db)):
+def update_outlet(outlet_id: int, body: OutletIn, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
     o = get_or_404(db, Outlet, outlet_id, "Outlet")
     if body.code != o.code and db.scalar(select(Outlet.id).where(Outlet.code == body.code)):
         raise HTTPException(409, f"Outlet code {body.code} already exists")
@@ -93,7 +98,7 @@ def update_outlet(outlet_id: int, body: OutletIn, _: User = Depends(require_admi
 
 
 @router.delete("/{outlet_id}")
-def delete_outlet(outlet_id: int, _: User = Depends(require_admin), db: Session = Depends(get_db)):
+def delete_outlet(outlet_id: int, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
     o = get_or_404(db, Outlet, outlet_id, "Outlet")
     if db.scalar(select(func.count(Sale.id)).where(Sale.outlet_id == o.id)):
         o.is_active = False

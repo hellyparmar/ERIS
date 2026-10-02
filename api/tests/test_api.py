@@ -29,7 +29,7 @@ def test_dashboard(client, admin):
     d = r.json()
     assert d["kpis"]["current"]["revenue"] > 0
     assert len(d["trend"]) == 30
-    assert len(d["outlets"]) == 6
+    assert len(d["outlets"]) == 5
     assert d["forecast"] and len(d["forecast"]["forecast"]) == 14
 
 
@@ -120,11 +120,13 @@ def test_reorder_suggestions_create_pos(client, admin):
 
 
 def test_sales_import_dry_run_then_commit(client, admin):
-    today = date.today().isoformat()
+    from datetime import timedelta
+
+    today = (date.today() - timedelta(days=1)).isoformat()  # a past date in every time zone
     csv = ("invoice_no,date,time,outlet_code,sku,quantity,unit_price,discount,payment_method,customer_phone\n"
-           f"IMP-1,{today},09:30,MUM-BAN,DAI-001,2,,,upi,9000000001\n"
-           f"IMP-1,{today},09:30,MUM-BAN,BAK-002,1,,,upi,9000000001\n"
-           f"IMP-2,{today},10:00,Bandra,Cola 750ml,3,45,5,gpay,\n")
+           f"IMP-1,{today},09:30,BLR-IND,DAI-001,2,,,upi,9000000001\n"
+           f"IMP-1,{today},09:30,BLR-IND,BAK-002,1,,,upi,9000000001\n"
+           f"IMP-2,{today},10:00,Indiranagar,Cola 750ml,3,45,5,gpay,\n")
     files = {"file": ("sales.csv", csv, "text/csv")}
     r = client.post("/api/imports/sales?dry_run=true", headers=admin, files=files)
     res = r.json()
@@ -198,7 +200,7 @@ def test_crud_outlet_product_supplier_customer(client, admin):
 
 def test_user_management(client, admin):
     r = client.post("/api/users", headers=admin, json={"email": "new.staff@eris.demo", "full_name": "New Staff",
-                                                         "role": "staff", "outlet_id": 2, "password": "Password1"})
+                                                         "role": "staff", "outlet_ids": [2], "password": "Password1"})
     assert r.status_code == 201
     r = client.post("/api/users", headers=admin, json={"email": "x@eris.demo", "full_name": "No Outlet",
                                                          "role": "manager", "password": "Password1"})
@@ -227,7 +229,7 @@ def test_assistant_answers_core_questions(client, admin):
         assert body["intent"] == intent, (q, body["intent"])
         assert body["answer"]
     # follow-up keeps the previous intent but switches outlet
-    client.post("/api/assistant/chat", headers=admin, json={"message": "Revenue at Bandra last month"})
+    client.post("/api/assistant/chat", headers=admin, json={"message": "Revenue at Indiranagar last month"})
     r = client.post("/api/assistant/chat", headers=admin, json={"message": "what about Pune?"}).json()
     assert r["intent"] == "sales_summary" and "Koregaon Park" in r["answer"]
     history = client.get("/api/assistant/history", headers=admin).json()
@@ -239,12 +241,12 @@ def test_assistant_uses_llm_when_rules_are_unsure(client, admin, monkeypatch):
     from app.services.assistant import llm
 
     monkeypatch.setattr(llm, "status", lambda force=False: {"available": True, "model": "mock", "provider": "ollama", "error": None})
-    monkeypatch.setattr(llm, "classify", lambda q, o, c: {"intent": "top_products", "period": "last 7 days", "outlets": ["Bandra"],
+    monkeypatch.setattr(llm, "classify", lambda q, o, c: {"intent": "top_products", "period": "last 7 days", "outlets": ["Indiranagar"],
                                                           "category": None, "product": None, "top_n": 3, "horizon_days": None})
     monkeypatch.setattr(llm, "general_answer", lambda q, facts, org: "Mocked advice")
     r = client.post("/api/assistant/chat", headers=admin, json={"message": "gimme the stars of bandra lately"}).json()
     assert r["engine"] == "rules+llm" and r["intent"] == "top_products"
-    assert "Bandra" in r["answer"] and "last 7 days" in r["answer"]
+    assert "Indiranagar" in r["answer"] and "last 7 days" in r["answer"]
     r = client.post("/api/assistant/chat", headers=admin, json={"message": "tell me a joke"}).json()
     assert r["intent"] in ("general", "top_products")
 

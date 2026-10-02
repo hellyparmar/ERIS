@@ -12,7 +12,8 @@ from sqlalchemy import func, select
 
 from app import clock
 from app.config import settings
-from app.db import SessionLocal, create_tables
+from app.db import SessionLocal, migrate
+from app.services import audit as _audit  # noqa: F401  (registers the audit hook)
 from app.routers import auth, catalog, imports, insights, inventory, outlets, partners, sales
 from app.routers import settings as settings_router
 from app.state import seeding_state, set_seeding
@@ -32,7 +33,7 @@ def _bootstrap() -> None:
         if settings.ENVIRONMENT == "production":
             raise RuntimeError("Set a strong JWT_SECRET_KEY (32+ random characters) before running in production")
         log.warning("Using a development JWT secret - set JWT_SECRET_KEY for any shared deployment")
-    create_tables()
+    migrate()
     with SessionLocal() as db:
         clock.load_from_db(db)
         has_users = db.scalar(select(func.count(User.id))) or 0
@@ -47,13 +48,13 @@ def _bootstrap() -> None:
         return
 
     def seed() -> None:
+        from app.seed.__main__ import seed_kwargs
         from app.seed.generator import generate_demo_data
 
         set_seeding(True, "Generating demo data (about a minute)...")
         try:
             with SessionLocal() as db:
-                generate_demo_data(db, days=settings.SEED_DAYS, seed=settings.SEED_RANDOM_STATE,
-                                   log=lambda m: (log.info(m), set_seeding(True, m.strip())))
+                generate_demo_data(db, **seed_kwargs(), log=lambda m: (log.info(m), set_seeding(True, m.strip())))
             set_seeding(False, "Demo data ready")
         except Exception as exc:
             log.exception("demo data generation failed")

@@ -9,16 +9,18 @@ from app import clock
 from app.db import get_db
 from app.models import Outlet, User
 from app.routers.common import get_or_404
-from app.schemas import ChangePasswordIn, LoginIn, ProfileIn, UserIn, UserUpdate
-from app.security import create_access_token, get_current_user, hash_password, require_admin, verify_password
+from app.schemas import ChangePasswordIn, LoginIn, ProfileIn, RefreshIn, UserIn, UserUpdate
+from app.security import decode_token, get_current_user, hash_password, require_admin, token_pair, verify_password
+from app.services.audit import audit
 
 router = APIRouter(prefix="/api", tags=["auth & users"])
 
 
 def user_dict(u: User) -> dict:
     return {
-        "id": u.id, "email": u.email, "full_name": u.full_name, "role": u.role, "outlet_id": u.outlet_id,
-        "outlet_name": u.outlet.name if u.outlet else None, "is_active": u.is_active,
+        "id": u.id, "email": u.email, "full_name": u.full_name, "role": u.role,
+        "outlet_ids": u.outlet_ids, "outlet_names": [o.name for o in u.outlets],
+        "is_active": u.is_active,
         "last_login_at": u.last_login_at.isoformat() if u.last_login_at else None,
         "created_at": u.created_at.isoformat() if u.created_at else None,
     }
@@ -57,7 +59,25 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
         raise HTTPException(403, "This account has been deactivated")
     user.last_login_at = clock.now()
     db.commit()
-    return {"access_token": create_access_token(user), "token_type": "bearer", "user": user_dict(user)}
+    return {**token_pair(user), "user": user_dict(user)}
+
+
+@router.post("/auth/refresh")
+def refresh(body: RefreshIn, db: Session = Depends(get_db)):
+    """Exchange a refresh token for a new access + refresh token pair (rotation)."""
+    payload = decode_token(body.refresh_token, "refresh")
+    user = db.get(User, int(payload.get("sub", 0)))
+    if user is None or not user.is_active or payload.get("ver") != (user.token_version or 0):
+        raise HTTPException(401, "Session is no longer valid - please sign in again")
+    return {**token_pair(user), "user": user_dict(user)}
+
+
+@router.post("/auth/logout-all")
+def logout_everywhere(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Invalidate every refresh token of this user (all devices)."""
+    user.token_version = (user.token_version or 0) + 1
+    db.commit()
+    return {"ok": True}
 
 
 @router.get("/auth/me")
@@ -77,8 +97,10 @@ def change_password(body: ChangePasswordIn, user: User = Depends(get_current_use
     if not verify_password(body.current_password, user.password_hash):
         raise HTTPException(400, "Current password is incorrect")
     user.password_hash = hash_password(body.new_password)
+    user.token_version = (user.token_version or 0) + 1  # sign out other sessions
+    audit(db, user, "user.password", "user", user.id, "Changed own password")
     db.commit()
-    return {"ok": True}
+    return {**token_pair(user), "ok": True}
 
 
 # ------------------------------------------------------------------------------------------ users (admin)
@@ -87,22 +109,25 @@ def list_users(_: User = Depends(require_admin), db: Session = Depends(get_db)):
     return [user_dict(u) for u in db.scalars(select(User).order_by(User.role, User.full_name)).all()]
 
 
-def _validate_outlet(db: Session, role: str, outlet_id: int | None) -> None:
-    if role in ("manager", "staff") and not outlet_id:
-        raise HTTPException(400, "Managers and staff must be assigned to an outlet")
-    if outlet_id:
-        get_or_404(db, Outlet, outlet_id, "Outlet")
+def _outlets_for(db: Session, role: str, outlet_ids: list[int] | None) -> list[Outlet]:
+    if role == "admin":
+        return []
+    if not outlet_ids:
+        raise HTTPException(400, "Assign at least one outlet to managers, staff and viewers")
+    outlets = db.scalars(select(Outlet).where(Outlet.id.in_(outlet_ids))).all()
+    if len(outlets) != len(set(outlet_ids)):
+        raise HTTPException(404, "Outlet not found")
+    return list(outlets)
 
 
 @router.post("/users", status_code=201)
-def create_user(body: UserIn, _: User = Depends(require_admin), db: Session = Depends(get_db)):
+def create_user(body: UserIn, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
     if db.scalar(select(User.id).where(func.lower(User.email) == body.email.lower())):
         raise HTTPException(409, "A user with this email already exists")
-    _validate_outlet(db, body.role, body.outlet_id)
     user = User(email=body.email.lower(), full_name=body.full_name.strip(), role=body.role,
-                outlet_id=body.outlet_id if body.role != "admin" else None,
-                password_hash=hash_password(body.password))
+                password_hash=hash_password(body.password), outlets=_outlets_for(db, body.role, body.outlet_ids))
     db.add(user)
+    db.flush()
     db.commit()
     db.refresh(user)
     return user_dict(user)
@@ -115,14 +140,15 @@ def update_user(user_id: int, body: UserUpdate, admin: User = Depends(require_ad
     if user.id == admin.id and (data.get("role", "admin") != "admin" or data.get("is_active") is False):
         raise HTTPException(400, "You cannot demote or deactivate your own account")
     role = data.get("role", user.role)
-    outlet_id = data.get("outlet_id", user.outlet_id)
-    _validate_outlet(db, role, outlet_id)
+    outlet_ids = data.pop("outlet_ids", None)
+    user.outlets = _outlets_for(db, role, outlet_ids if outlet_ids is not None else user.outlet_ids)
     if "password" in data:
         user.password_hash = hash_password(data.pop("password"))
+        user.token_version = (user.token_version or 0) + 1
+    if data.get("is_active") is False or data.get("role", user.role) != user.role:
+        user.token_version = (user.token_version or 0) + 1
     for k, v in data.items():
         setattr(user, k, v)
-    if user.role == "admin":
-        user.outlet_id = None
     db.commit()
     db.refresh(user)
     return user_dict(user)
@@ -134,5 +160,6 @@ def deactivate_user(user_id: int, admin: User = Depends(require_admin), db: Sess
     if user.id == admin.id:
         raise HTTPException(400, "You cannot deactivate your own account")
     user.is_active = False
+    user.token_version = (user.token_version or 0) + 1
     db.commit()
     return {"ok": True}

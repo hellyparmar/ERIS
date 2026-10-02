@@ -13,6 +13,7 @@ from app.security import get_current_user, require_admin
 from app.services import analytics as A
 from app.services import forecasting as F
 from app.services.assistant import llm
+from app.services.audit import audit
 from app.state import seeding_state
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
@@ -20,7 +21,8 @@ router = APIRouter(prefix="/api/settings", tags=["settings"])
 
 def org_dict(org: Organization) -> dict:
     return {k: getattr(org, k) for k in ("id", "name", "industry", "currency", "currency_symbol", "timezone", "email",
-                                         "phone", "address", "tax_id", "low_stock_cover_days")}
+                                         "phone", "address", "tax_id", "tax_id_is_demo", "state", "state_code",
+                                         "low_stock_cover_days")}
 
 
 @router.get("/organization")
@@ -32,12 +34,14 @@ def get_org(_: User = Depends(get_current_user), db: Session = Depends(get_db)):
 
 
 @router.put("/organization")
-def update_org(body: OrganizationIn, _: User = Depends(require_admin), db: Session = Depends(get_db)):
+def update_org(body: OrganizationIn, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
     org = db.scalar(select(Organization))
     if org is None:
-        org = Organization(**body.model_dump())
+        org = Organization(**body.model_dump(), tax_id_is_demo=False)
         db.add(org)
     else:
+        if body.tax_id != org.tax_id:
+            org.tax_id_is_demo = False  # a GSTIN typed in by the user is no longer the generated demo one
         for k, v in body.model_dump().items():
             setattr(org, k, v)
     db.commit()
@@ -71,16 +75,17 @@ def system_info(_: User = Depends(get_current_user), db: Session = Depends(get_d
     }
 
 
-def _run_seed(days: int) -> None:
+def _run_seed() -> None:
+    from app.seed.__main__ import seed_kwargs
     from app.seed.generator import generate_demo_data
     from app.state import set_seeding
 
     set_seeding(True, "Generating demo data...")
     try:
         with SessionLocal() as db:
-            generate_demo_data(db, days=days, seed=settings.SEED_RANDOM_STATE,
-                               log=lambda m: set_seeding(True, m.strip()))
+            generate_demo_data(db, **seed_kwargs(), log=lambda m: set_seeding(True, m.strip()))
         F.clear_cache()
+        A._CACHE.clear()
         set_seeding(False, "Demo data ready")
     except Exception as exc:  # pragma: no cover - surfaced through status
         set_seeding(False, f"Demo data generation failed: {exc}")
@@ -91,21 +96,45 @@ def regenerate_demo(_: User = Depends(require_admin)):
     """Wipe everything and regenerate the demo organization (runs in the background, ~1 minute)."""
     if seeding_state()["running"]:
         raise HTTPException(409, "Demo data generation is already running")
-    threading.Thread(target=_run_seed, args=(settings.SEED_DAYS,), daemon=True).start()
+    threading.Thread(target=_run_seed, daemon=True).start()
     return {"started": True, "message": "Generating demo data. You will be signed out when it finishes - log in "
                                         "again with the demo accounts."}
 
 
 @router.post("/clear-transactions")
 def clear_transactions(admin: User = Depends(require_admin), db: Session = Depends(get_db)):
-    """Start fresh with your own data: removes all sales, purchase orders, stock levels and customers but keeps
-    outlets, products, suppliers and users."""
-    from sqlalchemy import delete
+    """Start fresh with your own data: removes sales, invoices, purchase orders, stock history, customers and all
+    synthetic demand drivers (promotions, prices, weather, stockouts, anomaly labels, dataset provenance), keeps
+    outlets, products, suppliers and users, and resets every stock level to zero."""
+    from sqlalchemy import delete, insert
 
-    from app.models import ChatMessage, InventoryItem, PurchaseOrderItem, StockMovement
+    from app.models import (
+        AnomalyLabel,
+        ChatMessage,
+        DatasetInfo,
+        ForecastResult,
+        ForecastRun,
+        InventoryItem,
+        Invoice,
+        PriceHistory,
+        Promotion,
+        PurchaseOrderItem,
+        StockMovement,
+        StockoutEvent,
+        WeatherDaily,
+    )
 
-    for model in (ChatMessage, StockMovement, PurchaseOrderItem, PurchaseOrder, SaleItem, Sale, InventoryItem, Customer):
+    for model in (ChatMessage, Invoice, StockMovement, PurchaseOrderItem, PurchaseOrder, SaleItem, Sale, InventoryItem,
+                  Customer, ForecastResult, ForecastRun, StockoutEvent, AnomalyLabel, Promotion, PriceHistory,
+                  WeatherDaily, DatasetInfo):
         db.execute(delete(model))
+    outlets = db.scalars(select(Outlet.id)).all()
+    products = db.execute(select(Product.id, Product.reorder_level)).all()
+    rows = [{"outlet_id": o, "product_id": p, "quantity": 0.0, "reorder_level": r} for o in outlets for p, r in products]
+    if rows:
+        db.execute(insert(InventoryItem), rows)
+    audit(db, admin, "data.clear", "database", None, "Cleared all transactions to start with own data")
     db.commit()
     F.clear_cache()
+    A._CACHE.clear()
     return {"ok": True}

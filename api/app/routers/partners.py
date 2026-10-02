@@ -9,7 +9,7 @@ from app.db import get_db
 from app.models import Customer, Product, PurchaseOrder, Sale, SaleItem, Supplier, User
 from app.routers.common import csv_response, get_or_404, page_response, paginate
 from app.schemas import CustomerIn, SupplierIn
-from app.security import get_current_user, require_manager, scoped_outlet_ids
+from app.security import get_current_user, require_manager, require_writer, scoped_outlet_ids
 from app.services import analytics as A
 from app.services.sales import normalize_phone
 
@@ -182,7 +182,7 @@ def _phone_unique(db: Session, phone: str | None, exclude_id: int | None = None)
 
 
 @router.post("/customers", status_code=201)
-def create_customer(body: CustomerIn, _: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def create_customer(body: CustomerIn, _: User = Depends(require_writer), db: Session = Depends(get_db)):
     data = body.model_dump()
     data["phone"] = _phone_unique(db, body.phone)
     c = Customer(**data)
@@ -192,7 +192,7 @@ def create_customer(body: CustomerIn, _: User = Depends(get_current_user), db: S
 
 
 @router.put("/customers/{customer_id}")
-def update_customer(customer_id: int, body: CustomerIn, _: User = Depends(get_current_user),
+def update_customer(customer_id: int, body: CustomerIn, _: User = Depends(require_writer),
                     db: Session = Depends(get_db)):
     c = get_or_404(db, Customer, customer_id, "Customer")
     data = body.model_dump()

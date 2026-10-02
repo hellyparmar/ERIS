@@ -12,16 +12,16 @@ os.environ["LLM_ENABLED"] = "false"
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from app.db import SessionLocal, create_tables  # noqa: E402
+from app.db import SessionLocal, migrate  # noqa: E402
 from app.main import app  # noqa: E402
 from app.seed.generator import DEMO_PASSWORDS, generate_demo_data  # noqa: E402
 
 
 @pytest.fixture(scope="session", autouse=True)
 def seeded():
-    create_tables()
+    migrate()
     with SessionLocal() as db:
-        generate_demo_data(db, days=130, seed=7, end_date=date.today() - timedelta(days=1), log=lambda *_: None)
+        generate_demo_data(db, days=200, seed=7, end_date=date.today() - timedelta(days=1), log=lambda *_: None)
     yield
 
 

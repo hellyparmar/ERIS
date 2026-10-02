@@ -238,8 +238,8 @@ def _import_sales(db: Session, rows: list[dict], user: User, result: dict, updat
     for i, row in enumerate(rows, start=2):  # row 1 is the header
         try:
             outlet = lk.outlet(row)
-            if user.role != "admin" and user.outlet_id and outlet.id != user.outlet_id:
-                raise ValueError("you can only import sales for your own outlet")
+            if user.role != "admin" and outlet.id not in user.outlet_ids:
+                raise ValueError("you can only import sales for your own outlets")
             product = lk.product(row)
             qty = _num(row.get("quantity", ""), "quantity")
             if qty == 0:
@@ -428,8 +428,8 @@ def _import_inventory(db: Session, rows: list[dict], user: User, result: dict, _
     for i, row in enumerate(rows, start=2):
         try:
             outlet = lk.outlet(row)
-            if user.role != "admin" and user.outlet_id and outlet.id != user.outlet_id:
-                raise ValueError("you can only update stock for your own outlet")
+            if user.role != "admin" and outlet.id not in user.outlet_ids:
+                raise ValueError("you can only update stock for your own outlets")
             product = lk.product(row)
             qty = _num(row.get("quantity", ""), "quantity")
             reorder = _num(row.get("reorder_level", ""), "reorder_level", allow_empty=True)

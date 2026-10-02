@@ -19,14 +19,17 @@ class Settings(BaseSettings):
 
     JWT_SECRET_KEY: str = "dev-only-secret-change-me-in-production-0123456789"
     JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 12
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 14
 
     CORS_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173"
 
     # Demo data: generated automatically the first time the API starts on an empty database.
     SEED_DEMO_DATA: bool = True
-    SEED_DAYS: int = 540
+    SEED_DAYS: int = 730  # two years of history
+    SEED_OUTLETS: int = 5  # 1-7 outlets in the demo company
     SEED_RANDOM_STATE: int = 42
+    SEED_END_DATE: str | None = None  # YYYY-MM-DD; default = yesterday (business time zone)
 
     # Optional local LLM (free, open source) via Ollama: https://ollama.com
     # The assistant works fully without it (built-in analytics engine);

@@ -18,18 +18,22 @@ class ProfileIn(BaseModel):
     full_name: str = Field(min_length=2, max_length=120)
 
 
+class RefreshIn(BaseModel):
+    refresh_token: str
+
+
 class UserIn(BaseModel):
     email: EmailStr
     full_name: str = Field(min_length=2, max_length=120)
-    role: str = Field(pattern="^(admin|manager|staff)$")
-    outlet_id: int | None = None
+    role: str = Field(pattern="^(admin|manager|staff|viewer)$")
+    outlet_ids: list[int] = Field(default_factory=list)
     password: str = Field(min_length=8, max_length=128)
 
 
 class UserUpdate(BaseModel):
     full_name: str | None = Field(default=None, min_length=2, max_length=120)
-    role: str | None = Field(default=None, pattern="^(admin|manager|staff)$")
-    outlet_id: int | None = None
+    role: str | None = Field(default=None, pattern="^(admin|manager|staff|viewer)$")
+    outlet_ids: list[int] | None = None
     is_active: bool | None = None
     password: str | None = Field(default=None, min_length=8, max_length=128)
 
@@ -44,6 +48,8 @@ class OrganizationIn(BaseModel):
     phone: str | None = Field(default=None, max_length=32)
     address: str | None = Field(default=None, max_length=255)
     tax_id: str | None = Field(default=None, max_length=32)
+    state: str | None = Field(default=None, max_length=40)
+    state_code: str | None = Field(default=None, pattern=r"^\d{2}$")
     low_stock_cover_days: int = Field(default=7, ge=1, le=60)
 
     @field_validator("timezone")
@@ -62,6 +68,8 @@ class OutletIn(BaseModel):
     code: str = Field(min_length=2, max_length=16, pattern=r"^[A-Za-z0-9-]+$")
     name: str = Field(min_length=2, max_length=120)
     city: str = Field(min_length=2, max_length=80)
+    state: str | None = Field(default=None, max_length=40)
+    state_code: str | None = Field(default=None, pattern=r"^\d{2}$")
     address: str | None = Field(default=None, max_length=255)
     phone: str | None = Field(default=None, max_length=32)
     manager_name: str | None = Field(default=None, max_length=120)
@@ -88,6 +96,7 @@ class ProductIn(BaseModel):
     selling_price: float = Field(gt=0)
     tax_rate: float = Field(default=5, ge=0, le=40)
     reorder_level: float = Field(default=10, ge=0)
+    hsn_code: str | None = Field(default=None, pattern=r"^\d{4,8}$")
     is_active: bool = True
 
     @field_validator("sku")
@@ -114,7 +123,21 @@ class CustomerIn(BaseModel):
     email: str | None = Field(default=None, max_length=160)
     city: str | None = Field(default=None, max_length=80)
     customer_type: str = Field(default="retail", pattern="^(retail|business)$")
+    gstin: str | None = Field(default=None, max_length=15)
+    state_code: str | None = Field(default=None, pattern=r"^\d{2}$")
     notes: str | None = Field(default=None, max_length=1000)
+
+    @field_validator("gstin")
+    @classmethod
+    def valid_gstin(cls, v: str | None) -> str | None:
+        from app.services.gst import is_valid_gstin
+
+        if not v:
+            return None
+        v = v.strip().upper()
+        if not is_valid_gstin(v):
+            raise ValueError("GSTIN is not valid (15 characters with a correct check digit)")
+        return v
 
 
 class SaleLineIn(BaseModel):

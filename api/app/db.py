@@ -65,6 +65,39 @@ def get_db() -> Iterator[Session]:
 
 
 def create_tables() -> None:
+    """Create all tables directly (tests / throwaway databases). Normal startup uses `migrate()`."""
     from app import models  # noqa: F401  (register models)
 
     Base.metadata.create_all(engine)
+
+
+def migrate() -> None:
+    """Bring the database schema to the latest Alembic revision (one migration tree for SQLite & PostgreSQL).
+
+    Databases created by ERIS v2 (before migrations existed) are detected: an untouched synthetic demo is simply
+    rebuilt; a database containing user data stops with instructions instead of being modified.
+    """
+    from alembic import command
+    from alembic.config import Config
+    from sqlalchemy import inspect, text
+
+    from app import models  # noqa: F401
+
+    api_dir = Path(__file__).resolve().parent.parent
+    cfg = Config(str(api_dir / "alembic.ini"))
+    cfg.set_main_option("script_location", str(api_dir / "migrations"))
+    tables = set(inspect(engine).get_table_names())
+    if tables and "alembic_version" not in tables:
+        with engine.connect() as conn:
+            sources = {r[0] for r in conn.execute(text("SELECT DISTINCT source FROM sales"))} if "sales" in tables else set()
+        if sources - {"demo", "synthetic"}:
+            raise RuntimeError(
+                "This database was created by an older ERIS version and contains your own data. Export it "
+                "(Sales/Products/Customers -> Export), point DATABASE_URL at a new database and import the CSVs.")
+        Base.metadata.drop_all(engine)
+        with engine.begin() as conn:
+            for t in tables - set(Base.metadata.tables):
+                conn.execute(text(f'DROP TABLE IF EXISTS "{t}"'))
+    with engine.begin() as connection:
+        cfg.attributes["connection"] = connection
+        command.upgrade(cfg, "head")
