@@ -6,6 +6,7 @@ import { useApp, useToast } from '../lib/app'
 import { date, money, num } from '../lib/format'
 import { Card, DataTable, Delta, Drawer, ErrorState, Field, Modal, PageHead, Spinner, StatusBadge } from '../components/ui'
 import { ShareList, TrendChart } from '../components/charts'
+import { StateSelect } from '../components/pickers'
 
 export default function Outlets() {
   const { isAdmin } = useApp()
@@ -14,8 +15,9 @@ export default function Outlets() {
   const [detail, setDetail] = useState(null)
   return (
     <>
-      <PageHead title="Outlets" subtitle="Your stores at a glance - last 30 days.">
-        {isAdmin && <button className="btn primary" onClick={() => setEdit({})}><Plus />Add outlet</button>}
+      <PageHead title="Outlets" subtitle="Your stores at a glance - last 30 days. ERIS supports up to 7 outlets per organization.">
+        {isAdmin && <button className="btn primary" disabled={(q.data?.length || 0) >= 7} title={(q.data?.length || 0) >= 7 ? 'The 7-outlet limit is reached' : undefined}
+          onClick={() => setEdit({})}><Plus />Add outlet</button>}
       </PageHead>
       {q.isError ? <ErrorState error={q.error} /> : q.isLoading ? <Spinner /> : (
         <div className="grid grid-3">
@@ -78,7 +80,8 @@ function OutletForm({ outlet, onClose }) {
   const toast = useToast()
   const isNew = !outlet.id
   const [f, setF] = useState({ code: outlet.code || '', name: outlet.name || '', city: outlet.city || '', address: outlet.address || '', phone: outlet.phone || '',
-    manager_name: outlet.manager_name || '', opened_on: outlet.opened_on || '', is_active: outlet.is_active ?? true })
+    manager_name: outlet.manager_name || '', opened_on: outlet.opened_on || '', is_active: outlet.is_active ?? true,
+    state: outlet.state || null, state_code: outlet.state_code || null })
   const set = (k, v) => setF((x) => ({ ...x, [k]: v }))
   const refresh = () => { qc.invalidateQueries({ queryKey: ['outlets'] }); qc.invalidateQueries({ queryKey: ['outlets-stats'] }) }
   const save = useMutation({
@@ -100,6 +103,7 @@ function OutletForm({ outlet, onClose }) {
         <Field label="Code" hint="Short unique code, e.g. MUM-AND"><input className="input" value={f.code} onChange={(e) => set('code', e.target.value.toUpperCase())} /></Field>
         <Field label="Name"><input className="input" value={f.name} onChange={(e) => set('name', e.target.value)} /></Field>
         <Field label="City"><input className="input" value={f.city} onChange={(e) => set('city', e.target.value)} /></Field>
+        <Field label="State (GST)" hint="Decides the outlet's GSTIN and CGST/SGST vs IGST"><StateSelect value={f.state_code} onChange={(code, name) => setF((x) => ({ ...x, state_code: code, state: name }))} /></Field>
         <Field label="Phone"><input className="input" value={f.phone} onChange={(e) => set('phone', e.target.value)} /></Field>
         <Field label="Address" className="full"><input className="input" value={f.address} onChange={(e) => set('address', e.target.value)} /></Field>
         <Field label="Manager name"><input className="input" value={f.manager_name} onChange={(e) => set('manager_name', e.target.value)} /></Field>

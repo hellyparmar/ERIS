@@ -61,7 +61,7 @@ def product_dict(p: Product) -> dict:
     return {"id": p.id, "sku": p.sku, "name": p.name, "category_id": p.category_id,
             "category": p.category.name if p.category else None, "supplier_id": p.supplier_id,
             "supplier": p.supplier.name if p.supplier else None, "unit": p.unit, "cost_price": p.cost_price,
-            "selling_price": p.selling_price, "tax_rate": p.tax_rate, "reorder_level": p.reorder_level,
+            "selling_price": p.selling_price, "tax_rate": p.tax_rate, "hsn_code": p.hsn_code, "reorder_level": p.reorder_level,
             "is_active": p.is_active, "margin_pct": round(margin / net * 100, 1) if net else 0}
 
 

@@ -98,6 +98,31 @@ function useSpeech(onText) {
   return { supported: !!SR, listening, toggle }
 }
 
+/** Where an answer came from: data source, filters, timing, model version and caveats. */
+function Provenance({ p }) {
+  if (!p) return null
+  const f = p.filters || {}
+  return (
+    <details className="provenance">
+      <summary>
+        Source &amp; method · {p.query_ms} ms{p.model_version ? ` · model v${p.model_version}` : ''}
+        {p.notes?.length > 0 && <> · <span className="warn-ink">{p.notes.length} note{p.notes.length > 1 ? 's' : ''}</span></>}
+      </summary>
+      <dl>
+        {p.data_source && <><dt>Data</dt><dd>{p.data_source}</dd></>}
+        {f.outlets && <><dt>Outlets</dt><dd>{f.outlets}</dd></>}
+        {f.periods?.length > 0 && <><dt>Periods</dt><dd>{f.periods.join('; ')}</dd></>}
+        {f.category && <><dt>Category</dt><dd>{f.category}</dd></>}
+        {f.products?.length > 0 && <><dt>Products</dt><dd>{f.products.join(', ')}</dd></>}
+        {f.horizon_days && <><dt>Horizon</dt><dd>{f.horizon_days} days</dd></>}
+        {p.sources?.length > 0 && <><dt>Sources</dt><dd>{p.sources.join('; ')}</dd></>}
+        <dt>Method</dt><dd>{p.method} · engine: {p.engine}{p.forecast_run_id ? ` · forecast run #${p.forecast_run_id}` : ''}</dd>
+        {p.notes?.length > 0 && <><dt>Notes</dt><dd>{p.notes.map((n) => <div key={n}>{n}</div>)}</dd></>}
+      </dl>
+    </details>
+  )
+}
+
 export default function Assistant() {
   const qc = useQueryClient()
   const toast = useToast()
@@ -139,7 +164,7 @@ export default function Assistant() {
 
   return (
     <>
-      <PageHead title="AI Assistant" subtitle="Ask about sales, stock, customers and forecasts in plain English - answers come from your live data.">
+      <PageHead title="AI Assistant" subtitle="Ask about sales, stock, customers, forecasts and why numbers changed in plain English. Answers come from fixed, tested analyses of your data (never free-form SQL), and each one shows its source.">
         <Badge tone={llm?.available ? 'good' : 'info'}>{llm?.available ? `Local LLM: ${llm.model}` : 'Built-in analytics engine'}</Badge>
         <button className="btn" onClick={() => clear.mutate()} disabled={!msgs.length}><Trash2 />Clear chat</button>
       </PageHead>
@@ -163,6 +188,7 @@ export default function Assistant() {
               <div className="bubble">
                 <Markdown text={m.content} />
                 {m.blocks?.length > 0 && <Blocks blocks={m.blocks} />}
+                <Provenance p={m.provenance} />
               </div>
             </div>
           ))}
@@ -180,7 +206,7 @@ export default function Assistant() {
             </div>
           )}
           <form className="chat-input" onSubmit={(e) => { e.preventDefault(); ask() }}>
-            <input className="input" placeholder="e.g. Which outlet grew the most last month?" value={input} maxLength={500}
+            <input className="input" placeholder="e.g. Why was Outlet 3 revenue lower this week?" value={input} maxLength={500}
               onChange={(e) => setInput(e.target.value)} aria-label="Ask a question" autoFocus />
             {speech.supported && (
               <button type="button" className={`btn icon ${speech.listening ? 'primary' : ''}`} onClick={speech.toggle} aria-label={speech.listening ? 'Stop listening' : 'Speak your question'} style={{ height: 42, width: 42 }}>

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Ban, Download, Plus, Receipt, Search, Trash2, Upload } from 'lucide-react'
+import { Ban, Download, FileText, Plus, Receipt, Search, Trash2, Upload } from 'lucide-react'
 import { api, download } from '../lib/api'
 import { useApp, useToast } from '../lib/app'
 import { dateTime, isoDay, money, num, titleCase } from '../lib/format'
@@ -11,7 +11,7 @@ import { OutletSelect, ProductSearch } from '../components/pickers'
 const PAYMENTS = ['cash', 'upi', 'card', 'credit']
 
 export default function Sales() {
-  const { outletId } = useApp()
+  const { outletId, canWrite } = useApp()
   const [filters, setFilters] = useState({ start: '', end: '', payment_method: '', channel: '', status: '' })
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
@@ -25,9 +25,9 @@ export default function Sales() {
   return (
     <>
       <PageHead title="Sales" subtitle="Every bill across your outlets. Record a sale manually or import sales from a CSV file.">
-        <Link to="/import?type=sales" className="btn"><Upload />Import CSV</Link>
+        {canWrite && <Link to="/import?type=sales" className="btn"><Upload />Import CSV</Link>}
         <button className="btn" onClick={() => download('/sales/export', { outlet_id: outletId, start: filters.start || undefined, end: filters.end || undefined })}><Download />Export</button>
-        <button className="btn primary" onClick={() => setShowNew(true)}><Plus />New sale</button>
+        {canWrite && <button className="btn primary" onClick={() => setShowNew(true)}><Plus />New sale</button>}
       </PageHead>
 
       <Card flush>
@@ -70,13 +70,19 @@ export default function Sales() {
 }
 
 export function SaleDrawer({ id, onClose }) {
-  const { isManager } = useApp()
+  const { isManager, canWrite } = useApp()
+  const navigate = useNavigate()
   const qc = useQueryClient()
   const toast = useToast()
   const q = useQuery({ queryKey: ['sale', id], queryFn: () => api(`/sales/${id}`) })
   const voidM = useMutation({
     mutationFn: (reason) => api(`/sales/${id}/void`, { method: 'POST', body: { reason } }),
     onSuccess: () => { toast('Sale voided and stock restored', 'success'); qc.invalidateQueries() },
+    onError: (e) => toast(e.message, 'error'),
+  })
+  const invoiceM = useMutation({
+    mutationFn: () => api('/invoices', { method: 'POST', body: { sale_id: id } }),
+    onSuccess: (inv) => { toast(`Demo invoice ${inv.number} issued`, 'success'); qc.invalidateQueries({ queryKey: ['sale', id] }); navigate(`/invoices?id=${inv.id}`) },
     onError: (e) => toast(e.message, 'error'),
   })
   const doVoid = () => {
@@ -86,7 +92,12 @@ export function SaleDrawer({ id, onClose }) {
   const s = q.data
   return (
     <Drawer title={s ? `Bill ${s.invoice_no}` : 'Bill'} onClose={onClose}
-      actions={s && isManager && s.status === 'completed' && <button className="btn danger sm" onClick={doVoid} disabled={voidM.isPending}><Ban />Void</button>}>
+      actions={s && <>
+        {s.invoice
+          ? <Link className="btn sm" to={`/invoices?id=${s.invoice.id}`}><FileText />Invoice {s.invoice.number}</Link>
+          : canWrite && s.status === 'completed' && <button className="btn sm" onClick={() => invoiceM.mutate()} disabled={invoiceM.isPending}><FileText />Issue GST invoice (demo)</button>}
+        {isManager && s.status === 'completed' && <button className="btn danger sm" onClick={doVoid} disabled={voidM.isPending}><Ban />Void</button>}
+      </>}>
       {!s ? <Spinner /> : (
         <>
           <Card>

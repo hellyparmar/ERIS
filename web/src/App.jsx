@@ -17,6 +17,11 @@ const Analytics = lazy(() => import('./pages/Analytics'))
 const Outlets = lazy(() => import('./pages/Outlets'))
 const DataImport = lazy(() => import('./pages/DataImport'))
 const Settings = lazy(() => import('./pages/Settings'))
+const ModelComparison = lazy(() => import('./pages/ModelComparison'))
+const Insights = lazy(() => import('./pages/Insights'))
+const Reports = lazy(() => import('./pages/Reports'))
+const Invoices = lazy(() => import('./pages/Invoices'))
+const AuditLog = lazy(() => import('./pages/AuditLog'))
 
 export default function App() {
   const { token, user, loadingUser } = useApp()
@@ -38,6 +43,11 @@ export default function App() {
           <Route path="outlets" element={<Outlets />} />
           <Route path="import" element={<DataImport />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="models" element={<ModelComparison />} />
+          <Route path="insights" element={<Insights />} />
+          <Route path="reports" element={<Reports />} />
+          <Route path="invoices" element={<Invoices />} />
+          <Route path="audit" element={<AuditLog />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

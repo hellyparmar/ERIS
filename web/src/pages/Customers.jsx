@@ -7,11 +7,12 @@ import { useApp, useToast } from '../lib/app'
 import { date, dateTime, money, num } from '../lib/format'
 import { Badge, Card, DataTable, Drawer, ErrorState, Field, Modal, PageHead, Pager, Spinner, useDebounced } from '../components/ui'
 import { SaleDrawer } from './Sales'
+import { StateSelect } from '../components/pickers'
 
 const SEG_TONE = { Champions: 'good', Loyal: 'good', 'Potential Loyalists': 'info', New: 'info', 'Needs Attention': 'warn', 'At Risk': 'bad', Lost: '' }
 
 export default function Customers() {
-  const { outletId, isManager } = useApp()
+  const { outletId, isManager, canWrite } = useApp()
   const [search, setSearch] = useState('')
   const [type, setType] = useState('')
   const [sort, setSort] = useState('spend')
@@ -28,7 +29,7 @@ export default function Customers() {
       <PageHead title="Customers" subtitle="Loyalty customers and business accounts. Bills are linked by phone number.">
         {isManager && <button className="btn" onClick={() => download('/customers/export')}><Download />Export</button>}
         {isManager && <Link to="/import?type=customers" className="btn"><Upload />Import CSV</Link>}
-        <button className="btn primary" onClick={() => setEdit({})}><Plus />Add customer</button>
+        {canWrite && <button className="btn primary" onClick={() => setEdit({})}><Plus />Add customer</button>}
       </PageHead>
       {seg.data && (
         <Card title="Customer segments" subtitle={`RFM analysis of ${num(seg.data.total_customers)} customers over the last 12 months · ${seg.data.repeat.repeat_rate_pct}% repeat rate (90 days)`}>
@@ -59,7 +60,7 @@ export default function Customers() {
               { key: 'orders', label: 'Visits', format: 'number' },
               { key: 'spend', label: 'Total spend', format: 'currency' },
               { key: 'last_purchase', label: 'Last purchase', format: 'date' },
-              { key: 'e', label: '', render: (r) => <button className="btn sm icon ghost" aria-label="Edit" onClick={(e) => { e.stopPropagation(); setEdit(r) }}><Pencil /></button> },
+              ...(canWrite ? [{ key: 'e', label: '', render: (r) => <button className="btn sm icon ghost" aria-label="Edit" onClick={(e) => { e.stopPropagation(); setEdit(r) }}><Pencil /></button> }] : []),
             ]} />
             <Pager page={page} pages={q.data.pages} total={q.data.total} onPage={setPage} label="customers" />
           </>
@@ -77,10 +78,10 @@ function CustomerForm({ customer, onClose }) {
   const { isManager } = useApp()
   const isNew = !customer.id
   const [f, setF] = useState({ name: customer.name || '', phone: customer.phone || '', email: customer.email || '', city: customer.city || '',
-    customer_type: customer.customer_type || 'retail', notes: customer.notes || '' })
+    customer_type: customer.customer_type || 'retail', notes: customer.notes || '', gstin: customer.gstin || '', state_code: customer.state_code || '' })
   const set = (k, v) => setF((x) => ({ ...x, [k]: v }))
   const save = useMutation({
-    mutationFn: () => api(isNew ? '/customers' : `/customers/${customer.id}`, { method: isNew ? 'POST' : 'PUT', body: { ...f, phone: f.phone || null, email: f.email || null } }),
+    mutationFn: () => api(isNew ? '/customers' : `/customers/${customer.id}`, { method: isNew ? 'POST' : 'PUT', body: { ...f, phone: f.phone || null, email: f.email || null, gstin: f.gstin.trim().toUpperCase() || null, state_code: f.state_code || null } }),
     onSuccess: () => { toast('Customer saved', 'success'); qc.invalidateQueries({ queryKey: ['customers'] }); qc.invalidateQueries({ queryKey: ['customer'] }); onClose() },
     onError: (e) => toast(e.message, 'error'),
   })
@@ -100,6 +101,10 @@ function CustomerForm({ customer, onClose }) {
         <Field label="Email"><input className="input" type="email" value={f.email} onChange={(e) => set('email', e.target.value)} /></Field>
         <Field label="City"><input className="input" value={f.city} onChange={(e) => set('city', e.target.value)} /></Field>
         <Field label="Type"><select className="select" value={f.customer_type} onChange={(e) => set('customer_type', e.target.value)}><option value="retail">Retail</option><option value="business">Business (can buy on credit)</option></select></Field>
+        <Field label="GSTIN (business buyers)" hint="Optional - printed on demo invoices; decides CGST/SGST vs IGST">
+          <input className="input" value={f.gstin} maxLength={15} onChange={(e) => set('gstin', e.target.value.toUpperCase())} placeholder="e.g. 27AAPFU0939F1ZV" />
+        </Field>
+        <Field label="State (place of supply)"><StateSelect value={f.state_code} onChange={(code) => set('state_code', code || '')} placeholder="Same as outlet" /></Field>
         <Field label="Notes" className="full"><textarea className="input" rows={2} value={f.notes} onChange={(e) => set('notes', e.target.value)} /></Field>
       </div>
     </Modal>
@@ -120,6 +125,7 @@ function CustomerDrawer({ id, onClose }) {
           </div>
           <Card><dl className="dl">
             <dt>Phone</dt><dd>{c.phone || '-'}</dd><dt>Email</dt><dd>{c.email || '-'}</dd><dt>City</dt><dd>{c.city || '-'}</dd>
+            {c.gstin && <><dt>GSTIN</dt><dd>{c.gstin}</dd></>}
             <dt>Customer since</dt><dd>{date(c.first_purchase || c.created_at)}</dd>
             <dt>Favourites</dt><dd>{c.favourite_products.map((f) => f.name).join(', ') || '-'}</dd>
             {c.notes && <><dt>Notes</dt><dd>{c.notes}</dd></>}

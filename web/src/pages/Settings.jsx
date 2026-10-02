@@ -1,10 +1,11 @@
 import { Fragment, useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Bot, Building2, Database, KeyRound, Pencil, Plus, RefreshCw, Trash2, UserCog, Users } from 'lucide-react'
-import { api } from '../lib/api'
+import { Bot, Building2, Database, KeyRound, LogOut, Pencil, Plus, RefreshCw, Trash2, UserCog, Users } from 'lucide-react'
+import { api, setSession } from '../lib/api'
 import { useApp, useToast } from '../lib/app'
 import { date, dateTime, num } from '../lib/format'
 import { Badge, Card, DataTable, Field, Modal, PageHead, Spinner, StatusBadge, Tabs } from '../components/ui'
+import { StateSelect } from '../components/pickers'
 
 export default function Settings() {
   const { isAdmin } = useApp()
@@ -48,7 +49,13 @@ function OrgTab() {
         <Field label="Email"><input className="input" value={f.email || ''} onChange={(e) => set('email', e.target.value)} /></Field>
         <Field label="Phone"><input className="input" value={f.phone || ''} onChange={(e) => set('phone', e.target.value)} /></Field>
         <Field label="Address" className="full"><input className="input" value={f.address || ''} onChange={(e) => set('address', e.target.value)} /></Field>
-        <Field label="GSTIN / tax ID"><input className="input" value={f.tax_id || ''} onChange={(e) => set('tax_id', e.target.value)} /></Field>
+        <Field label="GSTIN" hint={f.tax_id_is_demo && f.tax_id === org.tax_id ? 'Synthetic demo GSTIN - invoices are watermarked "DEMO - NOT FOR TAX FILING"' : 'Each outlet uses this PAN with its own state code'}>
+          <div className="row" style={{ flexWrap: 'nowrap' }}>
+            <input className="input" style={{ flex: 1 }} value={f.tax_id || ''} onChange={(e) => set('tax_id', e.target.value.toUpperCase())} />
+            {f.tax_id_is_demo && f.tax_id === org.tax_id && <Badge tone="warn">Demo</Badge>}
+          </div>
+        </Field>
+        <Field label="Home state (GST)"><StateSelect value={f.state_code} onChange={(code, name) => setF((x) => ({ ...x, state_code: code, state: name }))} /></Field>
         <Field label="Time zone"><input className="input" value={f.timezone} onChange={(e) => set('timezone', e.target.value)} /></Field>
         <Field label="Currency code"><input className="input" value={f.currency} onChange={(e) => set('currency', e.target.value.toUpperCase())} /></Field>
         <Field label="Currency symbol"><input className="input" value={f.currency_symbol} onChange={(e) => set('currency_symbol', e.target.value)} /></Field>
@@ -67,7 +74,17 @@ function ProfileTab() {
   const saveName = useMutation({ mutationFn: () => api('/auth/me', { method: 'PATCH', body: { full_name: name } }), onSuccess: () => { toast('Profile saved', 'success'); qc.invalidateQueries({ queryKey: ['me'] }) }, onError: (e) => toast(e.message, 'error') })
   const savePw = useMutation({
     mutationFn: () => api('/auth/change-password', { method: 'POST', body: { current_password: pw.current_password, new_password: pw.new_password } }),
-    onSuccess: () => { toast('Password changed', 'success'); setPw({ current_password: '', new_password: '', confirm: '' }) },
+    onSuccess: (r) => {
+      setSession(r.access_token, r.refresh_token)  // other devices are signed out; this one stays signed in
+      toast('Password changed - other devices have been signed out', 'success')
+      setPw({ current_password: '', new_password: '', confirm: '' })
+    },
+    onError: (e) => toast(e.message, 'error'),
+  })
+  const { logout } = useApp()
+  const signOutAll = useMutation({
+    mutationFn: () => api('/auth/logout-all', { method: 'POST' }),
+    onSuccess: () => { toast('Signed out on all devices', 'success'); logout() },
     onError: (e) => toast(e.message, 'error'),
   })
   const mismatch = pw.confirm && pw.new_password !== pw.confirm
@@ -76,8 +93,11 @@ function ProfileTab() {
       <Card title="Profile">
         <form className="stack" onSubmit={(e) => { e.preventDefault(); saveName.mutate() }}>
           <Field label="Full name"><input className="input" value={name} onChange={(e) => setName(e.target.value)} /></Field>
-          <dl className="dl"><dt>Email</dt><dd>{user.email}</dd><dt>Role</dt><dd><StatusBadge status={user.role} /></dd><dt>Outlet</dt><dd>{user.outlet_name || 'All outlets'}</dd></dl>
-          <div><button className="btn primary" disabled={name.trim().length < 2}>Save</button></div>
+          <dl className="dl"><dt>Email</dt><dd>{user.email}</dd><dt>Role</dt><dd><StatusBadge status={user.role} /></dd><dt>Outlets</dt><dd>{user.role === 'admin' ? 'All outlets' : (user.outlet_names || []).join(', ')}</dd></dl>
+          <div className="row">
+            <button className="btn primary" disabled={name.trim().length < 2}>Save</button>
+            <button type="button" className="btn" onClick={() => window.confirm('Sign out on every device, including this one?') && signOutAll.mutate()}><LogOut />Sign out everywhere</button>
+          </div>
         </form>
       </Card>
       <Card title="Change password">
@@ -97,13 +117,13 @@ function UsersTab() {
   const q = useQuery({ queryKey: ['users'], queryFn: () => api('/users') })
   const [edit, setEdit] = useState(null)
   return (
-    <Card flush title="Team" subtitle="Admins see every outlet. Managers run one outlet (stock, purchasing, voids). Staff record sales and look up stock."
+    <Card flush title="Team" subtitle="Admins see every outlet. Managers run their outlets (stock, purchasing, imports, voids). Staff record sales and look up stock. Viewers can see reports and insights for their outlets but cannot change anything."
       actions={<button className="btn primary" onClick={() => setEdit({})}><Plus />Add user</button>}>
       {q.isLoading ? <Spinner /> : (
         <DataTable rows={q.data} columns={[
           { key: 'full_name', label: 'Name', render: (u) => <><b>{u.full_name}</b><div className="small muted">{u.email}</div></> },
           { key: 'role', label: 'Role', format: 'status' },
-          { key: 'outlet_name', label: 'Outlet', render: (u) => u.outlet_name || <span className="muted">All</span> },
+          { key: 'outlet_names', label: 'Outlets', render: (u) => (u.role === 'admin' ? <span className="muted">All</span> : (u.outlet_names || []).join(', ')) },
           { key: 'last_login_at', label: 'Last login', render: (u) => (u.last_login_at ? dateTime(u.last_login_at) : <span className="muted">Never</span>) },
           { key: 'is_active', label: 'Status', render: (u) => <StatusBadge status={u.is_active ? 'active' : 'inactive'} /> },
           { key: 'e', label: '', render: (u) => <button className="btn sm icon ghost" aria-label="Edit user" onClick={() => setEdit(u)}><Pencil /></button> },
@@ -119,11 +139,12 @@ function UserForm({ u, onClose }) {
   const qc = useQueryClient()
   const toast = useToast()
   const isNew = !u.id
-  const [f, setF] = useState({ email: u.email || '', full_name: u.full_name || '', role: u.role || 'staff', outlet_id: u.outlet_id || '', is_active: u.is_active ?? true, password: '' })
+  const [f, setF] = useState({ email: u.email || '', full_name: u.full_name || '', role: u.role || 'staff', outlet_ids: u.outlet_ids || [], is_active: u.is_active ?? true, password: '' })
   const set = (k, v) => setF((x) => ({ ...x, [k]: v }))
+  const toggleOutlet = (id) => set('outlet_ids', f.outlet_ids.includes(id) ? f.outlet_ids.filter((x) => x !== id) : [...f.outlet_ids, id])
   const save = useMutation({
     mutationFn: () => {
-      const body = { full_name: f.full_name, role: f.role, outlet_id: f.role === 'admin' ? null : Number(f.outlet_id) || null }
+      const body = { full_name: f.full_name, role: f.role, outlet_ids: f.role === 'admin' ? [] : f.outlet_ids }
       if (isNew) return api('/users', { method: 'POST', body: { ...body, email: f.email, password: f.password } })
       return api(`/users/${u.id}`, { method: 'PATCH', body: { ...body, is_active: f.is_active, ...(f.password ? { password: f.password } : {}) } })
     },
@@ -133,25 +154,33 @@ function UserForm({ u, onClose }) {
   return (
     <Modal title={isNew ? 'Add user' : `Edit ${u.full_name}`} onClose={onClose} footer={<>
       <button className="btn" onClick={onClose}>Cancel</button>
-      <button className="btn primary" disabled={save.isPending || (isNew && f.password.length < 8) || (f.role !== 'admin' && !f.outlet_id)} onClick={() => save.mutate()}>Save</button>
+      <button className="btn primary" disabled={save.isPending || (isNew && f.password.length < 8) || (f.role !== 'admin' && !f.outlet_ids.length)} onClick={() => save.mutate()}>Save</button>
     </>}>
       <div className="form-grid">
         <Field label="Full name"><input className="input" value={f.full_name} onChange={(e) => set('full_name', e.target.value)} /></Field>
         <Field label="Email"><input className="input" type="email" value={f.email} disabled={!isNew} onChange={(e) => set('email', e.target.value)} /></Field>
         <Field label="Role">
           <select className="select" value={f.role} onChange={(e) => set('role', e.target.value)} disabled={u.id === me.id}>
-            <option value="admin">Admin - everything</option><option value="manager">Manager - one outlet</option><option value="staff">Staff - billing & stock lookup</option>
-          </select>
-        </Field>
-        <Field label="Outlet">
-          <select className="select" value={f.role === 'admin' ? '' : f.outlet_id} disabled={f.role === 'admin'} onChange={(e) => set('outlet_id', e.target.value)}>
-            <option value="">{f.role === 'admin' ? 'All outlets' : 'Choose outlet…'}</option>
-            {outlets.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+            <option value="admin">Admin - everything, all outlets</option>
+            <option value="manager">Manager - runs assigned outlets</option>
+            <option value="staff">Staff - billing & stock lookup</option>
+            <option value="viewer">Viewer - read-only reports & insights</option>
           </select>
         </Field>
         <Field label={isNew ? 'Password' : 'Reset password'} hint={isNew ? 'At least 8 characters' : 'Leave empty to keep current'}>
           <input className="input" type="password" autoComplete="new-password" value={f.password} onChange={(e) => set('password', e.target.value)} />
         </Field>
+        <fieldset className="field full" style={{ border: 0, padding: 0, margin: 0 }}>
+          <span>Outlets {f.role === 'admin' ? '(admins see all outlets)' : '(choose one or more)'}</span>
+          <div className="row" style={{ gap: 12 }}>
+            {outlets.map((o) => (
+              <label key={o.id} className="row small" style={{ gap: 6 }}>
+                <input type="checkbox" disabled={f.role === 'admin'} checked={f.role === 'admin' || f.outlet_ids.includes(o.id)} onChange={() => toggleOutlet(o.id)} />
+                {o.name}{o.is_active ? '' : ' (inactive)'}
+              </label>
+            ))}
+          </div>
+        </fieldset>
         {!isNew && <Field label="Status"><select className="select" value={String(f.is_active)} disabled={u.id === me.id} onChange={(e) => set('is_active', e.target.value === 'true')}><option value="true">Active</option><option value="false">Deactivated</option></select></Field>}
       </div>
     </Modal>
@@ -189,6 +218,10 @@ function SystemTab() {
           <dt>Sales history</dt><dd>{d.data_from ? `${date(d.data_from)} – ${date(d.data_to)}` : 'No sales yet'}</dd>
           {Object.entries(d.counts).map(([k, v]) => <Fragment key={k}><dt>{k.replace('_', ' ')}</dt><dd>{num(v)}</dd></Fragment>)}
           <dt>Sales by source</dt><dd>{Object.entries(d.sales_by_source).map(([k, v]) => `${k}: ${num(v)}`).join(' · ') || '-'}</dd>
+          {d.dataset && <>
+            <dt>Demo dataset</dt>
+            <dd>Synthetic - generator v{d.dataset.generator_version}, seed {d.dataset.random_seed}, {date(d.dataset.period_start)} – {date(d.dataset.period_end)}, generated {dateTime(d.dataset.generated_at)}</dd>
+          </>}
         </dl>
       </Card>
       <Card title="AI assistant engine">
@@ -211,7 +244,7 @@ function SystemTab() {
           <div className="stack">
             {d.seeding?.running && <div className="alert info"><div className="spinner" style={{ width: 16, height: 16 }} /><div><b>Generating demo data…</b><p>{d.seeding.message}</p></div></div>}
             <div className="row between">
-              <div><b>Regenerate demo organization</b><p className="small text-2">Replaces ALL data with a fresh 6-outlet demo (about 18 months of sales). Takes about a minute; you'll be signed out.</p></div>
+              <div><b>Regenerate demo organization</b><p className="small text-2">Replaces ALL data with a fresh synthetic demo (5 outlets, two years of bills, seed 42 - the same seed always gives the same data). Takes about a minute; you'll be signed out.</p></div>
               <button className="btn" disabled={regen.isPending || d.seeding?.running} onClick={() => window.confirm('This deletes ALL data and users and regenerates the demo. Continue?') && regen.mutate()}><RefreshCw />Regenerate demo</button>
             </div>
             <div className="row between">

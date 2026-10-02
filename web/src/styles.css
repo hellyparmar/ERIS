@@ -114,6 +114,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .span-2 { grid-column: span 2; }
+.grid-side { grid-template-columns: minmax(220px, 280px) minmax(0, 1fr); align-items: start; }
 .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .stack { display: flex; flex-direction: column; gap: 10px; }
 .between { justify-content: space-between; }
@@ -177,7 +178,7 @@ textarea.input { height: auto; padding: 8px 10px; resize: vertical; }
 @media (max-width: 560px) { .search .input { width: 100%; } .search { width: 100%; } }
 .check { display: inline-flex; gap: 8px; align-items: center; cursor: pointer; }
 
-.seg { display: inline-flex; background: var(--surface-2); border-radius: var(--radius-sm); padding: 3px; gap: 2px; border: 1px solid var(--border); }
+.seg { display: inline-flex; flex-wrap: wrap; max-width: 100%; background: var(--surface-2); border-radius: var(--radius-sm); padding: 3px; gap: 2px; border: 1px solid var(--border); }
 .seg button { border: 0; background: transparent; height: 26px; padding: 0 10px; border-radius: 6px; cursor: pointer; font-weight: 550; color: var(--text-2); font-size: 13px; }
 .seg button.on { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
 
@@ -297,3 +298,15 @@ table.table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .progress i { display: block; height: 100%; background: var(--accent); }
 .kbd { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; padding: 1px 6px; }
 pre.code { background: var(--surface-2); border-radius: 8px; padding: 10px; overflow-x: auto; font-size: 12px; margin: 0; }
+
+@media (max-width: 900px) { .grid-side { grid-template-columns: 1fr; } }
+.provenance { margin-top: 10px; border-top: 1px solid var(--grid); padding-top: 8px; font-size: 12px; color: var(--text-2); }
+.provenance summary { cursor: pointer; color: var(--muted); }
+.provenance dl { display: grid; grid-template-columns: max-content 1fr; gap: 2px 10px; margin: 6px 0 0; }
+.provenance dt { color: var(--muted); }
+.provenance dd { margin: 0; overflow-wrap: anywhere; }
+.watermark-note { border: 1px dashed var(--bad); color: var(--bad); border-radius: 8px; padding: 6px 10px; font-weight: 600; font-size: 12px; }
+.warn-ink { color: var(--warn-ink); }
+.card-head > div { min-width: 0; }
+.card-head .row { flex-wrap: wrap; max-width: 100%; }
+.grid > * { min-width: 0; }

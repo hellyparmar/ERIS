@@ -95,7 +95,10 @@ def export_sales(outlet_id: int | None = None, start: date | None = None, end: d
 def get_sale(sale_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     s = get_or_404(db, Sale, sale_id, "Sale")
     ensure_outlet_access(user, s.outlet_id)
-    return sale_dict(s, detail=True)
+    from app.models import Invoice
+
+    inv = db.scalar(select(Invoice).where(Invoice.sale_id == s.id))
+    return {**sale_dict(s, detail=True), "invoice": {"id": inv.id, "number": inv.number} if inv else None}
 
 
 @router.post("", status_code=201)

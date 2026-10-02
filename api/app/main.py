@@ -73,7 +73,7 @@ app = FastAPI(
     title="ERIS API",
     description="Enterprise Retail Intelligence System - sales, inventory, forecasting and an AI assistant "
                 "for multi-outlet retailers.",
-    version="2.0.0",
+    version="3.0.0",
     lifespan=lifespan,
 )
 app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins, allow_credentials=True,

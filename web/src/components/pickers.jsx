@@ -60,3 +60,21 @@ export function useCategories() {
 export function useSuppliers() {
   return useQuery({ queryKey: ['suppliers'], queryFn: () => api('/suppliers'), staleTime: 120_000 })
 }
+
+export function useGstStates() {
+  return useQuery({ queryKey: ['gst-states'], queryFn: () => api('/settings/gst-states'), staleTime: Infinity })
+}
+
+/** GST state picker; onChange(code, name). */
+export function StateSelect({ value, onChange, placeholder = 'Choose state…' }) {
+  const states = useGstStates()
+  return (
+    <select className="select" value={value || ''} onChange={(e) => {
+      const s = (states.data || []).find((x) => x.code === e.target.value)
+      onChange(s?.code || null, s?.name || null)
+    }}>
+      <option value="">{placeholder}</option>
+      {(states.data || []).map((s) => <option key={s.code} value={s.code}>{s.code} - {s.name}</option>)}
+    </select>
+  )
+}

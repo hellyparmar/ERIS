@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
-  BarChart3, Bell, Boxes, Bot, Building2, Contact, LayoutDashboard, LogOut, Menu, Moon, Package, Receipt,
-  Settings, Store, Sun, TrendingUp, Truck, Upload, Monitor,
+  Activity, BarChart3, Bell, Boxes, Bot, Building2, Contact, FileSpreadsheet, FileText, FlaskConical, History,
+  LayoutDashboard, LogOut, Menu, Moon, Package, Receipt, Settings, Store, Sun, TrendingUp, Truck, Upload, Monitor,
 } from 'lucide-react'
 import { api } from '../lib/api'
 import { useApp } from '../lib/app'
@@ -20,26 +20,32 @@ const NAV = [
   { to: '/products', label: 'Products', icon: Package },
   { to: '/suppliers', label: 'Suppliers & orders', icon: Truck },
   { to: '/customers', label: 'Customers', icon: Contact },
+  { to: '/invoices', label: 'Invoices (demo GST)', icon: FileText },
   { section: 'Insights' },
   { to: '/forecasts', label: 'Forecasts', icon: TrendingUp },
+  { to: '/models', label: 'Model comparison', icon: FlaskConical },
+  { to: '/insights', label: 'Anomalies & drivers', icon: Activity },
   { to: '/analytics', label: 'Analytics', icon: BarChart3 },
+  { to: '/reports', label: 'Reports & export', icon: FileSpreadsheet },
   { section: 'Business' },
   { to: '/outlets', label: 'Outlets', icon: Store },
   { to: '/import', label: 'Data import', icon: Upload, manager: true },
+  { to: '/audit', label: 'Audit log', icon: History, admin: true },
   { to: '/settings', label: 'Settings', icon: Settings },
 ]
 
 function OutletPicker() {
   const { user, outlets, outletId, setOutletId } = useApp()
   if (!user) return null
-  if (user.role !== 'admin') {
-    return <span className="badge info"><Building2 size={12} />{user.outlet_name || 'My outlet'}</span>
+  const mine = user.role === 'admin' ? outlets : outlets.filter((o) => user.outlet_ids.includes(o.id))
+  if (user.role !== 'admin' && mine.length <= 1) {
+    return <span className="badge info"><Building2 size={12} />{user.outlet_names?.[0] || 'My outlet'}</span>
   }
   return (
     <select className="select" value={outletId || ''} onChange={(e) => setOutletId(e.target.value ? Number(e.target.value) : null)}
       aria-label="Outlet filter" style={{ maxWidth: 220 }}>
-      <option value="">All outlets</option>
-      {outlets.map((o) => <option key={o.id} value={o.id}>{o.name}{o.is_active ? '' : ' (inactive)'}</option>)}
+      <option value="">{user.role === 'admin' ? 'All outlets' : 'All my outlets'}</option>
+      {mine.map((o) => <option key={o.id} value={o.id}>{o.name}{o.is_active ? '' : ' (inactive)'}</option>)}
     </select>
   )
 }
@@ -85,7 +91,7 @@ function ThemeButton() {
 }
 
 export default function Layout() {
-  const { user, logout, org, isManager } = useApp()
+  const { user, logout, org, isManager, isAdmin } = useApp()
   const [open, setOpen] = useState(false)
   const location = useLocation()
   useEffect(() => setOpen(false), [location.pathname])
@@ -99,7 +105,7 @@ export default function Layout() {
           <div className="brand-mark">E</div>
           <div><b>ERIS</b><small>Retail Intelligence</small></div>
         </div>
-        {NAV.filter((n) => !n.manager || isManager).map((n) => n.section
+        {NAV.filter((n) => (!n.manager || isManager) && (!n.admin || isAdmin)).map((n) => n.section
           ? <div key={n.section} className="nav-section">{n.section}</div>
           : <NavLink key={n.to} to={n.to} end={n.end} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><n.icon />{n.label}</NavLink>)}
         <div className="sidebar-foot">

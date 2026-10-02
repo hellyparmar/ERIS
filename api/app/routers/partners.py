@@ -101,7 +101,7 @@ def delete_supplier(supplier_id: int, _: User = Depends(require_manager), db: Se
 # ------------------------------------------------------------------------------------------ customers
 def customer_dict(c: Customer) -> dict:
     return {"id": c.id, "name": c.name, "phone": c.phone, "email": c.email, "city": c.city,
-            "customer_type": c.customer_type, "notes": c.notes,
+            "customer_type": c.customer_type, "notes": c.notes, "gstin": c.gstin, "state_code": c.state_code,
             "created_at": c.created_at.isoformat() if c.created_at else None}
 
 

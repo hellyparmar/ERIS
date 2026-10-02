@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { CalendarDays, Download, FlaskConical, Lightbulb, PackageCheck } from 'lucide-react'
 import { api } from '../lib/api'
@@ -10,7 +10,7 @@ import { ForecastChart } from '../components/charts'
 import { ProductSearch, useCategories } from '../components/pickers'
 
 const SCOPES = [{ value: 'total', label: 'Total sales' }, { value: 'outlet', label: 'Outlet' }, { value: 'category', label: 'Category' }, { value: 'product', label: 'Product' }]
-const HORIZONS = [7, 14, 30, 60, 90].map((h) => ({ value: h, label: `${h}d` }))
+const HORIZONS = [7, 14, 30].map((h) => ({ value: h, label: `${h} days` }))
 
 function toCsv(fc) {
   const rows = [['date', 'forecast', 'lower_80', 'upper_80'], ...fc.forecast.map((f) => [f.date, f.yhat, f.lower, f.upper])]
@@ -33,7 +33,8 @@ export default function Forecasts() {
   const [productName, setProductName] = useState(null)
   const models = useQuery({ queryKey: ['fc-models'], queryFn: () => api('/forecast/models'), staleTime: Infinity })
 
-  const effectiveTarget = scope === 'outlet' ? (targetId || outletId || (user.role !== 'admin' ? user.outlet_id : outlets[0]?.id)) : targetId
+  const myOutlets = user.role === 'admin' ? outlets : outlets.filter((o) => user.outlet_ids.includes(o.id))
+  const effectiveTarget = scope === 'outlet' ? (targetId || outletId || myOutlets[0]?.id) : targetId
   const ready = scope === 'total' || !!effectiveTarget
   const qp = { scope, target_id: scope === 'total' ? undefined : effectiveTarget, horizon, model, outlet_id: scope === 'outlet' ? undefined : outletId }
   const q = useQuery({ queryKey: ['forecast', qp], queryFn: () => api('/forecast', { params: qp }), enabled: ready, staleTime: 300_000 })
@@ -43,14 +44,16 @@ export default function Forecasts() {
 
   return (
     <>
-      <PageHead title="Forecasts" subtitle="Demand and revenue forecasts. Four models are back-tested on the last 8 weeks of every series and the most reliable one is used." />
+      <PageHead title="Forecasts" subtitle="Demand and revenue forecasts. Seasonal naive, Holt-Winters, XGBoost, Prophet and an ensemble are back-tested on the latest weeks of every series; the most reliable one is used.">
+        <Link className="btn" to="/models"><FlaskConical />Model comparison</Link>
+      </PageHead>
       <Card>
         <div className="row" style={{ alignItems: 'flex-end', gap: 14 }}>
           <Field label="Forecast"><Seg options={SCOPES} value={scope} onChange={setScope} label="Scope" /></Field>
           {scope === 'outlet' && (
             <Field label="Outlet">
-              <select className="select" value={effectiveTarget || ''} onChange={(e) => setTarget(e.target.value)} disabled={user.role !== 'admin'}>
-                {outlets.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+              <select className="select" value={effectiveTarget || ''} onChange={(e) => setTarget(e.target.value)} disabled={myOutlets.length <= 1}>
+                {myOutlets.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
               </select>
             </Field>
           )}
@@ -143,11 +146,16 @@ function Result({ fc, showBacktest, setShowBacktest }) {
           <DataTable rows={[...fc.evaluation].sort((a, b) => (a.wape ?? 999) - (b.wape ?? 999))} sortable={false} columns={[
             { key: 'label', label: 'Model', render: (r) => <><b>{r.label}</b> {r.selected && <Badge tone="good">used</Badge>}{r.error && <div className="small down">failed: {r.error}</div>}</> },
             { key: 'wape', label: 'WAPE', align: 'right', render: (r) => (r.wape != null ? `${r.wape}%` : '-') },
-            { key: 'mape', label: 'MAPE', align: 'right', render: (r) => (r.mape != null ? `${r.mape}%` : '-') },
+            { key: 'smape', label: 'sMAPE', align: 'right', render: (r) => (r.smape != null ? `${r.smape}%` : '-') },
             { key: 'mae', label: 'MAE', align: 'right', render: (r) => (r.mae != null ? formatValue(r.mae, fmt) : '-') },
+            { key: 'rmse', label: 'RMSE', align: 'right', render: (r) => (r.rmse != null ? formatValue(r.rmse, fmt) : '-') },
+            { key: 'interval_coverage', label: '80% band', align: 'right', render: (r) => (r.interval_coverage != null ? `${r.interval_coverage}%` : '-') },
             { key: 'bias_pct', label: 'Bias', align: 'right', render: (r) => (r.bias_pct != null ? `${r.bias_pct > 0 ? '+' : ''}${r.bias_pct}%` : '-') },
           ]} />
-          <p className="small muted" style={{ padding: 12 }}><FlaskConical size={13} style={{ verticalAlign: -2 }} /> WAPE = total absolute error ÷ total actual. Bias &gt; 0 means the model over-forecasts.</p>
+          <p className="small muted" style={{ padding: 12 }}><FlaskConical size={13} style={{ verticalAlign: -2 }} /> WAPE = total absolute error ÷ total actual. 80% band = share of back-test days inside the prediction range (ideal ≈ 80%). Bias &gt; 0 means the model over-forecasts.</p>
+          <p className="small muted" style={{ padding: '0 12px 12px' }}>
+            Run {fc.run_id ? <Link to={`/models?run=${fc.run_id}`}>#{fc.run_id}</Link> : '(not saved)'} · model version {fc.model_version} · trained on {fc.data_range ? `${date(fc.data_range.start)} – ${date(fc.data_range.end)} (${fc.data_range.days} days)` : '-'} · {fc.features?.length || 0} features
+          </p>
         </Card>
         <Card title="Daily forecast" flush>
           <DataTable maxHeight={360} rows={fc.forecast} sortable={false} columns={[

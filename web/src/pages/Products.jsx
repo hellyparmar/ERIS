@@ -83,12 +83,14 @@ function ProductForm({ product, onClose }) {
     sku: product.sku || '', name: product.name || '', category_id: product.category_id || '', supplier_id: product.supplier_id || '',
     unit: product.unit || 'pcs', cost_price: product.cost_price ?? '', selling_price: product.selling_price ?? '',
     tax_rate: product.tax_rate ?? 5, reorder_level: product.reorder_level ?? 10, is_active: product.is_active ?? true,
+    hsn_code: product.hsn_code || '',
   })
   const set = (k, v) => setF((x) => ({ ...x, [k]: v }))
   const save = useMutation({
     mutationFn: () => api(isNew ? '/products' : `/products/${product.id}`, { method: isNew ? 'POST' : 'PUT', body: {
       ...f, category_id: Number(f.category_id), supplier_id: f.supplier_id ? Number(f.supplier_id) : null,
       cost_price: Number(f.cost_price), selling_price: Number(f.selling_price), tax_rate: Number(f.tax_rate), reorder_level: Number(f.reorder_level),
+      hsn_code: f.hsn_code.trim() || null,
     } }),
     onSuccess: () => { toast(isNew ? 'Product added to every outlet' : 'Product saved', 'success'); qc.invalidateQueries({ queryKey: ['products'] }); qc.invalidateQueries({ queryKey: ['categories'] }); onClose() },
     onError: (e) => toast(e.message, 'error'),
@@ -123,6 +125,7 @@ function ProductForm({ product, onClose }) {
         <Field label="GST rate %">
           <select className="select" value={f.tax_rate} onChange={(e) => set('tax_rate', e.target.value)}>{[0, 5, 12, 18, 28].map((t) => <option key={t} value={t}>{t}%</option>)}</select>
         </Field>
+        <Field label="HSN code" hint="4-8 digits, printed on GST invoices"><input className="input" inputMode="numeric" maxLength={8} value={f.hsn_code} onChange={(e) => set('hsn_code', e.target.value.replace(/\D/g, ''))} /></Field>
         <Field label="Cost price (₹)"><input className="input" type="number" min="0" step="any" value={f.cost_price} onChange={(e) => set('cost_price', e.target.value)} required /></Field>
         <Field label="Selling price incl. GST (₹)" hint={f.selling_price && f.cost_price ? `Margin ${margin.toFixed(1)}% after tax` : ''}>
           <input className="input" type="number" min="0" step="any" value={f.selling_price} onChange={(e) => set('selling_price', e.target.value)} required />
@@ -170,7 +173,7 @@ function ProductDrawer({ id, onClose, onEdit }) {
           )}
           <Card><dl className="dl">
             <dt>SKU</dt><dd>{p.sku}</dd><dt>Category</dt><dd>{p.category}</dd><dt>Supplier</dt><dd>{p.supplier || '-'}</dd>
-            <dt>Cost / price</dt><dd>{money(p.cost_price, { decimals: true })} / {money(p.selling_price, { decimals: true })} (GST {p.tax_rate}%)</dd>
+            <dt>Cost / price</dt><dd>{money(p.cost_price, { decimals: true })} / {money(p.selling_price, { decimals: true })} (GST {p.tax_rate}%{p.hsn_code ? `, HSN ${p.hsn_code}` : ''})</dd>
             <dt>Status</dt><dd><StatusBadge status={p.is_active ? 'active' : 'inactive'} /></dd>
           </dl></Card>
         </>

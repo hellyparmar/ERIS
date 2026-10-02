@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { api, getToken, setToken, setUnauthorizedHandler } from './api'
+import { api, clearSession, getToken, setSession, setUnauthorizedHandler } from './api'
 import { setCurrencySymbol } from './format'
 
 const AppCtx = createContext(null)
@@ -23,7 +23,7 @@ export function AppProvider({ children }) {
   const [theme, setThemeState] = useState(() => readPref('eris-theme', 'system'))
 
   const logout = useCallback(() => {
-    setToken(null)
+    clearSession()
     setTok(null)
     qc.clear()
   }, [qc])
@@ -38,7 +38,7 @@ export function AppProvider({ children }) {
 
   const login = async (email, password) => {
     const res = await api('/auth/login', { method: 'POST', body: { email, password } })
-    setToken(res.access_token)
+    setSession(res.access_token, res.refresh_token)
     qc.clear()
     setTok(res.access_token)
     return res.user
@@ -61,12 +61,16 @@ export function AppProvider({ children }) {
   }
 
   const user = me.data
-  // Managers and staff always work within their own outlet.
-  const effectiveOutlet = user && user.role !== 'admin' ? user.outlet_id : outletId
+  // Non-admins work within their assigned outlets: one outlet is fixed, several can be switched between
+  // (or viewed together when no outlet is chosen).
+  const assigned = user?.outlet_ids || []
+  const effectiveOutlet = !user || user.role === 'admin' ? outletId
+    : assigned.length === 1 ? assigned[0] : (assigned.includes(outletId) ? outletId : null)
   const value = useMemo(() => ({
     token, user, loadingUser: !!token && me.isLoading, login, logout,
     org: org.data, outlets: outlets.data || [], outletId: effectiveOutlet, setOutletId,
     isAdmin: user?.role === 'admin', isManager: user?.role === 'admin' || user?.role === 'manager',
+    canWrite: !!user && user.role !== 'viewer', isViewer: user?.role === 'viewer',
     theme, setTheme,
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [token, user, me.isLoading, org.data, outlets.data, effectiveOutlet, theme])

@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app import clock
 from app.config import settings
 from app.db import SessionLocal, get_db
-from app.models import Customer, Organization, Outlet, Product, PurchaseOrder, Sale, SaleItem, Supplier, User
+from app.models import Customer, DatasetInfo, Organization, Outlet, Product, PurchaseOrder, Sale, SaleItem, Supplier, User
 from app.schemas import OrganizationIn
 from app.security import get_current_user, require_admin
 from app.services import analytics as A
@@ -49,6 +49,14 @@ def update_org(body: OrganizationIn, admin: User = Depends(require_admin), db: S
     return org_dict(org)
 
 
+@router.get("/gst-states")
+def gst_states(_: User = Depends(get_current_user)):
+    """GST state codes (used for outlet, organization and customer forms)."""
+    from app.services.gst import STATES
+
+    return [{"code": k, "name": v} for k, v in sorted(STATES.items())]
+
+
 @router.get("/system")
 def system_info(_: User = Depends(get_current_user), db: Session = Depends(get_db)):
     counts = {
@@ -62,11 +70,17 @@ def system_info(_: User = Depends(get_current_user), db: Session = Depends(get_d
         "users": db.scalar(select(func.count(User.id))),
     }
     by_source = dict(db.execute(select(Sale.source, func.count(Sale.id)).group_by(Sale.source)).all())
+    ds = db.scalar(select(DatasetInfo).order_by(DatasetInfo.id.desc()))
+    dataset = None if ds is None else {
+        "data_source": ds.data_source, "generator_version": ds.generator_version, "random_seed": ds.random_seed,
+        "generated_at": ds.generated_at.isoformat(), "period_start": ds.period_start.isoformat(),
+        "period_end": ds.period_end.isoformat(), "parameters": ds.parameters, "row_counts": ds.row_counts}
     return {
         "app": settings.APP_NAME,
         "database": "SQLite" if settings.is_sqlite else "PostgreSQL",
         "counts": counts,
         "sales_by_source": by_source,
+        "dataset": dataset,
         "data_from": (A.first_sale_date(db) or None),
         "data_to": (A.latest_sale_date(db) or None),
         "forecast_models": F.available_models(),
