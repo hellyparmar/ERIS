@@ -63,12 +63,21 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False
 _write_engine = engine.execution_options(sqlite_immediate=True)
 
 
-READ_MOSTLY_POSTS = {"/api/auth/login", "/api/auth/refresh"}
+# POSTs that mostly read: sign-in only records the last-login time (best effort) and the assistant computes an answer
+# (possibly via a slow local LLM) before saving it in a short write_session(), so neither may hold the write lock
+READ_MOSTLY_POSTS = {"/api/auth/login", "/api/auth/refresh", "/api/assistant/chat"}
+
+
+def write_session() -> Session:
+    """A separate short write transaction for a request that otherwise only reads (e.g. saving a forecast run).
+
+    On SQLite a read transaction cannot be upgraded to a write once another request has written, so writes made
+    while serving a read go through their own session that takes the write lock up front."""
+    return SessionLocal(bind=_write_engine)
 
 
 def get_db(request: Request) -> Iterator[Session]:
     """Session for one request. Requests that change data use write transactions from the start on SQLite."""
-    # sign-in only records the last-login time (best effort), so it must not queue behind long writes
     writes = request.method not in ("GET", "HEAD", "OPTIONS") and request.url.path not in READ_MOSTLY_POSTS
     db = SessionLocal(bind=_write_engine) if writes and settings.is_sqlite else SessionLocal()
     try:

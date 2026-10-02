@@ -5,7 +5,7 @@ import { CalendarDays, Download, FlaskConical, Lightbulb, PackageCheck } from 'l
 import { api } from '../lib/api'
 import { useApp } from '../lib/app'
 import { date, formatValue, money, num } from '../lib/format'
-import { Badge, Card, DataTable, Delta, ErrorState, Field, Kpi, PageHead, Seg, Spinner } from '../components/ui'
+import { Badge, Card, DataTable, Delta, Empty, ErrorState, Field, Kpi, PageHead, Seg, Spinner } from '../components/ui'
 import { ForecastChart } from '../components/charts'
 import { ProductSearch, useCategories } from '../components/pickers'
 
@@ -78,7 +78,12 @@ export default function Forecasts() {
         </div>
       </Card>
       {!ready ? <Card><div className="empty"><b>Choose what to forecast</b><div className="small">Pick a {scope} above.</div></div></Card>
-        : q.isError ? <ErrorState error={q.error} onRetry={q.refetch} />
+        : q.isError && q.error?.status === 400 ? (
+          <Card><Empty title="Not enough sales history for this forecast yet" icon={CalendarDays}>
+            {q.error.message}. Forecasts become available automatically once enough bills are recorded -
+            add past sales on the <Link to="/import?type=sales">Data import</Link> page to start sooner.
+          </Empty></Card>)
+          : q.isError ? <ErrorState error={q.error} onRetry={q.refetch} />
           : q.isLoading ? <Card><Spinner label="Training and back-testing models… (a few seconds the first time)" /></Card>
             : <Result fc={q.data} showBacktest={showBacktest} setShowBacktest={setShowBacktest} />}
       {scope === 'total' && byOutlet.data?.length > 0 && (

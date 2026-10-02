@@ -33,6 +33,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app import clock
+from app.db import write_session
 from app.models import (
     OPEN_PO_STATUSES,
     Category,
@@ -354,7 +355,7 @@ def run_forecast(series: pd.Series, horizon: int, model: str = "auto", exog: pd.
             "final_fit_seconds": inference_seconds}
 
 
-def _persist(db: Session, spec: SeriesSpec, series: pd.Series | None, horizon: int, result: dict | None,
+def _persist(spec: SeriesSpec, series: pd.Series | None, horizon: int, result: dict | None,
              error: str | None, seconds: float, user_id: int | None, run_type: str = "forecast") -> int | None:
     try:
         run = ForecastRun(
@@ -373,11 +374,11 @@ def _persist(db: Session, spec: SeriesSpec, series: pd.Series | None, horizon: i
         if result:
             run.results = [ForecastResult(day=date.fromisoformat(f["date"]), yhat=f["yhat"], lower=f["lower"],
                                           upper=f["upper"]) for f in result["forecast"]]
-        db.add(run)
-        db.commit()
-        return run.id
+        with write_session() as wdb:
+            wdb.add(run)
+            wdb.commit()
+            return run.id
     except Exception:  # persisting must never break forecasting
-        db.rollback()
         log.exception("could not persist forecast run")
         return None
 
@@ -391,6 +392,8 @@ def forecast_series(db: Session, spec: SeriesSpec, horizon: int = 30, model: str
     with _cache_lock:
         hit = _cache.get(key)
         if hit and time.time() - hit[0] < CACHE_SECONDS:
+            if isinstance(hit[1], ValueError):
+                raise hit[1]  # the same data cannot be forecast: answer again without another failed run
             return hit[1]
 
     t0 = time.time()
@@ -401,9 +404,11 @@ def forecast_series(db: Session, spec: SeriesSpec, horizon: int = 30, model: str
         result = run_forecast(series, horizon, model, exog)
     except ValueError as exc:
         if persist:
-            _persist(db, spec, series, horizon, None, str(exc), time.time() - t0, user_id)
+            _persist(spec, series, horizon, None, str(exc), time.time() - t0, user_id)
+        with _cache_lock:
+            _cache[key] = (time.time(), exc)
         raise
-    result["run_id"] = _persist(db, spec, series, horizon, result, None, time.time() - t0, user_id) if persist else None
+    result["run_id"] = _persist(spec, series, horizon, result, None, time.time() - t0, user_id) if persist else None
     result["model_version"] = MODEL_VERSION
     result["data_range"] = {"start": series.index[0].date().isoformat(), "end": series.index[-1].date().isoformat(),
                             "days": len(series)}

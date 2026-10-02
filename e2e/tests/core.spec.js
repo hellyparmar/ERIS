@@ -94,3 +94,28 @@ test('reports download as CSV and Excel', async ({ page }) => {
   const [xlsx] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Excel' }).click()])
   expect(xlsx.suggestedFilename()).toMatch(/\.xlsx$/)
 })
+
+test('purchase order can be delivered in parts, then completed', async ({ page }) => {
+  await login(page, 'manager')
+  await page.goto('/suppliers')
+  await page.getByRole('button', { name: 'New purchase order' }).click()
+  const modal = page.locator('.modal')
+  await modal.locator('label:has-text("Supplier") select').selectOption({ index: 1 })
+  await modal.getByLabel('Search products').fill('milk')
+  await page.getByRole('button', { name: /Toned Milk 1L/ }).click()
+  await modal.getByRole('button', { name: /Create/ }).last().click()
+  const toast = page.locator('.toast', { hasText: /Purchase order .* created/ })
+  await expect(toast).toBeVisible()
+  const poNumber = (await toast.textContent()).match(/Purchase order (\S+) created/)[1]
+
+  await page.locator('main table tbody tr', { hasText: poNumber }).click()
+  const drawer = page.locator('.drawer')
+  const qty = drawer.locator('input[type=number]').first()
+  const ordered = Number(await qty.inputValue())
+  await qty.fill(String(Math.max(1, Math.floor(ordered / 2))))
+  await drawer.getByRole('button', { name: 'Record delivery' }).click()
+  await expect(page.getByText(/rest of the order is still expected/)).toBeVisible()
+  await expect(drawer.getByText('Part-delivered').first()).toBeVisible()
+  await drawer.getByRole('button', { name: 'Record delivery' }).click()
+  await expect(page.getByText(/order complete/)).toBeVisible()
+})

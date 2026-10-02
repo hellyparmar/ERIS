@@ -6,7 +6,7 @@ the work and how it is verified. Deviations from the recommended stack are liste
 
 Verification shorthand:
 
-- **T**: pytest API tests (`api/tests`, 87 tests, SQLite and PostgreSQL).
+- **T**: pytest API tests (`api/tests`, 88 tests, SQLite and PostgreSQL).
 - **E**: Playwright end-to-end tests (`e2e/`).
 - **Ev**: evaluation scripts and reports.
 
@@ -122,7 +122,7 @@ There is no IRN, filing, e-way bill or any claim of compliance.
 
 | Item | Status |
 |---|---|
-| Playwright end-to-end tests | `e2e/`, 9 scenarios, CI job `e2e` |
+| Playwright end-to-end tests | `e2e/`, 10 scenarios, CI job `e2e` |
 | PostgreSQL integration tests | Full suite runs on PostgreSQL 16 (CI job `api-postgres`) |
 | Docker Compose | `docker compose up` (SQLite); `--profile postgres` and `--profile ai` (Ollama) |
 | One-command demo seed | Automatic on first start, or `python -m app.seed` |

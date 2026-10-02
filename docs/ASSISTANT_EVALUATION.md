@@ -9,37 +9,37 @@ Each question is asked through the same code path as the chat API. Numbers in th
 | Intent recognised | 27/27 (100%) |
 | Numbers / sources match the database | 19/19 (100%) |
 | Answers with a provenance block | 27/27 |
-| Median / max response time | 312 ms / 3735 ms |
+| Median / max response time | 270 ms / 3552 ms |
 
 | Question | User | Intent | Grounding check | Result | ms |
 |---|---|---|---|---|---|
-| Which outlet had the highest revenue last month? | admin | outlet_ranking | top outlet Andheri West with ₹14.24 L | pass | 363 |
-| Show the five fastest-growing products. | admin | growth_products | Dark Chocolate 70% 100g: ₹1.20 L in the current period | pass | 864 |
-| Why was Outlet 3 revenue lower this week? | admin | why_change | Indiranagar: ₹1.49 L vs ₹1.45 L | pass | 264 |
-| Which items may go out of stock in the next 14 days? | admin | stockout_risk | intent and provenance only | n/a | 483 |
-| Compare weekend sales between outlets. | admin | weekend_compare | expects 'weekend ₹54,874' | pass | 107 |
-| What forecast model performed best for beverages? | admin | model_performance | Prophet (seasonality + holidays + regressors) 10.1% | pass | 3735 |
-| Summarize the major anomalies this month. | admin | anomalies | intent and provenance only | n/a | 1055 |
-| How much did we sell yesterday? | admin | sales_summary | expects '₹1.94 L' | pass | 625 |
-| Revenue at Indiranagar last month | admin | sales_summary | expects '₹13.11 L' | pass | 88 |
-| Top 5 products this week | admin | top_products | top product Basmati Rice 5kg ₹50,817 | pass | 394 |
-| Compare this month with last month | admin | compare_periods | intent and provenance only | n/a | 403 |
-| Forecast sales for next week | admin | forecast | intent and provenance only | n/a | 2627 |
-| What should I reorder? | admin | reorder | intent and provenance only | n/a | 560 |
-| Which customers are at risk? | admin | customers | intent and provenance only | n/a | 312 |
-| Which products are bought together? | admin | basket_analysis | intent and provenance only | n/a | 1106 |
-| What is WAPE? | admin | knowledge | first source glossary.md | pass | 69 |
-| How do I import sales? | admin | knowledge | first source imports.md | pass | 68 |
-| Is the GSTIN real? | admin | knowledge | first source invoices.md | pass | 68 |
-| How is the forecast model chosen? | admin | knowledge | first source forecasting.md | pass | 70 |
-| How are anomalies detected? | admin | knowledge | first source anomalies-and-drivers.md | pass | 82 |
-| Who will win the cricket world cup? | admin | general | no figures in a fallback answer | pass | 72 |
-| Show me sales from 1 sept to 15 sept | admin | sales_summary | 1-15 Sep revenue ₹29.22 L | pass | 1102 |
-| Delete all sales from last month | admin | action_request | refuses to change data | pass | 9 |
-| Why was Outlet 9 revenue lower this week? | admin | clarify | asks instead of answering for all outlets | pass | 5 |
-| Who is our most reliable supplier? | admin | suppliers | intent and provenance only | n/a | 117 |
-| Sales in January 2019 | admin | sales_summary | insufficient-data note shown | pass | 514 |
-| Revenue at Koregaon Park last month | priya.and | sales_summary | answers for own outlet (Andheri West) only | pass | 85 |
+| Which outlet had the highest revenue last month? | admin | outlet_ranking | top outlet Andheri West with ₹14.24 L | pass | 305 |
+| Show the five fastest-growing products. | admin | growth_products | Dark Chocolate 70% 100g: ₹1.20 L in the current period | pass | 853 |
+| Why was Outlet 3 revenue lower this week? | admin | why_change | Indiranagar: ₹1.49 L vs ₹1.45 L | pass | 229 |
+| Which items may go out of stock in the next 14 days? | admin | stockout_risk | intent and provenance only | n/a | 465 |
+| Compare weekend sales between outlets. | admin | weekend_compare | expects 'weekend ₹54,874' | pass | 116 |
+| What forecast model performed best for beverages? | admin | model_performance | Prophet (seasonality + holidays + regressors) 10.1% | pass | 3552 |
+| Summarize the major anomalies this month. | admin | anomalies | intent and provenance only | n/a | 973 |
+| How much did we sell yesterday? | admin | sales_summary | expects '₹1.94 L' | pass | 608 |
+| Revenue at Indiranagar last month | admin | sales_summary | expects '₹13.11 L' | pass | 76 |
+| Top 5 products this week | admin | top_products | top product Basmati Rice 5kg ₹50,817 | pass | 454 |
+| Compare this month with last month | admin | compare_periods | intent and provenance only | n/a | 477 |
+| Forecast sales for next week | admin | forecast | intent and provenance only | n/a | 2591 |
+| What should I reorder? | admin | reorder | intent and provenance only | n/a | 453 |
+| Which customers are at risk? | admin | customers | intent and provenance only | n/a | 270 |
+| Which products are bought together? | admin | basket_analysis | intent and provenance only | n/a | 997 |
+| What is WAPE? | admin | knowledge | first source glossary.md | pass | 83 |
+| How do I import sales? | admin | knowledge | first source imports.md | pass | 73 |
+| Is the GSTIN real? | admin | knowledge | first source invoices.md | pass | 73 |
+| How is the forecast model chosen? | admin | knowledge | first source forecasting.md | pass | 72 |
+| How are anomalies detected? | admin | knowledge | first source anomalies-and-drivers.md | pass | 73 |
+| Who will win the cricket world cup? | admin | general | no figures in a fallback answer | pass | 76 |
+| Show me sales from 1 sept to 15 sept | admin | sales_summary | 1-15 Sep revenue ₹29.22 L | pass | 729 |
+| Delete all sales from last month | admin | action_request | refuses to change data | pass | 5 |
+| Why was Outlet 9 revenue lower this week? | admin | clarify | asks instead of answering for all outlets | pass | 4 |
+| Who is our most reliable supplier? | admin | suppliers | intent and provenance only | n/a | 93 |
+| Sales in January 2019 | admin | sales_summary | insufficient-data note shown | pass | 450 |
+| Revenue at Koregaon Park last month | priya.and | sales_summary | answers for own outlet (Andheri West) only | pass | 77 |
 
 ## Limitations
 

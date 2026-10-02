@@ -78,6 +78,32 @@ erDiagram
 **Money.** Selling prices include GST (MRP style). Tax per line = line total × rate / (100 + rate). Gross
 profit = revenue − tax − cost of goods.
 
+**Purchase orders.** A PO is `ordered`, then `partial` while deliveries arrive in parts
+(`purchase_order_items.received_quantity`), then `received`. Cancelling an untouched order makes it `cancelled`;
+closing a part-delivered one makes it `closed` (the rest is no longer expected). Forecast stock plans and alerts
+count only the outstanding quantity of open orders, and supplier on-time rates and spend use what actually arrived.
+
+## Simultaneous requests
+
+Several people can bill, receive stock and issue invoices at the same time without overselling or clashing numbers:
+
+- **Stock** rows are locked before they change (`SELECT ... FOR UPDATE` on PostgreSQL), so two sales of the last
+  unit cannot both succeed.
+- **Bill, PO and invoice numbers** are inserted in a savepoint; on a unique-key clash the next number is taken and
+  the insert retried. Issuing the invoice for a bill twice returns the existing invoice.
+- **SQLite** allows one writer at a time. Requests that change data start with `BEGIN IMMEDIATE`, so they queue for
+  the write lock (up to 30 s) instead of failing. Requests that mostly read (forecasts, the assistant) save their
+  small records through a separate short write transaction (`db.write_session()`).
+- `api/tests/test_concurrency.py` checks all of this on SQLite and PostgreSQL.
+
+## Starting without the demo data
+
+Set `SEED_DEMO_DATA=false` with `INITIAL_ADMIN_EMAIL` and `INITIAL_ADMIN_PASSWORD` and the first start creates an
+empty organisation and its admin. Alternatively run `python -m app.manage create-admin --email ... --name ...
+--password ... --org ...`. Then add outlets, products and suppliers in Settings, or import CSVs. The demo
+generator needs at least 90 days of history; a demo created with `SEED_END_DATE` keeps its dates, while the
+default demo moves forward to yesterday on each start.
+
 ## Roles and access control
 
 | Role | Can do | Outlets |
@@ -116,6 +142,11 @@ flowchart LR
 A real import is all-or-nothing. A bill whose invoice number already exists is skipped with a warning by
 default, so the same file can be uploaded twice safely; this can be switched off, in which case the file is
 rejected instead.
+
+Exports (CSV and Excel) prefix cells that begin with `=`, `+`, `-` or `@` with an apostrophe, so a value such as a
+customer name cannot run as a spreadsheet formula. Imports accept UTF-8 and UTF-16 files, reject non-numeric or
+infinite numbers, quantities above 100,000 per line, phone numbers that are not 10 digits, and bills dated before
+their outlet opened.
 
 ## Forecasting
 
@@ -241,6 +272,6 @@ flowchart LR
 
 | Layer | What |
 |---|---|
-| API (pytest, 87 tests) | Business rules, imports, roles, refresh tokens, audit, invoices, reports, forecasting, anomalies, drivers, assistant. Runs on SQLite and PostgreSQL (CI job `api-postgres`). |
-| End-to-end (Playwright, `e2e/`) | Every page as admin; sale → invoice → PDF; import with column mapping; assistant provenance; report downloads; viewer read-only; area manager outlet switching; token refresh; phone layout |
+| API (pytest, 88 tests) | Business rules, imports, roles, refresh tokens, audit, invoices, reports, forecasting, anomalies, drivers, assistant. Runs on SQLite and PostgreSQL (CI job `api-postgres`). |
+| End-to-end (Playwright, `e2e/`) | Every page as admin; sale → invoice → PDF; import with column mapping; assistant provenance; purchase order delivered in parts; report downloads; viewer read-only; area manager outlet switching; token refresh; phone layout |
 | Model evaluations | `python -m app.evaluation` (forecasting), `python -m app.assistant_eval` (assistant grounding), anomaly precision and recall (Anomalies & drivers page, notebook) |

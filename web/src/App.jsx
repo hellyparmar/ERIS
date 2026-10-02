@@ -1,7 +1,7 @@
 import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import Layout from './components/Layout'
-import { Spinner } from './components/ui'
+import { Empty, Spinner } from './components/ui'
 import { useApp } from './lib/app'
 import Login from './pages/Login'
 
@@ -23,6 +23,19 @@ const Reports = lazy(() => import('./pages/Reports'))
 const Invoices = lazy(() => import('./pages/Invoices'))
 const AuditLog = lazy(() => import('./pages/AuditLog'))
 
+/** Pages a role cannot use show a clear message instead of failing API calls (the API enforces it too). */
+function Guard({ allow, children }) {
+  const { user } = useApp()
+  if (allow.includes(user.role)) return children
+  return (
+    <Empty title="You don't have access to this page">
+      This page is for {allow.join(' / ')} accounts. Ask an admin if you need access. <a href="/">Back to the dashboard</a>
+    </Empty>
+  )
+}
+
+const MANAGERS = ['admin', 'manager']
+
 export default function App() {
   const { token, user, loadingUser } = useApp()
   if (!token) return <Login />
@@ -41,13 +54,13 @@ export default function App() {
           <Route path="forecasts" element={<Forecasts />} />
           <Route path="analytics" element={<Analytics />} />
           <Route path="outlets" element={<Outlets />} />
-          <Route path="import" element={<DataImport />} />
+          <Route path="import" element={<Guard allow={MANAGERS}><DataImport /></Guard>} />
           <Route path="settings" element={<Settings />} />
           <Route path="models" element={<ModelComparison />} />
           <Route path="insights" element={<Insights />} />
           <Route path="reports" element={<Reports />} />
           <Route path="invoices" element={<Invoices />} />
-          <Route path="audit" element={<AuditLog />} />
+          <Route path="audit" element={<Guard allow={['admin']}><AuditLog /></Guard>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

@@ -25,7 +25,7 @@ function Drivers() {
   const [period, setPeriod] = useState('7d')
   const q = useQuery({ queryKey: ['drivers', period, outletId], queryFn: () => api('/analytics/drivers', { params: { period, outlet_id: outletId } }) })
   return (
-    <Card title="Why did revenue change?" subtitle="This period compared with the period of the same length just before it."
+    <Card title="Why did revenue change?" subtitle="Compared like for like: the same weekdays just before (7 and 14 days), the same days of last month (month to date), or the previous 30 days."
       actions={<Seg options={PERIODS} value={period} onChange={setPeriod} label="Period" />}>
       <Query q={q}>{(d) => (d.insufficient_data
         ? <Empty title="Not enough data">{d.summary.join(' ')}</Empty>

@@ -10,6 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app import clock
+from app.db import write_session
 from app.models import ChatMessage, DatasetInfo, Organization, Outlet, Sale, User
 from app.security import scoped_outlet_ids
 from app.services import analytics as A
@@ -250,9 +251,10 @@ def answer(db: Session, user: User, message: str) -> dict:
         "data_as_of": anchor.isoformat(),
         "provenance": provenance,
     }
-    db.add(ChatMessage(user_id=user.id, role="user", content=message))
-    db.add(ChatMessage(user_id=user.id, role="assistant", content=out["answer"],
-                       payload={k: response[k] for k in ("blocks", "suggestions", "intent", "engine", "context",
-                                                         "provenance")}))
-    db.commit()
+    with write_session() as wdb:  # short write transaction: the answer itself only reads
+        wdb.add(ChatMessage(user_id=user.id, role="user", content=message))
+        wdb.add(ChatMessage(user_id=user.id, role="assistant", content=out["answer"],
+                            payload={k: response[k] for k in ("blocks", "suggestions", "intent", "engine", "context",
+                                                              "provenance")}))
+        wdb.commit()
     return response

@@ -25,7 +25,7 @@ Every number traces back to the data.
 | **AI assistant** | Answers questions such as *"Why was Outlet 3 revenue lower this week?"*, *"Which items may go out of stock in the next 14 days?"* and *"What forecast model performed best for beverages?"*. It maps each question to a validated intent template (no generated SQL), respects outlet permissions, and shows its data source, filters, timing, model version and caveats. Definition and how-to questions are answered from the project docs by retrieval. Optional local LLM through Ollama. **Grounding check: 27/27 intents and 19/19 answers match independent SQL.** |
 | **Anomalies and drivers** | Robust z-score detection of unusual outlet-days and suspicious bill lines: **precision 0.79, recall 0.73** against the 26 anomalies injected into the data. A "why did revenue change?" analysis splits the change exactly into bills × average bill, then by outlet and category, and estimates the calendar, promotion, stockout and rainfall contributions. |
 | **Data pipeline** | A deterministic generator (seed 42): 2 years of bill lines with seasonality, festivals, weather, promotions, price elasticity, substitutions and stockouts, plus full provenance. CSV import with column mapping, a dry run, duplicate handling, an error report, an atomic commit and import history. |
-| **Engineering** | FastAPI with SQLAlchemy 2 and Alembic on SQLite or PostgreSQL; React 19. JWT access and refresh tokens, 4 roles with application-level outlet scoping, and an automatic audit log. 87 API tests on SQLite and PostgreSQL, 9 Playwright end-to-end tests, and CI. |
+| **Engineering** | FastAPI with SQLAlchemy 2 and Alembic on SQLite or PostgreSQL; React 19. JWT access and refresh tokens, 4 roles with application-level outlet scoping, and an automatic audit log. 88 API tests on SQLite and PostgreSQL, 10 Playwright end-to-end tests, and CI. |
 
 ## Screenshots
 
@@ -94,6 +94,13 @@ cd web && npm install && npm run dev               # http://localhost:5173 (prox
 
 To run everything as a single process, run `cd web && npm run build`; the API then serves the built app on
 port 8000.
+
+### Start with your own data
+
+Set `SEED_DEMO_DATA=false`, `INITIAL_ADMIN_EMAIL` and `INITIAL_ADMIN_PASSWORD` before the first start (or run
+`python -m app.manage create-admin --email owner@shop.in --name "Owner" --org "My Shop"` in `api/`). Sign in, add
+your outlets, products and suppliers in the app, or load them with **Data import**. Forecasts need at least three weeks
+with sales (more history gives better accuracy); until then the Forecasts page says so.
 
 ### Demo logins
 
@@ -171,7 +178,8 @@ Every setting has a default; see [`api/.env.example`](api/.env.example).
 | `DATABASE_URL` | SQLite in `api/data/eris.db` | e.g. `postgresql+psycopg2://eris:eris@localhost:5432/eris` |
 | `JWT_SECRET_KEY` | development value | **Change this for any shared deployment** (the app warns at startup) |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` / `REFRESH_TOKEN_EXPIRE_DAYS` | 60 / 14 | Session lifetime |
-| `SEED_DEMO_DATA`, `SEED_DAYS`, `SEED_OUTLETS`, `SEED_RANDOM_STATE`, `SEED_END_DATE` | true, 730, 5, 42, yesterday | Demo data generation |
+| `SEED_DEMO_DATA`, `SEED_DAYS`, `SEED_OUTLETS`, `SEED_RANDOM_STATE`, `SEED_END_DATE` | true, 730, 5, 42, yesterday | Demo data generation (at least 90 days, 1-7 outlets) |
+| `INITIAL_ADMIN_EMAIL`, `INITIAL_ADMIN_PASSWORD` | not set | With `SEED_DEMO_DATA=false`: the first admin created on an empty database |
 | `LLM_ENABLED`, `OLLAMA_URL`, `OLLAMA_MODEL` | true, `http://localhost:11434`, `llama3.2:3b` | Optional local LLM |
 
 ## Development and verification
@@ -179,7 +187,7 @@ Every setting has a default; see [`api/.env.example`](api/.env.example).
 ```bash
 cd api
 pip install -r requirements-dev.txt
-ruff check app tests && pytest -q                       # 87 tests
+ruff check app tests && pytest -q                       # 88 tests
 TEST_DATABASE_URL=postgresql+psycopg2://eris:eris@localhost:5432/eris_test pytest -q   # same suite on PostgreSQL
 python -m app.evaluation                                # forecast evaluation   -> docs/FORECAST_EVALUATION.md
 python -m app.assistant_eval                            # assistant grounding   -> docs/ASSISTANT_EVALUATION.md

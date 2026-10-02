@@ -209,6 +209,7 @@ def run(db: Session) -> list[dict]:
         t0 = time.perf_counter()
         r = answer(db, user, c.question)
         ms = (time.perf_counter() - t0) * 1000
+        db.rollback()  # end the read snapshot so the checks also see records the answer saved (forecast runs)
         prov = r.get("provenance") or {}
         has_prov = bool(prov.get("method")) and (prov.get("data_source") is not None or c.intent == "general")
         grounded, detail = (None, "intent and provenance only")

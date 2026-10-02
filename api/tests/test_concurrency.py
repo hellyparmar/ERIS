@@ -51,3 +51,24 @@ def test_simultaneous_numbering(client, admin):
     assert codes.count(500) == 0 and codes.count(409) == 0
     numbers = {i["number"] for i in client.get("/api/invoices?page_size=200", headers=admin).json()["items"]}
     assert len(numbers) >= 6
+
+
+def test_forecasts_are_saved_while_sales_are_written(client, admin):
+    """A forecast (a GET) saves its run even when other requests write at the same moment."""
+    product, outlet = 30, 2
+    client.post("/api/inventory/adjust", headers=admin, json={"outlet_id": outlet, "product_id": product, "mode": "set", "quantity": 50})
+
+    def sell(_):
+        body = {"outlet_id": outlet, "items": [{"product_id": product, "quantity": 1}]}
+        return client.post("/api/sales", headers=admin, json=body).status_code
+
+    def forecast(horizon):
+        r = client.get(f"/api/forecast?scope=outlet&target_id={outlet}&horizon={horizon}&model=seasonal_naive", headers=admin)
+        return r.status_code, r.json().get("run_id")
+
+    with ThreadPoolExecutor(8) as pool:
+        sales = pool.map(sell, range(8))
+        runs = pool.map(forecast, range(7, 15))
+        sales, runs = list(sales), list(runs)
+    assert all(code == 201 for code in sales), sales
+    assert all(code == 200 and run_id for code, run_id in runs), runs

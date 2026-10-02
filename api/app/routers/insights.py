@@ -30,6 +30,7 @@ def dashboard(period: str = "30d", outlet_id: int | None = None, start: date | N
               user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     outlet_ids = scoped_outlet_ids(user, outlet_id)
     rng = _range(db, period, start, end)
+    prev = A.comparable_period(rng)[0]  # month to date is compared with the same days of last month
     recent = db.scalars(select(Sale).where(Sale.status == "completed", *([Sale.outlet_id.in_(outlet_ids)] if outlet_ids else []))
                         .order_by(Sale.sold_at.desc(), Sale.id.desc()).limit(8)).all()
     forecast = None
@@ -43,9 +44,10 @@ def dashboard(period: str = "30d", outlet_id: int | None = None, start: date | N
     return {
         "range": rng.as_dict(),
         "data_as_of": A.anchor_date(db).isoformat(),
-        "kpis": A.kpis_with_comparison(db, rng, outlet_ids),
+        "kpis": A.kpis_with_comparison(db, rng, outlet_ids, prev),
+        "comparison": prev.as_dict(),
         "trend": A.revenue_series(db, rng, outlet_ids, "week" if rng.days > 92 else "day"),
-        "previous_trend": A.revenue_series(db, rng.previous(), outlet_ids, "week" if rng.days > 92 else "day"),
+        "previous_trend": A.revenue_series(db, prev, outlet_ids, "week" if rng.days > 92 else "day"),
         "top_products": A.top_products(db, rng, outlet_ids, 6),
         "outlets": A.outlet_performance(db, rng, outlet_ids),
         "categories": A.category_breakdown(db, rng, outlet_ids),
