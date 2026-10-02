@@ -198,10 +198,11 @@ def assistant_status(_: User = Depends(get_current_user)):
     st = llm.status(force=True)
     return {"engine": "ERIS analytics engine" + (f" + {st['model']} (Ollama)" if st["available"] else ""),
             "llm": st,
-            "suggestions": ["How is business this week?", "What should I reorder?", "Forecast sales for next week",
-                            "Top 5 products this month", "Which outlet performed best last month?",
-                            "Which customers are at risk?", "How can I increase sales?",
-                            "Which products are bought together?"]}
+            "suggestions": ["Which outlet had the highest revenue last month?",
+                            "Show the five fastest-growing products", "Why was Outlet 3 revenue lower this week?",
+                            "Which items may go out of stock in the next 14 days?",
+                            "Compare weekend sales between outlets", "What forecast model performed best for beverages?",
+                            "Summarize the major anomalies this month", "How is business this week?"]}
 
 
 

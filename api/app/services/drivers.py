@@ -218,18 +218,18 @@ def explain_change(db: Session, cur_start: date, cur_end: date, cmp_start: date 
         {"key": "traffic", "label": "Number of bills (footfall)", "effect": round(traffic, 2),
          "detail": f"{n1:,} bills vs {n0:,.0f} ({A.pct_change(n1, n0):+.1f}%)" if n0 else None},
         {"key": "basket", "label": "Average bill value", "effect": round(basket, 2),
-         "detail": f"Rs {aov1:,.0f} vs Rs {aov0:,.0f}"},
+         "detail": f"₹{aov1:,.0f} vs ₹{aov0:,.0f}"},
         {"key": "calendar", "label": "Weekday mix and festivals", "effect": calendar["effect"],
          "detail": (f"festival days {calendar['festival_days'][0]} vs {calendar['festival_days'][1]}, weekend days "
                     f"{calendar['weekend_days'][0]} vs {calendar['weekend_days'][1]}") if "weekend_days" in calendar
          else calendar.get("note")},
         {"key": "promotions", "label": "Promotions (estimated uplift)",
          "effect": round(p1["uplift"] - p0["uplift"] * scale, 2),
-         "detail": f"uplift Rs {p1['uplift']:,.0f} vs Rs {p0['uplift'] * scale:,.0f}; "
+         "detail": f"uplift ₹{p1['uplift']:,.0f} vs ₹{p0['uplift'] * scale:,.0f}; "
                    f"{len(p1['running'])} vs {len(p0['running'])} promotion(s)"},
         {"key": "stockouts", "label": "Stockouts (estimated lost sales)",
          "effect": round(-(s1["lost_revenue"] - s0["lost_revenue"] * scale), 2),
-         "detail": f"Rs {s1['lost_revenue']:,.0f} lost vs Rs {s0['lost_revenue'] * scale:,.0f}"},
+         "detail": f"₹{s1['lost_revenue']:,.0f} lost vs ₹{s0['lost_revenue'] * scale:,.0f}"},
         {"key": "weather", "label": "Rainfall (association)", "effect": weather["effect"],
          "detail": (f"{weather['rain_mm_per_day'][0]} vs {weather['rain_mm_per_day'][1]} mm/day; heavy-rain days "
                     f"{weather['heavy_rain_days'][0]} vs {weather['heavy_rain_days'][1]}")
@@ -248,10 +248,15 @@ def explain_change(db: Session, cur_start: date, cur_end: date, cmp_start: date 
 
 
 def _money(v: float) -> str:
-    return f"Rs {abs(v):,.0f}"
+    return f"₹{abs(v):,.0f}"
 
 
-def _summary(r: dict) -> list[str]:
+def summary_lines(r: dict, money=_money) -> list[str]:
+    """Plain-language summary of an explain_change() result; `money` formats an absolute amount."""
+    return _summary(r, money)
+
+
+def _summary(r: dict, _money=_money) -> list[str]:
     ch = r["change"]
     direction = "up" if ch >= 0 else "down"
     pct = f" ({r['change_pct']:+.1f}%)" if r["change_pct"] is not None else ""

@@ -22,13 +22,42 @@ MONTHS.update({m.lower(): i for i, m in enumerate(calendar.month_abbr) if m})
 MONTHS["sept"] = 9
 
 INTENTS = [
-    "business_overview", "sales_summary", "compare_periods", "sales_trend", "top_products", "slow_products",
+    "model_performance", "stockout_risk", "why_change", "anomalies", "weekend_compare", "growth_products",
+    "knowledge", "business_overview", "sales_summary", "compare_periods", "sales_trend", "top_products", "slow_products",
     "outlet_ranking", "category_mix", "forecast", "stock_status", "reorder", "customers", "peak_hours",
     "payment_mix", "profitability", "purchase_orders", "basket_analysis", "advice", "help", "general",
 ]
 
+GLOSSARY_TERMS = (r"wape|mape|smape|rmse|mae|rfm|abc (analysis|class)|lift|gstin|hsn|cgst|sgst|igst|gst|aov|"
+                  r"prophet|xgboost|holt[- ]winters|seasonal naive|ensemble|prediction interval|interval coverage|"
+                  r"shaded band|robust z|z-?score|elasticity|random seed|seed|synthetic|back-?test|fold|"
+                  r"rolling[- ]origin|days of cover|safety stock|reorder level|margin|gross profit|bias|"
+                  r"data dictionary|irn|e-?invoice|place of supply")
+
 # (intent, weight, pattern)
 INTENT_PATTERNS: list[tuple[str, float, str]] = [
+    ("model_performance", 6, r"\b(models?|algorithms?)\b.*\b(best|perform\w*|accura\w*|won|wins?|chosen|selected|"
+                             r"error|wape|better|compare|comparison)\b|\b(best|which|what)\b.*\b(forecast(ing)? )?"
+                             r"(models?|algorithms?)\b"),
+    ("stockout_risk", 6, r"\b(may|might|will|could|likely to|going to|about to|expected to)\s+(go|run|be|get)\s+out\b|"
+                         r"\brun(ning|s)? out (in|within|over|by|before|during)\b|\bstock ?out risk\b|"
+                         r"\brisk of (a )?(stock ?outs?|running out)\b"),
+    ("why_change", 5, r"^\s*why\b|\bwhy (is|was|are|were|did|has|have|do|does)\b|\bwhat (caused|explains|drove|is driving)"
+                      r"\b|\breasons? (for|behind)\b|\bexplain (the |this |that )?(drop|dip|fall|decline|increase|rise|"
+                      r"change|jump|growth)\b|\bdrivers? of\b"),
+    ("anomalies", 5, r"\b(anomal\w*|unusual|outliers?|abnormal|irregular|strange|suspicious|spikes?|glitch\w*|"
+                     r"outages?)\b"),
+    ("weekend_compare", 5, r"\bweek-?ends?\b"),
+    ("growth_products", 4.5, r"\b(fastest[- ]growing|growing (the )?fastest|grew (the )?(most|fastest)|biggest (growth|"
+                             r"gainers?|increases?)|top gainers?|trending( up)?|rising( fastest)?|gaining)\b"),
+    ("growth_products", 4.5, r"\b(fastest[- ]declining|declining (the )?(most|fastest)|biggest (drops?|declines?|"
+                             r"losers?|falls?)|falling (the )?fastest)\b.*\b(products?|items?|skus?)\b"),
+    ("knowledge", 4, rf"\b(what (is|are|does|do)|what's|whats|define|definition of|meaning of|explain)\b.*\b({GLOSSARY_TERMS})\b"),
+    ("knowledge", 4, r"\b(how (do|can|should) (i|we|you) (import|upload|add|create|record|issue|export|download|"
+                     r"enter|use|reset|clear|change)|how (does|do|is|are) .*\b(calculated|computed|measured|chosen|"
+                     r"selected|detected|generated|built|made|trained|work|works|handled)|where does .* come from|"
+                     r"is (the|this|our|it) .*\b(real|synthetic|fake|valid|accurate|reliable)\b|"
+                     r"(valid|use) for (tax )?filing)\b"),
     ("forecast", 3, r"\b(forecast|predict|prediction|projection|project(ed)?|expect(ed)?|anticipate|outlook)\b"),
     ("forecast", 2.5, r"\b(next|coming|upcoming)\s+(\d+\s+)?(day|days|week|weeks|month|months|fortnight|quarter)\b"),
     ("forecast", 2, r"\b(tomorrow|will (we|i|it)|going to sell|future demand|demand for)\b"),
@@ -77,6 +106,11 @@ PRODUCT_STOPWORDS = {
     "tender", "toned", "malai", "robusta", "shimla", "hass", "red", "baby", "belgian", "california", "alphonso",
     "darjeeling", "assam", "refined", "virgin", "rolled", "gift", "frozen", "cold",
 }
+
+
+WORD_NUMBERS = {"three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
+                "fifteen": 15, "twenty": 20}
+ORDINALS = {"first": 1, "second": 2, "third": 3, "fourth": 4, "fifth": 5, "sixth": 6, "seventh": 7}
 
 
 def _stem(word: str) -> str:
@@ -196,6 +230,9 @@ def parse_horizon(text: str) -> int | None:
     m = re.search(r"\b(?:next|coming|upcoming)\s+(\d{1,3})\s*(day|week|month)s?\b", t)
     if m:
         return min(90, int(m.group(1)) * {"day": 1, "week": 7, "month": 30}[m.group(2)])
+    m = re.search(r"\b(?:within|in)\s+(?:the\s+)?(\d{1,2})\s*(day|week)s?\b", t)
+    if m:
+        return min(90, int(m.group(1)) * {"day": 1, "week": 7}[m.group(2)])
     if re.search(r"\b(next|coming) (fortnight|two weeks)\b", t):
         return 14
     if re.search(r"\b(next|coming|upcoming) week\b|\btomorrow\b", t):
@@ -232,12 +269,18 @@ class EntityIndex:
     def match_outlets(self, text: str) -> list[Outlet]:
         t = text.lower()
         hits = []
+        # "Outlet 3", "store #2", "outlet no. 4", "third outlet": position in the outlet list (ordered by id)
+        for m in re.finditer(r"\b(?:outlet|store|branch|shop)s?\s*(?:no\.?|number|#)?\s*(\d)\b|"
+                             r"\b(" + "|".join(ORDINALS) + r")\s+(?:outlet|store|branch|shop)\b", t):
+            k = int(m.group(1)) if m.group(1) else ORDINALS[m.group(2)]
+            if 1 <= k <= len(self.outlets) and self.outlets[k - 1] not in hits:
+                hits.append(self.outlets[k - 1])
         for o in self.outlets:
             keys = {o.name.lower(), o.code.lower()}
             first = o.name.lower().split()[0]
             if len(first) >= 4 and first not in ("west", "east", "road", "new"):
                 keys.add(first)
-            if any(re.search(rf"\b{re.escape(k)}\b", t) for k in keys):
+            if o not in hits and any(re.search(rf"\b{re.escape(k)}\b", t) for k in keys):
                 hits.append(o)
         if not hits:
             for o in self.outlets:
@@ -291,9 +334,13 @@ def parse(db: Session, text: str, anchor: date, index: EntityIndex | None = None
 
     p.periods = parse_periods(t, anchor)
     p.horizon = parse_horizon(t)
-    m = re.search(r"\b(?:top|best|bottom|worst|least|first)\s+(\d{1,2})\b|\b(\d{1,2})\s+(?:best|top|worst|slowest|products|items)\b", t)
+    num_t = re.sub(r"\b(" + "|".join(WORD_NUMBERS) + r")\b", lambda m: str(WORD_NUMBERS[m.group(1)]), t)
+    m = re.search(r"\b(?:top|best|bottom|worst|least|first)\s+(\d{1,2})\b|\b(\d{1,2})\s+(?:best|top|worst|slowest|"
+                  r"fastest|biggest|most|products|items)\b", num_t)
     if m:
         p.top_n = int(m.group(1) or m.group(2))
+    if re.search(r"\b(declin\w*|drop\w*|fall\w*|losers?|lower|less|down|decrease\w*)\b", t):
+        p.flags.add("decline")
 
     outlets = index.match_outlets(t)
     p.outlet_ids = [o.id for o in outlets]
@@ -340,6 +387,8 @@ def parse(db: Session, text: str, anchor: date, index: EntityIndex | None = None
         scores["sales_summary"] = 1
     if "stock_status" in scores and "reorder" in scores:
         scores["reorder"] += 1
+    if "knowledge" in scores and (p.periods or p.outlet_ids or p.product_ids):
+        scores["knowledge"] -= 3  # "what is the margin at Andheri last month" is a data question
 
     if scores:
         priority = {name: i for i, name in enumerate(INTENTS)}

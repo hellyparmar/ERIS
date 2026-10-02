@@ -69,7 +69,14 @@ INTENT_DESCRIPTIONS = {
     "payment_mix": "payment methods (UPI, cash, card)",
     "profitability": "profit and margins",
     "purchase_orders": "open or overdue purchase orders",
-    "general": "anything else (advice, explanations)",
+    "growth_products": "fastest growing (or declining) products",
+    "why_change": "why revenue went up or down, drivers of a change",
+    "stockout_risk": "items that may run out of stock in the coming days",
+    "weekend_compare": "weekend versus weekday sales by outlet",
+    "model_performance": "which forecasting model is most accurate",
+    "anomalies": "unusual days, spikes, drops, suspicious bills",
+    "knowledge": "definitions and how ERIS works (metrics, imports, forecasts, dataset, invoices)",
+    "general": "anything else (advice, small talk)",
 }
 
 
@@ -100,3 +107,14 @@ def general_answer(question: str, facts: str, org_name: str) -> str | None:
         "needs data you don't have, say what the user can ask instead.\n\nFACTS:\n" + facts
     )
     return _chat([{"role": "system", "content": system}, {"role": "user", "content": question}], max_tokens=350)
+
+
+def document_answer(question: str, passages: list[dict]) -> str | None:
+    """Answer a how-to / definition question using only the retrieved documentation passages."""
+    context = "\n\n".join(f"[{i}] {p['title']}\n{p['text']}" for i, p in enumerate(passages, 1))
+    system = (
+        "You answer questions about the ERIS retail analytics software using ONLY the documentation passages "
+        "below. Answer in under 120 words in simple language, in markdown. If the passages do not contain the "
+        "answer, say so. Do not add facts that are not in the passages.\n\nPASSAGES:\n" + context
+    )
+    return _chat([{"role": "system", "content": system}, {"role": "user", "content": question}], max_tokens=300)

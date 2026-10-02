@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     LLM_ENABLED: bool = True
     LLM_TIMEOUT_SECONDS: float = 45.0
 
+    # Project documentation the assistant may quote (definitions, how-tos, model and dataset cards)
+    KNOWLEDGE_DIR: str = str(API_DIR.parent / "docs" / "knowledge")
+
     @property
     def cors_origins(self) -> list[str]:
         return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]

@@ -90,15 +90,33 @@ class Ctx:
             else ("all outlets" if not self.outlet_ids else ", ".join(
                 db.scalars(select(Outlet.name).where(Outlet.id.in_(self.outlet_ids))).all()))
 
+        self.used_periods: list[tuple[A.DateRange, str]] = []
+
     def period(self, default_days: int = 30) -> tuple[A.DateRange, str]:
         if self.parsed.period:
-            return self.parsed.period
-        rng = A.DateRange(self.anchor - timedelta(days=default_days - 1), self.anchor)
-        return rng, f"the last {default_days} days"
+            chosen = self.clip(*self.parsed.period)
+        else:
+            chosen = (A.DateRange(self.anchor - timedelta(days=default_days - 1), self.anchor),
+                      f"the last {default_days} days")
+        self.use(*chosen)
+        return chosen
+
+    def clip(self, rng: A.DateRange, label: str) -> tuple[A.DateRange, str]:
+        """Periods that run past the last day with sales data (e.g. "this week" when today has no bills yet)
+        end on that day instead, so partial or empty days do not distort comparisons."""
+        if rng.start <= self.anchor < rng.end:
+            return A.DateRange(rng.start, self.anchor), label
+        return rng, label
+
+    def use(self, rng: A.DateRange, label: str) -> None:
+        """Record a period an answer is based on (shown in the answer's provenance)."""
+        if not any(r.start == rng.start and r.end == rng.end for r, _ in self.used_periods):
+            self.used_periods.append((rng, label))
 
 
-def result(answer: str, blocks: list | None = None, suggestions: list | None = None) -> dict:
-    return {"answer": answer, "blocks": blocks or [], "suggestions": suggestions or []}
+def result(answer: str, blocks: list | None = None, suggestions: list | None = None, meta: dict | None = None) -> dict:
+    """meta (optional): model_version, notes (insufficient-data caveats), sources (documents), data_source."""
+    return {"answer": answer, "blocks": blocks or [], "suggestions": suggestions or [], "meta": meta or {}}
 
 
 def kpi(label: str, value, fmt: str = "number", change: float | None = None, hint: str | None = None) -> dict:
@@ -118,6 +136,7 @@ def chart(kind: str, title: str, data: list[dict], x: str, series: list[tuple[st
 # ------------------------------------------------------------------------------------------ intents
 def business_overview(c: Ctx) -> dict:
     rng = A.DateRange(c.anchor - timedelta(days=6), c.anchor)
+    c.use(rng, "last 7 days")
     k = A.kpis_with_comparison(c.db, rng, c.outlet_ids)
     cur, ch = k["current"], k["change_pct"]
     outlets = A.outlet_performance(c.db, rng, c.outlet_ids)
@@ -255,6 +274,8 @@ def compare_periods(c: Ctx) -> dict:
         if c.parsed.period and "month" in l1 and r1.start.day == 1:
             prev_end = r1.start - timedelta(days=1)
             r2, l2 = A.DateRange(prev_end.replace(day=1), prev_end), f"{prev_end:%B %Y}"
+    c.use(r1, l1)
+    c.use(r2, l2)
     k1, k2 = A.kpis(c.db, r1, c.outlet_ids), A.kpis(c.db, r2, c.outlet_ids)
     metrics = [("revenue", "Revenue", "currency"), ("orders", "Bills", "number"), ("avg_basket", "Avg bill", "currency"),
                ("units", "Units", "number"), ("gross_profit", "Gross profit", "currency"), ("margin_pct", "Margin %", "percent_plain"),
@@ -279,6 +300,7 @@ def sales_trend(c: Ctx) -> dict:
     else:
         start = max(A.first_sale_date(c.db) or c.anchor, c.anchor - timedelta(days=364))
         rng, label = A.DateRange(start.replace(day=1), c.anchor), "the last 12 months"
+    c.use(rng, label)
     gran = "month" if rng.days > 90 else ("week" if rng.days > 31 else "day")
     series = A.revenue_series(c.db, rng, c.outlet_ids, gran, category_id=c.parsed.category_id,
                               product_id=c.parsed.product_ids[0] if c.parsed.product_ids else None)
@@ -432,8 +454,12 @@ def forecast(c: Ctx) -> dict:
     blocks.append(table("Model back-test (lower error is better)",
                         [("label", "Model", "text"), ("wape", "WAPE %", "number"), ("mape", "MAPE %", "number"),
                          ("mae", "MAE", "number")], [e for e in fc["evaluation"] if e.get("wape") is not None]))
+    hist_range = fc.get("data_range") or {}
     return result(ans, blocks, ["What should I reorder?", "Forecast each category for next month",
-                                "Which outlet will sell the most next week?"])
+                                "Which outlet will sell the most next week?"],
+                  {"model_version": fc.get("model_version"), "forecast_run_id": fc.get("run_id"),
+                   "notes": [f"Trained on {hist_range.get('days')} days of history ({hist_range.get('start')} to "
+                             f"{hist_range.get('end')})."] if hist_range else []})
 
 
 def _stock_rows(c: Ctx, product_ids: list[int] | None = None, category_id: int | None = None) -> list[dict]:
@@ -749,18 +775,20 @@ def advice(c: Ctx) -> dict:
 
 
 HELP_TEXT = """I'm your ERIS business assistant. Ask me in plain English about your sales, stock and customers - \
-I look up the live data and answer with numbers, charts and tables. For example:
+I look up the live data and answer with numbers, charts and tables, and show where every number came from. For example:
 
-- **Sales**: "How much did we sell yesterday?", "Revenue at Bandra last month", "Compare September with August"
-- **Products**: "Top 5 products this week", "Slow moving items", "How is paneer selling?"
-- **Outlets**: "Which outlet performed best this month?", "Compare outlets"
-- **Forecasts**: "Forecast sales for next week", "Predict milk demand for the next 14 days"
-- **Inventory**: "What is out of stock?", "What should I reorder?", "Stock of eggs"
+- **Sales**: "How much did we sell yesterday?", "Revenue at Indiranagar last month", "Compare September with August"
+- **Why it changed**: "Why was Outlet 3 revenue lower this week?", "What caused the drop at Andheri last month?"
+- **Products**: "Top 5 products this week", "Show the five fastest-growing products", "How is paneer selling?"
+- **Outlets**: "Which outlet had the highest revenue last month?", "Compare weekend sales between outlets"
+- **Forecasts**: "Forecast sales for next week", "What forecast model performed best for beverages?"
+- **Inventory**: "Which items may go out of stock in the next 14 days?", "What should I reorder?", "Stock of eggs"
+- **Unusual activity**: "Summarize the major anomalies this month"
 - **Customers**: "Who are my top customers?", "Which customers are at risk?"
-- **Patterns**: "When are our busiest hours?", "Payment method split", "Which products are bought together?"
-- **Advice**: "How can I increase sales?", "How is business this week?"
+- **Patterns & advice**: "When are our busiest hours?", "Which products are bought together?", "How can I increase sales?"
+- **How ERIS works**: "What is WAPE?", "How do I import sales?", "Is the GSTIN real?"
 
-You can name an outlet (Andheri, Bandra, Pune...), a category (dairy, bakery...) or a product, \
+You can name an outlet (Andheri, Indiranagar, "Outlet 2"...), a category (dairy, bakery...) or a product, \
 and a time period (today, last week, March, last 90 days)."""
 
 

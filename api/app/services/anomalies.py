@@ -43,7 +43,16 @@ def daily_outlet_revenue(db: Session, start: date, end: date, outlet_ids: list[i
 
 @A.cached
 def detect(db: Session, start: date, end: date, outlet_ids: list[int] | None = None) -> list[dict]:
-    """Anomalous outlet-days between start and end (history before `start` is used as context)."""
+    """Anomalous outlet-days between start and end (history before `start` is used as context).
+
+    Days after the last day that has any sales in the database (e.g. today, before data arrives) are not
+    judged - an empty day there means "not loaded yet", not "closed"."""
+    latest = A.latest_sale_date(db)
+    if latest is None:
+        return []
+    end = min(end, latest)
+    if end < start:
+        return []
     ctx_start = start - timedelta(days=70)
     df = daily_outlet_revenue(db, ctx_start, end, outlet_ids)
     if df.empty:

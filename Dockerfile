@@ -13,6 +13,7 @@ WORKDIR /app/api
 COPY api/requirements.txt ./
 RUN pip install -r requirements.txt
 COPY api/ ./
+COPY docs/knowledge /app/docs/knowledge
 COPY --from=web /web/dist /app/web/dist
 RUN useradd --create-home eris && mkdir -p /app/api/data && chown -R eris /app
 USER eris

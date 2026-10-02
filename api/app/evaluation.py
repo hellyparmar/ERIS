@@ -96,12 +96,16 @@ def save_run(db: Session, df: pd.DataFrame, origins: int, horizon: int, seconds:
     overall = [{"model": m, "label": LABELS.get(m, m), **{k: (None if pd.isna(v) else float(v)) for k, v in r.items()}}
                for m, r in s["overall"].iterrows()]
     by_scope = {m: {k: (None if pd.isna(v) else float(v)) for k, v in r.items()} for m, r in s["wape"].iterrows()}
+    per_series = df.groupby(["series", "model"])["wape"].mean().round(2)
+    by_series: dict[str, dict] = {}
+    for (series, model), wape in per_series.items():
+        by_series.setdefault(series, {})[model] = None if pd.isna(wape) else float(wape)
     run = ForecastRun(
         run_type="evaluation", scope="all", target="mixed", series_label=f"{df['series'].nunique()} series",
         horizon=horizon, data_start=min(df["origin"]), data_end=max(df["origin"]) + pd.Timedelta(days=horizon - 1),
         selected_model="auto", model_version=F.MODEL_VERSION, features=F.feature_names(),
         parameters={"origins": origins, "horizon": horizon, "series": int(df["series"].nunique()),
-                    "runs": int(len(df)), "wape_by_scope": by_scope,
+                    "runs": int(len(df)), "wape_by_scope": by_scope, "wape_by_series": by_series,
                     "wins": {k: int(v) for k, v in s["wins"].items()},
                     "chosen": {k: int(v) for k, v in s["chosen"].items()},
                     "auto_interval_coverage": s["coverage"]},
