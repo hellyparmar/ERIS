@@ -24,7 +24,7 @@ from app.services import analytics as A
 from app.services import forecasting as F
 
 log = logging.getLogger(__name__)
-MODEL_ORDER = ["seasonal_naive", "holt_winters", "gbm", "prophet", "auto"]
+MODEL_ORDER = ["seasonal_naive", "holt_winters", "xgboost", "prophet", "auto"]
 LABELS = {**{k: v.split(" (")[0] for k, v in F.MODEL_LABELS.items()}, "auto": "ERIS auto-selection"}
 
 
@@ -45,23 +45,31 @@ def evaluate(db: Session, origins: int = 3, horizon: int = 28, products: int = 1
     specs = series_specs(db, products)
     for i, spec in enumerate(specs, 1):
         series = F.load_series(db, spec, anchor)
+        exog = F.load_exog(db, spec, series, horizon)
         progress(f"[{i}/{len(specs)}] {spec.label} ({len(series)} days)")
         for k in range(origins, 0, -1):
             cut = len(series) - k * horizon
             if cut < 120:
                 continue
             train, test = series.iloc[:cut], series.iloc[cut:cut + horizon]
+            ex = exog.loc[:test.index[-1]] if exog is not None else None
             for name in models:
                 try:
-                    pred = F.MODEL_FUNCS[name](train, horizon)
+                    t0 = time.time()
+                    pred = F.MODEL_FUNCS[name](train, horizon, ex)
                     rows.append({"series": spec.label, "scope": spec.scope, "origin": test.index[0].date(), "model": name,
-                                 **F._metrics(test.values, pred)})
+                                 "seconds": round(time.time() - t0, 2), **F._metrics(test.values, pred)})
                 except Exception as exc:  # keep evaluating other models
                     log.warning("%s failed on %s: %s", name, spec.label, exc)
-            res = F.run_forecast(train, horizon, "auto")
+            t0 = time.time()
+            res = F.run_forecast(train, horizon, "auto", ex)
             pred = np.array([f["yhat"] for f in res["forecast"]])
+            lo = np.array([f["lower"] for f in res["forecast"]])
+            hi = np.array([f["upper"] for f in res["forecast"]])
             rows.append({"series": spec.label, "scope": spec.scope, "origin": test.index[0].date(), "model": "auto",
-                         "chosen": res["model"], **F._metrics(test.values, pred)})
+                         "chosen": res["model"], "seconds": round(time.time() - t0, 2),
+                         "interval_coverage": round(float(np.mean((test.values >= lo) & (test.values <= hi)) * 100), 1),
+                         **F._metrics(test.values, pred)})
     return pd.DataFrame(rows)
 
 
@@ -72,7 +80,35 @@ def summarise(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
     single = df[df["model"] != "auto"]
     wins = single.loc[single.groupby(["series", "origin"])["wape"].idxmin(), "model"].value_counts()
     chosen = df.loc[df["model"] == "auto", "chosen"].value_counts()
-    return {"wape": by_scope.round(2), "wins": wins, "chosen": chosen}
+    overall = df.groupby("model").agg(wape=("wape", "mean"), smape=("smape", "mean"), mae=("mae", "mean"),
+                                      rmse=("rmse", "mean"), bias_pct=("bias_pct", "mean"),
+                                      seconds=("seconds", "mean")).reindex(by_scope.index)
+    coverage = df.loc[df["model"] == "auto", "interval_coverage"].mean() if "interval_coverage" in df else None
+    return {"wape": by_scope.round(2), "wins": wins, "chosen": chosen, "overall": overall.round(2),
+            "coverage": round(float(coverage), 1) if coverage is not None and not np.isnan(coverage) else None}
+
+
+def save_run(db: Session, df: pd.DataFrame, origins: int, horizon: int, seconds: float, user_id: int | None = None) -> int:
+    """Persist an evaluation as a ForecastRun(run_type="evaluation") so the app can show it."""
+    from app.models import ForecastRun
+
+    s = summarise(df)
+    overall = [{"model": m, "label": LABELS.get(m, m), **{k: (None if pd.isna(v) else float(v)) for k, v in r.items()}}
+               for m, r in s["overall"].iterrows()]
+    by_scope = {m: {k: (None if pd.isna(v) else float(v)) for k, v in r.items()} for m, r in s["wape"].iterrows()}
+    run = ForecastRun(
+        run_type="evaluation", scope="all", target="mixed", series_label=f"{df['series'].nunique()} series",
+        horizon=horizon, data_start=min(df["origin"]), data_end=max(df["origin"]) + pd.Timedelta(days=horizon - 1),
+        selected_model="auto", model_version=F.MODEL_VERSION, features=F.feature_names(),
+        parameters={"origins": origins, "horizon": horizon, "series": int(df["series"].nunique()),
+                    "runs": int(len(df)), "wape_by_scope": by_scope,
+                    "wins": {k: int(v) for k, v in s["wins"].items()},
+                    "chosen": {k: int(v) for k, v in s["chosen"].items()},
+                    "auto_interval_coverage": s["coverage"]},
+        metrics=overall, status="ok", duration_seconds=round(seconds, 1), created_by=user_id)
+    db.add(run)
+    db.commit()
+    return run.id
 
 
 def _plots(df: pd.DataFrame, s: dict, out: Path, db: Session) -> list[str]:
@@ -151,8 +187,16 @@ def write_report(df: pd.DataFrame, out: Path, db: Session, origins: int, horizon
         f"- **ERIS auto-selection: {auto:.1f}% WAPE** vs {naive:.1f}% for the seasonal-naive baseline "
         f"({(naive - auto) / naive * 100:.0f}% lower error).",
         f"- Best single model overall: **{LABELS[best_single]}** ({s['wape'].loc[best_single, 'all series']:.1f}%).",
+        f"- 80% prediction-interval coverage of ERIS auto on the held-out windows: **{s['coverage']}%** "
+        "(target 80%).",
         "- Product-level series are noisier (small daily counts), so their errors are naturally higher than revenue "
         "series that aggregate many products.",
+        "",
+        "## All metrics (mean over series and origins)",
+        "",
+        s["overall"].rename(index=LABELS).to_markdown(),
+        "",
+        "sMAPE is symmetric MAPE; `seconds` is training + inference time per series and origin.",
         "",
         "## How often each model was the most accurate",
         "",
@@ -190,6 +234,7 @@ def main() -> None:
     with SessionLocal() as db:
         df = evaluate(db, a.origins, a.horizon, a.products)
         path = write_report(df, Path(a.out), db, a.origins, a.horizon)
+        save_run(db, df, a.origins, a.horizon, time.time() - t0)
     print(f"\nWrote {path} in {time.time() - t0:.0f}s")
     print(summarise(df)["wape"].to_string())
 

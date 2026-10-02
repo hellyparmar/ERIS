@@ -1,13 +1,21 @@
-"""Demand & revenue forecasting.
+"""Demand & revenue forecasting (model version 3).
 
-Four models compete on every series; each is back-tested on the most recent 2 x `TEST_DAYS` days (two
-consecutive folds) and the model - or the ensemble of the best two - with the lowest WAPE wins ("auto"). Prediction intervals come from the
-winning model's empirical back-test errors, so they reflect how accurate the model really was.
+Candidates, all trained only on data before each validation fold:
 
-* Seasonal naive - "same weekday last weeks" baseline every model must beat
-* Holt-Winters   - exponential smoothing with damped trend and weekly seasonality (statsmodels)
-* Gradient boosting - recursive HistGradientBoosting on scale-free lags + calendar & festival features (scikit-learn)
-* Prophet        - additive model with weekly/yearly seasonality and the retail festival calendar (Meta Prophet)
+* Seasonal naive  - mean of the same weekday over the last 4 weeks: the baseline every model must beat
+* Holt-Winters    - exponential smoothing with damped trend and weekly seasonality (statsmodels)
+* XGBoost         - recursive gradient-boosted trees on scale-free lags, rolling means, calendar, festival and
+                    exogenous features (promotions, price index, weather, stockouts) - see services/features.py
+* Prophet         - weekly/yearly seasonality, the festival calendar as holidays, promotions/price/weather as
+                    extra regressors (Meta Prophet)
+* Ensemble        - mean of the two best non-baseline models
+
+Selection: every candidate is scored on two consecutive 28-day folds at the end of the history. Prophet is the
+incumbent and is replaced only when a challenger's WAPE is more than 10% lower (rule chosen by the rolling-origin
+study in docs/FORECAST_EVALUATION.md). The 80% interval comes from the chosen model's back-test errors; its
+coverage on the most recent fold (using intervals estimated on the earlier fold) is reported honestly.
+Every forecast is persisted as a ForecastRun with data range, features, parameters, metrics and the selection.
+A failure is recorded and reported as an error - never replaced by made-up numbers.
 """
 from __future__ import annotations
 
@@ -24,48 +32,70 @@ import pandas as pd
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models import Category, InventoryItem, Outlet, Product, Sale, SaleItem, Supplier
+from app import clock
+from app.models import (
+    Category,
+    ForecastResult,
+    ForecastRun,
+    InventoryItem,
+    Outlet,
+    Product,
+    Sale,
+    SaleItem,
+    Supplier,
+)
 from app.services import analytics as A
-from app.services.holidays import EVENTS, holidays_frame, upcoming_events
+from app.services.features import (
+    CALENDAR_FEATURES,
+    EXOG_FEATURES,
+    FESTIVALS,
+    calendar_features,
+    exogenous_features,
+    feature_names,
+)
+from app.services.holidays import holidays_frame, upcoming_events
 
 log = logging.getLogger(__name__)
 logging.getLogger("cmdstanpy").setLevel(logging.WARNING)
 logging.getLogger("prophet").setLevel(logging.ERROR)
 logging.getLogger("prophet.plot").setLevel(logging.CRITICAL)
 
+MODEL_VERSION = "3.0"
 TEST_DAYS = 28
 INCUMBENT = "prophet"
 SWITCH_MARGIN = 0.10  # a challenger must cut back-test WAPE by >10% to replace the incumbent
 MAX_HISTORY_DAYS = 730
+XGB_PARAMS = {"n_estimators": 350, "max_depth": 4, "learning_rate": 0.05, "subsample": 0.8,
+              "colsample_bytree": 0.8, "min_child_weight": 3, "random_state": 0}
 MODEL_LABELS = {
     "seasonal_naive": "Seasonal naive (baseline)",
     "holt_winters": "Holt-Winters exponential smoothing",
-    "gbm": "Gradient boosting (lags + calendar + festivals)",
-    "prophet": "Prophet (seasonality + holidays)",
+    "xgboost": "XGBoost (lags + calendar + promotions + weather)",
+    "prophet": "Prophet (seasonality + holidays + regressors)",
     "ensemble": "Ensemble (average of the two best models)",
 }
 
 
 def available_models() -> list[str]:
-    models = ["seasonal_naive", "gbm"]
-    try:
-        import statsmodels  # noqa: F401
-
-        models.insert(1, "holt_winters")
-    except ImportError:
-        pass
-    try:
-        import prophet  # noqa: F401
-
-        models.append("prophet")
-    except ImportError:
-        pass
+    models = ["seasonal_naive"]
+    for name, module in (("holt_winters", "statsmodels"), ("xgboost", "xgboost"), ("prophet", "prophet")):
+        try:
+            __import__(module)
+            models.append(name)
+        except ImportError:
+            pass
     return models
 
 
+def short_label(model: str) -> str:
+    return MODEL_LABELS.get(model, model).split(" (")[0]
+
+
 # ------------------------------------------------------------------------------------------ models
-def _seasonal_naive(train: pd.Series, horizon: int) -> np.ndarray:
-    """Average of the same weekday over the last 4 weeks."""
+# Every model has the signature f(train: Series, horizon: int, exog: DataFrame | None) -> ndarray.
+# `exog` (when given) is indexed from the first training day to the last forecast day.
+
+def _seasonal_naive(train: pd.Series, horizon: int, exog=None) -> np.ndarray:
     vals = train.values
     out = []
     for h in range(1, horizon + 1):
@@ -74,7 +104,7 @@ def _seasonal_naive(train: pd.Series, horizon: int) -> np.ndarray:
     return np.array(out)
 
 
-def _holt_winters(train: pd.Series, horizon: int) -> np.ndarray:
+def _holt_winters(train: pd.Series, horizon: int, exog=None) -> np.ndarray:
     from statsmodels.tsa.holtwinters import ExponentialSmoothing
 
     y = train.iloc[-365:].astype(float)
@@ -88,93 +118,100 @@ def _holt_winters(train: pd.Series, horizon: int) -> np.ndarray:
     return np.clip(model.forecast(horizon), 0, None)
 
 
-def _calendar_features(idx: pd.DatetimeIndex) -> pd.DataFrame:
-    df = pd.DataFrame(index=idx)
-    df["dow"] = idx.dayofweek
-    df["weekend"] = (idx.dayofweek >= 5).astype(int)
-    df["month"] = idx.month
-    df["dom"] = idx.day
-    doy = idx.dayofyear
-    df["doy_sin"] = np.sin(2 * np.pi * doy / 365.25)
-    df["doy_cos"] = np.cos(2 * np.pi * doy / 365.25)
-    names = sorted({e[0] for e in EVENTS})
-    for n in names:
-        df[f"ev_{n}"] = 0.0
-    for name, day, before, after in EVENTS:
-        ts = pd.Timestamp(day)
-        for k in range(-after, before + 1):
-            d = ts - pd.Timedelta(days=k)
-            if d in df.index:
-                # 1.0 on the day itself, fading with distance (captures build-up before festivals)
-                df.loc[d, f"ev_{name}"] = max(df.loc[d, f"ev_{name}"], 1 - abs(k) / (before + after + 1))
-                if k == 0:
-                    df.loc[d, f"ev_{name}"] = 1.0
-    return df
-
-
-def _lag_features(y: np.ndarray, t: int, cal: np.ndarray) -> tuple[list[float], float]:
+def _lag_row(y: np.ndarray, t: int) -> tuple[list[float], float]:
+    """Weekly lags scaled by the 28-day level. (A lag-1 term was tested and dropped: in recursive multi-step
+    forecasting it compounds errors - weekly lags were better on 4 of 6 benchmark series.)"""
     level = float(y[t - 28:t].mean()) or 1.0
-    return [y[t - 1] / level, y[t - 7] / level, y[t - 14] / level, y[t - 28] / level,
-            y[t - 7:t].mean() / level, *cal[t]], level
+    return [y[t - 7] / level, y[t - 14] / level, y[t - 21] / level, y[t - 28] / level], level
 
 
-def _gbm(train: pd.Series, horizon: int) -> np.ndarray:
-    """Recursive gradient boosting on scale-free lag features + calendar/festival features (M5-style)."""
-    from sklearn.ensemble import HistGradientBoostingRegressor
+def _design(train: pd.Series, horizon: int, exog: pd.DataFrame | None) -> np.ndarray:
+    idx = pd.date_range(train.index[0], periods=len(train) + horizon, freq="D")
+    cal = calendar_features(idx)
+    if exog is not None:
+        cal = cal.join(exog.reindex(idx).ffill().fillna(0.0))
+    else:
+        for c in EXOG_FEATURES:
+            cal[c] = 0.0
+    return cal[CALENDAR_FEATURES + [f"fest_{n}" for n in FESTIVALS] + EXOG_FEATURES].values
+
+
+def _xgboost(train: pd.Series, horizon: int, exog: pd.DataFrame | None = None) -> np.ndarray:
+    """Recursive XGBoost on scale-free lags + calendar/festival + exogenous features (M5-style)."""
+    from xgboost import XGBRegressor
 
     y = train.clip(lower=0).astype(float).values
-    idx = pd.date_range(train.index[0], periods=len(y) + horizon, freq="D")
-    cal = _calendar_features(idx).values
+    other = _design(train, horizon, exog)
     X, target = [], []
     for t in range(28, len(y)):
-        f, level = _lag_features(y, t, cal)
-        X.append(f)
+        lags, level = _lag_row(y, t)
+        X.append(lags + list(other[t]))
         target.append(y[t] / level)
-    model = HistGradientBoostingRegressor(max_iter=300, learning_rate=0.05, max_leaf_nodes=15,
-                                          min_samples_leaf=10, random_state=0)
+    model = XGBRegressor(**XGB_PARAMS, n_jobs=2, verbosity=0)
     model.fit(np.array(X), np.array(target))
     ext = np.concatenate([y, np.zeros(horizon)])
     for t in range(len(y), len(y) + horizon):
-        f, level = _lag_features(ext, t, cal)
-        ext[t] = max(0.0, float(model.predict([f])[0]) * level)
+        lags, level = _lag_row(ext, t)
+        ext[t] = max(0.0, float(model.predict(np.array([lags + list(other[t])]))[0]) * level)
     return ext[len(y):]
 
 
-def _prophet(train: pd.Series, horizon: int) -> np.ndarray:
+def _prophet(train: pd.Series, horizon: int, exog: pd.DataFrame | None = None) -> np.ndarray:
     from prophet import Prophet
 
     df = pd.DataFrame({"ds": train.index, "y": train.values.astype(float)})
     logging.getLogger("prophet").setLevel(logging.ERROR)
-    # With under two years of history a full yearly Fourier series over-fits one season's peaks,
-    # so use a smoother yearly term and a stiffer trend.
     if len(df) >= 730:
         yearly, cps = True, 0.05
     elif len(df) >= 365:
-        yearly, cps = 4, 0.02
+        yearly, cps = 4, 0.02  # smoother yearly term + stiffer trend with under two years of history
     else:
         yearly, cps = False, 0.05
     m = Prophet(weekly_seasonality=True, yearly_seasonality=yearly, daily_seasonality=False,
                 holidays=holidays_frame(), seasonality_mode="multiplicative" if (df.y > 0).all() else "additive",
                 changepoint_prior_scale=cps, uncertainty_samples=0)
+    future = pd.DataFrame({"ds": pd.date_range(train.index[-1] + pd.Timedelta(days=1), periods=horizon, freq="D")})
+    regressors = []
+    if exog is not None:
+        for col in ("promo_depth", "price_index", "temp_max_c", "rain_mm"):
+            hist = exog[col].reindex(train.index)
+            if hist.std() > 1e-6:
+                regressors.append(col)
+                m.add_regressor(col, mode="additive" if col in ("temp_max_c", "rain_mm") else "multiplicative")
+                df[col] = hist.values
+                future[col] = exog[col].reindex(future["ds"]).ffill().fillna(float(hist.iloc[-1])).values
     m.fit(df)
-    future = m.make_future_dataframe(periods=horizon, include_history=False)
     return np.clip(m.predict(future)["yhat"].values, 0, None)
 
 
-MODEL_FUNCS = {"seasonal_naive": _seasonal_naive, "holt_winters": _holt_winters, "gbm": _gbm, "prophet": _prophet}
+MODEL_FUNCS = {"seasonal_naive": _seasonal_naive, "holt_winters": _holt_winters, "xgboost": _xgboost,
+               "prophet": _prophet}
 
 
 def _metrics(actual: np.ndarray, pred: np.ndarray) -> dict:
     err = pred - actual
     total = np.abs(actual).sum()
     nz = actual > 0
+    denom = np.abs(actual) + np.abs(pred)
+    ok = denom > 0
     return {
         "mae": round(float(np.mean(np.abs(err))), 2),
         "rmse": round(float(np.sqrt(np.mean(err ** 2))), 2),
         "mape": round(float(np.mean(np.abs(err[nz] / actual[nz])) * 100), 2) if nz.any() else None,
+        "smape": round(float(np.mean(2 * np.abs(err[ok]) / denom[ok]) * 100), 2) if ok.any() else None,
         "wape": round(float(np.abs(err).sum() / total * 100), 2) if total else None,
         "bias_pct": round(float(err.sum() / total * 100), 2) if total else None,
     }
+
+
+def _interval(actual: np.ndarray, pred: np.ndarray) -> tuple[float, float]:
+    rel = (actual - pred) / np.where(pred > 0, pred, 1)
+    return float(np.quantile(rel, 0.1)), float(np.quantile(rel, 0.9))
+
+
+def _coverage(actual: np.ndarray, pred: np.ndarray, lo_q: float, hi_q: float) -> float:
+    lo, hi = pred * (1 + lo_q), np.maximum(pred, pred * (1 + hi_q))
+    return round(float(np.mean((actual >= lo) & (actual <= hi)) * 100), 1)
 
 
 # ------------------------------------------------------------------------------------------ engine
@@ -206,17 +243,24 @@ def load_series(db: Session, spec: SeriesSpec, end: date) -> pd.Series:
     start = max(A.first_sale_date(db) or end, end - timedelta(days=MAX_HISTORY_DAYS - 1))
     rng = A.DateRange(start, end)
     if spec.scope == "product":
-        return A.product_daily_units(db, spec.product_id, start, end, spec.outlet_ids)
-    rows = A.revenue_series(db, rng, spec.outlet_ids, "day", category_id=spec.category_id)
-    key = "units" if spec.target == "units" else "revenue"
-    s = pd.Series([r[key] for r in rows], index=pd.to_datetime([r["date"] for r in rows]), dtype=float)
-    # Drop leading zeros (e.g. an outlet that opened recently).
-    nz = np.flatnonzero(s.values > 0)
+        s = A.product_daily_units(db, spec.product_id, start, end, spec.outlet_ids)
+    else:
+        rows = A.revenue_series(db, rng, spec.outlet_ids, "day", category_id=spec.category_id)
+        key = "units" if spec.target == "units" else "revenue"
+        s = pd.Series([r[key] for r in rows], index=pd.to_datetime([r["date"] for r in rows]), dtype=float)
+    nz = np.flatnonzero(s.values > 0)  # drop leading zeros (e.g. an outlet that opened recently)
     return s.iloc[nz[0]:] if len(nz) else s
 
 
-def run_forecast(series: pd.Series, horizon: int, model: str = "auto") -> dict:
-    """Back-test all candidate models, choose the best and forecast `horizon` days ahead."""
+def load_exog(db: Session, spec: SeriesSpec, series: pd.Series, horizon: int) -> pd.DataFrame | None:
+    if series.empty:
+        return None
+    return exogenous_features(db, series.index[0].date(), series.index[-1].date() + timedelta(days=horizon),
+                              spec.outlet_ids, spec.category_id, spec.product_id)
+
+
+def run_forecast(series: pd.Series, horizon: int, model: str = "auto", exog: pd.DataFrame | None = None) -> dict:
+    """Back-test the candidate models, choose one and forecast `horizon` days ahead."""
     models = available_models()
     if model != "auto":
         if model not in MODEL_FUNCS:
@@ -225,25 +269,33 @@ def run_forecast(series: pd.Series, horizon: int, model: str = "auto") -> dict:
             raise ValueError(f"Model '{model}' is not installed on this server")
     n = len(series)
     if n < 21 or series.sum() <= 0:
-        raise ValueError("Not enough sales history to forecast (need at least 3 weeks of data)")
+        raise ValueError("Not enough sales history to forecast (need at least 3 weeks with sales)")
 
     test_days = min(TEST_DAYS, max(7, n // 5))
-    # Two consecutive validation folds when history allows: choosing on ~8 weeks of errors is far more
-    # stable than on a single 4-week window.
     n_folds = 2 if n - 2 * test_days >= 120 else 1
     folds = [(n - (k + 1) * test_days, n - k * test_days) for k in range(n_folds - 1, -1, -1)]
     if n < 120 and "prophet" in models:
         models.remove("prophet")  # Prophet needs a longer history to be reliable
+    if n < 70 and "xgboost" in models:
+        models.remove("xgboost")
     candidates = models if model == "auto" else sorted({model, "seasonal_naive"}, key=models.index)
     actual = np.concatenate([series.values[a:b] for a, b in folds])
+
+    def fit(name: str, train: pd.Series, h: int) -> np.ndarray:
+        ex = exog.loc[:train.index[-1] + pd.Timedelta(days=h)] if exog is not None else None
+        return MODEL_FUNCS[name](train, h, ex)
 
     evaluation, test_preds = [], {}
     for name in candidates:
         t0 = time.time()
         try:
-            pred = np.concatenate([MODEL_FUNCS[name](series.iloc[:a], b - a) for a, b in folds])
+            parts = [fit(name, series.iloc[:a], b - a) for a, b in folds]
+            pred = np.concatenate(parts)
             m = _metrics(actual, pred)
-            m.update(model=name, label=MODEL_LABELS[name], seconds=round(time.time() - t0, 2))
+            if n_folds == 2:
+                lo_q, hi_q = _interval(series.values[folds[0][0]:folds[0][1]], parts[0])
+                m["interval_coverage"] = _coverage(series.values[folds[1][0]:folds[1][1]], parts[1], lo_q, hi_q)
+            m.update(model=name, label=MODEL_LABELS[name], train_seconds=round(time.time() - t0, 2))
             evaluation.append(m)
             test_preds[name] = pred
         except Exception as exc:  # a failing model must not break forecasting
@@ -253,21 +305,18 @@ def run_forecast(series: pd.Series, horizon: int, model: str = "auto") -> dict:
     scored = [e for e in evaluation if e.get("wape") is not None]
     if not scored:
         raise ValueError("All forecasting models failed for this series")
-    # Ensemble candidate: averaging the two strongest models is usually more robust than either alone.
     members = [e["model"] for e in sorted(scored, key=lambda e: e["wape"]) if e["model"] != "seasonal_naive"][:2]
     if model == "auto" and len(members) == 2:
         pred = (test_preds[members[0]] + test_preds[members[1]]) / 2
         m = _metrics(actual, pred)
-        m.update(model="ensemble", label=f"Ensemble ({MODEL_LABELS[members[0]].split(' (')[0]} + "
-                                         f"{MODEL_LABELS[members[1]].split(' (')[0]})", seconds=0.0)
+        m.update(model="ensemble", label=f"Ensemble ({short_label(members[0])} + {short_label(members[1])})",
+                 train_seconds=0.0)
         evaluation.append(m)
         scored.append(m)
         test_preds["ensemble"] = pred
     if model != "auto" and model in test_preds:
         best = model
     else:
-        # Incumbent rule: back-test scores are noisy, so keep the model with the strongest long-run record
-        # (Prophet, see docs/FORECAST_EVALUATION.md) unless a challenger is clearly better.
         top = min(scored, key=lambda e: e["wape"])
         incumbent = next((e for e in scored if e["model"] == INCUMBENT), None)
         best = top["model"]
@@ -276,17 +325,17 @@ def run_forecast(series: pd.Series, horizon: int, model: str = "auto") -> dict:
     for e in evaluation:
         e["selected"] = e["model"] == best
 
-    # Empirical 80% interval from all back-test relative errors of the chosen model.
     pred = test_preds[best]
-    rel = (actual - pred) / np.where(pred > 0, pred, 1)
-    lo_q, hi_q = np.quantile(rel, 0.1), np.quantile(rel, 0.9)
+    lo_q, hi_q = _interval(actual, pred)
     test = series.iloc[folds[-1][0]:]
-    actual, pred = test.values, pred[-test_days:]
+    last_pred = pred[-test_days:]
 
+    t0 = time.time()
     if best == "ensemble":
-        final = (MODEL_FUNCS[members[0]](series, horizon) + MODEL_FUNCS[members[1]](series, horizon)) / 2
+        final = (fit(members[0], series, horizon) + fit(members[1], series, horizon)) / 2
     else:
-        final = MODEL_FUNCS[best](series, horizon)
+        final = fit(best, series, horizon)
+    inference_seconds = round(time.time() - t0, 2)
     idx = pd.date_range(series.index[-1] + pd.Timedelta(days=1), periods=horizon, freq="D")
     forecast = [
         {"date": d.date().isoformat(), "yhat": round(float(v), 2),
@@ -295,15 +344,45 @@ def run_forecast(series: pd.Series, horizon: int, model: str = "auto") -> dict:
     ]
     backtest = [
         {"date": d.date().isoformat(), "actual": round(float(a), 2), "predicted": round(float(p), 2)}
-        for d, a, p in zip(test.index, actual, pred, strict=False)
+        for d, a, p in zip(test.index, test.values, last_pred, strict=False)
     ]
     label = next(e["label"] for e in evaluation if e["model"] == best)
-    return {"model": best, "model_label": label, "evaluation": evaluation,
-            "forecast": forecast, "backtest": backtest, "test_days": test_days * n_folds}
+    return {"model": best, "model_label": label, "evaluation": evaluation, "forecast": forecast,
+            "backtest": backtest, "test_days": test_days * n_folds, "folds": n_folds,
+            "ensemble_members": members if best == "ensemble" else None,
+            "final_fit_seconds": inference_seconds}
+
+
+def _persist(db: Session, spec: SeriesSpec, series: pd.Series | None, horizon: int, result: dict | None,
+             error: str | None, seconds: float, user_id: int | None, run_type: str = "forecast") -> int | None:
+    try:
+        run = ForecastRun(
+            run_type=run_type, scope=spec.scope, target=spec.target, series_label=spec.label,
+            outlet_ids=spec.outlet_ids, category_id=spec.category_id, product_id=spec.product_id, horizon=horizon,
+            data_start=series.index[0].date() if series is not None and len(series) else None,
+            data_end=series.index[-1].date() if series is not None and len(series) else None,
+            selected_model=result["model"] if result else None, model_version=MODEL_VERSION,
+            features=feature_names(),
+            parameters={"selection": "two 28-day folds, Prophet incumbent, 10% switch margin",
+                        "test_days": result["test_days"] if result else None, "xgboost": XGB_PARAMS,
+                        "interval": "empirical 10th-90th percentile of relative back-test errors",
+                        "ensemble_members": result.get("ensemble_members") if result else None},
+            metrics=result["evaluation"] if result else None, status="ok" if result else "failed",
+            error=error, duration_seconds=round(seconds, 2), created_by=user_id)
+        if result:
+            run.results = [ForecastResult(day=date.fromisoformat(f["date"]), yhat=f["yhat"], lower=f["lower"],
+                                          upper=f["upper"]) for f in result["forecast"]]
+        db.add(run)
+        db.commit()
+        return run.id
+    except Exception:  # persisting must never break forecasting
+        db.rollback()
+        log.exception("could not persist forecast run")
+        return None
 
 
 def forecast_series(db: Session, spec: SeriesSpec, horizon: int = 30, model: str = "auto",
-                    history_days: int = 120) -> dict:
+                    history_days: int = 120, user_id: int | None = None, persist: bool = True) -> dict:
     horizon = max(7, min(int(horizon), 90))
     end = A.anchor_date(db)
     key = (spec.scope, spec.target, tuple(spec.outlet_ids or []), spec.category_id, spec.product_id, horizon, model,
@@ -313,8 +392,21 @@ def forecast_series(db: Session, spec: SeriesSpec, horizon: int = 30, model: str
         if hit and time.time() - hit[0] < CACHE_SECONDS:
             return hit[1]
 
-    series = load_series(db, spec, end)
-    result = run_forecast(series, horizon, model)
+    t0 = time.time()
+    series = None
+    try:
+        series = load_series(db, spec, end)
+        exog = load_exog(db, spec, series, horizon)
+        result = run_forecast(series, horizon, model, exog)
+    except ValueError as exc:
+        if persist:
+            _persist(db, spec, series, horizon, None, str(exc), time.time() - t0, user_id)
+        raise
+    result["run_id"] = _persist(db, spec, series, horizon, result, None, time.time() - t0, user_id) if persist else None
+    result["model_version"] = MODEL_VERSION
+    result["data_range"] = {"start": series.index[0].date().isoformat(), "end": series.index[-1].date().isoformat(),
+                            "days": len(series)}
+    result["features"] = feature_names()
     fc = result["forecast"]
     hist = series.iloc[-history_days:]
     last_30 = float(series.iloc[-30:].sum())
@@ -505,3 +597,63 @@ def reorder_suggestions(db: Session, outlet_ids: list[int] | None = None, limit:
         })
     out.sort(key=lambda r: (r["urgency"] != "critical", r["days_of_cover"] if r["days_of_cover"] is not None else 0))
     return out[:limit] if limit else out
+
+
+def stockout_risk(db: Session, days: int = 14, outlet_ids: list[int] | None = None) -> list[dict]:
+    """Items expected to run out within `days`: stock + open purchase orders vs trend-adjusted demand.
+
+    Uses the same demand-rate estimate as the reorder planner (last 28 days, recent-trend adjusted).
+    """
+    from app.models import PurchaseOrder, PurchaseOrderItem
+
+    as_of = A.anchor_date(db)
+    start = as_of - timedelta(days=27)
+    q = select(SaleItem.outlet_id, SaleItem.product_id, SaleItem.sale_date, func.sum(SaleItem.quantity)).join(
+        Sale, Sale.id == SaleItem.sale_id).where(A.COMPLETED, SaleItem.sale_date >= start, SaleItem.sale_date <= as_of)
+    if outlet_ids:
+        q = q.where(SaleItem.outlet_id.in_(outlet_ids))
+    df = pd.DataFrame(db.execute(q.group_by(SaleItem.outlet_id, SaleItem.product_id, SaleItem.sale_date)).all(),
+                      columns=["outlet_id", "product_id", "d", "units"])
+    if df.empty:
+        return []
+    df["d"] = pd.to_datetime(df["d"])
+    full = pd.date_range(start, as_of, freq="D")
+    rates = {}
+    for (o, p), g in df.groupby(["outlet_id", "product_id"]):
+        s = g.set_index("d")["units"].reindex(full, fill_value=0.0)
+        recent, prior = s.iloc[-14:].mean(), s.iloc[:14].mean()
+        trend = min(max(recent / prior, 0.7), 1.4) if prior > 0 else 1.0
+        rates[(o, p)] = float(s.mean() * (0.5 + 0.5 * trend))
+    incoming = {}
+    for o, p, qty, exp in db.execute(select(PurchaseOrder.outlet_id, PurchaseOrderItem.product_id,
+                                            PurchaseOrderItem.quantity, PurchaseOrder.expected_date).join(
+            PurchaseOrder, PurchaseOrder.id == PurchaseOrderItem.order_id).where(PurchaseOrder.status == "ordered")):
+        incoming.setdefault((o, p), []).append((exp, float(qty)))
+    inv_q = select(InventoryItem, Product, Outlet).join(Product, Product.id == InventoryItem.product_id).join(
+        Outlet, Outlet.id == InventoryItem.outlet_id).where(Product.is_active.is_(True), Outlet.is_active.is_(True))
+    if outlet_ids:
+        inv_q = inv_q.where(InventoryItem.outlet_id.in_(outlet_ids))
+    today = clock.today()
+    out = []
+    for inv, p, o in db.execute(inv_q).all():
+        rate = rates.get((o.id, p.id), 0.0)
+        if rate <= 0.05:
+            continue
+        stock, run_out = inv.quantity, None
+        arrivals = sorted(incoming.get((o.id, p.id), []), key=lambda x: x[0] or today)
+        for k in range(1, days + 1):
+            day = today + timedelta(days=k - 1)
+            stock += sum(q for exp, q in arrivals if exp and exp == day)
+            stock -= rate
+            if stock < 0:
+                run_out = day
+                break
+        if run_out is None:
+            continue
+        out.append({"outlet_id": o.id, "outlet": o.name, "product_id": p.id, "product": p.name, "sku": p.sku,
+                    "unit": p.unit, "current_stock": inv.quantity, "avg_daily_demand": round(rate, 2),
+                    "on_order": round(sum(q for _, q in arrivals), 1), "runs_out_on": run_out.isoformat(),
+                    "days_left": (run_out - today).days, "lost_revenue_estimate": round(
+                        rate * max(0, days - (run_out - today).days) * p.selling_price, 2)})
+    out.sort(key=lambda r: (r["days_left"], -r["lost_revenue_estimate"]))
+    return out

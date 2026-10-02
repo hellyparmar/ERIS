@@ -50,3 +50,8 @@ def manager(client):
 @pytest.fixture(scope="session")
 def staff(client):
     return _login(client, "staff.andheri@eris.demo", DEMO_PASSWORDS["staff"])
+
+
+@pytest.fixture(scope="session")
+def viewer(client):
+    return _login(client, "analyst@eris.demo", DEMO_PASSWORDS["viewer"])
