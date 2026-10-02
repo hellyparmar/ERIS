@@ -57,3 +57,23 @@ def test_sample_with_errors_history_and_error_report(client, admin, manager):
     # managers only see their own imports
     assert client.get(f"/api/imports/history/{res['job_id']}/errors.csv", headers=manager).status_code == 403
     assert all(j["id"] != res["job_id"] for j in client.get("/api/imports/history", headers=manager).json()["items"])
+
+
+def test_import_edge_cases(client, admin):
+    y = (date.today() - timedelta(days=1)).isoformat()
+
+    def check(name, content):
+        return client.post("/api/imports/sales", headers=admin, files={"file": (name, content, "text/csv")}).json()
+
+    head = "date,outlet_code,sku,quantity\n"
+    assert check("u16.csv", (head + f"{y},MUM-AND,DAI-001,1\n").encode("utf-16"))["error_count"] == 0
+    assert "not a number" in check("nan.csv", head + f"{y},MUM-AND,DAI-001,nan\n")["errors"][0]["message"]
+    assert "too large" in check("big.csv", head + f"{y},MUM-AND,DAI-001,1e9\n")["errors"][0]["message"]
+    assert "before Andheri West opened" in check("old.csv", head + "1990-01-01,MUM-AND,DAI-001,1\n")["errors"][0]["message"]
+
+
+def test_exports_neutralise_spreadsheet_formulas(client, admin):
+    r = client.post("/api/customers", headers=admin, json={"name": "=HYPERLINK(\"http://x\")", "phone": "9811155555"})
+    assert r.status_code == 201
+    text = client.get("/api/customers/export", headers=admin).text
+    assert "'=HYPERLINK" in text and "\n=HYPERLINK" not in text

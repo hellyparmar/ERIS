@@ -31,11 +31,22 @@ def get_or_404(db: Session, model, obj_id: int, name: str | None = None):
     return obj
 
 
+FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
+
+
+def safe_cell(v):
+    """Neutralise spreadsheet formulas in exported text (CSV/Excel injection): '=HYPERLINK(..)' -> \"'=HYPERLINK(..)\".
+    Numbers are left alone, so negative amounts stay numeric."""
+    if isinstance(v, str) and v.startswith(FORMULA_PREFIXES):
+        return "'" + v
+    return v
+
+
 def csv_response(filename: str, header: list[str], rows: Iterable[list]) -> StreamingResponse:
     buf = io.StringIO()
     w = csv.writer(buf)
     w.writerow(header)
-    w.writerows(rows)
+    w.writerows([safe_cell(v) for v in row] for row in rows)
     buf.seek(0)
     return StreamingResponse(iter([buf.getvalue()]), media_type="text/csv",
                              headers={"Content-Disposition": f'attachment; filename="{filename}"'})

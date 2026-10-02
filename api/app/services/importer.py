@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import csv
 import io
+import math
 import re
 from collections import OrderedDict
 from datetime import datetime, time
@@ -23,6 +24,7 @@ from app.services.sales import LineInput, SaleInput, create_sale, normalize_phon
 
 MAX_ROWS = 50_000
 MAX_ERRORS = 200
+MAX_LINE_QTY = 100_000  # same limit as manual billing
 
 TEMPLATES: dict[str, dict] = {
     "sales": {
@@ -107,7 +109,7 @@ def check_file(filename: str | None, content: bytes) -> None:
         raise HTTPException(400, "Excel files are not read directly - use File > Save As > CSV (UTF-8) first")
     if name and not name.endswith(ALLOWED_EXTENSIONS):
         raise HTTPException(400, f"Only CSV files are accepted ({', '.join(ALLOWED_EXTENSIONS)})")
-    if b"\x00" in content[:8192]:
+    if b"\x00" in content[:8192] and content[:2] not in (b"\xff\xfe", b"\xfe\xff"):
         raise HTTPException(400, "The file looks binary, not a text CSV file")
 
 
@@ -146,7 +148,12 @@ def inspect_file(kind: str, content: bytes, filename: str | None) -> dict:
 
 def _read_csv(content: bytes, with_headers: bool = False):
     text = None
-    for enc in ("utf-8-sig", "cp1252", "latin-1"):
+    if content[:2] in (b"\xff\xfe", b"\xfe\xff"):  # UTF-16 with BOM (Excel "Unicode Text")
+        try:
+            text = content.decode("utf-16")
+        except UnicodeDecodeError:
+            raise HTTPException(400, "The file could not be read as UTF-16 text") from None
+    for enc in () if text is not None else ("utf-8-sig", "cp1252", "latin-1"):
         try:
             text = content.decode(enc)
             break
@@ -185,6 +192,8 @@ def _num(value: str, name: str, allow_empty: bool = False, minimum: float | None
         n = float(str(value).replace(",", "").replace("₹", "").strip())
     except ValueError:
         raise ValueError(f"{name} '{value}' is not a number") from None
+    if not math.isfinite(n):
+        raise ValueError(f"{name} '{value}' is not a number")
     if minimum is not None and n < minimum:
         raise ValueError(f"{name} cannot be below {minimum:g}")
     return n
@@ -415,9 +424,13 @@ def _import_sales(db: Session, rows: list[dict], user: User, result: dict, opts:
             qty = _num(row.get("quantity", ""), "quantity")
             if qty == 0:
                 raise ValueError("quantity must be greater than zero")
+            if qty > MAX_LINE_QTY:
+                raise ValueError(f"quantity {qty:g} is too large (at most {MAX_LINE_QTY:,} per line)")
             price = _num(row.get("unit_price", ""), "unit_price", allow_empty=True)
             disc = _num(row.get("discount", ""), "discount", allow_empty=True) or 0.0
             d = _date(row.get("date", ""))
+            if outlet.opened_on and d < outlet.opened_on:
+                raise ValueError(f"date {d} is before {outlet.name} opened ({outlet.opened_on})")
             t = _time(row.get("time", ""))
             pm = (row.get("payment_method") or "cash").lower().replace(" ", "_")
             pm = {"gpay": "upi", "phonepe": "upi", "paytm": "upi", "debit_card": "card", "credit_card": "card"}.get(pm, pm)

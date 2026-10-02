@@ -178,10 +178,12 @@ def provenance(db: Session, report: Report, rng: A.DateRange, outlet_ids: list[i
 
 
 def to_csv(report: Report, rows: list[list]) -> str:
+    from app.routers.common import safe_cell
+
     buf = io.StringIO()
     w = csv.writer(buf)
     w.writerow([h for _, h in report.columns])
-    w.writerows(rows)
+    w.writerows([safe_cell(v) for v in r] for r in rows)
     return buf.getvalue()
 
 
@@ -197,8 +199,10 @@ def to_xlsx(report: Report, rows: list[list], info: list[tuple[str, str]]) -> by
     for cell in ws[1]:
         cell.font = Font(bold=True, color="FFFFFF")
         cell.fill = PatternFill("solid", fgColor="1F4E79")
+    from app.routers.common import safe_cell
+
     for r in rows:
-        ws.append(r)
+        ws.append([safe_cell(v) for v in r])
     ws.freeze_panes = "A2"
     if rows:
         ws.auto_filter.ref = ws.dimensions
