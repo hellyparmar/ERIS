@@ -36,21 +36,21 @@ def test_simultaneous_numbering(client, admin):
         return client.post("/api/purchase-orders", headers=admin, json={"supplier_id": 1, "outlet_id": outlet,
                                                                        "items": [{"product_id": product, "quantity": 2}]}).status_code
 
-    with ThreadPoolExecutor(6) as pool:
-        sales = list(pool.map(sell, range(6)))
-        pos = list(pool.map(order, range(6)))
-    assert all(code == 201 for code, _ in sales) and all(code == 201 for code in pos)
-    assert _stock(outlet, product) == 44
+    with ThreadPoolExecutor(12) as pool:
+        sales = list(pool.map(sell, range(12)))
+        pos = list(pool.map(order, range(12)))
+    assert all(code == 201 for code, _ in sales) and all(code == 201 for code in pos), (sales, pos)
+    assert _stock(outlet, product) == 38
 
     def invoice(sale_id):
         return client.post("/api/invoices", headers=admin, json={"sale_id": sale_id}).status_code
 
     ids = [sid for _, sid in sales]
-    with ThreadPoolExecutor(8) as pool:
-        codes = list(pool.map(invoice, ids + [ids[0]] * 2))
-    assert codes.count(500) == 0 and codes.count(409) == 0
+    with ThreadPoolExecutor(12) as pool:
+        codes = list(pool.map(invoice, ids + [ids[0]] * 3))
+    assert codes.count(201) == 12 and codes.count(200) == 3, codes
     numbers = {i["number"] for i in client.get("/api/invoices?page_size=200", headers=admin).json()["items"]}
-    assert len(numbers) >= 6
+    assert len(numbers) >= 12
 
 
 def test_forecasts_are_saved_while_sales_are_written(client, admin):

@@ -142,8 +142,9 @@ def create_sale(db: Session, data: SaleInput, user: User | None, source: str = "
         b[4] += share
         remaining = round(remaining - share, 2)
 
-    if not data.invoice_no:
-        # one bill number at a time per outlet: simultaneous bills queue here instead of clashing (PostgreSQL)
+    if not data.invoice_no and commit:
+        # one bill number at a time per outlet: simultaneous bills queue here instead of clashing (PostgreSQL).
+        # Imports (one long transaction) skip the lock so billing is not blocked; the retry below covers them.
         db.execute(select(Outlet.id).where(Outlet.id == outlet.id).with_for_update())
     invoice_no = data.invoice_no or next_invoice_no(db, outlet, sold_at)
     if data.invoice_no and db.scalar(select(Sale.id).where(Sale.invoice_no == data.invoice_no)):

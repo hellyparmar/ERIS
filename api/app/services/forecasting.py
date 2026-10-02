@@ -206,9 +206,15 @@ def _metrics(actual: np.ndarray, pred: np.ndarray) -> dict:
     }
 
 
-def _interval(actual: np.ndarray, pred: np.ndarray) -> tuple[float, float]:
-    rel = (actual - pred) / np.where(pred > 0, pred, 1)
-    return float(np.quantile(rel, 0.1)), float(np.quantile(rel, 0.9))
+def _interval(actual: np.ndarray, pred: np.ndarray, alpha: float = 0.2) -> tuple[float, float]:
+    """Relative error bounds for an 80% band from back-test errors (split-conformal quantile levels).
+
+    Plain 10th/90th percentiles of a few dozen errors give a band that is too narrow on new days; the conformal
+    finite-sample correction uses the ceil((n + 1)(1 - alpha/2))-th smallest error instead."""
+    rel = np.sort((actual - pred) / np.where(pred > 0, pred, 1))
+    n = len(rel)
+    k = min(n, int(np.ceil((n + 1) * (1 - alpha / 2))))
+    return float(rel[n - k]), float(rel[k - 1])
 
 
 def _coverage(actual: np.ndarray, pred: np.ndarray, lo_q: float, hi_q: float) -> float:
@@ -367,7 +373,7 @@ def _persist(spec: SeriesSpec, series: pd.Series | None, horizon: int, result: d
             features=feature_names(),
             parameters={"selection": "two 28-day folds, Prophet incumbent, 10% switch margin",
                         "test_days": result["test_days"] if result else None, "xgboost": XGB_PARAMS,
-                        "interval": "empirical 10th-90th percentile of relative back-test errors",
+                        "interval": "split-conformal 80% band from relative back-test errors",
                         "ensemble_members": result.get("ensemble_members") if result else None},
             metrics=result["evaluation"] if result else None, status="ok" if result else "failed",
             error=error, duration_seconds=round(seconds, 2), created_by=user_id)

@@ -1,0 +1,27 @@
+# Render Blueprint: a free hosted ERIS demo (https://render.com -> New -> Blueprint -> pick this repository).
+# The free plan has no persistent disk, so the SQLite database lives in the container: the synthetic demo is
+# generated on each start (about a minute) and changes made in the demo are lost when the service restarts or
+# sleeps. For a lasting deployment attach a PostgreSQL database and set DATABASE_URL.
+services:
+  - type: web
+    name: eris-demo
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: ENVIRONMENT
+        value: production
+      - key: SEED_DEMO_DATA
+        value: "true"
+      - key: SEED_DAYS
+        value: "730"
+      - key: SEED_OUTLETS
+        value: "5"
+      - key: LLM_ENABLED  # no Ollama on the free plan; the assistant uses its built-in engine
+        value: "false"
+      - key: MALLOC_ARENA_MAX  # keeps memory well inside the free plan's 512 MB
+        value: "2"

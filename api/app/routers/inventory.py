@@ -13,6 +13,7 @@ from app.models import (
     OPEN_PO_STATUSES,
     Category,
     InventoryItem,
+    Organization,
     Outlet,
     Product,
     PurchaseOrder,
@@ -226,6 +227,8 @@ def _create_po(db: Session, body: PurchaseOrderIn, user: User) -> PurchaseOrder:
     supplier = get_or_404(db, Supplier, body.supplier_id, "Supplier")
     get_or_404(db, Outlet, body.outlet_id, "Outlet")
     today = clock.today()
+    # PO numbers run across the organisation: allocate one at a time (simultaneous orders queue here)
+    db.execute(select(Organization.id).with_for_update())
 
     def next_number() -> str:
         count = db.scalar(select(func.count(PurchaseOrder.id))) or 0

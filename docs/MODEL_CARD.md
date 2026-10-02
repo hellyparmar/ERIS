@@ -34,7 +34,8 @@ Rolling-origin evaluation on the default demo dataset (seed 42):
   series-and-origin pairs.
 - The error is lowest for the whole-business series (8.6% WAPE) and highest for outlets (20.5%), because the
   newest outlet is still ramping up and one outlet is declining.
-- The 80% band covered **75.5%** of held-out days, so it is slightly too narrow.
+- The 80% band covered **80.0%** of held-out days. It uses split-conformal quantile levels of the back-test
+  errors; plain 10th/90th percentiles covered only 75.5%.
 
 ### Known limitations
 

@@ -57,12 +57,13 @@ def _bootstrap() -> None:
 
     def seed() -> None:
         from app.seed.__main__ import seed_kwargs
-        from app.seed.generator import generate_demo_data
+        from app.seed.generator import generate_demo_data, release_memory
 
         set_seeding(True, "Generating demo data (about a minute)...")
         try:
             with SessionLocal() as db:
                 generate_demo_data(db, **seed_kwargs(), log=lambda m: (log.info(m), set_seeding(True, m.strip())))
+            release_memory()
             set_seeding(False, "Demo data ready")
         except Exception as exc:
             log.exception("demo data generation failed")

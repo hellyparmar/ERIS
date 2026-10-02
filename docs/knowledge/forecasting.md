@@ -13,7 +13,7 @@ Calendar features are day of week, weekend flag, day of month, month, quarter an
 Each candidate is trained only on data before two consecutive 28-day validation folds at the end of the history and scored with WAPE. Prophet is the incumbent model; another model replaces it only when its WAPE is more than 10% lower. This rule came from the rolling-origin study, which showed that switching models on small differences adds noise rather than accuracy. The selected model is then refitted on the full history to produce the forecast.
 
 ## Prediction intervals
-The 80% band comes from the distribution of the selected model's relative errors in the back-test. Its coverage on the most recent fold, using a band estimated on the earlier fold, is reported so users can see whether the band is too narrow or too wide.
+The 80% band comes from the distribution of the selected model's relative errors in the back-test, using split-conformal quantile levels (a small-sample correction that widens the band slightly so it covers about 80% of new days). Its coverage on the most recent fold, using a band estimated on the earlier fold, is reported so users can see whether the band is too narrow or too wide.
 
 ## Model runs and versions
 Every forecast request is saved as a forecast run with the series, the data range used, the feature list, the model parameters, the back-test metrics of every candidate, the selected model, the model version (currently 3.0), the run time and the forecast values. Failed runs are saved with their error. The Model Comparison page lists these runs and the latest rolling-origin evaluation.

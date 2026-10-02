@@ -41,6 +41,8 @@ Every number traces back to the data.
 
 <img src="docs/images/mobile-dark.png" alt="Mobile, dark mode" width="260">
 
+Screenshots are regenerated with `cd e2e && node screenshots.mjs` against a running demo.
+
 ## Features
 
 | Area | What you can do |
@@ -81,6 +83,15 @@ Other variants:
 DATABASE_URL=postgresql+psycopg2://eris:eris@postgres:5432/eris docker compose --profile postgres up --build
 docker compose --profile ai up --build    # adds Ollama; then: docker compose exec ollama ollama pull llama3.2:3b
 ```
+
+### Free hosted demo (Render)
+
+[`render.yaml`](render.yaml) deploys the Docker image to Render's free plan: on render.com choose **New → Blueprint**
+and pick this repository. A random `JWT_SECRET_KEY` is generated. The free plan has no persistent disk, so the
+demo data is regenerated on every start (about a minute) and edits are lost when the service sleeps; set
+`DATABASE_URL` to a PostgreSQL database for a lasting deployment. The full two-year demo uses about 340 MB of RAM
+in use (the plan allows 512 MB). Any host that runs Docker images and sets `$PORT` (Fly.io, Railway) works the
+same way.
 
 ### Local (Python 3.11+, Node 20+)
 
@@ -162,7 +173,8 @@ System & data), then import CSVs or enter sales manually. Real data is never dat
   process, not how they would perform for a real shop.
 - XGBoost is weaker than the baseline on aggregate series in this data, which is reported as is. LSTM was left
   out because the scope made it optional and simpler models already win.
-- The 80% prediction band is slightly narrow: it covers 75.5% of held-out days.
+- The 80% prediction band covers 80.0% of held-out days on average (split-conformal calibration), but it can still
+  be too narrow around festivals that fall outside the back-test window.
 - The assistant's rule-based parser covers the documented question types. Other phrasings fall back to help
   text, or to the local LLM when Ollama is installed. Check the licence of whichever model you pull.
 - Demo GST invoices are illustrations only: there is no IRN, e-way bill or GSTR filing.

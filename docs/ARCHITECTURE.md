@@ -177,8 +177,9 @@ history and scored with WAPE. Prophet is the incumbent. A challenger, including 
 when its WAPE is more than 10% lower. This rule came from the rolling-origin study: picking the minimum on a
 single short window chased noise. The chosen model is then refitted on all the data.
 
-**Intervals.** The 80% band comes from the empirical 10th-90th percentiles of the chosen model's relative
-back-test errors. Its coverage on the latest fold, using a band estimated on the earlier fold, is reported
+**Intervals.** The 80% band comes from the chosen model's relative back-test errors, taken at split-conformal
+quantile levels: with n errors, the ⌈(n + 1) × 0.9⌉-th smallest and largest. Plain 10th-90th percentiles covered
+only 75.5% of held-out days; the conformal levels cover 80.0%. Its coverage on the latest fold, using a band estimated on the earlier fold, is reported
 alongside the forecast.
 
 **Persistence.** Every forecast request is stored as a `forecast_run` with:

@@ -14,7 +14,7 @@ Generated with `python -m app.evaluation` on the demo dataset: 25 series (total,
 
 - **ERIS auto-selection: 17.3% WAPE** vs 20.2% for the seasonal-naive baseline (14% lower error).
 - Best single model overall: **Prophet** (17.2%).
-- 80% prediction-interval coverage of ERIS auto on the held-out windows: **75.5%** (target 80%).
+- 80% prediction-interval coverage of ERIS auto on the held-out windows: **80.0%** (target 80%).
 - Product-level series are noisier (small daily counts), so their errors are naturally higher than revenue series that aggregate many products.
 
 ## All metrics (mean over series and origins)
@@ -22,10 +22,10 @@ Generated with `python -m app.evaluation` on the demo dataset: 25 series (total,
 | model                              |   wape |   smape |     mae |    rmse |   bias_pct |   seconds |
 |:-----------------------------------|-------:|--------:|--------:|--------:|-----------:|----------:|
 | Seasonal naive                     |  20.18 |   19.86 | 3655.91 | 4946.81 |      -2.7  |      0    |
-| Holt-Winters exponential smoothing |  19.57 |   19.56 | 3746.33 | 4855.68 |      -3.06 |      0.14 |
-| XGBoost                            |  22.03 |   21.07 | 4448.83 | 5732.4  |       3.18 |      0.26 |
-| Prophet                            |  17.16 |   17.41 | 3032.68 | 4024.69 |      -1.82 |      0.2  |
-| ERIS auto-selection                |  17.28 |   17.53 | 3043.93 | 4042.56 |      -1.33 |      1.29 |
+| Holt-Winters exponential smoothing |  19.57 |   19.56 | 3746.33 | 4855.68 |      -3.06 |      0.12 |
+| XGBoost                            |  22.03 |   21.07 | 4448.83 | 5732.4  |       3.18 |      0.25 |
+| Prophet                            |  17.16 |   17.41 | 3032.68 | 4024.69 |      -1.82 |      0.19 |
+| ERIS auto-selection                |  17.28 |   17.53 | 3043.93 | 4042.56 |      -1.33 |      1.25 |
 
 sMAPE is symmetric MAPE; `seconds` is training + inference time per series and origin.
 

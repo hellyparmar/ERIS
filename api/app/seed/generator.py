@@ -16,6 +16,8 @@ See docs/DATASET.md for the full data dictionary.
 """
 from __future__ import annotations
 
+import ctypes
+import gc
 import math
 import time
 from collections import defaultdict
@@ -67,6 +69,7 @@ WEEKDAY_FACTOR = np.array([0.88, 0.86, 0.90, 0.95, 1.06, 1.24, 1.16])  # Mon..Su
 HOUR_WEIGHTS_WEEKDAY = np.array([3, 5, 6, 7, 8, 7, 5, 4, 5, 7, 9, 10, 8, 4], dtype=float)  # 08:00..21:00
 HOUR_WEIGHTS_WEEKEND = np.array([2, 4, 6, 8, 9, 8, 7, 6, 7, 8, 9, 9, 7, 4], dtype=float)
 MIN_DAYS = 90  # price changes, anomalies and churn are placed at least 60 days into the history
+WRITE_BATCH_LINES = 50_000  # bill lines held in memory before they are written
 FUTURE_DAYS = 90  # weather climatology and planned promotions are generated this far ahead (known future inputs)
 PROMO_ELASTICITY = 2.0  # demand multiplier = (1 - discount) ^ -elasticity
 PRICE_ELASTICITY = 1.0
@@ -446,6 +449,13 @@ def generate_demo_data(db: Session, days: int = 730, seed: int = 42, end_date: d
     for cid, o_idx in business_ids:
         business_by_outlet[o_idx].append(cid)
 
+    # bills reference promotions, so the demand-driver tables go in first
+    db.execute(insert(WeatherDaily), weather_rows)
+    db.execute(insert(PriceHistory), price_rows)
+    db.execute(insert(Promotion), promo_rows)
+    if stockout_rows:
+        db.execute(insert(StockoutEvent), stockout_rows)
+
     # --- sales simulation ----------------------------------------------------------------------
     units_sold = np.zeros((n_outlets, n_products, days))
     day_revenue = np.zeros((n_outlets, days))
@@ -610,17 +620,17 @@ def generate_demo_data(db: Session, days: int = 730, seed: int = 42, end_date: d
                     "items_count": qty_total, "status": "completed", "source": "synthetic", "dataset_id": dataset.id,
                     "created_at": sold_at,
                 })
+        if len(item_rows) >= WRITE_BATCH_LINES:  # write whole days in batches to keep memory flat
+            _bulk_insert(db, Sale, sale_rows)
+            _bulk_insert(db, SaleItem, item_rows)
+            sale_rows, item_rows = [], []
         if d_i and d_i % 180 == 0:
             log(f"  simulated {d_i}/{days} days ({time.time() - t0:.1f}s)")
 
-    log(f"  simulated {len(sale_rows):,} bills / {len(item_rows):,} lines ({time.time() - t0:.1f}s)")
-    db.execute(insert(WeatherDaily), weather_rows)
-    db.execute(insert(PriceHistory), price_rows)
-    db.execute(insert(Promotion), promo_rows)
-    if stockout_rows:
-        db.execute(insert(StockoutEvent), stockout_rows)
     _bulk_insert(db, Sale, sale_rows)
     _bulk_insert(db, SaleItem, item_rows)
+    del sale_rows, item_rows
+    log(f"  simulated {sale_id:,} bills / {item_id:,} lines ({time.time() - t0:.1f}s)")
     db.commit()
     log(f"  sales written ({time.time() - t0:.1f}s)")
 
@@ -714,7 +724,7 @@ def generate_demo_data(db: Session, days: int = 730, seed: int = 42, end_date: d
 
     counts = {
         "outlets": len(outlets), "products": n_products, "suppliers": len(suppliers), "customers": len(customer_rows),
-        "sales": len(sale_rows), "sale_items": len(item_rows), "purchase_orders": len(po_rows),
+        "sales": sale_id, "sale_items": item_id, "purchase_orders": len(po_rows),
         "promotions": len(promo_rows), "price_changes": len(price_rows) - n_products,
         "stockout_events": len(stockout_rows), "lost_lines_due_to_stockout": lost_lines,
         "substituted_lines": substituted_lines, "anomaly_labels": len(label_rows), "weather_days": len(weather_rows),
@@ -725,3 +735,12 @@ def generate_demo_data(db: Session, days: int = 730, seed: int = 42, end_date: d
     counts.update(start_date=start_date.isoformat(), end_date=end_date.isoformat(), seconds=round(time.time() - t0, 1))
     log(f"  done: {counts}")
     return counts
+
+
+def release_memory() -> None:
+    """Hand the memory used while generating back to the OS (keeps a small hosted demo within its RAM limit)."""
+    gc.collect()
+    try:
+        ctypes.CDLL("libc.so.6").malloc_trim(0)  # glibc keeps freed memory otherwise
+    except (OSError, AttributeError):  # not glibc (macOS, Windows, musl)
+        pass

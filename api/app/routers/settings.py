@@ -94,13 +94,14 @@ def system_info(_: User = Depends(get_current_user), db: Session = Depends(get_d
 
 def _run_seed() -> None:
     from app.seed.__main__ import seed_kwargs
-    from app.seed.generator import generate_demo_data
+    from app.seed.generator import generate_demo_data, release_memory
     from app.state import set_seeding
 
     set_seeding(True, "Generating demo data...")
     try:
         with SessionLocal() as db:
             generate_demo_data(db, **seed_kwargs(), log=lambda m: set_seeding(True, m.strip()))
+        release_memory()
         F.clear_cache()
         A._CACHE.clear()
         set_seeding(False, "Demo data ready")

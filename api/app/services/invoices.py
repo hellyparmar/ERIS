@@ -57,8 +57,13 @@ def create_invoice(db: Session, sale: Sale, user: User | None, buyer_gstin: str 
         return existing, False
     if sale.status != "completed":
         raise HTTPException(400, "Invoices can only be issued for completed sales")
-    org = db.scalar(select(Organization))
     outlet = sale.outlet
+    # one invoice number at a time per outlet; a second request for the same bill then finds the first invoice
+    db.execute(select(Outlet.id).where(Outlet.id == outlet.id).with_for_update())
+    existing = db.scalar(select(Invoice).where(Invoice.sale_id == sale.id))
+    if existing:
+        return existing, False
+    org = db.scalar(select(Organization))
     cust = sale.customer
     buyer_gstin = (buyer_gstin or (cust.gstin if cust else None) or "").strip().upper() or None
     if buyer_gstin and not is_valid_gstin(buyer_gstin):
