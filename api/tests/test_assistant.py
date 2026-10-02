@@ -93,3 +93,8 @@ def test_history_keeps_provenance(client, admin):
     ask(client, admin, "Compare weekend sales between outlets.")
     last = client.get("/api/assistant/history?limit=2", headers=admin).json()[-1]
     assert last["role"] == "assistant" and last["provenance"]["filters"]
+
+
+@pytest.mark.parametrize("question", ["How is the forecast model chosen?", "How are anomalies detected?"])
+def test_how_it_works_questions_use_documentation(client, admin, question):
+    assert ask(client, admin, question)["intent"] == "knowledge"

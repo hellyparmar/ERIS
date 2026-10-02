@@ -1,0 +1,43 @@
+import { expect, test } from '@playwright/test'
+import { login } from './helpers'
+
+test('viewer is read-only', async ({ page }) => {
+  await login(page, 'viewer')
+  await page.goto('/sales')
+  await expect(page.locator('table')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'New sale' })).toHaveCount(0)
+  await page.goto('/customers')
+  await expect(page.locator('table')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Add customer' })).toHaveCount(0)
+  await expect(page.getByRole('link', { name: 'Data import' })).toHaveCount(0)
+  await expect(page.getByRole('link', { name: 'Audit log' })).toHaveCount(0)
+})
+
+test('area manager can switch between their two outlets only', async ({ page }) => {
+  await login(page, 'areaManager')
+  const picker = page.getByLabel('Outlet filter')
+  await expect(picker.locator('option')).toHaveText(['All my outlets', 'Indiranagar', 'Whitefield'])
+  await picker.selectOption({ label: 'Whitefield' })
+  await page.goto('/outlets')
+  await expect(page.getByRole('heading', { name: 'Whitefield' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Andheri West' })).toHaveCount(0)
+})
+
+test('expired access token is renewed with the refresh token', async ({ page }) => {
+  await login(page, 'manager')
+  await page.evaluate(() => localStorage.setItem('eris-token', 'expired.invalid.token'))
+  await page.goto('/sales')
+  await expect(page.locator('table')).toBeVisible()
+  expect(await page.evaluate(() => localStorage.getItem('eris-token'))).not.toBe('expired.invalid.token')
+})
+
+test('phone layout has no horizontal scrolling', async ({ browser }) => {
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } })
+  await login(page)
+  for (const path of ['/', '/insights', '/reports', '/models', '/invoices', '/import', '/assistant', '/forecasts']) {
+    await page.goto(path)
+    await page.waitForLoadState('networkidle')
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+    expect(overflow, path).toBeLessThanOrEqual(1)
+  }
+})

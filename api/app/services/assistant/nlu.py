@@ -387,6 +387,8 @@ def parse(db: Session, text: str, anchor: date, index: EntityIndex | None = None
         scores["sales_summary"] = 1
     if "stock_status" in scores and "reorder" in scores:
         scores["reorder"] += 1
+    if "knowledge" in scores and re.match(r"^\s*how (is|are|does|do|was|were)\b", t):
+        scores["knowledge"] += 3  # "how are anomalies detected?" asks how ERIS works, not for the anomalies
     if "knowledge" in scores and (p.periods or p.outlet_ids or p.product_ids):
         scores["knowledge"] -= 3  # "what is the margin at Andheri last month" is a data question
 

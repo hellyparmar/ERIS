@@ -1,8 +1,10 @@
+import logging
 import threading
 import time
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import func, select
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from app import clock
@@ -13,6 +15,7 @@ from app.schemas import ChangePasswordIn, LoginIn, ProfileIn, RefreshIn, UserIn,
 from app.security import decode_token, get_current_user, hash_password, require_admin, token_pair, verify_password
 from app.services.audit import audit
 
+log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["auth & users"])
 
 
@@ -57,8 +60,12 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
         _failures.pop(key, None)
     if not user.is_active:
         raise HTTPException(403, "This account has been deactivated")
-    user.last_login_at = clock.now()
-    db.commit()
+    try:
+        user.last_login_at = clock.now()
+        db.commit()
+    except OperationalError:  # e.g. SQLite busy while demo data is being generated - not a reason to refuse sign-in
+        db.rollback()
+        log.warning("could not record last login for %s", user.email)
     return {**token_pair(user), "user": user_dict(user)}
 
 

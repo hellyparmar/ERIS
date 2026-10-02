@@ -216,8 +216,15 @@ def write_report(df: pd.DataFrame, out: Path, db: Session, origins: int, horizon
         "- **WAPE** = Σ|actual − forecast| ÷ Σ actual. Unlike MAPE it is stable when some days have tiny sales.",
         "- **Rolling origin**: origins are spaced one horizon apart, ending at the last day of data, so each "
         "test window is unseen by the model.",
-        "- **Auto-selection** reproduces production exactly: it back-tests candidates on the last 4 weeks of "
-        "its own training data and refits the winner (or an ensemble of the best two).",
+        "- **Auto-selection** reproduces production exactly: it back-tests the candidates on two consecutive "
+        "28-day folds at the end of its own training data, keeps Prophet unless a challenger (including the "
+        "ensemble of the two best models) cuts WAPE by more than 10%, and refits the choice on all training data.",
+        "- **Features**: XGBoost and Prophet use calendar and festival features plus promotions, price index, "
+        "weather and stockouts; planned promotions and climatological weather are known for the test window, "
+        "future stockouts are not (set to zero).",
+        "- **Honest reading**: on this synthetic dataset Prophet is the strongest model and the recursive XGBoost "
+        "model is weaker than the seasonal-naive baseline on aggregate revenue, so auto-selection almost always "
+        "keeps Prophet. XGBoost is kept as a challenger because it can win on individual series.",
     ]
     path = out / "FORECAST_EVALUATION.md"
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
