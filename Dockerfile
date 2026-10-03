@@ -1,6 +1,6 @@
 # ERIS - single image: builds the React app, then serves it together with the FastAPI backend.
 #   docker build -t eris .  &&  docker run -p 8000:8000 -v eris-data:/app/api/data eris
-FROM node:22-alpine AS web
+FROM node:26-alpine AS web
 WORKDIR /web
 COPY web/package.json web/package-lock.json ./
 RUN npm ci --no-audit --no-fund
