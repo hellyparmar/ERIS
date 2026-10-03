@@ -1,0 +1,9 @@
+line-length = 140
+target-version = "py311"
+
+[lint]
+select = ["E", "F", "W", "I", "B"]
+ignore = ["B008"]  # FastAPI's Depends() in defaults
+
+[lint.per-file-ignores]
+"app/services/assistant/nlu.py" = ["E501"]  # long regular expressions read better on one line

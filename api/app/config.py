@@ -1,0 +1,64 @@
+"""Application settings, loaded from environment variables (or an optional .env file)."""
+from functools import lru_cache
+from pathlib import Path
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+API_DIR = Path(__file__).resolve().parent.parent
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=API_DIR / ".env", extra="ignore")
+
+    APP_NAME: str = "ERIS"
+    ENVIRONMENT: str = "development"
+
+    # SQLite by default so the project runs with zero setup.
+    # For PostgreSQL use: postgresql+psycopg2://user:pass@host:5432/eris
+    DATABASE_URL: str = f"sqlite:///{(API_DIR / 'data' / 'eris.db').as_posix()}"
+
+    JWT_SECRET_KEY: str = "dev-only-secret-change-me-in-production-0123456789"
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 14
+
+    CORS_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173"
+    # optional pattern for extra web origins, e.g. Vercel previews: https://my-project-[a-z0-9-]+\.vercel\.app
+    CORS_ORIGIN_REGEX: str | None = None
+
+    # Demo data: generated automatically the first time the API starts on an empty database.
+    SEED_DEMO_DATA: bool = True
+    SEED_DAYS: int = 730  # two years of history
+    SEED_OUTLETS: int = 5  # 1-7 outlets in the demo company
+    SEED_RANDOM_STATE: int = 42
+    SEED_END_DATE: str | None = None  # YYYY-MM-DD; default = yesterday (business time zone)
+    # Start without demo data: the first admin is created from these on an empty database
+    INITIAL_ADMIN_EMAIL: str | None = None
+    INITIAL_ADMIN_PASSWORD: str | None = None
+
+    # Optional local LLM (free, open source) via Ollama: https://ollama.com
+    # The assistant works fully without it (built-in analytics engine);
+    # when available the LLM is used to understand free-form questions and phrase answers.
+    OLLAMA_URL: str = "http://localhost:11434"
+    OLLAMA_MODEL: str = "llama3.2:3b"
+    LLM_ENABLED: bool = True
+    LLM_TIMEOUT_SECONDS: float = 45.0
+
+    # Project documentation the assistant may quote (definitions, how-tos, model and dataset cards)
+    KNOWLEDGE_DIR: str = str(API_DIR.parent / "docs" / "knowledge")
+
+    @property
+    def cors_origins(self) -> list[str]:
+        return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
+
+    @property
+    def is_sqlite(self) -> bool:
+        return self.DATABASE_URL.startswith("sqlite")
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()
+
+
+settings = get_settings()

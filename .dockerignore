@@ -1,0 +1,10 @@
+**/node_modules
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+api/data
+web/dist
+.git
+e2e
+notebooks
+**/test-results

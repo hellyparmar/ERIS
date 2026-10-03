@@ -1,0 +1,376 @@
+series,scope,origin,model,seconds,mae,rmse,mape,smape,wape,bias_pct,chosen,interval_coverage
+Revenue - All outlets,total,2026-07-10,seasonal_naive,0.0,19335.79,26683.74,11.23,10.9,11.58,2.89,,
+Revenue - All outlets,total,2026-07-10,holt_winters,0.41,16705.24,20955.67,9.92,9.91,10.0,0.7,,
+Revenue - All outlets,total,2026-07-10,xgboost,0.3,18185.62,23016.6,10.58,10.6,10.89,0.84,,
+Revenue - All outlets,total,2026-07-10,prophet,0.22,16613.0,23551.33,9.36,10.1,9.95,-6.96,,
+Revenue - All outlets,total,2026-07-10,auto,1.14,16613.0,23551.33,9.36,10.1,9.95,-6.96,prophet,85.7
+Revenue - All outlets,total,2026-08-07,seasonal_naive,0.0,21034.18,26616.77,11.41,11.92,12.0,-4.72,,
+Revenue - All outlets,total,2026-08-07,holt_winters,0.08,26155.16,29707.8,15.2,14.33,14.92,7.45,,
+Revenue - All outlets,total,2026-08-07,xgboost,0.23,23104.25,27240.3,13.65,12.58,13.18,10.76,,
+Revenue - All outlets,total,2026-08-07,prophet,0.18,13169.28,15974.3,7.51,7.26,7.51,3.55,,
+Revenue - All outlets,total,2026-08-07,auto,1.09,13169.28,15974.3,7.51,7.26,7.51,3.55,prophet,85.7
+Revenue - All outlets,total,2026-09-04,seasonal_naive,0.0,24234.89,32739.33,12.24,12.9,12.87,-6.89,,
+Revenue - All outlets,total,2026-09-04,holt_winters,0.09,23072.28,30443.88,11.79,12.34,12.25,-5.43,,
+Revenue - All outlets,total,2026-09-04,xgboost,0.25,38426.95,46604.16,21.99,19.12,20.41,14.83,,
+Revenue - All outlets,total,2026-09-04,prophet,0.19,15693.03,18796.76,8.96,8.54,8.33,3.53,,
+Revenue - All outlets,total,2026-09-04,auto,1.11,15693.03,18796.76,8.96,8.54,8.33,3.53,prophet,75.0
+Revenue - Andheri West,outlet,2026-07-10,seasonal_naive,0.0,8841.3,10483.38,24.36,21.29,21.38,5.81,,
+Revenue - Andheri West,outlet,2026-07-10,holt_winters,0.08,7760.78,9824.95,21.84,18.68,18.77,7.05,,
+Revenue - Andheri West,outlet,2026-07-10,xgboost,0.24,7380.26,9314.46,18.44,18.08,17.85,-1.13,,
+Revenue - Andheri West,outlet,2026-07-10,prophet,0.15,7459.93,8713.94,18.89,18.9,18.04,-4.73,,
+Revenue - Andheri West,outlet,2026-07-10,auto,1.04,7459.93,8713.94,18.89,18.9,18.04,-4.73,prophet,75.0
+Revenue - Andheri West,outlet,2026-08-07,seasonal_naive,0.0,9077.08,11361.63,20.7,20.83,20.59,-6.22,,
+Revenue - Andheri West,outlet,2026-08-07,holt_winters,0.06,10103.12,12140.54,23.89,22.85,22.91,-1.56,,
+Revenue - Andheri West,outlet,2026-08-07,xgboost,0.26,8383.71,10359.95,20.21,18.47,19.01,6.93,,
+Revenue - Andheri West,outlet,2026-08-07,prophet,0.15,7909.44,9550.37,19.29,17.87,17.94,4.37,,
+Revenue - Andheri West,outlet,2026-08-07,auto,1.02,7909.44,9550.37,19.29,17.87,17.94,4.37,prophet,75.0
+Revenue - Andheri West,outlet,2026-09-04,seasonal_naive,0.0,11058.78,14835.08,22.41,22.84,22.89,-8.72,,
+Revenue - Andheri West,outlet,2026-09-04,holt_winters,0.08,9043.43,11448.81,19.27,18.55,18.72,-2.78,,
+Revenue - Andheri West,outlet,2026-09-04,xgboost,0.23,16002.35,20999.48,38.27,28.87,33.13,24.84,,
+Revenue - Andheri West,outlet,2026-09-04,prophet,0.13,9446.39,11780.97,22.66,19.85,19.56,8.86,,
+Revenue - Andheri West,outlet,2026-09-04,auto,1.1,9446.39,11780.97,22.66,19.85,19.56,8.86,prophet,67.9
+Revenue - Koregaon Park,outlet,2026-07-10,seasonal_naive,0.0,8598.58,12455.93,19.32,21.79,22.15,-17.28,,
+Revenue - Koregaon Park,outlet,2026-07-10,holt_winters,0.08,9225.66,13211.33,20.68,24.16,23.77,-21.2,,
+Revenue - Koregaon Park,outlet,2026-07-10,xgboost,0.25,7467.02,10850.43,16.98,18.52,19.24,-11.56,,
+Revenue - Koregaon Park,outlet,2026-07-10,prophet,0.16,9049.07,13007.38,19.99,23.21,23.32,-20.1,,
+Revenue - Koregaon Park,outlet,2026-07-10,auto,1.19,9049.07,13007.38,19.99,23.21,23.32,-20.1,prophet,64.3
+Revenue - Koregaon Park,outlet,2026-08-07,seasonal_naive,0.0,7290.82,10259.04,20.87,19.1,19.14,1.9,,
+Revenue - Koregaon Park,outlet,2026-08-07,holt_winters,0.09,8206.13,9712.52,23.78,22.0,21.55,1.61,,
+Revenue - Koregaon Park,outlet,2026-08-07,xgboost,0.23,8257.07,10079.25,23.01,22.38,21.68,-3.17,,
+Revenue - Koregaon Park,outlet,2026-08-07,prophet,0.16,7116.82,9105.62,19.37,19.12,18.69,-3.05,,
+Revenue - Koregaon Park,outlet,2026-08-07,auto,0.96,7116.82,9105.62,19.37,19.12,18.69,-3.05,prophet,75.0
+Revenue - Koregaon Park,outlet,2026-09-04,seasonal_naive,0.0,6761.1,8572.45,17.6,17.39,17.22,-3.0,,
+Revenue - Koregaon Park,outlet,2026-09-04,holt_winters,0.08,6787.82,8781.5,16.41,17.57,17.29,-10.16,,
+Revenue - Koregaon Park,outlet,2026-09-04,xgboost,0.29,9927.84,12615.81,29.15,23.97,25.28,14.21,,
+Revenue - Koregaon Park,outlet,2026-09-04,prophet,0.17,6021.05,7309.83,17.21,15.88,15.33,3.51,,
+Revenue - Koregaon Park,outlet,2026-09-04,auto,1.17,6021.05,7309.83,17.21,15.88,15.33,3.51,prophet,85.7
+Revenue - Indiranagar,outlet,2026-07-10,seasonal_naive,0.0,9226.39,15161.41,26.9,21.16,26.08,17.91,,
+Revenue - Indiranagar,outlet,2026-07-10,holt_winters,0.1,6010.48,6778.36,19.16,17.19,16.99,10.5,,
+Revenue - Indiranagar,outlet,2026-07-10,xgboost,0.23,8187.14,10101.9,24.09,22.58,23.14,4.67,,
+Revenue - Indiranagar,outlet,2026-07-10,prophet,0.18,5702.41,6542.42,18.51,16.6,16.12,9.04,,
+Revenue - Indiranagar,outlet,2026-07-10,auto,1.02,5702.41,6542.42,18.51,16.6,16.12,9.04,prophet,96.4
+Revenue - Indiranagar,outlet,2026-08-07,seasonal_naive,0.0,7086.23,9497.43,16.84,18.05,17.81,-11.1,,
+Revenue - Indiranagar,outlet,2026-08-07,holt_winters,0.1,5884.95,8303.46,14.6,14.69,14.79,-3.13,,
+Revenue - Indiranagar,outlet,2026-08-07,xgboost,0.25,7541.16,9359.39,18.18,19.59,18.95,-11.74,,
+Revenue - Indiranagar,outlet,2026-08-07,prophet,0.16,5992.92,7868.79,15.36,14.84,15.06,0.06,,
+Revenue - Indiranagar,outlet,2026-08-07,auto,1.12,5992.92,7868.79,15.36,14.84,15.06,0.06,prophet,82.1
+Revenue - Indiranagar,outlet,2026-09-04,seasonal_naive,0.0,8484.8,11199.66,20.35,20.25,19.39,-9.04,,
+Revenue - Indiranagar,outlet,2026-09-04,holt_winters,0.12,7955.73,10936.58,18.75,19.32,18.18,-11.48,,
+Revenue - Indiranagar,outlet,2026-09-04,xgboost,0.27,10796.28,13041.64,27.85,23.74,24.68,9.04,,
+Revenue - Indiranagar,outlet,2026-09-04,prophet,0.18,6119.72,8737.15,16.16,14.66,13.99,-0.06,,
+Revenue - Indiranagar,outlet,2026-09-04,auto,1.26,6119.72,8737.15,16.16,14.66,13.99,-0.06,prophet,82.1
+Revenue - SG Highway,outlet,2026-07-10,seasonal_naive,0.0,8697.41,16331.88,38.51,33.4,37.95,0.86,,
+Revenue - SG Highway,outlet,2026-07-10,holt_winters,0.09,7610.83,15852.31,33.06,29.23,33.21,-1.41,,
+Revenue - SG Highway,outlet,2026-07-10,xgboost,0.26,7573.57,15636.41,31.64,28.28,33.05,0.5,,
+Revenue - SG Highway,outlet,2026-07-10,prophet,0.19,6540.99,16085.77,22.74,23.59,28.54,-15.54,,
+Revenue - SG Highway,outlet,2026-07-10,auto,1.32,6540.99,16085.77,22.74,23.59,28.54,-15.54,prophet,89.3
+Revenue - SG Highway,outlet,2026-08-07,seasonal_naive,0.0,6503.73,8185.99,34.56,29.33,31.59,11.32,,
+Revenue - SG Highway,outlet,2026-08-07,holt_winters,0.08,5676.36,6626.57,31.97,27.0,27.58,12.54,,
+Revenue - SG Highway,outlet,2026-08-07,xgboost,0.27,22323.2,24501.19,123.3,70.17,108.44,108.44,,
+Revenue - SG Highway,outlet,2026-08-07,prophet,0.34,5503.41,6278.32,30.68,26.73,26.74,11.45,,
+Revenue - SG Highway,outlet,2026-08-07,auto,1.25,5503.41,6278.32,30.68,26.73,26.74,11.45,prophet,78.6
+Revenue - SG Highway,outlet,2026-09-04,seasonal_naive,0.0,5729.86,7477.42,22.4,24.46,23.68,-14.91,,
+Revenue - SG Highway,outlet,2026-09-04,holt_winters,0.08,5054.33,6917.38,20.85,21.02,20.89,-4.75,,
+Revenue - SG Highway,outlet,2026-09-04,xgboost,0.24,5532.23,7691.24,20.19,23.78,22.87,-18.68,,
+Revenue - SG Highway,outlet,2026-09-04,prophet,0.17,5315.23,6644.11,23.11,21.8,21.97,0.54,,
+Revenue - SG Highway,outlet,2026-09-04,auto,1.22,5315.23,6644.11,23.11,21.8,21.97,0.54,prophet,85.7
+Revenue - Whitefield,outlet,2026-07-10,seasonal_naive,0.0,5227.78,6674.26,19.88,17.92,18.29,9.12,,
+Revenue - Whitefield,outlet,2026-07-10,holt_winters,0.07,7176.7,8273.61,28.54,24.03,25.11,19.05,,
+Revenue - Whitefield,outlet,2026-07-10,xgboost,0.22,5826.26,7489.26,22.67,20.17,20.38,9.49,,
+Revenue - Whitefield,outlet,2026-07-10,prophet,0.09,5849.57,7791.01,20.63,20.59,20.46,-2.71,,
+Revenue - Whitefield,outlet,2026-07-10,auto,0.43,5849.58,7791.02,20.63,20.59,20.46,-2.71,prophet,85.7
+Revenue - Whitefield,outlet,2026-08-07,seasonal_naive,0.0,7690.36,9746.3,22.46,23.7,23.47,-12.75,,
+Revenue - Whitefield,outlet,2026-08-07,holt_winters,0.04,6722.17,9038.84,18.72,20.24,20.52,-12.28,,
+Revenue - Whitefield,outlet,2026-08-07,xgboost,0.26,8302.41,10729.27,23.21,26.59,25.34,-19.85,,
+Revenue - Whitefield,outlet,2026-08-07,prophet,0.11,7445.38,9478.89,21.01,23.5,22.73,-16.0,,
+Revenue - Whitefield,outlet,2026-08-07,auto,0.72,7445.38,9478.89,21.01,23.5,22.73,-16.0,prophet,71.4
+Revenue - Whitefield,outlet,2026-09-04,seasonal_naive,0.0,8076.02,9403.91,29.48,26.02,24.63,-0.08,,
+Revenue - Whitefield,outlet,2026-09-04,holt_winters,0.1,7986.31,9576.51,28.87,25.35,24.36,-1.08,,
+Revenue - Whitefield,outlet,2026-09-04,xgboost,0.2,7311.32,9104.59,26.07,23.48,22.3,-3.64,,
+Revenue - Whitefield,outlet,2026-09-04,prophet,0.1,9385.28,11762.64,26.83,30.3,28.62,-20.53,,
+Revenue - Whitefield,outlet,2026-09-04,auto,0.74,9385.28,11762.65,26.83,30.3,28.62,-20.53,prophet,67.9
+Revenue - Bakery,category,2026-07-10,seasonal_naive,0.0,1986.25,2601.55,12.39,12.31,12.11,-2.82,,
+Revenue - Bakery,category,2026-07-10,holt_winters,0.09,2269.95,2712.54,14.0,14.41,13.84,-6.58,,
+Revenue - Bakery,category,2026-07-10,xgboost,0.26,2156.89,2688.01,13.87,13.52,13.15,1.14,,
+Revenue - Bakery,category,2026-07-10,prophet,0.16,2149.33,2674.53,13.05,13.9,13.1,-8.26,,
+Revenue - Bakery,category,2026-07-10,auto,1.17,2185.47,2658.01,13.34,13.96,13.32,-7.42,ensemble,75.0
+Revenue - Bakery,category,2026-08-07,seasonal_naive,0.0,2454.34,3335.93,15.25,15.02,14.42,-3.62,,
+Revenue - Bakery,category,2026-08-07,holt_winters,0.11,2347.44,3044.36,14.12,14.27,13.79,-3.49,,
+Revenue - Bakery,category,2026-08-07,xgboost,0.26,2575.32,3128.03,15.01,15.81,15.13,-8.13,,
+Revenue - Bakery,category,2026-08-07,prophet,0.2,2402.32,2869.75,14.08,14.72,14.11,-7.19,,
+Revenue - Bakery,category,2026-08-07,auto,1.3,2402.32,2869.75,14.08,14.72,14.11,-7.19,prophet,78.6
+Revenue - Bakery,category,2026-09-04,seasonal_naive,0.0,2811.81,3914.84,14.31,14.97,15.26,-7.62,,
+Revenue - Bakery,category,2026-09-04,holt_winters,0.09,2706.14,3676.19,13.98,14.56,14.69,-7.09,,
+Revenue - Bakery,category,2026-09-04,xgboost,0.27,3542.3,4261.15,20.99,19.1,19.23,7.1,,
+Revenue - Bakery,category,2026-09-04,prophet,0.22,2557.84,3412.53,14.55,13.92,13.88,0.33,,
+Revenue - Bakery,category,2026-09-04,auto,1.17,2557.84,3412.53,14.55,13.92,13.88,0.33,prophet,78.6
+Revenue - Beverages,category,2026-07-10,seasonal_naive,0.0,2688.32,3207.08,18.84,17.15,17.78,12.83,,
+Revenue - Beverages,category,2026-07-10,holt_winters,0.1,1782.45,2390.14,11.86,11.82,11.79,-0.13,,
+Revenue - Beverages,category,2026-07-10,xgboost,0.26,1835.16,2439.61,12.01,12.22,12.14,-1.77,,
+Revenue - Beverages,category,2026-07-10,prophet,0.16,1795.92,2480.35,11.56,11.9,11.88,-3.06,,
+Revenue - Beverages,category,2026-07-10,auto,1.33,1795.92,2480.35,11.56,11.9,11.88,-3.06,prophet,75.0
+Revenue - Beverages,category,2026-08-07,seasonal_naive,0.0,1878.8,2258.71,12.22,12.5,11.73,-5.58,,
+Revenue - Beverages,category,2026-08-07,holt_winters,0.06,1556.94,1958.94,9.68,10.01,9.72,-5.47,,
+Revenue - Beverages,category,2026-08-07,xgboost,0.27,1634.89,2027.72,9.89,10.58,10.21,-7.75,,
+Revenue - Beverages,category,2026-08-07,prophet,0.2,1172.08,1380.09,7.71,7.61,7.32,-0.41,,
+Revenue - Beverages,category,2026-08-07,auto,1.16,1172.08,1380.09,7.71,7.61,7.32,-0.41,prophet,96.4
+Revenue - Beverages,category,2026-09-04,seasonal_naive,0.0,2758.58,3574.49,14.6,15.75,15.56,-9.71,,
+Revenue - Beverages,category,2026-09-04,holt_winters,0.08,2741.95,3553.29,14.47,15.64,15.46,-9.43,,
+Revenue - Beverages,category,2026-09-04,xgboost,0.24,3256.85,3944.1,19.54,18.15,18.37,4.25,,
+Revenue - Beverages,category,2026-09-04,prophet,0.21,2232.58,2793.79,13.55,13.06,12.59,2.07,,
+Revenue - Beverages,category,2026-09-04,auto,1.22,2232.58,2793.79,13.55,13.06,12.59,2.07,prophet,67.9
+Revenue - Dairy & Eggs,category,2026-07-10,seasonal_naive,0.0,2505.52,3100.69,9.27,8.99,8.82,1.38,,
+Revenue - Dairy & Eggs,category,2026-07-10,holt_winters,0.09,2430.55,2927.16,8.96,8.83,8.55,0.11,,
+Revenue - Dairy & Eggs,category,2026-07-10,xgboost,0.25,2524.3,3159.34,9.19,8.88,8.88,3.72,,
+Revenue - Dairy & Eggs,category,2026-07-10,prophet,0.2,2310.38,2918.42,8.37,8.37,8.13,-1.89,,
+Revenue - Dairy & Eggs,category,2026-07-10,auto,1.19,2310.38,2918.42,8.37,8.37,8.13,-1.89,prophet,78.6
+Revenue - Dairy & Eggs,category,2026-08-07,seasonal_naive,0.0,3882.22,5183.85,11.89,12.72,12.6,-7.75,,
+Revenue - Dairy & Eggs,category,2026-08-07,holt_winters,0.09,3765.68,5315.78,11.29,12.22,12.22,-8.17,,
+Revenue - Dairy & Eggs,category,2026-08-07,xgboost,0.25,3177.29,3923.85,10.06,10.61,10.31,-7.12,,
+Revenue - Dairy & Eggs,category,2026-08-07,prophet,0.26,2404.17,3098.23,7.45,7.64,7.8,-4.01,,
+Revenue - Dairy & Eggs,category,2026-08-07,auto,1.11,2404.17,3098.23,7.45,7.64,7.8,-4.01,prophet,92.9
+Revenue - Dairy & Eggs,category,2026-09-04,seasonal_naive,0.0,4438.9,5574.42,13.72,13.9,13.8,-4.21,,
+Revenue - Dairy & Eggs,category,2026-09-04,holt_winters,0.09,4348.02,5385.48,13.37,13.67,13.52,-4.62,,
+Revenue - Dairy & Eggs,category,2026-09-04,xgboost,0.29,6007.4,6872.91,20.31,18.34,18.68,10.6,,
+Revenue - Dairy & Eggs,category,2026-09-04,prophet,0.24,3238.38,3951.64,11.11,10.48,10.07,3.27,,
+Revenue - Dairy & Eggs,category,2026-09-04,auto,1.28,3238.38,3951.64,11.11,10.48,10.07,3.27,prophet,71.4
+Revenue - Frozen & Ready-to-eat,category,2026-07-10,seasonal_naive,0.0,2502.06,3191.43,19.22,17.7,17.18,3.26,,
+Revenue - Frozen & Ready-to-eat,category,2026-07-10,holt_winters,0.08,2414.79,3160.42,18.89,16.99,16.59,4.86,,
+Revenue - Frozen & Ready-to-eat,category,2026-07-10,xgboost,0.23,2736.49,3430.3,19.99,18.81,18.8,0.73,,
+Revenue - Frozen & Ready-to-eat,category,2026-07-10,prophet,0.18,2551.11,3106.06,18.18,18.1,17.52,-4.87,,
+Revenue - Frozen & Ready-to-eat,category,2026-07-10,auto,1.24,2409.32,3044.02,18.01,17.02,16.55,-0.0,ensemble,60.7
+Revenue - Frozen & Ready-to-eat,category,2026-08-07,seasonal_naive,0.0,2204.54,2914.76,13.7,14.27,14.14,-6.61,,
+Revenue - Frozen & Ready-to-eat,category,2026-08-07,holt_winters,0.09,1850.9,2403.82,11.24,11.8,11.87,-7.1,,
+Revenue - Frozen & Ready-to-eat,category,2026-08-07,xgboost,0.24,2180.66,3065.92,12.91,14.15,13.99,-10.43,,
+Revenue - Frozen & Ready-to-eat,category,2026-08-07,prophet,0.17,1556.32,2147.2,9.97,10.02,9.98,-2.65,,
+Revenue - Frozen & Ready-to-eat,category,2026-08-07,auto,1.16,1556.33,2147.2,9.97,10.02,9.98,-2.65,prophet,92.9
+Revenue - Frozen & Ready-to-eat,category,2026-09-04,seasonal_naive,0.0,3307.27,4147.15,18.85,19.61,19.83,-6.51,,
+Revenue - Frozen & Ready-to-eat,category,2026-09-04,holt_winters,0.08,3193.18,4092.18,17.74,19.08,19.15,-9.04,,
+Revenue - Frozen & Ready-to-eat,category,2026-09-04,xgboost,0.24,4230.4,4924.69,26.67,24.07,25.37,12.39,,
+Revenue - Frozen & Ready-to-eat,category,2026-09-04,prophet,0.19,2854.47,3424.07,16.88,16.95,17.12,-1.94,,
+Revenue - Frozen & Ready-to-eat,category,2026-09-04,auto,1.2,2854.47,3424.07,16.88,16.95,17.12,-1.94,prophet,85.7
+Revenue - Fruits & Vegetables,category,2026-07-10,seasonal_naive,0.0,3481.36,4269.16,20.61,17.83,19.49,18.29,,
+Revenue - Fruits & Vegetables,category,2026-07-10,holt_winters,0.08,2286.05,2955.57,12.27,12.91,12.8,-6.92,,
+Revenue - Fruits & Vegetables,category,2026-07-10,xgboost,0.23,2283.07,3043.91,12.19,12.86,12.78,-7.01,,
+Revenue - Fruits & Vegetables,category,2026-07-10,prophet,0.17,2412.41,3046.1,13.24,13.79,13.5,-3.89,,
+Revenue - Fruits & Vegetables,category,2026-07-10,auto,1.04,2412.41,3046.1,13.24,13.79,13.5,-3.89,prophet,82.1
+Revenue - Fruits & Vegetables,category,2026-08-07,seasonal_naive,0.0,2653.59,3618.53,12.25,13.24,13.65,-8.11,,
+Revenue - Fruits & Vegetables,category,2026-08-07,holt_winters,0.1,2707.05,3786.2,12.54,13.45,13.93,-6.23,,
+Revenue - Fruits & Vegetables,category,2026-08-07,xgboost,0.23,2503.87,3177.02,12.22,12.77,12.88,-5.02,,
+Revenue - Fruits & Vegetables,category,2026-08-07,prophet,0.19,2817.27,3154.51,14.94,14.03,14.49,8.33,,
+Revenue - Fruits & Vegetables,category,2026-08-07,auto,1.16,2817.27,3154.51,14.94,14.03,14.49,8.33,prophet,89.3
+Revenue - Fruits & Vegetables,category,2026-09-04,seasonal_naive,0.0,3165.66,3980.5,15.71,15.75,15.4,-5.42,,
+Revenue - Fruits & Vegetables,category,2026-09-04,holt_winters,0.08,2956.68,3795.66,14.31,14.79,14.39,-7.34,,
+Revenue - Fruits & Vegetables,category,2026-09-04,xgboost,0.27,3590.28,4439.72,19.36,17.2,17.47,7.12,,
+Revenue - Fruits & Vegetables,category,2026-09-04,prophet,0.23,2253.3,2646.44,11.93,11.45,10.96,-0.23,,
+Revenue - Fruits & Vegetables,category,2026-09-04,auto,1.15,2253.3,2646.44,11.93,11.45,10.96,-0.23,prophet,92.9
+Revenue - Snacks & Confectionery,category,2026-07-10,seasonal_naive,0.0,2393.9,2981.94,13.01,12.32,11.68,2.29,,
+Revenue - Snacks & Confectionery,category,2026-07-10,holt_winters,0.08,2451.97,3056.99,13.53,12.57,11.96,3.21,,
+Revenue - Snacks & Confectionery,category,2026-07-10,xgboost,0.23,2650.82,3481.27,14.57,12.98,12.93,7.27,,
+Revenue - Snacks & Confectionery,category,2026-07-10,prophet,0.19,2654.0,3409.96,13.72,14.14,12.95,-6.29,,
+Revenue - Snacks & Confectionery,category,2026-07-10,auto,1.07,2654.0,3409.96,13.72,14.14,12.95,-6.29,prophet,92.9
+Revenue - Snacks & Confectionery,category,2026-08-07,seasonal_naive,0.0,3849.14,6031.94,14.83,16.5,16.96,-9.68,,
+Revenue - Snacks & Confectionery,category,2026-08-07,holt_winters,0.08,4893.34,7287.33,18.18,21.67,21.56,-19.99,,
+Revenue - Snacks & Confectionery,category,2026-08-07,xgboost,0.24,2624.69,3527.13,11.34,11.66,11.57,-4.27,,
+Revenue - Snacks & Confectionery,category,2026-08-07,prophet,0.2,2553.3,3637.74,10.83,11.18,11.25,-5.19,,
+Revenue - Snacks & Confectionery,category,2026-08-07,auto,1.78,3544.74,5149.25,13.72,15.19,15.62,-12.13,ensemble,85.7
+Revenue - Snacks & Confectionery,category,2026-09-04,seasonal_naive,0.0,5266.28,6616.97,20.7,21.37,21.49,-7.39,,
+Revenue - Snacks & Confectionery,category,2026-09-04,holt_winters,0.28,6911.6,8992.14,24.62,29.82,28.2,-27.42,,
+Revenue - Snacks & Confectionery,category,2026-09-04,xgboost,0.31,4497.84,5647.77,21.61,18.93,18.35,9.88,,
+Revenue - Snacks & Confectionery,category,2026-09-04,prophet,0.17,3515.15,4275.32,15.19,14.39,14.34,3.33,,
+Revenue - Snacks & Confectionery,category,2026-09-04,auto,1.48,3515.15,4275.32,15.19,14.39,14.34,3.33,prophet,71.4
+Revenue - Staples & Grains,category,2026-07-10,seasonal_naive,0.0,10653.95,18714.86,25.02,23.63,28.54,-1.88,,
+Revenue - Staples & Grains,category,2026-07-10,holt_winters,0.17,8189.04,16323.73,18.42,18.89,21.94,-2.68,,
+Revenue - Staples & Grains,category,2026-07-10,xgboost,0.28,8693.53,17873.02,18.03,20.81,23.29,-17.07,,
+Revenue - Staples & Grains,category,2026-07-10,prophet,0.16,8658.28,17612.09,17.74,20.93,23.19,-18.43,,
+Revenue - Staples & Grains,category,2026-07-10,auto,1.47,8658.28,17612.09,17.74,20.93,23.19,-18.43,prophet,71.4
+Revenue - Staples & Grains,category,2026-08-07,seasonal_naive,0.0,6954.25,8190.71,20.54,19.0,19.96,7.12,,
+Revenue - Staples & Grains,category,2026-08-07,holt_winters,0.22,22426.16,23853.02,69.19,49.36,64.35,64.35,,
+Revenue - Staples & Grains,category,2026-08-07,xgboost,0.28,23956.21,27270.09,71.32,49.5,68.74,68.74,,
+Revenue - Staples & Grains,category,2026-08-07,prophet,0.17,6241.37,7224.51,19.74,17.45,17.91,14.06,,
+Revenue - Staples & Grains,category,2026-08-07,auto,1.48,6241.37,7224.52,19.74,17.45,17.91,14.06,prophet,75.0
+Revenue - Staples & Grains,category,2026-09-04,seasonal_naive,0.0,7237.77,9135.88,18.47,19.11,18.69,-10.0,,
+Revenue - Staples & Grains,category,2026-09-04,holt_winters,0.14,6471.61,8072.02,17.01,17.05,16.71,-4.12,,
+Revenue - Staples & Grains,category,2026-09-04,xgboost,0.29,6743.83,8250.41,17.7,17.45,17.42,-2.34,,
+Revenue - Staples & Grains,category,2026-09-04,prophet,0.22,6021.5,7369.99,16.94,15.75,15.55,3.66,,
+Revenue - Staples & Grains,category,2026-09-04,auto,1.42,6021.5,7369.99,16.94,15.75,15.55,3.66,prophet,82.1
+Revenue - Sweets & Festive,category,2026-07-10,seasonal_naive,0.0,1143.65,1914.88,109.85,48.93,69.49,37.54,,
+Revenue - Sweets & Festive,category,2026-07-10,holt_winters,0.25,796.02,982.53,80.57,46.44,48.37,32.38,,
+Revenue - Sweets & Festive,category,2026-07-10,xgboost,0.24,871.71,1135.62,69.29,54.37,52.97,2.65,,
+Revenue - Sweets & Festive,category,2026-07-10,prophet,0.17,746.69,931.66,78.42,46.06,45.37,21.33,,
+Revenue - Sweets & Festive,category,2026-07-10,auto,1.19,746.69,931.66,78.42,46.06,45.37,21.33,prophet,82.1
+Revenue - Sweets & Festive,category,2026-08-07,seasonal_naive,0.0,1360.69,1854.34,67.59,60.35,57.17,-30.85,,
+Revenue - Sweets & Festive,category,2026-08-07,holt_winters,0.1,1514.51,1854.55,94.28,67.91,63.64,-9.41,,
+Revenue - Sweets & Festive,category,2026-08-07,xgboost,0.29,980.46,1292.92,53.83,52.74,41.2,-28.71,,
+Revenue - Sweets & Festive,category,2026-08-07,prophet,0.2,1067.45,1330.62,63.25,50.74,44.85,2.98,,
+Revenue - Sweets & Festive,category,2026-08-07,auto,1.24,1067.45,1330.62,63.25,50.74,44.85,2.98,prophet,78.6
+Revenue - Sweets & Festive,category,2026-09-04,seasonal_naive,0.0,1368.37,1830.82,72.06,53.45,51.14,-11.05,,
+Revenue - Sweets & Festive,category,2026-09-04,holt_winters,0.11,1266.51,1690.96,60.83,50.3,47.33,-17.4,,
+Revenue - Sweets & Festive,category,2026-09-04,xgboost,0.26,1354.8,1712.4,71.35,52.72,50.63,1.89,,
+Revenue - Sweets & Festive,category,2026-09-04,prophet,0.15,1180.11,1599.88,52.03,43.04,44.1,-1.41,,
+Revenue - Sweets & Festive,category,2026-09-04,auto,1.49,1133.75,1504.63,57.4,44.19,42.37,0.24,ensemble,82.1
+Revenue - Tea & Coffee,category,2026-07-10,seasonal_naive,0.0,2896.98,3920.42,18.29,19.4,19.06,-7.66,,
+Revenue - Tea & Coffee,category,2026-07-10,holt_winters,0.5,2591.0,3700.06,15.97,16.76,17.04,-8.15,,
+Revenue - Tea & Coffee,category,2026-07-10,xgboost,0.26,4129.51,4953.87,29.09,24.52,27.16,19.52,,
+Revenue - Tea & Coffee,category,2026-07-10,prophet,0.18,2817.09,3970.16,16.87,18.57,18.53,-13.54,,
+Revenue - Tea & Coffee,category,2026-07-10,auto,1.95,2817.09,3970.16,16.87,18.57,18.53,-13.54,prophet,78.6
+Revenue - Tea & Coffee,category,2026-08-07,seasonal_naive,0.0,2636.55,3742.59,14.87,15.71,15.95,-8.02,,
+Revenue - Tea & Coffee,category,2026-08-07,holt_winters,0.13,3594.99,4647.44,20.29,22.13,21.75,-15.67,,
+Revenue - Tea & Coffee,category,2026-08-07,xgboost,0.28,3381.83,4359.33,20.13,19.48,20.46,1.68,,
+Revenue - Tea & Coffee,category,2026-08-07,prophet,0.23,2908.93,3743.72,17.1,17.25,17.6,-5.53,,
+Revenue - Tea & Coffee,category,2026-08-07,auto,1.83,2908.93,3743.72,17.1,17.25,17.6,-5.53,prophet,82.1
+Revenue - Tea & Coffee,category,2026-09-04,seasonal_naive,0.0,2387.47,3041.19,14.24,14.4,14.17,-1.91,,
+Revenue - Tea & Coffee,category,2026-09-04,holt_winters,0.19,3025.27,3584.27,17.22,18.89,17.95,-14.69,,
+Revenue - Tea & Coffee,category,2026-09-04,xgboost,0.25,8645.18,16705.61,50.65,30.96,51.31,45.49,,
+Revenue - Tea & Coffee,category,2026-09-04,prophet,0.22,3721.59,4246.78,24.56,21.19,22.09,18.83,,
+Revenue - Tea & Coffee,category,2026-09-04,auto,1.72,3721.59,4246.78,24.56,21.19,22.09,18.83,prophet,60.7
+Units - Toned Milk 1L,product,2026-07-10,seasonal_naive,0.0,11.39,15.58,9.08,8.85,8.71,-0.63,,
+Units - Toned Milk 1L,product,2026-07-10,holt_winters,0.21,12.53,15.14,9.71,9.81,9.58,-2.21,,
+Units - Toned Milk 1L,product,2026-07-10,xgboost,0.27,17.06,21.04,13.93,12.66,13.04,9.81,,
+Units - Toned Milk 1L,product,2026-07-10,prophet,0.22,16.25,19.99,12.05,12.98,12.42,-9.94,,
+Units - Toned Milk 1L,product,2026-07-10,auto,1.8,17.06,21.04,13.93,12.66,13.05,9.81,xgboost,85.7
+Units - Toned Milk 1L,product,2026-08-07,seasonal_naive,0.0,16.25,20.12,12.39,12.25,12.28,-1.16,,
+Units - Toned Milk 1L,product,2026-08-07,holt_winters,0.19,17.2,20.83,13.39,12.9,13.0,1.19,,
+Units - Toned Milk 1L,product,2026-08-07,xgboost,0.27,13.51,16.09,10.14,10.2,10.21,-1.88,,
+Units - Toned Milk 1L,product,2026-08-07,prophet,0.2,15.39,18.73,12.07,11.86,11.63,-2.62,,
+Units - Toned Milk 1L,product,2026-08-07,auto,1.1,16.25,20.12,12.39,12.25,12.28,-1.16,seasonal_naive,82.1
+Units - Toned Milk 1L,product,2026-09-04,seasonal_naive,0.0,17.98,22.81,13.14,13.24,13.26,-2.42,,
+Units - Toned Milk 1L,product,2026-09-04,holt_winters,0.09,16.83,21.35,12.4,12.37,12.41,-0.62,,
+Units - Toned Milk 1L,product,2026-09-04,xgboost,0.24,24.27,28.85,18.55,17.14,17.9,8.47,,
+Units - Toned Milk 1L,product,2026-09-04,prophet,0.21,19.47,26.21,13.91,14.56,14.36,-3.79,,
+Units - Toned Milk 1L,product,2026-09-04,auto,0.9,17.98,22.81,13.14,13.24,13.26,-2.42,seasonal_naive,75.0
+Units - Packaged Drinking Water 1L,product,2026-07-10,seasonal_naive,0.0,15.04,17.69,25.29,21.24,22.1,19.84,,
+Units - Packaged Drinking Water 1L,product,2026-07-10,holt_winters,0.06,12.04,14.57,19.94,17.38,17.69,13.0,,
+Units - Packaged Drinking Water 1L,product,2026-07-10,xgboost,0.26,10.44,12.96,15.65,15.82,15.34,-5.18,,
+Units - Packaged Drinking Water 1L,product,2026-07-10,prophet,0.17,9.9,12.09,14.78,14.66,14.55,-2.4,,
+Units - Packaged Drinking Water 1L,product,2026-07-10,auto,1.09,9.9,12.09,14.78,14.66,14.55,-2.41,prophet,78.6
+Units - Packaged Drinking Water 1L,product,2026-08-07,seasonal_naive,0.0,13.73,17.42,17.02,18.62,17.53,-13.13,,
+Units - Packaged Drinking Water 1L,product,2026-08-07,holt_winters,0.08,12.38,15.63,15.73,16.29,15.8,-8.71,,
+Units - Packaged Drinking Water 1L,product,2026-08-07,xgboost,0.21,12.82,16.19,15.66,17.04,16.37,-10.63,,
+Units - Packaged Drinking Water 1L,product,2026-08-07,prophet,0.18,11.5,14.69,14.28,15.58,14.68,-11.53,,
+Units - Packaged Drinking Water 1L,product,2026-08-07,auto,1.18,11.5,14.69,14.28,15.58,14.68,-11.53,prophet,82.1
+Units - Packaged Drinking Water 1L,product,2026-09-04,seasonal_naive,0.0,14.04,17.45,16.07,16.76,16.65,-7.12,,
+Units - Packaged Drinking Water 1L,product,2026-09-04,holt_winters,0.08,14.98,18.01,16.78,18.12,17.76,-11.24,,
+Units - Packaged Drinking Water 1L,product,2026-09-04,xgboost,0.27,17.64,21.63,21.83,20.52,20.92,4.63,,
+Units - Packaged Drinking Water 1L,product,2026-09-04,prophet,0.23,11.08,13.57,12.92,13.64,13.14,-6.02,,
+Units - Packaged Drinking Water 1L,product,2026-09-04,auto,1.15,11.08,13.57,12.92,13.64,13.14,-6.02,prophet,89.3
+Units - Whole Wheat Bread 400g,product,2026-07-10,seasonal_naive,0.0,9.48,12.14,14.83,14.68,14.19,-4.49,,
+Units - Whole Wheat Bread 400g,product,2026-07-10,holt_winters,0.1,9.42,11.65,16.38,14.63,14.09,6.5,,
+Units - Whole Wheat Bread 400g,product,2026-07-10,xgboost,0.24,8.48,10.45,14.53,13.18,12.7,5.7,,
+Units - Whole Wheat Bread 400g,product,2026-07-10,prophet,0.17,7.12,10.2,11.31,11.02,10.65,-3.43,,
+Units - Whole Wheat Bread 400g,product,2026-07-10,auto,1.07,7.12,10.2,11.31,11.02,10.65,-3.43,prophet,78.6
+Units - Whole Wheat Bread 400g,product,2026-08-07,seasonal_naive,0.0,13.71,16.95,21.58,20.26,20.37,-0.74,,
+Units - Whole Wheat Bread 400g,product,2026-08-07,holt_winters,0.08,13.67,17.43,19.29,20.94,20.3,-13.69,,
+Units - Whole Wheat Bread 400g,product,2026-08-07,xgboost,0.23,11.69,14.49,17.21,18.1,17.36,-9.36,,
+Units - Whole Wheat Bread 400g,product,2026-08-07,prophet,0.21,12.54,15.37,19.21,19.5,18.62,-6.72,,
+Units - Whole Wheat Bread 400g,product,2026-08-07,auto,1.12,12.54,15.37,19.21,19.5,18.62,-6.72,prophet,71.4
+Units - Whole Wheat Bread 400g,product,2026-09-04,seasonal_naive,0.0,16.84,20.91,20.65,22.0,21.72,-13.17,,
+Units - Whole Wheat Bread 400g,product,2026-09-04,holt_winters,0.09,16.37,20.61,19.56,21.45,21.11,-14.23,,
+Units - Whole Wheat Bread 400g,product,2026-09-04,xgboost,0.26,16.35,20.47,23.21,21.15,21.09,3.47,,
+Units - Whole Wheat Bread 400g,product,2026-09-04,prophet,0.16,13.65,18.35,17.92,18.28,17.6,-5.81,,
+Units - Whole Wheat Bread 400g,product,2026-09-04,auto,1.09,13.65,18.35,17.92,18.28,17.6,-5.81,prophet,71.4
+Units - Tomatoes 1kg,product,2026-07-10,seasonal_naive,0.0,11.57,13.89,22.86,20.47,19.46,4.62,,
+Units - Tomatoes 1kg,product,2026-07-10,holt_winters,0.09,10.66,13.02,21.94,19.05,17.93,5.42,,
+Units - Tomatoes 1kg,product,2026-07-10,xgboost,0.22,9.91,13.03,18.81,17.13,16.66,1.94,,
+Units - Tomatoes 1kg,product,2026-07-10,prophet,0.18,10.74,13.17,21.78,19.18,18.07,3.48,,
+Units - Tomatoes 1kg,product,2026-07-10,auto,1.15,10.74,13.17,21.77,19.18,18.07,3.48,prophet,75.0
+Units - Tomatoes 1kg,product,2026-08-07,seasonal_naive,0.0,12.88,17.78,17.69,19.87,19.07,-11.9,,
+Units - Tomatoes 1kg,product,2026-08-07,holt_winters,0.09,11.51,16.71,14.86,16.52,17.06,-10.65,,
+Units - Tomatoes 1kg,product,2026-08-07,xgboost,0.24,10.92,14.71,15.92,16.99,16.18,-5.26,,
+Units - Tomatoes 1kg,product,2026-08-07,prophet,0.19,8.85,13.12,12.57,12.48,13.11,-1.2,,
+Units - Tomatoes 1kg,product,2026-08-07,auto,1.36,8.85,13.12,12.57,12.48,13.11,-1.2,prophet,92.9
+Units - Tomatoes 1kg,product,2026-09-04,seasonal_naive,0.0,11.89,15.44,16.49,16.71,16.86,-4.3,,
+Units - Tomatoes 1kg,product,2026-09-04,holt_winters,0.18,12.11,15.56,17.04,17.12,17.16,-3.3,,
+Units - Tomatoes 1kg,product,2026-09-04,xgboost,0.23,13.73,16.26,22.23,19.63,19.46,7.84,,
+Units - Tomatoes 1kg,product,2026-09-04,prophet,0.2,11.81,14.94,16.61,16.76,16.74,-1.74,,
+Units - Tomatoes 1kg,product,2026-09-04,auto,1.74,11.81,14.94,16.61,16.76,16.74,-1.74,prophet,85.7
+Units - Salted Butter 100g,product,2026-07-10,seasonal_naive,0.0,10.46,12.3,17.48,17.55,17.18,-4.75,,
+Units - Salted Butter 100g,product,2026-07-10,holt_winters,0.1,12.4,14.16,20.47,21.12,20.37,-8.4,,
+Units - Salted Butter 100g,product,2026-07-10,xgboost,0.31,11.08,13.23,19.0,18.71,18.2,-3.78,,
+Units - Salted Butter 100g,product,2026-07-10,prophet,0.26,11.7,13.79,18.65,20.02,19.21,-11.28,,
+Units - Salted Butter 100g,product,2026-07-10,auto,2.0,11.7,13.79,18.65,20.02,19.21,-11.28,prophet,89.3
+Units - Salted Butter 100g,product,2026-08-07,seasonal_naive,0.0,10.59,15.28,16.97,16.73,16.89,-2.85,,
+Units - Salted Butter 100g,product,2026-08-07,holt_winters,0.08,9.67,13.53,14.87,15.39,15.42,-5.64,,
+Units - Salted Butter 100g,product,2026-08-07,xgboost,0.28,11.88,15.3,19.0,19.63,18.96,-7.72,,
+Units - Salted Butter 100g,product,2026-08-07,prophet,0.24,10.67,14.8,16.15,17.48,17.03,-10.98,,
+Units - Salted Butter 100g,product,2026-08-07,auto,1.46,10.68,14.8,16.15,17.48,17.03,-10.98,prophet,85.7
+Units - Salted Butter 100g,product,2026-09-04,seasonal_naive,0.0,13.95,19.64,19.9,19.96,19.91,-10.5,,
+Units - Salted Butter 100g,product,2026-09-04,holt_winters,0.08,13.32,18.2,19.71,19.06,19.02,-7.93,,
+Units - Salted Butter 100g,product,2026-09-04,xgboost,0.24,16.52,20.16,25.48,23.41,23.59,1.31,,
+Units - Salted Butter 100g,product,2026-09-04,prophet,0.26,14.05,17.69,22.09,20.58,20.06,-2.82,,
+Units - Salted Butter 100g,product,2026-09-04,auto,1.23,14.05,17.69,22.08,20.58,20.06,-2.82,prophet,82.1
+Units - Red Onions 1kg,product,2026-07-10,seasonal_naive,0.0,10.27,13.38,23.71,19.14,18.77,11.49,,
+Units - Red Onions 1kg,product,2026-07-10,holt_winters,0.08,10.51,12.77,23.1,19.15,19.21,14.21,,
+Units - Red Onions 1kg,product,2026-07-10,xgboost,0.27,12.08,14.94,25.81,21.12,22.08,17.38,,
+Units - Red Onions 1kg,product,2026-07-10,prophet,0.16,8.16,10.54,17.82,15.39,14.92,5.98,,
+Units - Red Onions 1kg,product,2026-07-10,auto,1.13,11.03,13.49,23.97,19.73,20.15,15.8,ensemble,82.1
+Units - Red Onions 1kg,product,2026-08-07,seasonal_naive,0.0,13.3,17.94,19.59,22.01,21.01,-13.59,,
+Units - Red Onions 1kg,product,2026-08-07,holt_winters,0.1,14.28,18.58,20.3,23.23,22.55,-17.41,,
+Units - Red Onions 1kg,product,2026-08-07,xgboost,0.22,16.14,21.18,22.52,27.15,25.48,-24.34,,
+Units - Red Onions 1kg,product,2026-08-07,prophet,0.21,12.86,16.44,18.76,20.82,20.3,-13.55,,
+Units - Red Onions 1kg,product,2026-08-07,auto,1.69,12.86,16.44,18.76,20.82,20.3,-13.55,prophet,75.0
+Units - Red Onions 1kg,product,2026-09-04,seasonal_naive,0.0,11.38,14.84,19.62,18.2,17.48,-2.69,,
+Units - Red Onions 1kg,product,2026-09-04,holt_winters,0.26,10.57,13.63,18.28,17.09,16.25,-1.53,,
+Units - Red Onions 1kg,product,2026-09-04,xgboost,0.26,12.25,15.8,23.33,19.16,18.83,14.0,,
+Units - Red Onions 1kg,product,2026-09-04,prophet,0.2,9.85,12.94,17.67,15.47,15.14,5.58,,
+Units - Red Onions 1kg,product,2026-09-04,auto,1.43,9.85,12.94,17.67,15.47,15.14,5.58,prophet,75.0
+Units - Robusta Bananas (dozen),product,2026-07-10,seasonal_naive,0.0,12.55,17.83,24.47,21.05,22.47,5.18,,
+Units - Robusta Bananas (dozen),product,2026-07-10,holt_winters,0.08,10.39,12.85,20.15,18.42,18.6,3.66,,
+Units - Robusta Bananas (dozen),product,2026-07-10,xgboost,0.24,12.87,15.82,24.43,23.18,23.04,-1.49,,
+Units - Robusta Bananas (dozen),product,2026-07-10,prophet,0.15,9.85,12.53,18.83,17.61,17.64,2.04,,
+Units - Robusta Bananas (dozen),product,2026-07-10,auto,1.07,9.85,12.53,18.83,17.61,17.64,2.04,prophet,67.9
+Units - Robusta Bananas (dozen),product,2026-08-07,seasonal_naive,0.0,10.88,13.2,20.81,19.51,18.45,-5.21,,
+Units - Robusta Bananas (dozen),product,2026-08-07,holt_winters,0.1,11.56,14.59,22.45,20.5,19.61,-1.91,,
+Units - Robusta Bananas (dozen),product,2026-08-07,xgboost,0.26,10.93,13.14,19.65,19.51,18.55,-8.67,,
+Units - Robusta Bananas (dozen),product,2026-08-07,prophet,0.16,9.99,12.47,20.35,18.08,16.95,0.88,,
+Units - Robusta Bananas (dozen),product,2026-08-07,auto,1.03,9.99,12.47,20.35,18.08,16.95,0.89,prophet,78.6
+Units - Robusta Bananas (dozen),product,2026-09-04,seasonal_naive,0.0,14.32,17.52,23.72,23.64,22.52,-7.36,,
+Units - Robusta Bananas (dozen),product,2026-09-04,holt_winters,0.08,11.73,15.65,18.89,18.98,18.44,-6.31,,
+Units - Robusta Bananas (dozen),product,2026-09-04,xgboost,0.22,10.62,12.6,18.44,16.86,16.69,3.6,,
+Units - Robusta Bananas (dozen),product,2026-09-04,prophet,0.17,11.3,14.48,20.05,18.25,17.77,4.7,,
+Units - Robusta Bananas (dozen),product,2026-09-04,auto,1.05,11.3,14.49,20.05,18.25,17.77,4.7,prophet,82.1
+Units - Farm Eggs (12),product,2026-07-10,seasonal_naive,0.0,10.77,14.05,21.76,20.05,21.07,1.54,,
+Units - Farm Eggs (12),product,2026-07-10,holt_winters,0.1,7.66,9.09,16.04,15.49,14.99,-1.65,,
+Units - Farm Eggs (12),product,2026-07-10,xgboost,0.24,9.01,11.26,18.98,17.35,17.62,6.06,,
+Units - Farm Eggs (12),product,2026-07-10,prophet,0.16,8.05,9.81,15.88,16.34,15.75,-7.62,,
+Units - Farm Eggs (12),product,2026-07-10,auto,1.33,7.66,9.09,16.04,15.49,14.99,-1.65,holt_winters,85.7
+Units - Farm Eggs (12),product,2026-08-07,seasonal_naive,0.0,9.62,12.64,15.09,16.89,16.27,-13.59,,
+Units - Farm Eggs (12),product,2026-08-07,holt_winters,0.2,10.01,13.2,15.59,17.49,16.93,-14.43,,
+Units - Farm Eggs (12),product,2026-08-07,xgboost,0.25,8.36,10.84,13.83,15.11,14.14,-9.16,,
+Units - Farm Eggs (12),product,2026-08-07,prophet,0.16,7.35,10.01,11.65,12.62,12.42,-9.44,,
+Units - Farm Eggs (12),product,2026-08-07,auto,1.19,8.74,11.25,13.91,15.27,14.78,-11.8,ensemble,85.7
+Units - Farm Eggs (12),product,2026-09-04,seasonal_naive,0.0,10.95,15.91,19.38,17.86,18.02,-2.65,,
+Units - Farm Eggs (12),product,2026-09-04,holt_winters,0.1,9.52,14.77,16.19,15.54,15.68,-6.35,,
+Units - Farm Eggs (12),product,2026-09-04,xgboost,0.25,9.92,13.39,18.96,16.75,16.33,3.79,,
+Units - Farm Eggs (12),product,2026-09-04,prophet,0.18,9.39,14.04,17.52,15.6,15.45,3.66,,
+Units - Farm Eggs (12),product,2026-09-04,auto,1.1,9.39,14.04,17.52,15.6,15.45,3.66,prophet,60.7
+Units - Classic Salted Chips 90g,product,2026-07-10,seasonal_naive,0.0,11.09,13.88,25.5,23.55,22.98,4.74,,
+Units - Classic Salted Chips 90g,product,2026-07-10,holt_winters,0.08,9.98,12.25,23.45,21.42,20.69,1.82,,
+Units - Classic Salted Chips 90g,product,2026-07-10,xgboost,0.25,10.5,13.71,23.95,21.69,21.77,3.24,,
+Units - Classic Salted Chips 90g,product,2026-07-10,prophet,0.19,9.88,12.51,22.92,21.15,20.49,0.51,,
+Units - Classic Salted Chips 90g,product,2026-07-10,auto,1.14,9.88,12.51,22.91,21.15,20.49,0.51,prophet,71.4
+Units - Classic Salted Chips 90g,product,2026-08-07,seasonal_naive,0.0,9.93,12.78,20.23,20.08,18.76,-8.84,,
+Units - Classic Salted Chips 90g,product,2026-08-07,holt_winters,0.1,8.48,11.36,17.15,16.92,16.03,-8.21,,
+Units - Classic Salted Chips 90g,product,2026-08-07,xgboost,0.26,8.79,10.4,17.26,16.63,16.61,-1.38,,
+Units - Classic Salted Chips 90g,product,2026-08-07,prophet,0.18,8.32,10.31,18.01,16.6,15.72,-1.81,,
+Units - Classic Salted Chips 90g,product,2026-08-07,auto,1.1,8.32,10.31,18.01,16.6,15.72,-1.81,prophet,92.9
+Units - Classic Salted Chips 90g,product,2026-09-04,seasonal_naive,0.0,11.68,13.91,21.87,21.94,20.95,-5.06,,
+Units - Classic Salted Chips 90g,product,2026-09-04,holt_winters,0.41,10.76,13.38,18.93,20.05,19.3,-10.81,,
+Units - Classic Salted Chips 90g,product,2026-09-04,xgboost,0.28,10.22,12.73,19.75,19.47,18.34,-2.91,,
+Units - Classic Salted Chips 90g,product,2026-09-04,prophet,0.28,10.48,12.31,18.85,19.17,18.8,-4.66,,
+Units - Classic Salted Chips 90g,product,2026-09-04,auto,1.54,10.48,12.31,18.86,19.17,18.8,-4.66,prophet,85.7
+Units - Fresh Curd 400g,product,2026-07-10,seasonal_naive,0.0,13.55,15.51,34.54,28.29,31.11,24.67,,
+Units - Fresh Curd 400g,product,2026-07-10,holt_winters,0.19,8.8,10.31,22.45,19.98,20.19,10.69,,
+Units - Fresh Curd 400g,product,2026-07-10,xgboost,0.25,8.65,10.31,21.23,19.45,19.85,6.51,,
+Units - Fresh Curd 400g,product,2026-07-10,prophet,0.21,8.34,10.09,20.4,18.79,19.15,6.29,,
+Units - Fresh Curd 400g,product,2026-07-10,auto,1.72,8.34,10.09,20.4,18.79,19.15,6.29,prophet,64.3
+Units - Fresh Curd 400g,product,2026-08-07,seasonal_naive,0.0,11.61,14.69,22.02,23.66,22.98,-13.72,,
+Units - Fresh Curd 400g,product,2026-08-07,holt_winters,0.26,11.01,13.72,20.71,22.38,21.8,-13.45,,
+Units - Fresh Curd 400g,product,2026-08-07,xgboost,0.29,10.29,14.11,18.06,21.16,20.38,-19.73,,
+Units - Fresh Curd 400g,product,2026-08-07,prophet,0.19,8.71,10.82,17.55,17.07,17.25,-1.33,,
+Units - Fresh Curd 400g,product,2026-08-07,auto,1.61,8.71,10.82,17.55,17.07,17.25,-1.33,prophet,85.7
+Units - Fresh Curd 400g,product,2026-09-04,seasonal_naive,0.0,8.32,11.92,14.36,15.14,15.45,-6.23,,
+Units - Fresh Curd 400g,product,2026-09-04,holt_winters,0.21,7.48,9.9,13.28,13.53,13.89,-4.79,,
+Units - Fresh Curd 400g,product,2026-09-04,xgboost,0.25,11.36,14.08,22.93,19.83,21.1,12.76,,
+Units - Fresh Curd 400g,product,2026-09-04,prophet,0.19,7.81,9.92,15.35,14.22,14.51,4.77,,
+Units - Fresh Curd 400g,product,2026-09-04,auto,1.57,7.81,9.92,15.35,14.22,14.51,4.77,prophet,92.9
