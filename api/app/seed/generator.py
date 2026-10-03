@@ -64,6 +64,14 @@ from app.services.holidays import event_window
 
 GENERATOR_VERSION = "3.0.0"
 DEMO_PASSWORDS = {"admin": "Admin@123", "manager": "Manager@123", "staff": "Staff@123", "viewer": "Viewer@123"}
+# Sign-in shortcuts shown on the login page of the demo: (role label, email, password key, what they can see)
+DEMO_LOGINS = [
+    ("Owner / admin", "admin@eris.demo", "admin", "All outlets, settings and users"),
+    ("Outlet manager", "priya.and@eris.demo", "manager", "Andheri West only"),
+    ("Area manager", "arjun.ind@eris.demo", "manager", "Indiranagar + Whitefield"),
+    ("Staff", "staff.andheri@eris.demo", "staff", "Billing & stock lookup"),
+    ("Analyst (viewer)", "analyst@eris.demo", "viewer", "Read-only, all outlets"),
+]
 
 WEEKDAY_FACTOR = np.array([0.88, 0.86, 0.90, 0.95, 1.06, 1.24, 1.16])  # Mon..Sun
 HOUR_WEIGHTS_WEEKDAY = np.array([3, 5, 6, 7, 8, 7, 5, 4, 5, 7, 9, 10, 8, 4], dtype=float)  # 08:00..21:00

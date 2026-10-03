@@ -25,7 +25,7 @@ Every number traces back to the data.
 | **AI assistant** | Answers questions such as *"Why was Outlet 3 revenue lower this week?"*, *"Which items may go out of stock in the next 14 days?"* and *"What forecast model performed best for beverages?"*. It maps each question to a validated intent template (no generated SQL), respects outlet permissions, and shows its data source, filters, timing, model version and caveats. Definition and how-to questions are answered from the project docs by retrieval. Optional local LLM through Ollama. **Grounding check: 27/27 intents and 19/19 answers match independent SQL.** |
 | **Anomalies and drivers** | Robust z-score detection of unusual outlet-days and suspicious bill lines: **precision 0.79, recall 0.73** against the 26 anomalies injected into the data. A "why did revenue change?" analysis splits the change exactly into bills × average bill, then by outlet and category, and estimates the calendar, promotion, stockout and rainfall contributions. |
 | **Data pipeline** | A deterministic generator (seed 42): 2 years of bill lines with seasonality, festivals, weather, promotions, price elasticity, substitutions and stockouts, plus full provenance. CSV import with column mapping, a dry run, duplicate handling, an error report, an atomic commit and import history. |
-| **Engineering** | FastAPI with SQLAlchemy 2 and Alembic on SQLite or PostgreSQL; React 19. JWT access and refresh tokens, 4 roles with application-level outlet scoping, and an automatic audit log. 95 API tests on SQLite and PostgreSQL, 10 Playwright end-to-end tests, and CI. |
+| **Engineering** | FastAPI with SQLAlchemy 2 and Alembic on SQLite or PostgreSQL; React 19. JWT access and refresh tokens, 4 roles with application-level outlet scoping, and an automatic audit log. 96 API tests on SQLite and PostgreSQL, 10 Playwright end-to-end tests, and CI. |
 
 ## Screenshots
 
@@ -132,6 +132,9 @@ with sales (more history gives better accuracy); until then the Forecasts page s
 | Staff | `staff.andheri@eris.demo` | `Staff@123` | Andheri West |
 | Analyst (viewer) | `analyst@eris.demo` | `Viewer@123` | all, read-only |
 
+These are public credentials for the synthetic demo only. The sign-in page lists them (from `/api/auth/demo-accounts`)
+only while the demo accounts exist and still use these passwords, so an install with your own data shows none.
+
 ## Dataset
 
 The demo dataset has:
@@ -211,7 +214,7 @@ TEST_DATABASE_URL=postgresql+psycopg2://eris:eris@localhost:5432/eris_test E2E=1
 
 cd api
 pip install -r requirements-dev.txt -c constraints.txt
-ruff check app tests && pytest -q                       # 95 tests
+ruff check app tests && pytest -q                       # 96 tests
 python -m app.evaluation                                # forecast evaluation   -> docs/FORECAST_EVALUATION.md
 python -m app.assistant_eval                            # assistant grounding   -> docs/ASSISTANT_EVALUATION.md
 

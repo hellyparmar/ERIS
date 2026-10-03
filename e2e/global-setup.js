@@ -7,11 +7,9 @@ export default async function globalSetup(config) {
       const r = await fetch(`${base}/api/health`)
       const h = await r.json()
       if (h.seeding?.running) throw new Error('seeding')
-      const users = await fetch(`${base}/api/auth/login`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: 'admin@eris.demo', password: 'Admin@123' }),
-      })
-      if (users.ok) return
+      // ready once the demo accounts exist (the API lists them for the sign-in page)
+      const accounts = await (await fetch(`${base}/api/auth/demo-accounts`)).json()
+      if (Array.isArray(accounts) && accounts.some((a) => a.email === 'admin@eris.demo')) return
     } catch { /* server still starting */ }
     await new Promise((res) => setTimeout(res, 2000))
   }

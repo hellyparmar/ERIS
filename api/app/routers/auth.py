@@ -43,6 +43,31 @@ def _recent_failures(key: tuple[str, str]) -> list[float]:
         return hits
 
 
+_demo_password_ok: dict[tuple[str, str], bool] = {}  # (email, password hash) -> still the published demo password
+
+
+@router.get("/auth/demo-accounts")
+def demo_accounts(db: Session = Depends(get_db)):
+    """Sign-in shortcuts for the synthetic demo.
+
+    Lists only demo accounts that exist, are active and still use their published demo password, so an install
+    with real data (or a demo whose passwords were changed) shows none."""
+    from app.seed.generator import DEMO_LOGINS, DEMO_PASSWORDS
+
+    users = {u.email: u for u in db.scalars(select(User).where(User.email.in_([d[1] for d in DEMO_LOGINS])))}
+    out = []
+    for label, email, key, note in DEMO_LOGINS:
+        user = users.get(email)
+        if user is None or not user.is_active:
+            continue
+        cache_key = (email, user.password_hash)
+        if cache_key not in _demo_password_ok:  # bcrypt is slow on purpose: check each hash once
+            _demo_password_ok[cache_key] = verify_password(DEMO_PASSWORDS[key], user.password_hash)
+        if _demo_password_ok[cache_key]:
+            out.append({"role": label, "email": email, "password": DEMO_PASSWORDS[key], "note": note})
+    return out
+
+
 @router.post("/auth/login")
 def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
     email = body.email.strip().lower()

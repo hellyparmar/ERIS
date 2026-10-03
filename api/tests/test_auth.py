@@ -68,3 +68,26 @@ def test_viewer_cannot_change_settings_or_stock(client, viewer):
     assert client.put("/api/settings/organization", headers=viewer, json={"name": "X"}).status_code in (403, 405)
     assert client.post("/api/imports/sales", headers=viewer,
                        files={"file": ("s.csv", "date,outlet_code,sku,quantity\n", "text/csv")}).status_code == 403
+
+
+def test_demo_accounts_listed_only_while_they_use_the_published_passwords(client):
+    from app.db import SessionLocal
+    from app.models import User
+    from app.security import hash_password
+
+    accounts = client.get("/api/auth/demo-accounts").json()
+    assert [a["email"] for a in accounts][:2] == ["admin@eris.demo", "priya.and@eris.demo"] and len(accounts) == 5
+    assert all(client.post("/api/auth/login", json={"email": a["email"], "password": a["password"]}).status_code == 200
+               for a in accounts)
+
+    with SessionLocal() as db:  # the analyst changes their password: the shortcut disappears
+        user = db.query(User).filter_by(email="analyst@eris.demo").one()
+        original, user.password_hash = user.password_hash, hash_password("a-private-password")
+        db.commit()
+    try:
+        assert "analyst@eris.demo" not in {a["email"] for a in client.get("/api/auth/demo-accounts").json()}
+    finally:
+        with SessionLocal() as db:
+            db.query(User).filter_by(email="analyst@eris.demo").update({"password_hash": original})
+            db.commit()
+    assert len(client.get("/api/auth/demo-accounts").json()) == 5

@@ -4,14 +4,6 @@ import { Bot, LogIn } from 'lucide-react'
 import { api } from '../lib/api'
 import { useApp } from '../lib/app'
 
-const DEMO = [
-  { role: 'Owner / admin', email: 'admin@eris.demo', password: 'Admin@123', note: 'All outlets, settings and users' },
-  { role: 'Outlet manager', email: 'priya.and@eris.demo', password: 'Manager@123', note: 'Andheri West only' },
-  { role: 'Area manager', email: 'arjun.ind@eris.demo', password: 'Manager@123', note: 'Indiranagar + Whitefield' },
-  { role: 'Staff', email: 'staff.andheri@eris.demo', password: 'Staff@123', note: 'Billing & stock lookup' },
-  { role: 'Analyst (viewer)', email: 'analyst@eris.demo', password: 'Viewer@123', note: 'Read-only, all outlets' },
-]
-
 export default function Login() {
   const { login } = useApp()
   const [email, setEmail] = useState('')
@@ -20,6 +12,9 @@ export default function Login() {
   const [busy, setBusy] = useState(false)
   const health = useQuery({ queryKey: ['health'], queryFn: () => api('/health'), refetchInterval: (q) => (q.state.data?.seeding?.running ? 2000 : false) })
   const seeding = health.data?.seeding
+  // demo sign-in shortcuts come from the API: none on an install with real data
+  const demo = useQuery({ queryKey: ['demo-accounts', Boolean(seeding?.running)], queryFn: () => api('/auth/demo-accounts'), enabled: health.isSuccess })
+  const demoAccounts = demo.data || []
 
   const submit = async (e) => {
     e.preventDefault()
@@ -58,7 +53,7 @@ export default function Login() {
         <form className="login-card" onSubmit={submit}>
           <div>
             <h1>Sign in</h1>
-            <p className="text-2" style={{ marginTop: 4 }}>Use one of the demo accounts or your own login.</p>
+            <p className="text-2" style={{ marginTop: 4 }}>{demoAccounts.length ? 'Use one of the demo accounts or your own login.' : 'Sign in with your ERIS account.'}</p>
           </div>
           {seeding?.running && (
             <div className="alert info"><div className="spinner" style={{ width: 16, height: 16 }} /><div><b>Preparing demo data…</b><p>{seeding.message} This takes about a minute on first start.</p></div></div>
@@ -72,16 +67,16 @@ export default function Login() {
           </label>
           {error && <div className="alert critical"><div><b>{error}</b></div></div>}
           <button className="btn primary" disabled={busy} style={{ height: 40 }}><LogIn />{busy ? 'Signing in…' : 'Sign in'}</button>
-          <div className="stack demo-accounts" style={{ gap: 6, marginTop: 6 }}>
+          {demoAccounts.length > 0 && <div className="stack demo-accounts" style={{ gap: 6, marginTop: 6 }}>
             <span className="small muted">Demo accounts (click to fill)</span>
-            {DEMO.map((d) => (
+            {demoAccounts.map((d) => (
               <button type="button" key={d.email} className="btn" style={{ height: 'auto', padding: '8px 10px', justifyContent: 'space-between' }}
                 onClick={() => { setEmail(d.email); setPassword(d.password) }}>
                 <span><b>{d.role}</b><br /><span className="small muted">{d.email}</span></span>
                 <span className="small muted">{d.note}</span>
               </button>
             ))}
-          </div>
+          </div>}
         </form>
       </section>
     </div>
