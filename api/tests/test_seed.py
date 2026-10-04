@@ -6,7 +6,7 @@ from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import sessionmaker
 
 from app.db import Base
-from app.models import AnomalyLabel, DatasetInfo, Outlet, Sale
+from app.models import AnomalyLabel, DatasetInfo, ForecastRun, Outlet, Sale
 from app.seed.generator import generate_demo_data
 from app.seed.refresh import shift_demo_dates
 
@@ -41,10 +41,15 @@ def test_fixed_end_date_is_not_shifted_but_rolling_demo_is(small_db):
     ds = small_db.scalar(select(DatasetInfo))
     ds.parameters = {**ds.parameters, "fixed_end_date": False}
     small_db.commit()
+    old_latest = small_db.scalar(select(func.max(Sale.sale_date)))
+    small_db.add(ForecastRun(scope="total", target="revenue", series_label="Revenue", horizon=30, data_end=old_latest,
+                             model_version="test"))  # a saved forecast moves with the data, so it can be reused
+    small_db.commit()
     shifted = shift_demo_dates(small_db)
     assert shifted > 0 and shifted % 7 == 0  # whole weeks keep weekday patterns aligned
     latest = small_db.scalar(select(func.max(Sale.sale_date)))
     assert date.today() - timedelta(days=8) <= latest <= date.today()
+    assert small_db.scalar(select(ForecastRun.data_end)) == latest
 
 
 def test_generator_rejects_too_short_history(small_db):

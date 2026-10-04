@@ -80,16 +80,24 @@ jobs:
 
   docker:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v6
+      # the build also prepares the demo database (data, forecasts, page answers): a few minutes
       - run: docker build -t eris .
-      # the image must start, create its schema and answer on $PORT (demo generation is skipped to keep CI fast)
+      # the image must start fast with the demo ready: sign in and get the dashboard from the prepared answers
       - run: |
-          docker run -d --name eris -p 8080:8080 -e PORT=8080 -e SEED_DEMO_DATA=false \
+          docker run -d --name eris -p 8080:8080 -e PORT=8080 \
             -e JWT_SECRET_KEY=ci-only-secret-0123456789-0123456789-abcdef eris
-          for i in $(seq 60); do curl -fs http://localhost:8080/api/health && exit 0; sleep 2; done
-          docker logs eris; exit 1
+          for i in $(seq 60); do curl -fs http://localhost:8080/api/health && break; sleep 2; done
+          token=$(curl -fs http://localhost:8080/api/auth/login -H 'content-type: application/json' \
+            -d '{"email":"admin@eris.demo","password":"Admin@123"}' | python3 -c "import sys,json;print(json.load(sys.stdin)['access_token'])")
+          curl -fsS -D headers.txt -o dashboard.json -H "Authorization: Bearer $token" "http://localhost:8080/api/dashboard?period=30d"
+          grep -i "x-cache: hit" headers.txt
+          python3 -c "import json;d=json.load(open('dashboard.json'));assert d['kpis']['current']['orders']>1000, d['kpis']"
+          curl -fs http://localhost:8080/ | grep -q '<div id="root">'
+      - if: failure()
+        run: docker logs eris
 
   e2e:
     runs-on: ubuntu-latest

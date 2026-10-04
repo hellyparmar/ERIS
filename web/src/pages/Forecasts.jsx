@@ -146,10 +146,10 @@ function Result({ fc, showBacktest, setShowBacktest }) {
           )}
         </div>
       </div>
-      <div className="grid grid-2">
-        <Card title="Model leaderboard" subtitle={`Back-tested on the last ${fc.test_days} days (lower error is better)`} flush>
+      <div className="grid grid-3">
+        <Card title="Model leaderboard" subtitle={`Back-tested on the last ${fc.test_days} days (lower error is better)`} flush className="span-2">
           <DataTable rows={[...fc.evaluation].sort((a, b) => (a.wape ?? 999) - (b.wape ?? 999))} sortable={false} columns={[
-            { key: 'label', label: 'Model', render: (r) => <><b>{r.label}</b> {r.selected && <Badge tone="good">used</Badge>}{r.error && <div className="small down">failed: {r.error}</div>}</> },
+            { key: 'label', label: 'Model', render: (r) => <span title={r.label}><b>{r.label.split(' (')[0]}</b> {r.selected && <Badge tone="good">used</Badge>}{r.error && <div className="small down">failed: {r.error}</div>}</span> },
             { key: 'wape', label: 'WAPE', align: 'right', render: (r) => (r.wape != null ? `${r.wape}%` : '-') },
             { key: 'smape', label: 'sMAPE', align: 'right', render: (r) => (r.smape != null ? `${r.smape}%` : '-') },
             { key: 'mae', label: 'MAE', align: 'right', render: (r) => (r.mae != null ? formatValue(r.mae, fmt) : '-') },
@@ -162,10 +162,10 @@ function Result({ fc, showBacktest, setShowBacktest }) {
             Run {fc.run_id ? <Link to={`/models?run=${fc.run_id}`}>#{fc.run_id}</Link> : '(not saved)'} · model version {fc.model_version} · trained on {fc.data_range ? `${date(fc.data_range.start)} – ${date(fc.data_range.end)} (${fc.data_range.days} days)` : '-'} · {fc.features?.length || 0} features
           </p>
         </Card>
-        <Card title="Daily forecast" flush>
-          <DataTable maxHeight={360} rows={fc.forecast} sortable={false} columns={[
+        <Card title="Daily forecast" subtitle="With the 80% range" flush>
+          <DataTable maxHeight={430} rows={fc.forecast} sortable={false} columns={[
             { key: 'date', label: 'Date', render: (r) => date(r.date, { weekday: 'short', day: 'numeric', month: 'short' }) },
-            { key: 'yhat', label: 'Forecast', format: fmt }, { key: 'lower', label: 'Low (80%)', format: fmt }, { key: 'upper', label: 'High (80%)', format: fmt },
+            { key: 'yhat', label: 'Forecast', format: fmt }, { key: 'lower', label: 'Low', format: fmt }, { key: 'upper', label: 'High', format: fmt },
           ]} />
         </Card>
       </div>

@@ -79,13 +79,13 @@ MODEL_LABELS = {
 
 
 def available_models() -> list[str]:
+    """Installed candidate models (checked without importing them: Prophet alone takes seconds to load)."""
+    from importlib.util import find_spec
+
     models = ["seasonal_naive"]
     for name, module in (("holt_winters", "statsmodels"), ("xgboost", "xgboost"), ("prophet", "prophet")):
-        try:
-            __import__(module)
+        if find_spec(module) is not None:
             models.append(name)
-        except ImportError:
-            pass
     return models
 
 
@@ -363,8 +363,73 @@ def run_forecast(series: pd.Series, horizon: int, model: str = "auto", exog: pd.
             "final_fit_seconds": inference_seconds}
 
 
+def _fingerprint(series: pd.Series) -> str:
+    """Identifies the input series by its values (not its dates: the demo's dates move forward over time)."""
+    import hashlib
+
+    digest = hashlib.sha1(np.round(series.values.astype(float), 2).tobytes()).hexdigest()[:24]
+    return f"{len(series)}:{digest}"
+
+
+def _core(result: dict, requested: str) -> dict:
+    """The date-free part of a model result: enough to answer the same request again without refitting."""
+    return {"requested": requested, "model": result["model"], "model_label": result["model_label"],
+            "evaluation": result["evaluation"], "test_days": result["test_days"], "folds": result["folds"],
+            "ensemble_members": result.get("ensemble_members"), "final_fit_seconds": result.get("final_fit_seconds"),
+            "yhat": [f["yhat"] for f in result["forecast"]], "lower": [f["lower"] for f in result["forecast"]],
+            "upper": [f["upper"] for f in result["forecast"]], "backtest": [b["predicted"] for b in result["backtest"]]}
+
+
+def _reuse(db: Session, spec: SeriesSpec, series: pd.Series, horizon: int, model: str) -> dict | None:
+    """A saved run for the same series, data and model choice that covers the horizon, rebuilt as a result."""
+    fp = _fingerprint(series)
+    end = series.index[-1].date()
+    wanted_outlets = sorted(spec.outlet_ids) if spec.outlet_ids else None
+    runs = db.scalars(select(ForecastRun).where(
+        ForecastRun.scope == spec.scope, ForecastRun.target == spec.target, ForecastRun.data_end == end,
+        ForecastRun.fingerprint == fp, ForecastRun.status == "ok", ForecastRun.model_version == MODEL_VERSION,
+        ForecastRun.horizon >= horizon, ForecastRun.category_id.is_(spec.category_id) if spec.category_id is None
+        else ForecastRun.category_id == spec.category_id,
+        ForecastRun.product_id.is_(None) if spec.product_id is None else ForecastRun.product_id == spec.product_id,
+    ).order_by(ForecastRun.id.desc()).limit(20)).all()
+    for run in runs:
+        core = run.core or {}
+        have_outlets = sorted(run.outlet_ids) if run.outlet_ids else None
+        if core.get("requested") != model or have_outlets != wanted_outlets:
+            continue
+        idx = pd.date_range(series.index[-1] + pd.Timedelta(days=1), periods=horizon, freq="D")
+        forecast = [{"date": d.date().isoformat(), "yhat": y, "lower": lo, "upper": up}
+                    for d, y, lo, up in zip(idx, core["yhat"], core["lower"], core["upper"], strict=False)]
+        pred = core["backtest"]
+        test = series.iloc[-len(pred):] if pred else series.iloc[:0]
+        backtest = [{"date": d.date().isoformat(), "actual": round(float(a), 2), "predicted": p}
+                    for d, a, p in zip(test.index, test.values, pred, strict=False)]
+        return {"model": core["model"], "model_label": core["model_label"], "evaluation": core["evaluation"],
+                "forecast": forecast, "backtest": backtest, "test_days": core["test_days"], "folds": core["folds"],
+                "ensemble_members": core.get("ensemble_members"), "final_fit_seconds": core.get("final_fit_seconds"),
+                "run_id": run.id if run.run_type == "forecast" else None, "cache_run_id": run.id, "reused": True}
+    return None
+
+
+def _promote(run_id: int, user_id: int | None) -> int | None:
+    """A hidden cache run requested from the Forecasts page becomes a visible run in the history."""
+    try:
+        with write_session() as wdb:
+            run = wdb.get(ForecastRun, run_id)
+            if run is None:
+                return None
+            run.run_type = "forecast"
+            run.created_by = run.created_by or user_id
+            wdb.commit()
+            return run_id
+    except Exception:
+        log.exception("could not record the forecast run")
+        return None
+
+
 def _persist(spec: SeriesSpec, series: pd.Series | None, horizon: int, result: dict | None,
-             error: str | None, seconds: float, user_id: int | None, run_type: str = "forecast") -> int | None:
+             error: str | None, seconds: float, user_id: int | None, run_type: str = "forecast",
+             requested: str = "auto") -> int | None:
     try:
         run = ForecastRun(
             run_type=run_type, scope=spec.scope, target=spec.target, series_label=spec.label,
@@ -378,7 +443,9 @@ def _persist(spec: SeriesSpec, series: pd.Series | None, horizon: int, result: d
                         "interval": "split-conformal 80% band from relative back-test errors",
                         "ensemble_members": result.get("ensemble_members") if result else None},
             metrics=result["evaluation"] if result else None, status="ok" if result else "failed",
-            error=error, duration_seconds=round(seconds, 2), created_by=user_id)
+            error=error, duration_seconds=round(seconds, 2), created_by=user_id,
+            core=_core(result, requested) if result else None,
+            fingerprint=_fingerprint(series) if result and series is not None else None)
         if result:
             run.results = [ForecastResult(day=date.fromisoformat(f["date"]), yhat=f["yhat"], lower=f["lower"],
                                           upper=f["upper"]) for f in result["forecast"]]
@@ -408,15 +475,25 @@ def forecast_series(db: Session, spec: SeriesSpec, horizon: int = 30, model: str
     series = None
     try:
         series = load_series(db, spec, end)
-        exog = load_exog(db, spec, series, horizon)
-        result = run_forecast(series, horizon, model, exog)
+        result = _reuse(db, spec, series, horizon, model) if len(series) else None
+        if result is not None and persist and result.get("run_id") is None:
+            result["run_id"] = _promote(result["cache_run_id"], user_id)
+        if result is not None:
+            result.pop("cache_run_id", None)
+        if result is None:
+            exog = load_exog(db, spec, series, horizon)
+            result = run_forecast(series, horizon, model, exog)
+            # history runs show in Model comparison; "cache" runs only let the next identical request skip fitting
+            result["run_id"] = _persist(spec, series, horizon, result, None, time.time() - t0, user_id,
+                                        run_type="forecast" if persist else "cache", requested=model)
+            if not persist:
+                result["run_id"] = None
     except ValueError as exc:
         if persist:
             _persist(spec, series, horizon, None, str(exc), time.time() - t0, user_id)
         with _cache_lock:
             _cache[key] = (time.time(), exc)
         raise
-    result["run_id"] = _persist(spec, series, horizon, result, None, time.time() - t0, user_id) if persist else None
     result["model_version"] = MODEL_VERSION
     result["data_range"] = {"start": series.index[0].date().isoformat(), "end": series.index[-1].date().isoformat(),
                             "days": len(series)}

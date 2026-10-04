@@ -91,6 +91,7 @@ class Ctx:
                 db.scalars(select(Outlet.name).where(Outlet.id.in_(self.outlet_ids))).all()))
 
         self.used_periods: list[tuple[A.DateRange, str]] = []
+        self.fallback: tuple[str, str, date] | None = None  # (period asked for, period answered, last data day)
 
     def period(self, default_days: int = 30) -> tuple[A.DateRange, str]:
         if self.parsed.period:
@@ -103,9 +104,19 @@ class Ctx:
 
     def clip(self, rng: A.DateRange, label: str) -> tuple[A.DateRange, str]:
         """Periods that run past the last day with sales data (e.g. "this week" when today has no bills yet)
-        end on that day instead, so partial or empty days do not distort comparisons."""
+        end on that day instead, so partial or empty days do not distort comparisons. A period that lies entirely
+        after the data (e.g. "this week" on a Monday morning, before any bill) becomes the latest period of the
+        same length (at least a week, or the latest day for "today") - the answer says so (self.fallback)."""
         if rng.start <= self.anchor < rng.end:
             return A.DateRange(rng.start, self.anchor), label
+        latest = A.latest_sale_date(self.db)
+        if latest and rng.start > latest:
+            days = 1 if label == "today" else max(rng.days, 7)
+            new = A.DateRange(latest - timedelta(days=days - 1), latest)
+            new_label = f"{latest:%a %d %b} (the latest day with data)" if days == 1 else \
+                f"the latest {days} days ({new.start:%d %b} to {new.end:%d %b})"
+            self.fallback = (label, new_label, latest)
+            return new, new_label
         return rng, label
 
     def use(self, rng: A.DateRange, label: str) -> None:
@@ -185,6 +196,10 @@ def business_overview(c: Ctx) -> dict:
 
 def sales_summary(c: Ctx) -> dict:
     rng, label = c.period(30)
+    return _sales_summary(c, rng, label)
+
+
+def _sales_summary(c: Ctx, rng: A.DateRange, label: str) -> dict:
     p = c.parsed
     if p.product_ids:
         return product_performance(c, rng, label)

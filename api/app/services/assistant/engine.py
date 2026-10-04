@@ -238,6 +238,10 @@ def answer(db: Session, user: User, message: str) -> dict:
         except Exception:
             log.exception("assistant tool %s failed", parsed.intent)
             out = result("Sorry - something went wrong while analysing that. Please try rephrasing the question.")
+    if ctx is not None and ctx.fallback:  # the period asked for has no data yet: say which one was answered
+        asked, answered, latest = ctx.fallback
+        out["answer"] = (f"No sales are recorded for **{asked}** yet - the data runs to **{latest:%a %d %b}**, so this "
+                         f"answer covers **{answered}**.\n\n") + out["answer"]
     ms = (time.perf_counter() - t0) * 1000
     provenance = _provenance(db, parsed, ctx, out, ms, engine)
 

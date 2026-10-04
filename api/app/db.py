@@ -68,6 +68,11 @@ _write_engine = engine.execution_options(sqlite_immediate=True)
 READ_MOSTLY_POSTS = {"/api/auth/login", "/api/auth/refresh", "/api/assistant/chat"}
 
 
+def write_engine():
+    """Engine whose transactions take SQLite's write lock up front (BEGIN IMMEDIATE)."""
+    return _write_engine
+
+
 def write_session() -> Session:
     """A separate short write transaction for a request that otherwise only reads (e.g. saving a forecast run).
 

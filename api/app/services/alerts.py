@@ -1,7 +1,7 @@
 """Business alerts computed live from the data (nothing to configure or keep in sync)."""
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import date, timedelta
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -10,6 +10,12 @@ from app import clock
 from app.models import OPEN_PO_STATUSES, InventoryItem, Outlet, Product, PurchaseOrder
 from app.services import analytics as A
 from app.services.holidays import upcoming_events
+
+
+def _day(value) -> str:
+    """'2026-09-29' -> 'Tue 29 Sep' (alerts are read, not parsed)."""
+    d = date.fromisoformat(str(value)[:10])
+    return f"{d:%a} {d.day} {d:%b}"
 
 
 def compute_alerts(db: Session, outlet_ids: list[int] | None = None) -> list[dict]:
@@ -73,8 +79,8 @@ def compute_alerts(db: Session, outlet_ids: list[int] | None = None) -> list[dic
         alerts.append({"id": f"anomaly-{a['outlet_id']}-{a['day']}",
                        "severity": "critical" if a["severity"] == "critical" else "warning", "type": "anomaly",
                        "title": f"Unusual {'drop' if a['direction'] == 'down' else 'spike'} at {a['outlet']} on "
-                                f"{a['day']}: {a['change_pct']:+.0f}%" if a["change_pct"] is not None else
-                                f"Unusual day at {a['outlet']} on {a['day']}",
+                                f"{_day(a['day'])}: {a['change_pct']:+.0f}%" if a["change_pct"] is not None else
+                                f"Unusual day at {a['outlet']} on {_day(a['day'])}",
                        "message": AN.explain(db, a), "link": "/insights"})
     lines = AN.suspicious_lines(db, anchor - timedelta(days=13), anchor, outlet_ids)
     if lines:

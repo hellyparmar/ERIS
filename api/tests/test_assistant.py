@@ -117,7 +117,7 @@ def test_explicit_dates_and_like_for_like_baseline(client, admin):
     week = ask(client, admin, "sales this week")
     assert "a week earlier" in week["provenance"]["filters"]["periods"][1]
     future = ask(client, admin, "sales between 2030-01-01 and 2030-01-31")
-    assert "outside the recorded data" in " ".join(future["provenance"]["notes"])
+    assert "No sales are recorded for" in future["answer"] and "latest 31 days" in future["answer"]  # same length
 
 
 def test_read_only_assistant_changes_nothing(client, admin):
@@ -127,3 +127,10 @@ def test_read_only_assistant_changes_nothing(client, admin):
     assert "never create, change or delete" in body["answer"]
     with SessionLocal() as db:
         assert db.query(Sale).count() == before
+
+
+def test_period_after_the_latest_data_answers_for_the_latest_week(client, admin):
+    r = ask(client, admin, "What were the sales on 1 January 2099?")
+    assert r["intent"] == "sales_summary"
+    assert "No sales are recorded for" in r["answer"] and "latest 7 days" in r["answer"]
+    assert "revenue was" in r["answer"]

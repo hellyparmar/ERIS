@@ -19,10 +19,11 @@ export function Card({ title, subtitle, actions, children, className = '', flush
   )
 }
 
-export function PageHead({ title, subtitle, children }) {
+export function PageHead({ title, subtitle, children, eyebrow }) {
   return (
     <div className="page-head">
       <div>
+        {eyebrow && <div className="eyebrow">{eyebrow}</div>}
         <h1>{title}</h1>
         {subtitle && <p>{subtitle}</p>}
       </div>
@@ -43,12 +44,17 @@ export function Delta({ value, inverse = false, suffix = '' }) {
   )
 }
 
-export function Kpi({ label, value, change, hint, icon: Icon, loading }) {
+/** KPI tile: tinted icon chip, headline value, change pill and an optional sparkline (any React node). */
+export function Kpi({ label, value, change, hint, icon: Icon, loading, tone = '', spark, inverse = false }) {
   return (
     <div className="card kpi">
-      <div className="kpi-label">{Icon && <Icon size={16} aria-hidden="true" />}{label}</div>
+      <div className="kpi-top">
+        <div className="kpi-label">{Icon && <span className={`kpi-icon ${tone}`}><Icon aria-hidden="true" /></span>}{label}</div>
+        {change !== undefined && <Delta value={change} inverse={inverse} />}
+      </div>
       {loading ? <div className="skeleton" style={{ height: 32, width: '70%' }} /> : <div className="kpi-value">{value}</div>}
-      <div className="kpi-foot">{change !== undefined && <Delta value={change} />}{hint && <span>{hint}</span>}</div>
+      {hint && <div className="kpi-foot">{hint}</div>}
+      {spark && <div className="kpi-spark">{spark}</div>}
     </div>
   )
 }
@@ -69,18 +75,47 @@ export function Badge({ tone = '', children }) {
   return <span className={`badge ${tone}`}>{children}</span>
 }
 
+/** Loading state. After a few seconds it explains why: a free hosted server sleeps and needs ~a minute to wake. */
 export function Spinner({ label }) {
-  return <div className="center"><div className="row"><div className="spinner" />{label && <span className="muted">{label}</span>}</div></div>
+  const [slow, setSlow] = useState(false)
+  useEffect(() => {
+    const t = setTimeout(() => setSlow(true), 6000)
+    return () => clearTimeout(t)
+  }, [])
+  return (
+    <div className="center">
+      <div className="loading">
+        <div className="row"><div className="spinner" />{label && <span className="muted">{label}</span>}</div>
+        {slow && <div className="hint">Still working… the first request after a quiet period can take up to a minute while the server wakes up.</div>}
+      </div>
+    </div>
+  )
 }
 
 export function Empty({ title = 'Nothing here yet', children, icon: Icon = Inbox }) {
-  return <div className="empty"><Icon aria-hidden="true" /><b>{title}</b>{children && <div className="small">{children}</div>}</div>
+  return (
+    <div className="empty">
+      <span className="empty-icon"><Icon aria-hidden="true" /></span>
+      <b>{title}</b>
+      {children && <div className="small">{children}</div>}
+    </div>
+  )
+}
+
+/** Placeholder grid shown while a page's first data loads. */
+export function SkeletonGrid({ cards = 4, rows = 2 }) {
+  return (
+    <>
+      <div className="grid grid-4">{Array.from({ length: cards }, (_, i) => <div key={i} className="skeleton skeleton-card" />)}</div>
+      {Array.from({ length: rows }, (_, i) => <div key={i} className="skeleton" style={{ height: 300, borderRadius: 16 }} />)}
+    </>
+  )
 }
 
 export function ErrorState({ error, onRetry }) {
   return (
     <div className="empty">
-      <XCircle aria-hidden="true" />
+      <span className="empty-icon" style={{ background: 'var(--bad-soft)', color: 'var(--bad-ink)' }}><XCircle aria-hidden="true" /></span>
       <b>Could not load this data</b>
       <div className="small">{error?.message}</div>
       {onRetry && <button className="btn sm" onClick={onRetry}>Try again</button>}

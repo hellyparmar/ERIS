@@ -11,7 +11,7 @@ reproducible synthetic dataset. (Python, FastAPI, React, Prophet, XGBoost.)
 
 - Built **ERIS**, an open-source retail analytics platform (FastAPI, SQLAlchemy/Alembic, PostgreSQL or SQLite,
   React) for a 5-outlet chain. It has 17 working pages, 4 roles with outlet-level access control,
-  refresh-token auth and an automatic audit trail. Verified by 96 API tests on SQLite and PostgreSQL and 10
+  refresh-token auth and an automatic audit trail. Verified by 105 API tests on SQLite and PostgreSQL and 11
   Playwright end-to-end tests in CI.
 - Designed a **deterministic synthetic data generator**: 2 years, about 216K bills and 789K line items. It
   models seasonality, Indian festivals, weather, promotion and price elasticity, stockouts with substitution,
