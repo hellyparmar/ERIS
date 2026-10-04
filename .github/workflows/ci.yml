@@ -90,8 +90,11 @@ jobs:
           docker run -d --name eris -p 8080:8080 -e PORT=8080 \
             -e JWT_SECRET_KEY=ci-only-secret-0123456789-0123456789-abcdef eris
           for i in $(seq 60); do curl -fs http://localhost:8080/api/health && break; sleep 2; done
-          token=$(curl -fs http://localhost:8080/api/auth/login -H 'content-type: application/json' \
-            -d '{"email":"admin@eris.demo","password":"Admin@123"}' | python3 -c "import sys,json;print(json.load(sys.stdin)['access_token'])")
+          # sign in with the demo admin the image lists for its sign-in page (no password in this file)
+          curl -fs http://localhost:8080/api/auth/demo-accounts \
+            | python3 -c "import sys,json;a=next(x for x in json.load(sys.stdin) if x['email']=='admin@eris.demo');print(json.dumps({'email':a['email'],'password':a['password']}))" > login.json
+          token=$(curl -fs http://localhost:8080/api/auth/login -H 'content-type: application/json' -d @login.json \
+            | python3 -c "import sys,json;print(json.load(sys.stdin)['access_token'])")
           curl -fsS -D headers.txt -o dashboard.json -H "Authorization: Bearer $token" "http://localhost:8080/api/dashboard?period=30d"
           grep -i "x-cache: hit" headers.txt
           python3 -c "import json;d=json.load(open('dashboard.json'));assert d['kpis']['current']['orders']>1000, d['kpis']"
