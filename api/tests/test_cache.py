@@ -49,11 +49,16 @@ def test_exports_and_unauthenticated_requests_are_not_cached(client, admin):
 
 def test_prepared_page_requests_are_valid_for_every_demo_role(client):
     """The Docker build stores the answers to WARM_URLS; each must be a request the app really answers."""
-    from app.seed.bake import WARM_URLS
+    from app.seed.bake import user_warm_urls
     from app.seed.generator import DEMO_LOGINS, DEMO_PASSWORDS
 
     for _, email, key, _ in DEMO_LOGINS:
         token = client.post("/api/auth/login", json={"email": email, "password": DEMO_PASSWORDS[key]}).json()["access_token"]
-        for url in WARM_URLS:
-            r = client.get(url, headers={"Authorization": f"Bearer {token}"})
+        headers = {"Authorization": f"Bearer {token}"}
+        me = client.get("/api/auth/me", headers=headers).json()
+        urls = user_warm_urls(me)
+        if me["role"] != "admin" and len(me["outlet_ids"]) == 1:  # the web app pins single-outlet users
+            assert all(f"outlet_id={me['outlet_ids'][0]}" in u for u in urls)
+        for url in urls:
+            r = client.get(url, headers=headers)
             assert r.status_code == 200, (email, url, r.status_code, r.text[:200])

@@ -194,6 +194,15 @@ WARM_URLS = [
 ]
 
 
+def user_warm_urls(me: dict) -> list[str]:
+    """WARM_URLS as this user's pages request them: the web app pins a user with a single outlet to it, so their
+    requests carry outlet_id."""
+    ids = me.get("outlet_ids") or []
+    if me.get("role") == "admin" or len(ids) != 1:
+        return list(WARM_URLS)
+    return [f"{u}{'&' if '?' in u else '?'}outlet_id={ids[0]}" for u in WARM_URLS]
+
+
 def warm_cache() -> None:
     """Store every demo user's answers to the pages' default requests (see app/services/response_cache.py)."""
     from app.seed.generator import DEMO_LOGINS
@@ -202,7 +211,7 @@ def warm_cache() -> None:
     with _client() as c:
         for _, email, _, _ in DEMO_LOGINS:
             headers = _login(c, email)
-            for url in WARM_URLS:
+            for url in user_warm_urls(c.get("/api/auth/me", headers=headers).json()):
                 r = c.get(url, headers=headers)
                 stored += r.status_code == 200 and r.headers.get("x-cache") == "miss"
     _say(f"stored {stored} page answers for {len(DEMO_LOGINS)} demo users in {time.time() - t0:.0f}s")
