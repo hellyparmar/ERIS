@@ -4,7 +4,7 @@
 # sleeps. For a lasting deployment attach a PostgreSQL database and set DATABASE_URL.
 services:
   - type: web
-    name: eris-demo
+    name: eris
     runtime: docker
     plan: free
     dockerfilePath: ./Dockerfile

@@ -97,7 +97,7 @@ ERIS needs a long-running server (background demo generation, a database, foreca
   Railway) works the same way.
 - **Vercel (web app only, optional):** [`vercel.json`](vercel.json) builds just `web/` as a static site and
   [`.vercelignore`](.vercelignore) keeps `api/` out, so Vercel never tries to bundle the Python API. In the Vercel
-  project set the environment variable `VITE_API_URL` to the Render address (e.g. `https://eris-demo.onrender.com`),
+  project set the environment variable `VITE_API_URL` to the Render address (e.g. `https://eris.onrender.com`; Render adds a suffix when the name is taken),
   and on Render set `CORS_ORIGINS` to the Vercel address (or `CORS_ORIGIN_REGEX` to allow preview deployments,
   e.g. `https://your-project-[a-z0-9-]+\.vercel\.app`). Without `VITE_API_URL` the site loads but says the API
   cannot be reached.
