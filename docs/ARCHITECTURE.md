@@ -96,6 +96,29 @@ Several people can bill, receive stock and issue invoices at the same time witho
   small records through a separate short write transaction (`db.write_session()`).
 - `api/tests/test_concurrency.py` checks all of this on SQLite and PostgreSQL.
 
+## Fast on small servers
+
+A free hosted instance (Render: about a tenth of a CPU, no persistent disk, sleeps when idle) needs about ten
+minutes to generate the demo and half a minute per analytics page. Three mechanisms make it answer in seconds:
+
+- **Prepared at build time.** `python -m app.seed.bake` runs inside `docker build`: synthetic data, a few genuine
+  operations by the demo users (GST invoices, a part delivery, a stock count, a transfer - so Invoices and the
+  Audit log have real entries), pre-computed forecasts, the model-comparison evaluation and every demo user's
+  default page answers. A woken instance starts with all of it in 16 s (measured with a 0.1-CPU emulation).
+- **Forecast reuse.** Each run keeps a compact, date-free copy of its result (`forecast_runs.core`) and a
+  fingerprint of its input series. A request for the same series, data, model choice and a horizon the run covers
+  is answered from it without refitting; dates move with the data. Dashboard forecasts are stored as hidden
+  `cache` runs, and become visible in the run history when opened on the Forecasts page.
+- **Response cache.** GET answers of the heavy analytics endpoints (dashboard, analytics, drivers, anomalies,
+  alerts, outlet forecasts, reports, reorder suggestions) are stored in `response_cache` per user, request and
+  data version: code hash, newest audit entry, newest stock movement, sales count, newest sale id and date. Any
+  change a user makes is audited, so it starts a new version; a hit still checks that the user is active.
+  `tests/test_cache.py` covers invalidation, per-user scoping and deactivated users.
+
+Moving a stale demo's dates forward (all dated rows, forecast runs included) runs in a background thread at
+start-up in one transaction: the app serves the previous dates until it commits. Record timestamps use the
+business clock (Asia/Kolkata by default), like sales.
+
 ## Starting without the demo data
 
 Set `SEED_DEMO_DATA=false` with `INITIAL_ADMIN_EMAIL` and `INITIAL_ADMIN_PASSWORD` and the first start creates an
@@ -273,6 +296,6 @@ flowchart LR
 
 | Layer | What |
 |---|---|
-| API (pytest, 96 tests) | Business rules, imports, roles, refresh tokens, audit, invoices, reports, forecasting, anomalies, drivers, assistant. Runs on SQLite and PostgreSQL (CI job `api-postgres`). |
+| API (pytest, 105 tests) | Business rules, imports, roles, refresh tokens, audit, invoices, reports, forecasting, anomalies, drivers, assistant. Runs on SQLite and PostgreSQL (CI job `api-postgres`). |
 | End-to-end (Playwright, `e2e/`) | Every page as admin; sale → invoice → PDF; import with column mapping; assistant provenance; purchase order delivered in parts; report downloads; viewer read-only; area manager outlet switching; token refresh; phone layout |
 | Model evaluations | `python -m app.evaluation` (forecasting), `python -m app.assistant_eval` (assistant grounding), anomaly precision and recall (Anomalies & drivers page, notebook) |

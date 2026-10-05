@@ -24,6 +24,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app import clock
 from app.db import Base
 
 # admin: everything · manager: operations for assigned outlets · staff: billing & stock lookup ·
@@ -49,7 +50,7 @@ MOVEMENT_REASONS = (
 
 
 class TimestampMixin:
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=clock.now, server_default=func.now())
 
 
 class Organization(TimestampMixin, Base):
@@ -168,7 +169,7 @@ class InventoryItem(Base):
     product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), index=True)
     quantity: Mapped[float] = mapped_column(Float, default=0)
     reorder_level: Mapped[float] = mapped_column(Float, default=10)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=clock.now, server_default=func.now(), onupdate=clock.now)
 
     outlet: Mapped[Outlet] = relationship()
     product: Mapped[Product] = relationship()
@@ -187,7 +188,7 @@ class StockMovement(Base):
     reference: Mapped[str | None] = mapped_column(String(64))
     note: Mapped[str | None] = mapped_column(String(255))
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=clock.now, server_default=func.now(), index=True)
 
     product: Mapped[Product] = relationship()
     outlet: Mapped[Outlet] = relationship()
@@ -313,7 +314,7 @@ class ChatMessage(Base):
     role: Mapped[str] = mapped_column(String(12))  # user | assistant
     content: Mapped[str] = mapped_column(Text)
     payload: Mapped[dict | None] = mapped_column(JSON)
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=clock.now, server_default=func.now())
 
 
 # --------------------------------------------------------------------------------------------- provenance
@@ -347,7 +348,7 @@ class ImportJob(Base):
     mapping: Mapped[dict | None] = mapped_column(JSON)
     errors: Mapped[list | None] = mapped_column(JSON)
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=clock.now, server_default=func.now(), index=True)
 
     user: Mapped[User | None] = relationship()
 
@@ -363,7 +364,7 @@ class AuditLog(Base):
     outlet_id: Mapped[int | None] = mapped_column(ForeignKey("outlets.id", ondelete="SET NULL"))
     summary: Mapped[str] = mapped_column(String(255))
     details: Mapped[dict | None] = mapped_column(JSON)
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=clock.now, server_default=func.now(), index=True)
 
     user: Mapped[User | None] = relationship()
 
@@ -437,6 +438,7 @@ class AnomalyLabel(Base):
 # --------------------------------------------------------------------------------------------- forecasting
 class ForecastRun(Base):
     __tablename__ = "forecast_runs"
+    __table_args__ = (Index("ix_forecast_runs_lookup", "scope", "target", "data_end", "fingerprint"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     run_type: Mapped[str] = mapped_column(String(16), default="forecast")  # forecast | evaluation
@@ -458,9 +460,22 @@ class ForecastRun(Base):
     error: Mapped[str | None] = mapped_column(String(500))
     duration_seconds: Mapped[float | None] = mapped_column(Float)
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=clock.now, server_default=func.now(), index=True)
+    # compact, date-free result + input fingerprint: an identical request is answered without refitting
+    core: Mapped[dict | None] = mapped_column(JSON)
+    fingerprint: Mapped[str | None] = mapped_column(String(64))
 
     results: Mapped[list["ForecastResult"]] = relationship(back_populates="run", cascade="all, delete-orphan")
+
+
+class ResponseCache(Base):
+    """Analytics answers kept per user, request and data version (see app/services/response_cache.py)."""
+    __tablename__ = "response_cache"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    version: Mapped[str] = mapped_column(String(255))
+    body: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=clock.now, server_default=func.now())
 
 
 class ForecastResult(Base):

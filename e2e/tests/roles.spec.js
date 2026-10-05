@@ -41,3 +41,13 @@ test('phone layout has no horizontal scrolling', async ({ browser }) => {
     expect(overflow, path).toBeLessThanOrEqual(1)
   }
 })
+
+test('a demo-account card signs in, and a suggested question opens the assistant answered', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Explore as Outlet manager' }).click()
+  await expect(page.locator('.kpi-value').first()).toBeVisible({ timeout: 60_000 })
+  await expect(page.getByText('Andheri West').first()).toBeVisible()
+  await page.getByRole('link', { name: /Why did revenue change this week/ }).click()
+  await expect(page).toHaveURL(/\/assistant/)
+  await expect(page.locator('.msg.bot .provenance')).toBeVisible({ timeout: 60_000 })
+})

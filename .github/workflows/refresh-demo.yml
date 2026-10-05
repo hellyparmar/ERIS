@@ -1,0 +1,27 @@
+name: Refresh hosted demo
+
+# Rebuilds the hosted demo once a week so its data ends "yesterday" and every page answer is pre-computed again.
+# Without it, an instance whose image is older than a week moves the demo dates forward on each start (in the
+# background, about a minute on a free instance) and recomputes pages on first view.
+#
+# Setup (optional): Render -> service "eris" -> Settings -> Deploy Hook -> copy the URL, then in GitHub ->
+# Settings -> Secrets and variables -> Actions -> New repository secret: RENDER_DEPLOY_HOOK_URL = that URL.
+on:
+  schedule:
+    - cron: "17 21 * * 0"  # Sundays 21:17 UTC (early Monday in India)
+  workflow_dispatch:
+
+jobs:
+  redeploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Trigger a Render rebuild
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "RENDER_DEPLOY_HOOK_URL is not set - nothing to do (see the comment at the top of this file)."
+            exit 0
+          fi
+          curl -fsS -X POST "$HOOK" > /dev/null && echo "Rebuild requested."

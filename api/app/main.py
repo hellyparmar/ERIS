@@ -12,10 +12,11 @@ from sqlalchemy import func, select
 
 from app import clock
 from app.config import settings
-from app.db import SessionLocal, migrate
+from app.db import SessionLocal, migrate, write_engine
 from app.routers import auth, catalog, imports, insights, inventory, outlets, partners, records, sales
 from app.routers import settings as settings_router
 from app.services import audit as _audit  # noqa: F401  (registers the audit hook)
+from app.services import response_cache
 from app.state import seeding_state, set_seeding
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -24,10 +25,23 @@ DEFAULT_SECRET = "dev-only-secret-change-me-in-production-0123456789"
 WEB_DIST = Path(__file__).resolve().parents[2] / "web" / "dist"
 
 
+def _refresh_demo_dates() -> None:
+    from app.seed.refresh import shift_demo_dates
+    from app.services import analytics as A
+    from app.services import forecasting as F
+
+    try:
+        with SessionLocal(bind=write_engine()) as db:
+            if shift_demo_dates(db):
+                F.clear_cache()
+                A._CACHE.clear()
+    except Exception:  # never break the running app
+        log.exception("demo date refresh failed")
+
+
 def _bootstrap() -> None:
     """Create tables; generate demo data on an empty database; keep an untouched demo current."""
     from app.models import User
-    from app.seed.refresh import shift_demo_dates
 
     if settings.JWT_SECRET_KEY == DEFAULT_SECRET or len(settings.JWT_SECRET_KEY) < 32:
         if settings.ENVIRONMENT == "production":
@@ -38,10 +52,9 @@ def _bootstrap() -> None:
         clock.load_from_db(db)
         has_users = db.scalar(select(func.count(User.id))) or 0
         if has_users:
-            try:
-                shift_demo_dates(db)
-            except Exception:  # never block startup
-                log.exception("demo date refresh failed")
+            # moving a stale demo forward rewrites every dated row: done in the background in one transaction,
+            # so the app answers at once (from the previous dates) instead of after a minute on a small server
+            threading.Thread(target=_refresh_demo_dates, daemon=True).start()
             return
     if not settings.SEED_DEMO_DATA:
         if settings.INITIAL_ADMIN_EMAIL and settings.INITIAL_ADMIN_PASSWORD:
@@ -85,6 +98,8 @@ app = FastAPI(
     version="3.0.0",
     lifespan=lifespan,
 )
+app.middleware("http")(response_cache.middleware)  # analytics answers reused while the data is unchanged
+
 # CORS matters only when the web app is hosted on another origin (e.g. Vercel with VITE_API_URL pointing here)
 app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins, allow_origin_regex=settings.CORS_ORIGIN_REGEX,
                    allow_credentials=True, allow_methods=["*"], allow_headers=["*"],

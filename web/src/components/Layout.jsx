@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Activity, BarChart3, Bell, Boxes, Bot, Building2, Contact, FileSpreadsheet, FileText, FlaskConical, History,
-  LayoutDashboard, LogOut, Menu, Moon, Package, Receipt, Settings, Store, Sun, TrendingUp, Truck, Upload, Monitor,
+  LayoutDashboard, LogOut, Menu, Moon, Package, Receipt, Settings, Store, Sun, TrendingUp, Truck, Upload, Monitor, UserRound,
 } from 'lucide-react'
 import { api } from '../lib/api'
 import { useApp } from '../lib/app'
@@ -13,7 +13,7 @@ import { AlertItem } from './ui'
 const NAV = [
   { section: 'Overview' },
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/assistant', label: 'AI Assistant', icon: Bot },
+  { to: '/assistant', label: 'AI Assistant', icon: Bot, badge: 'AI' },
   { section: 'Operate' },
   { to: '/sales', label: 'Sales', icon: Receipt },
   { to: '/inventory', label: 'Inventory', icon: Boxes },
@@ -90,8 +90,56 @@ function ThemeButton() {
   return <button className="btn ghost icon" onClick={() => setTheme(next)} aria-label={`Theme: ${theme}. Switch to ${next}`} title={`Theme: ${theme}`}><Icon /></button>
 }
 
+export const initialsOf = (name = '') => name.replace(/\(.*\)/, '').split(/[^A-Za-z]+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '?'
+
+function UserMenu() {
+  const { user, logout } = useApp()
+  const [open, setOpen] = useState(false)
+  const navigate = useNavigate()
+  return (
+    <div style={{ position: 'relative' }}>
+      <button className="user-chip" onClick={() => setOpen((o) => !o)} aria-label="Account menu" aria-expanded={open} style={{ cursor: 'pointer' }}>
+        <span className="initials">{initialsOf(user?.full_name)}</span>
+        <span className="who hide-sm"><b>{user?.full_name}</b><span>{user?.role}</span></span>
+      </button>
+      {open && (
+        <>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 39 }} onClick={() => setOpen(false)} />
+          <div className="card" style={{ position: 'absolute', right: 0, top: 46, width: 240, zIndex: 40, padding: 8 }}>
+            <div style={{ padding: '8px 10px 10px' }}>
+              <b>{user?.full_name}</b>
+              <div className="small muted">{user?.email}</div>
+            </div>
+            <button className="btn ghost block" style={{ justifyContent: 'flex-start' }} onClick={() => { setOpen(false); navigate('/settings?tab=profile') }}><UserRound />My profile</button>
+            <button className="btn ghost block" style={{ justifyContent: 'flex-start' }} onClick={logout}><LogOut />Sign out</button>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+/** While the demo data is being generated, say so on every page and refresh the page's data when it is ready. */
+function PreparingBanner() {
+  const qc = useQueryClient()
+  const [was, setWas] = useState(false)
+  const health = useQuery({ queryKey: ['health'], queryFn: () => api('/health'), refetchInterval: (q) => (q.state.data?.seeding?.running ? 3000 : false) })
+  const running = !!health.data?.seeding?.running
+  useEffect(() => {
+    if (running) setWas(true)
+    else if (was) { setWas(false); qc.invalidateQueries() }
+  }, [running, was, qc])
+  if (!running) return null
+  return (
+    <div className="banner" role="status">
+      <div className="spinner" />
+      <div><b>Preparing the demo data</b><p>{health.data.seeding.message} - pages fill in automatically when it is ready (about a minute).</p></div>
+    </div>
+  )
+}
+
 export default function Layout() {
-  const { user, logout, org, isManager, isAdmin } = useApp()
+  const { org, isManager, isAdmin } = useApp()
   const [open, setOpen] = useState(false)
   const location = useLocation()
   useEffect(() => setOpen(false), [location.pathname])
@@ -107,10 +155,10 @@ export default function Layout() {
         </div>
         {NAV.filter((n) => (!n.manager || isManager) && (!n.admin || isAdmin)).map((n) => n.section
           ? <div key={n.section} className="nav-section">{n.section}</div>
-          : <NavLink key={n.to} to={n.to} end={n.end} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><n.icon />{n.label}</NavLink>)}
+          : <NavLink key={n.to} to={n.to} end={n.end} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><n.icon />{n.label}{n.badge && <span className="nav-badge">{n.badge}</span>}</NavLink>)}
         <div className="sidebar-foot">
-          {org?.name}
-          {sys.data?.data_to && <div>Data to {date(sys.data.data_to)}</div>}
+          <b>{org?.name || 'ERIS'}</b>
+          {sys.data?.data_to && <span className="live">Data to {date(sys.data.data_to)}</span>}
         </div>
       </nav>
       <div className="main">
@@ -120,13 +168,9 @@ export default function Layout() {
           <div className="spacer" />
           <AlertsBell />
           <ThemeButton />
-          <div className="hide-sm" style={{ textAlign: 'right', lineHeight: 1.2 }}>
-            <div style={{ fontWeight: 600 }}>{user?.full_name}</div>
-            <div className="small muted" style={{ textTransform: 'capitalize' }}>{user?.role}</div>
-          </div>
-          <button className="btn ghost icon" onClick={logout} aria-label="Sign out" title="Sign out"><LogOut /></button>
+          <UserMenu />
         </header>
-        <main className="content"><Outlet /></main>
+        <main className="content"><PreparingBanner /><Outlet /></main>
       </div>
     </div>
   )

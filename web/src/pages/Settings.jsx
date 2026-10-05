@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Bot, Building2, Database, KeyRound, LogOut, Pencil, Plus, RefreshCw, Trash2, UserCog, Users } from 'lucide-react'
 import { api, setSession } from '../lib/api'
@@ -9,7 +10,9 @@ import { StateSelect } from '../components/pickers'
 
 export default function Settings() {
   const { isAdmin } = useApp()
-  const [tab, setTab] = useState(isAdmin ? 'organization' : 'profile')
+  const [params, setParams] = useSearchParams()
+  const tab = params.get('tab') || (isAdmin ? 'organization' : 'profile')
+  const setTab = (t) => setParams({ tab: t }, { replace: true })
   const tabs = [
     ...(isAdmin ? [{ id: 'organization', label: 'Organization', icon: Building2 }] : []),
     { id: 'profile', label: 'My profile', icon: UserCog },

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Line, LineChart, ReferenceLine,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
@@ -72,6 +72,7 @@ export function Legend({ items }) {
 /** Time series as lines or areas. series: [{key, label, color?, dashed?, format?}] */
 export function TrendChart({ data, x = 'date', series, format = 'currency', height = 260, area = true, gran = 'day', compare }) {
   const c = useChartColors()
+  const gid = useId().replace(/:/g, '')
   const Chart = area ? AreaChart : LineChart
   const colorOf = (s, i) => resolve(s.color, c) || c.series[i % 8]
   return (
@@ -80,6 +81,14 @@ export function TrendChart({ data, x = 'date', series, format = 'currency', heig
       <div style={{ height, marginTop: series.length > 1 ? 8 : 0 }}>
         <ResponsiveContainer width="100%" height="100%">
           <Chart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+            <defs>
+              {series.map((s, i) => (
+                <linearGradient key={s.key} id={`${gid}-${i}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={colorOf(s, i)} stopOpacity={i === 0 ? 0.28 : 0.08} />
+                  <stop offset="100%" stopColor={colorOf(s, i)} stopOpacity={0} />
+                </linearGradient>
+              ))}
+            </defs>
             <CartesianGrid vertical={false} stroke={c.grid} />
             <XAxis dataKey={x} tickFormatter={dateTick(gran)} stroke={c.axis} tickLine={false} minTickGap={24} />
             <YAxis tickFormatter={fmtAxis(format)} stroke={c.axis} tickLine={false} axisLine={false} width={64} />
@@ -87,7 +96,7 @@ export function TrendChart({ data, x = 'date', series, format = 'currency', heig
               cursor={{ stroke: c.axis, strokeWidth: 1 }} />
             {series.map((s, i) => area && !s.dashed ? (
               <Area key={s.key} type="monotone" dataKey={s.key} name={s.label} stroke={colorOf(s, i)} strokeWidth={2}
-                fill={colorOf(s, i)} fillOpacity={i === 0 ? 0.12 : 0.05} dot={false} activeDot={{ r: 4, stroke: c.surface, strokeWidth: 2 }} isAnimationActive={false} />
+                fill={`url(#${gid}-${i})`} fillOpacity={1} dot={false} activeDot={{ r: 5, stroke: c.surface, strokeWidth: 2 }} isAnimationActive={false} />
             ) : (
               <Line key={s.key} type="monotone" dataKey={s.key} name={s.label} stroke={colorOf(s, i)} strokeWidth={2}
                 strokeDasharray={s.dashed ? '5 4' : undefined} dot={false} activeDot={{ r: 4, stroke: c.surface, strokeWidth: 2 }} isAnimationActive={false} />
@@ -243,13 +252,21 @@ export function Heatmap({ cells, format = 'currency', valueKey = 'revenue' }) {
   )
 }
 
-export function Sparkline({ data, k = 'revenue', color, height = 40 }) {
+export function Sparkline({ data, k = 'revenue', color, height = 46 }) {
   const c = useChartColors()
+  const gid = useId().replace(/:/g, '')
+  const stroke = resolve(color, c) || c.s1
   return (
-    <div style={{ height }}>
+    <div style={{ height }} aria-hidden="true">
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 2, right: 0, bottom: 2, left: 0 }}>
-          <Area type="monotone" dataKey={k} stroke={color || c.s1} fill={color || c.s1} fillOpacity={0.12} strokeWidth={2} dot={false} isAnimationActive={false} />
+        <AreaChart data={data} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
+          <defs>
+            <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={stroke} stopOpacity={0.25} />
+              <stop offset="100%" stopColor={stroke} stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <Area type="monotone" dataKey={k} stroke={stroke} fill={`url(#${gid})`} strokeWidth={2} dot={false} isAnimationActive={false} />
         </AreaChart>
       </ResponsiveContainer>
     </div>

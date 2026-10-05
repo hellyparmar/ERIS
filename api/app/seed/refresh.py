@@ -34,6 +34,9 @@ SHIFT_COLUMNS = [
     ("dataset_info", ["period_start", "period_end"], []),
     ("invoices", [], ["issued_at"]),
     ("weather_daily", ["day"], []),
+    # saved forecasts move with the data, so they can still be served without refitting
+    ("forecast_runs", ["data_start", "data_end"], ["created_at"]),
+    ("forecast_results", ["day"], []),
 ]
 FAR = 36500  # shift via a far-away date so unique (city, day) keys never collide mid-update
 
@@ -75,8 +78,6 @@ def shift_demo_dates(db: Session) -> int:
         else:
             shift(table, date_cols, dt_cols, days)
     db.execute(text("UPDATE weather_daily SET is_forecast = (day > :y)"), {"y": clock.today() - timedelta(days=1)})
-    db.execute(text("DELETE FROM forecast_results"))
-    db.execute(text("DELETE FROM forecast_runs"))
     db.commit()
     log.info("Demo data shifted forward by %s days to stay current", days)
     return days

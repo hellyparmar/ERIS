@@ -418,6 +418,8 @@ def generate_demo_data(db: Session, days: int = 730, seed: int = 42, end_date: d
     sizes = np.array([m["size"] for m in outlet_meta])
     home = rng.choice(n_outlets, n_customers, p=sizes / sizes.sum())
     loyalty = rng.lognormal(0, 1.0, n_customers)
+    # cap the long tail: the most loyal shoppers visit two or three times a week, not every day
+    loyalty = np.minimum(loyalty, np.quantile(loyalty, 0.99))
     join_offset = (rng.beta(1.2, 2.2, n_customers) * days).astype(int)
     churned = rng.random(n_customers) < 0.22
     churn_offset = np.where(churned, join_offset + rng.integers(60, 300, n_customers), days + 10)

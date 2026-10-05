@@ -33,3 +33,30 @@ def test_auto_selection_uses_every_candidate():
     result = F.run_forecast(_series(), 14, "auto")
     evaluated = {e["model"] for e in result["evaluation"] if e.get("wape") is not None}
     assert set(EXPECTED) <= evaluated, result["evaluation"]
+
+
+def test_saved_forecast_is_reused_without_refitting(client):
+    from app.db import SessionLocal
+
+    with SessionLocal() as db:
+        spec = F.build_spec(db, "outlet", 2, None)
+        fresh = F.forecast_series(db, spec, horizon=30, persist=False)
+        assert not fresh.get("reused")
+    F.clear_cache()
+    with SessionLocal() as db:  # a later request (its own session) is served from the saved 30-day result
+        week = F.forecast_series(db, spec, horizon=7, persist=False)
+    assert week.get("reused") and week["model"] == fresh["model"]
+    assert [f["yhat"] for f in week["forecast"]] == [f["yhat"] for f in fresh["forecast"][:7]]
+    assert [f["date"] for f in week["forecast"]] == [f["date"] for f in fresh["forecast"][:7]]
+    assert week["backtest"] == fresh["backtest"] and week["evaluation"] == fresh["evaluation"]
+
+
+def test_forecast_page_records_a_reused_run_in_the_history(client, admin):
+    from app.db import SessionLocal
+
+    with SessionLocal() as db:  # a hidden pre-computed run, as the Docker build stores them
+        F.forecast_series(db, F.build_spec(db, "outlet", 3, None), horizon=30, persist=False)
+    r = client.get("/api/forecast?scope=outlet&target_id=3&horizon=14&model=auto", headers=admin).json()
+    assert r["reused"] and r["run_id"]
+    runs = client.get("/api/forecast/runs", headers=admin).json()["items"]
+    assert r["run_id"] in [run["id"] for run in runs]

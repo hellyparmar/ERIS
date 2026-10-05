@@ -22,7 +22,7 @@ _CACHE_TTL = 600
 
 
 def _data_version(db: Session) -> tuple:
-    return tuple(db.execute(select(func.count(Sale.id), func.max(Sale.id),
+    return tuple(db.execute(select(func.count(Sale.id), func.max(Sale.id), func.max(Sale.sale_date),
                                    func.sum(case((Sale.status == "void", 1), else_=0)))).one())
 
 

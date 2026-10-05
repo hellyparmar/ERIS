@@ -14,8 +14,14 @@ COPY api/requirements.txt api/constraints.txt ./
 RUN pip install -r requirements.txt -c constraints.txt
 COPY api/ ./
 COPY docs/knowledge /app/docs/knowledge
+# The demo database is prepared here, on the build machine: synthetic data, a few genuine user operations,
+# pre-computed forecasts and page answers. A small hosted instance (e.g. Render's free plan) then starts with
+# everything ready instead of spending ~10 minutes generating it after every wake-up. --build-arg BAKE_DEMO=0
+# builds an image with an empty database instead (start with SEED_DEMO_DATA=false or your own DATABASE_URL).
+ARG BAKE_DEMO=1
+RUN mkdir -p /app/api/data && if [ "$BAKE_DEMO" = "1" ]; then python -m app.seed.bake; fi
 COPY --from=web /web/dist /app/web/dist
-RUN useradd --create-home eris && mkdir -p /app/api/data && chown -R eris /app
+RUN useradd --create-home eris && chown -R eris /app
 USER eris
 EXPOSE 8000
 ENV PORT=8000

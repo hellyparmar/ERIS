@@ -101,3 +101,17 @@ def test_audit_log_records_changes(client, admin, manager):
     assert client.get("/api/audit", headers=manager).status_code == 403
     with SessionLocal() as db:
         assert db.query(Customer).filter_by(id=cid).one().name == "Audit Probe 2"
+
+
+def test_record_times_use_the_business_clock(client, admin):
+    """Audit entries, stock movements and runs are stamped in business time (Asia/Kolkata), like sales."""
+    from datetime import datetime
+
+    from app import clock
+
+    client.post("/api/inventory/adjust", headers=admin, json={"outlet_id": 1, "product_id": 7, "mode": "add", "quantity": 1})
+    for path, key in (("/api/audit", "at"), ("/api/inventory/movements", "created_at")):
+        rows = client.get(path, headers=admin).json()
+        rows = rows["items"] if isinstance(rows, dict) else rows
+        newest = max(datetime.fromisoformat(r[key]) for r in rows)
+        assert abs((newest - clock.now()).total_seconds()) < 120, (path, newest, clock.now())

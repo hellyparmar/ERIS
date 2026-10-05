@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Bot, Mic, MicOff, Send, Trash2, User } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
+import { Activity, Bot, Boxes, Mic, MicOff, Send, Sparkles, Store, Trash2, TrendingUp, User, Users } from 'lucide-react'
 import { api } from '../lib/api'
 import { useToast } from '../lib/app'
 import { formatValue } from '../lib/format'
@@ -78,6 +79,8 @@ function Blocks({ blocks }) {
   ))
 }
 
+const PROMPT_ICONS = [[TrendingUp, 'sky'], [Store, ''], [Boxes, 'amber'], [Activity, 'rose'], [Users, 'emerald'], [Sparkles, 'violet']]
+
 function useSpeech(onText) {
   const [listening, setListening] = useState(false)
   const recRef = useRef(null)
@@ -147,6 +150,8 @@ export default function Assistant() {
     onSuccess: () => qc.setQueryData(['chat-history'], []),
   })
   const speech = useSpeech((t) => setInput(t))
+  const [params, setParams] = useSearchParams()
+  const linked = params.get('q')
 
   useEffect(() => {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight, behavior: 'smooth' })
@@ -158,25 +163,43 @@ export default function Assistant() {
     setInput('')
     send.mutate(t)
   }
+  // a question linked from another page (e.g. the dashboard) is asked once the history has loaded
+  useEffect(() => {
+    if (linked && history.isSuccess && !send.isPending) {
+      setParams({}, { replace: true })
+      send.mutate(linked)
+    }
+  }, [linked, history.isSuccess]) // eslint-disable-line react-hooks/exhaustive-deps
   const msgs = history.data || []
   const llm = status.data?.llm
   const lastSuggestions = [...msgs].reverse().find((m) => m.role === 'assistant')?.suggestions
 
   return (
     <>
-      <PageHead title="AI Assistant" subtitle="Ask about sales, stock, customers, forecasts and why numbers changed in plain English. Answers come from fixed, tested analyses of your data (never free-form SQL), and each one shows its source.">
+      <PageHead eyebrow={<><Sparkles size={13} />Ask in plain English</>} title="AI Assistant"
+        subtitle="Questions about sales, stock, customers, forecasts and why numbers changed. Answers come from tested analyses of your data (never free-form SQL), and each one shows its source.">
         <Badge tone={llm?.available ? 'good' : 'info'}>{llm?.available ? `Local LLM: ${llm.model}` : 'Built-in analytics engine'}</Badge>
         <button className="btn" onClick={() => clear.mutate()} disabled={!msgs.length}><Trash2 />Clear chat</button>
       </PageHead>
       <Card flush className="chat">
         <div className="chat-log" ref={logRef} aria-live="polite">
           {msgs.length === 0 && !pending && (
-            <div className="empty" style={{ margin: 'auto' }}>
-              <Bot />
-              <b>Hi! I'm your retail assistant.</b>
-              <div className="small" style={{ maxWidth: 520 }}>Try one of these questions, or type your own. You can mention an outlet, product, category or time period.</div>
-              <div className="chips" style={{ justifyContent: 'center', marginTop: 8 }}>
-                {(status.data?.suggestions || []).map((s) => <button key={s} className="chip" onClick={() => ask(s)}>{s}</button>)}
+            <div className="empty" style={{ margin: 'auto', gap: 14 }}>
+              <span className="avatar" style={{ width: 56, height: 56, borderRadius: 18 }}><Bot style={{ width: 28, height: 28 }} /></span>
+              <div>
+                <h2 style={{ fontSize: 20 }}>How can I help with the business today?</h2>
+                <div className="small" style={{ maxWidth: 560, marginTop: 6 }}>Mention an outlet, product, category or period - for example “last month at Indiranagar”. Pick a question to start:</div>
+              </div>
+              <div className="prompt-grid">
+                {(status.data?.suggestions || []).map((s, i) => {
+                  const [Icon, tone] = PROMPT_ICONS[i % PROMPT_ICONS.length]
+                  return (
+                    <button key={s} className="prompt-card" onClick={() => ask(s)}>
+                      <span className={`kpi-icon ${tone}`}><Icon size={16} /></span>
+                      <b>{s}</b>
+                    </button>
+                  )
+                })}
               </div>
             </div>
           )}
@@ -195,25 +218,25 @@ export default function Assistant() {
           {pending && (
             <>
               <div className="msg user"><div className="bubble">{pending}</div><div className="avatar"><User /></div></div>
-              <div className="msg bot"><div className="avatar"><Bot /></div><div className="bubble row"><div className="spinner" style={{ width: 16, height: 16 }} /><span className="muted">Analysing your data…</span></div></div>
+              <div className="msg bot"><div className="avatar"><Bot /></div><div className="bubble row"><span className="typing" aria-hidden="true"><i /><i /><i /></span><span className="muted">Analysing your data…</span></div></div>
             </>
           )}
         </div>
         <div>
           {lastSuggestions?.length > 0 && !pending && (
-            <div className="chips" style={{ padding: '10px 12px 0', background: 'var(--surface)' }}>
+            <div className="chips" style={{ padding: '12px 14px 0', background: 'var(--surface)' }}>
               {lastSuggestions.map((s) => <button key={s} className="chip" onClick={() => ask(s)}>{s}</button>)}
             </div>
           )}
           <form className="chat-input" onSubmit={(e) => { e.preventDefault(); ask() }}>
-            <input className="input" placeholder="e.g. Why was Outlet 3 revenue lower this week?" value={input} maxLength={500}
+            <input className="input" placeholder="Ask anything, e.g. Why was Indiranagar revenue lower this week?" value={input} maxLength={500}
               onChange={(e) => setInput(e.target.value)} aria-label="Ask a question" autoFocus />
             {speech.supported && (
-              <button type="button" className={`btn icon ${speech.listening ? 'primary' : ''}`} onClick={speech.toggle} aria-label={speech.listening ? 'Stop listening' : 'Speak your question'} style={{ height: 42, width: 42 }}>
+              <button type="button" className={`btn icon ${speech.listening ? 'primary' : ''}`} onClick={speech.toggle} aria-label={speech.listening ? 'Stop listening' : 'Speak your question'} style={{ width: 46 }}>
                 {speech.listening ? <MicOff /> : <Mic />}
               </button>
             )}
-            <button className="btn primary" disabled={!input.trim() || send.isPending} style={{ height: 42 }}><Send />Ask</button>
+            <button className="btn primary" disabled={!input.trim() || send.isPending}><Send />Ask</button>
           </form>
         </div>
       </Card>
