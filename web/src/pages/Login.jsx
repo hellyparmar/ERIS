@@ -12,8 +12,8 @@ const FEATURES = [
   { icon: Receipt, title: 'Operations in one place', text: 'Billing, stock, purchase orders, demo GST invoices and reports' },
 ]
 
-const AVATAR_TINTS = ['var(--brand-grad)', 'linear-gradient(135deg,#0ea5e9,#6366f1)', 'linear-gradient(135deg,#10b981,#0ea5e9)',
-  'linear-gradient(135deg,#f59e0b,#ef4444)', 'linear-gradient(135deg,#ec4899,#8b5cf6)']
+// one warm tint per demo role (decorative only)
+const AVATAR_TINTS = [['#4C4541', '#F2C46A'], ['#F2C46A', '#4C4541'], ['#AEAC78', '#2F2926'], ['#F3E6D5', '#4C4541'], ['#FCF0DA', '#8A6412']]
 
 export default function Login() {
   const { login } = useApp()
@@ -47,10 +47,10 @@ export default function Login() {
           <div><b>ERIS</b><small>Enterprise Retail Intelligence System</small></div>
         </div>
         <div className="stack" style={{ gap: 18 }}>
-          <span className="badge" style={{ alignSelf: 'flex-start', background: 'rgba(255,255,255,0.08)', color: '#c7d2fe', borderColor: 'rgba(255,255,255,0.12)' }}>
+          <span className="badge" style={{ alignSelf: 'flex-start', background: 'rgba(242,196,106,0.14)', color: '#F2C46A', borderColor: 'rgba(242,196,106,0.25)' }}>
             <ShieldCheck />Open-source retail analytics
           </span>
-          <h1>Every outlet, every number - <span className="gradient-text" style={{ backgroundImage: 'linear-gradient(90deg,#a5b4fc,#f0abfc,#7dd3fc)' }}>explained.</span></h1>
+          <h1>Every outlet, every number - <span style={{ color: '#F2C46A' }}>explained.</span></h1>
           <p className="lead">Sales, stock and customers across your stores, with forecasts you can trust and an assistant that answers in plain English.</p>
           <div className="feature-list">
             {FEATURES.map((f) => (
@@ -67,7 +67,7 @@ export default function Login() {
             <div><b>5 models</b><span>compared for every forecast</span></div>
             <div><b>Open source</b><span>no paid APIs required</span></div>
           </div>
-          <p className="small" style={{ color: '#7f88a8' }}>Demo data is synthetic, for a fictional chain (Urban Harvest Foods). GST invoices are demos - not for tax filing.</p>
+          <p className="small" style={{ color: '#BCAE9E' }}>Demo data is synthetic, for a fictional chain (Urban Harvest Foods). GST invoices are demos - not for tax filing.</p>
         </div>
       </section>
       <section className="login-form">
@@ -86,7 +86,7 @@ export default function Login() {
                 <button type="button" key={d.email} className={`demo-account ${busy === d.email ? 'on' : ''}`} disabled={!!busy}
                   onClick={() => { setEmail(d.email); setPassword(d.password); signIn(d.email, d.password, d.email) }}
                   aria-label={`Explore as ${d.role}`}>
-                  <span className="initials" style={{ background: AVATAR_TINTS[i % AVATAR_TINTS.length] }}>{initialsOf(d.role)}</span>
+                  <span className="initials" style={{ background: AVATAR_TINTS[i % AVATAR_TINTS.length][0], color: AVATAR_TINTS[i % AVATAR_TINTS.length][1] }}>{initialsOf(d.role)}</span>
                   <span style={{ minWidth: 0 }}><b>{d.role}</b><span>{d.note}</span></span>
                   {busy === d.email ? <span className="spinner go" style={{ width: 16, height: 16 }} /> : <ArrowRight size={16} className="go" />}
                 </button>

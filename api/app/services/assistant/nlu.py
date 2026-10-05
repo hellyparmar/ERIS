@@ -37,7 +37,7 @@ GLOSSARY_TERMS = (r"wape|mape|smape|rmse|mae|rfm|abc (analysis|class)|lift|gstin
 # (intent, weight, pattern)
 INTENT_PATTERNS: list[tuple[str, float, str]] = [
     ("action_request", 8, r"^\s*(please\s+|can you\s+|could you\s+)?(delete|remove|erase|drop|update|change|edit|create|"
-                          r"add|insert|void|cancel|refund|reset|clear|modify|rename|record|enter|place|raise|issue|"
+                          r"add|insert|void|cancel|refund|reset|clear|modify|rename|record|enter|place|raise|issue|transfer|move|"
                           r"order)\b(?!\s+me\b)(?!.*\b(how|should|what|which|suggest)\b)"),
     ("smalltalk", 6, r"^\s*(thanks|thank you|thank u|thx|ty|ok|okay|cool|great|nice|bye|good ?bye|good night|"
                      r"awesome|perfect|got it)\b[\s!.]*$"),
@@ -62,7 +62,7 @@ INTENT_PATTERNS: list[tuple[str, float, str]] = [
                              r"losers?|falls?)|falling (the )?fastest)\b.*\b(products?|items?|skus?)\b"),
     ("knowledge", 4, rf"\b(what (is|are|does|do)|what's|whats|define|definition of|meaning of|explain)\b.*\b({GLOSSARY_TERMS})\b"),
     ("knowledge", 4, r"\b(how (do|can|should) (i|we|you) (import|upload|add|create|record|issue|export|download|"
-                     r"enter|use|reset|clear|change)|how (does|do|is|are) .*\b(calculated|computed|measured|chosen|"
+                     r"enter|use|reset|clear|change|transfer|move|adjust|void|count|receive|correct)|how (does|do|is|are) .*\b(calculated|computed|measured|chosen|"
                      r"selected|detected|generated|built|made|trained|work|works|handled)|where does .* come from|"
                      r"is (the|this|our|it) .*\b(real|synthetic|fake|valid|accurate|reliable)\b|"
                      r"(valid|use) for (tax )?filing)\b"),
@@ -406,10 +406,24 @@ class EntityIndex:
 
 
 # ------------------------------------------------------------------------------------------ main
+# "Create a spreadsheet of the top 10 products", "export a table with sales by outlet", "... as a spreadsheet":
+# a request for an answer laid out as a table, not a request to change data. The format words are removed and
+# the rest is understood as usual; the answer then carries a table the web app opens as a spreadsheet.
+_AS_TABLE_PREFIX = re.compile(
+    r"^\s*(please\s+|can you\s+|could you\s+)?(create|make|build|generate|prepare|export|give me|show me|put together|"
+    r"draw up)\s+(me\s+)?(a\s+|an\s+|the\s+)?(spread\s?sheet|sheet|table|excel(\s+(file|sheet))?|csv( file)?)"
+    r"(\s+(of|with|for|showing|listing|on|about))?\s*")
+_AS_TABLE_SUFFIX = re.compile(r"\s+(as|in|into)\s+(a\s+|an\s+)?(spread\s?sheet|sheet|table|excel( file)?|csv)\s*[.?!]*$")
+
+
 def parse(db: Session, text: str, anchor: date, index: EntityIndex | None = None) -> Parsed:
     index = index or EntityIndex(db)
     t = text.lower().strip()
     p = Parsed(text=text)
+    stripped = _AS_TABLE_SUFFIX.sub("", _AS_TABLE_PREFIX.sub("", t, count=1))
+    if stripped != t:
+        p.flags.add("as_table")
+        t = stripped.strip() or "top products"
 
     scores: dict[str, float] = {}
     for intent, weight, pattern in INTENT_PATTERNS:

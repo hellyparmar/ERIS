@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Line, LineChart, ReferenceLine,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
@@ -6,24 +6,28 @@ import {
 import { formatValue, money, num, shortDate, monthLabel } from '../lib/format'
 
 const VARS = ['page', 's1', 's2', 's3', 's4', 's5', 's6', 's7', 's8', 'grid', 'axis', 'muted', 'text', 'text-2', 'surface', 'accent',
-  'seq-1', 'seq-2', 'seq-3', 'seq-4', 'seq-5', 'seq-6', 'seq-7', 'good', 'bad']
+  'seq-1', 'seq-2', 'seq-3', 'seq-4', 'seq-5', 'seq-6', 'seq-7', 'good', 'bad', 'bar-rest', 'highlight']
 
-function readColors() {
-  const cs = getComputedStyle(document.documentElement)
+function readColors(el) {
+  const cs = getComputedStyle(el || document.documentElement)
   return Object.fromEntries(VARS.map((v) => [v, cs.getPropertyValue(`--${v}`).trim()]))
 }
 
-/** Resolved theme colours (SVG attributes cannot use CSS variables), refreshed on theme change. */
-export function useChartColors() {
-  const [colors, setColors] = useState(readColors)
+/** Resolved theme colours (SVG attributes cannot use CSS variables), refreshed on theme change. With a ref, the
+ * colours come from that element, so a chart inside a dark card uses the card's palette. */
+export function useChartColors(ref) {
+  const [colors, setColors] = useState(() => readColors())
+  useLayoutEffect(() => {
+    if (ref?.current) setColors(readColors(ref.current))
+  }, [ref])
   useEffect(() => {
-    const update = () => setColors(readColors())
+    const update = () => setColors(readColors(ref?.current))
     const mo = new MutationObserver(update)
     mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
     const mq = window.matchMedia('(prefers-color-scheme: dark)')
     mq.addEventListener('change', update)
     return () => { mo.disconnect(); mq.removeEventListener('change', update) }
-  }, [])
+  }, [ref])
   return { ...colors, series: [colors.s1, colors.s2, colors.s3, colors.s4, colors.s5, colors.s6, colors.s7, colors.s8] }
 }
 
@@ -70,33 +74,34 @@ export function Legend({ items }) {
 }
 
 /** Time series as lines or areas. series: [{key, label, color?, dashed?, format?}] */
-export function TrendChart({ data, x = 'date', series, format = 'currency', height = 260, area = true, gran = 'day', compare }) {
-  const c = useChartColors()
+export function TrendChart({ data, x = 'date', series, format = 'currency', height = 260, area = true, gran = 'day', compare, legend = true }) {
+  const ref = useRef(null)
+  const c = useChartColors(ref)
   const gid = useId().replace(/:/g, '')
   const Chart = area ? AreaChart : LineChart
   const colorOf = (s, i) => resolve(s.color, c) || c.series[i % 8]
   return (
-    <div>
-      {series.length > 1 && <Legend items={series.map((s, i) => ({ label: s.label, color: colorOf(s, i), dashed: s.dashed }))} />}
-      <div style={{ height, marginTop: series.length > 1 ? 8 : 0 }}>
+    <div ref={ref}>
+      {legend && series.length > 1 && <Legend items={series.map((s, i) => ({ label: s.label, color: colorOf(s, i), dashed: s.dashed }))} />}
+      <div style={{ height, marginTop: legend && series.length > 1 ? 8 : 0 }}>
         <ResponsiveContainer width="100%" height="100%">
           <Chart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
             <defs>
               {series.map((s, i) => (
                 <linearGradient key={s.key} id={`${gid}-${i}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={colorOf(s, i)} stopOpacity={i === 0 ? 0.28 : 0.08} />
+                  <stop offset="0%" stopColor={colorOf(s, i)} stopOpacity={i === 0 ? 0.22 : 0.06} />
                   <stop offset="100%" stopColor={colorOf(s, i)} stopOpacity={0} />
                 </linearGradient>
               ))}
             </defs>
             <CartesianGrid vertical={false} stroke={c.grid} />
-            <XAxis dataKey={x} tickFormatter={dateTick(gran)} stroke={c.axis} tickLine={false} minTickGap={24} />
-            <YAxis tickFormatter={fmtAxis(format)} stroke={c.axis} tickLine={false} axisLine={false} width={64} />
+            <XAxis dataKey={x} tickFormatter={dateTick(gran)} stroke={c.axis} tickLine={false} axisLine={false} minTickGap={24} dy={6} />
+            <YAxis tickFormatter={fmtAxis(format)} stroke={c.axis} tickLine={false} axisLine={false} width={58} />
             <Tooltip content={<TipBox format={format} series={series} labelFormat={(l) => (typeof l === 'string' && l.length === 10 ? (gran === 'month' ? monthLabel(l) : shortDate(l)) : l)} />}
-              cursor={{ stroke: c.axis, strokeWidth: 1 }} />
+              cursor={{ stroke: c.axis, strokeWidth: 1, strokeDasharray: '3 3' }} />
             {series.map((s, i) => area && !s.dashed ? (
               <Area key={s.key} type="monotone" dataKey={s.key} name={s.label} stroke={colorOf(s, i)} strokeWidth={2}
-                fill={`url(#${gid}-${i})`} fillOpacity={1} dot={false} activeDot={{ r: 5, stroke: c.surface, strokeWidth: 2 }} isAnimationActive={false} />
+                fill={`url(#${gid}-${i})`} fillOpacity={1} dot={false} activeDot={{ r: 5, stroke: c.surface, strokeWidth: 3 }} isAnimationActive={false} />
             ) : (
               <Line key={s.key} type="monotone" dataKey={s.key} name={s.label} stroke={colorOf(s, i)} strokeWidth={2}
                 strokeDasharray={s.dashed ? '5 4' : undefined} dot={false} activeDot={{ r: 4, stroke: c.surface, strokeWidth: 2 }} isAnimationActive={false} />
@@ -109,13 +114,14 @@ export function TrendChart({ data, x = 'date', series, format = 'currency', heig
   )
 }
 
-/** Vertical or horizontal bars for categories. */
-export function BarsChart({ data, x, series, format = 'currency', height = 260, horizontal = false, colorBy }) {
-  const c = useChartColors()
+/** Bars for categories. `highlight(d, i)` picks the bars drawn in the series colour; the rest are drawn in a quiet tone. */
+export function BarsChart({ data, x, series, format = 'currency', height = 260, horizontal = false, colorBy, highlight, xTick }) {
+  const ref = useRef(null)
+  const c = useChartColors(ref)
   const colorOf = (s, i) => resolve(s.color, c) || c.series[i % 8]
   const labelWidth = horizontal ? Math.min(170, Math.max(80, ...data.map((d) => String(d[x]).length * 6.4))) : 0
   return (
-    <div>
+    <div ref={ref}>
       {series.length > 1 && <Legend items={series.map((s, i) => ({ label: s.label, color: colorOf(s, i) }))} />}
       <div style={{ height: horizontal ? Math.max(height, data.length * 30 + 30) : height, marginTop: series.length > 1 ? 8 : 0 }}>
         <ResponsiveContainer width="100%" height="100%">
@@ -128,15 +134,16 @@ export function BarsChart({ data, x, series, format = 'currency', height = 260, 
               </>
             ) : (
               <>
-                <XAxis dataKey={x} stroke={c.axis} tickLine={false} interval="preserveStartEnd" minTickGap={8} />
-                <YAxis tickFormatter={fmtAxis(format)} stroke={c.axis} tickLine={false} axisLine={false} width={64} />
+                <XAxis dataKey={x} stroke={c.axis} tickLine={false} axisLine={false} interval={data.length <= 10 ? 0 : 'preserveStartEnd'} minTickGap={4} tickFormatter={xTick} dy={4} />
+                <YAxis tickFormatter={fmtAxis(format)} stroke={c.axis} tickLine={false} axisLine={false} width={58} />
               </>
             )}
-            <Tooltip content={<TipBox format={format} series={series} />} cursor={{ fill: c.grid, opacity: 0.5 }} />
+            <Tooltip content={<TipBox format={format} series={series} labelFormat={xTick} />} cursor={{ fill: c.grid, opacity: 0.6 }} />
             {series.map((s, i) => (
-              <Bar key={s.key} dataKey={s.key} name={s.label} fill={colorOf(s, i)} radius={horizontal ? [0, 4, 4, 0] : [4, 4, 0, 0]}
-                maxBarSize={horizontal ? 18 : 42} isAnimationActive={false}>
+              <Bar key={s.key} dataKey={s.key} name={s.label} fill={colorOf(s, i)} radius={horizontal ? [0, 5, 5, 0] : [5, 5, 0, 0]}
+                maxBarSize={horizontal ? 18 : 34} isAnimationActive={false}>
                 {colorBy && data.map((d, j) => <Cell key={j} fill={colorBy(d, c)} />)}
+                {!colorBy && highlight && data.map((d, j) => <Cell key={j} fill={highlight(d, j) ? colorOf(s, i) : c['bar-rest']} />)}
               </Bar>
             ))}
           </BarChart>
@@ -168,7 +175,8 @@ export function ShareList({ rows, labelKey, valueKey, format = 'currency', extra
 
 /** History + forecast with an 80% band; optional back-test overlay. */
 export function ForecastChart({ history, forecast, backtest, format = 'currency', height = 320 }) {
-  const c = useChartColors()
+  const ref = useRef(null)
+  const c = useChartColors(ref)
   const bt = Object.fromEntries((backtest || []).map((b) => [b.date, b.predicted]))
   const data = [
     ...history.map((h) => ({ date: h.date, actual: h.actual, backtest: bt[h.date] ?? null })),
@@ -180,7 +188,7 @@ export function ForecastChart({ history, forecast, backtest, format = 'currency'
   }
   const today = forecast[0]?.date
   return (
-    <div>
+    <div ref={ref}>
       <Legend items={[{ label: 'Actual', color: c.s1 }, { label: 'Forecast', color: c.s2 }, { label: '80% range', color: c.s2 + '33' },
         ...(backtest?.length ? [{ label: 'Back-test prediction', color: c.s7, dashed: true }] : [])]} />
       <div style={{ height, marginTop: 8 }}>

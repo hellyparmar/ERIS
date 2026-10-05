@@ -10,7 +10,7 @@ test('admin can open every page without errors', async ({ page }) => {
     ['/suppliers', 'Suppliers'], ['/customers', 'Customers'], ['/invoices', 'Invoices (demo GST)'],
     ['/forecasts', 'Forecasts'], ['/models', 'Model comparison'], ['/insights', 'Anomalies & drivers'],
     ['/analytics', 'Analytics'], ['/reports', 'Reports & export'], ['/outlets', 'Outlets'], ['/import', 'Data import'],
-    ['/audit', 'Audit log'], ['/settings', 'Settings'],
+    ['/audit', 'Audit log'], ['/settings', 'Settings'], ['/help', 'Help & Support'],
   ]
   for (const [path, title] of pages) {
     await page.goto(path)
@@ -118,4 +118,27 @@ test('purchase order can be delivered in parts, then completed', async ({ page }
   await expect(drawer.getByText('Part-delivered').first()).toBeVisible()
   await drawer.getByRole('button', { name: 'Record delivery' }).click()
   await expect(page.getByText(/order complete/)).toBeVisible()
+})
+
+test('a spreadsheet request opens the answer as a sheet that can be downloaded', async ({ page }) => {
+  await login(page)
+  await page.goto('/assistant')
+  await page.getByLabel('Ask a question').fill('Create a spreadsheet of the top 10 products')
+  await page.getByRole('button', { name: 'Ask' }).click()
+  const sheet = page.locator('.sheet')
+  await expect(sheet).toBeVisible({ timeout: 60_000 })
+  await expect(sheet.locator('tr.hdr')).toContainText('Product')
+  await expect(sheet.locator('tbody tr:not(.hdr) td.n').first()).toBeVisible()
+  const [csv] = await Promise.all([page.waitForEvent('download'), sheet.getByRole('button', { name: 'CSV' }).click()])
+  expect(fs.readFileSync(await csv.path(), 'utf8').split('\n').length).toBeGreaterThan(10)
+  await sheet.getByRole('button', { name: 'Close spreadsheet' }).click()
+  await expect(sheet).toHaveCount(0)
+})
+
+test('outlet buttons switch the outlet details', async ({ page }) => {
+  await login(page)
+  await page.goto('/outlets')
+  await page.getByRole('button', { name: 'Koregaon Park', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Koregaon Park' })).toBeVisible()
+  await expect(page.locator('.kpi-value').first()).toBeVisible()
 })

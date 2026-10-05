@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ArrowDownRight, ArrowUpRight, ChevronLeft, ChevronRight, Info, Inbox, X, XCircle } from 'lucide-react'
+import { AlertTriangle, ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Info, Inbox, X, XCircle } from 'lucide-react'
 import { formatValue, pct, titleCase } from '../lib/format'
 
 export function Card({ title, subtitle, actions, children, className = '', flush = false }) {
@@ -22,7 +22,7 @@ export function Card({ title, subtitle, actions, children, className = '', flush
 export function PageHead({ title, subtitle, children, eyebrow }) {
   return (
     <div className="page-head">
-      <div>
+      <div style={{ minWidth: 0 }}>
         {eyebrow && <div className="eyebrow">{eyebrow}</div>}
         <h1>{title}</h1>
         {subtitle && <p>{subtitle}</p>}
@@ -35,26 +35,68 @@ export function PageHead({ title, subtitle, children, eyebrow }) {
 export function Delta({ value, inverse = false, suffix = '' }) {
   if (value === null || value === undefined) return <span className="muted small">no comparison</span>
   const good = inverse ? value < 0 : value >= 0
-  const Icon = value >= 0 ? ArrowUpRight : ArrowDownRight
-  return (
-    <span className={`delta ${good ? 'up' : 'down'}`}>
-      <Icon size={14} aria-hidden="true" />
-      {pct(value)}{suffix}
-    </span>
-  )
+  return <span className={`delta ${good ? 'up' : 'down'}`}>{pct(value)}{suffix}</span>
 }
 
-/** KPI tile: tinted icon chip, headline value, change pill and an optional sparkline (any React node). */
-export function Kpi({ label, value, change, hint, icon: Icon, loading, tone = '', spark, inverse = false }) {
+/** Small round arrow next to a headline number: direction of change, coloured by whether it is good. */
+export function TrendDot({ value, inverse = false }) {
+  if (value === null || value === undefined) return null
+  const good = inverse ? value < 0 : value >= 0
+  const Icon = value >= 0 ? ArrowUp : ArrowDown
+  return <span className={`trend-dot ${good ? 'up' : 'down'}`} aria-hidden="true"><Icon /></span>
+}
+
+/** KPI tile: label with the change pill on the right, the headline number, one line of context. */
+export function Kpi({ label, value, change, hint, loading, spark, inverse = false }) {
   return (
     <div className="card kpi">
       <div className="kpi-top">
-        <div className="kpi-label">{Icon && <span className={`kpi-icon ${tone}`}><Icon aria-hidden="true" /></span>}{label}</div>
-        {change !== undefined && <Delta value={change} inverse={inverse} />}
+        <div className="kpi-label"><span>{label}</span></div>
+        {change !== undefined && change !== null && <Delta value={change} inverse={inverse} />}
       </div>
-      {loading ? <div className="skeleton" style={{ height: 32, width: '70%' }} /> : <div className="kpi-value">{value}</div>}
-      {hint && <div className="kpi-foot">{hint}</div>}
+      <div>
+        {loading ? <div className="skeleton" style={{ height: 30, width: '70%' }} /> : (
+          <div className="kpi-main"><div className="kpi-value">{value}</div><TrendDot value={change} inverse={inverse} /></div>
+        )}
+        {hint && <div className="kpi-foot" style={{ marginTop: 6 }}>{hint}</div>}
+      </div>
       {spark && <div className="kpi-spark">{spark}</div>}
+    </div>
+  )
+}
+
+/** Share-of-total strip with a two-column legend (value and share per item). */
+export function SegmentBar({ items, format = (v) => v, thick = false, legend = true }) {
+  const total = items.reduce((a, i) => a + (i.value || 0), 0) || 1
+  return (
+    <div className="stack" style={{ gap: 14 }}>
+      <div className={`seg-bar ${thick ? 'thick' : ''}`} role="img" aria-label={items.map((i) => `${i.label} ${Math.round((i.value / total) * 100)}%`).join(', ')}>
+        {items.filter((i) => i.value > 0).map((i) => <i key={i.label} style={{ width: `${(i.value / total) * 100}%`, background: i.color }} title={`${i.label}: ${format(i.value)}`} />)}
+      </div>
+      {legend && (
+        <div className="seg-legend">
+          {items.map((i) => (
+            <div key={i.label}><span><i className="swatch" style={{ background: i.color }} />{i.label}</span><b>{format(i.value)}</b></div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Half-circle gauge for a 0-100 share (e.g. margin, loyalty share). */
+export function Gauge({ value, max = 100, label, caption, color = 'var(--s1)', size = 210 }) {
+  const r = 80
+  const len = Math.PI * r
+  const frac = Math.max(0, Math.min(1, (value || 0) / max))
+  return (
+    <div className="gauge" style={{ width: size, maxWidth: '100%', margin: '0 auto' }}>
+      <svg viewBox="0 0 200 112" width="100%" role="img" aria-label={`${label}: ${caption}`}>
+        <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="var(--surface-3)" strokeWidth="14" strokeLinecap="round" />
+        <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke={color} strokeWidth="14" strokeLinecap="round"
+          strokeDasharray={`${len * frac} ${len}`} />
+      </svg>
+      <div className="label"><b>{label}</b><span>{caption}</span></div>
     </div>
   )
 }

@@ -47,7 +47,7 @@ await p.waitForTimeout(2500)
 await shot(p, 'dashboard')
 
 await p.goto(BASE + '/assistant')
-await p.getByRole('button', { name: 'Clear chat' }).click().catch(() => {})
+await p.getByRole('button', { name: 'New chat' }).first().click().catch(() => {})
 await p.getByLabel('Ask a question').fill('Which outlet had the highest revenue last month?')
 await p.getByRole('button', { name: 'Ask' }).click()
 await p.waitForSelector('.provenance', { timeout: 60_000 })
