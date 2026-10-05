@@ -130,7 +130,8 @@ async def middleware(request: Request, call_next):
     if body is not None:
         return Response(body, media_type="application/json", headers={"X-Cache": "hit"})
     response = await call_next(request)
-    if response.status_code != 200 or not response.headers.get("content-type", "").startswith("application/json"):
+    if response.status_code != 200 or not response.headers.get("content-type", "").startswith("application/json") \
+            or "no-store" in response.headers.get("cache-control", ""):
         return response
     chunks = [chunk async for chunk in response.body_iterator]
     raw = b"".join(c if isinstance(c, bytes) else c.encode() for c in chunks)

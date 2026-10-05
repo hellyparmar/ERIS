@@ -4,6 +4,11 @@ on:
   push:
   pull_request:
 
+# Least privilege: jobs can read the code and nothing else - no writes, no secrets (none are referenced), and
+# checkout leaves no git credentials behind for later steps. Actions are pinned to commits (Dependabot bumps them).
+permissions:
+  contents: read
+
 # A newer push to the same branch cancels the run that is still going
 concurrency:
   group: ci-${{ github.ref }}
@@ -17,8 +22,9 @@ jobs:
       run:
         working-directory: api
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6.1.0
+        with: { persist-credentials: false }
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6.3.0
         with:
           python-version: "3.11"
           cache: pip
@@ -50,8 +56,9 @@ jobs:
     env:
       TEST_DATABASE_URL: postgresql+psycopg2://eris:eris@localhost:5432/eris_test
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6.1.0
+        with: { persist-credentials: false }
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6.3.0
         with:
           python-version: "3.11"
           cache: pip
@@ -68,8 +75,9 @@ jobs:
       run:
         working-directory: web
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6.1.0
+        with: { persist-credentials: false }
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38  # v6.5.0
         with:
           node-version: "22"
           cache: npm
@@ -82,13 +90,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6.1.0
+        with: { persist-credentials: false }
       # the build also prepares the demo database (data, forecasts, page answers): a few minutes
       - run: docker build -t eris .
-      # the image must start fast with the demo ready: sign in and get the dashboard from the prepared answers
+      # the image must start fast with the demo ready: sign in and get the dashboard from the prepared answers.
+      # It runs as on a small host (512 MB) with no Linux capabilities, and the server may not change its own code.
       - run: |
-          docker run -d --name eris -p 8080:8080 -e PORT=8080 \
-            -e JWT_SECRET_KEY=ci-only-secret-0123456789-0123456789-abcdef eris
+          docker run -d --name eris -p 8080:8080 -e PORT=8080 --memory 512m --cap-drop ALL \
+            --security-opt no-new-privileges -e JWT_SECRET_KEY=ci-only-secret-0123456789-0123456789-abcdef eris
           for i in $(seq 60); do curl -fs http://localhost:8080/api/health && break; sleep 2; done
           # sign in with the demo admin the image lists for its sign-in page (no password in this file)
           curl -fs http://localhost:8080/api/auth/demo-accounts \
@@ -99,6 +109,7 @@ jobs:
           grep -i "x-cache: hit" headers.txt
           python3 -c "import json;d=json.load(open('dashboard.json'));assert d['kpis']['current']['orders']>1000, d['kpis']"
           curl -fs http://localhost:8080/ | grep -q '<div id="root">'
+          docker exec eris sh -c 'test "$(id -u)" != 0 && ! touch /app/api/app/probe 2>/dev/null && touch /app/api/data/probe'
       - if: failure()
         run: docker logs eris
 
@@ -107,15 +118,16 @@ jobs:
     timeout-minutes: 30
     needs: [api, web]
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6.1.0
+        with: { persist-credentials: false }
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6.3.0
         with:
           python-version: "3.11"
           cache: pip
           cache-dependency-path: |
             api/requirements*.txt
             api/constraints.txt
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38  # v6.5.0
         with:
           node-version: "22"
           cache: npm
@@ -129,7 +141,7 @@ jobs:
         working-directory: e2e
       - run: npm test
         working-directory: e2e
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6.0.0
         if: failure()
         with:
           name: playwright-results

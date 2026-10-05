@@ -11,6 +11,14 @@ on:
     - cron: "17 21 * * 0"  # Sundays 21:17 UTC (early Monday in India)
   workflow_dispatch:
 
+# The job only calls the deploy hook: it gets no repository token and no code checkout, and the hook secret is
+# the only secret it can read.
+permissions: {}
+
+concurrency:
+  group: refresh-demo
+  cancel-in-progress: false
+
 jobs:
   redeploy:
     runs-on: ubuntu-latest

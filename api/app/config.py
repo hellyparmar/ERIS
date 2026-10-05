@@ -36,6 +36,12 @@ class Settings(BaseSettings):
     INITIAL_ADMIN_EMAIL: str | None = None
     INITIAL_ADMIN_PASSWORD: str | None = None
 
+    # Model fitting is the heaviest work the API does. At most this many fits run at once, so a burst of forecast
+    # requests cannot take every worker thread (or the whole CPU of a small server) from the other pages; a
+    # request that cannot start a fit within FORECAST_WAIT_SECONDS gets a quick "busy, try again" (HTTP 503).
+    FORECAST_WORKERS: int = 1
+    FORECAST_WAIT_SECONDS: float = 20.0
+
     # Optional local LLM (free, open source) via Ollama: https://ollama.com
     # The assistant works fully without it (built-in analytics engine);
     # when available the LLM is used to understand free-form questions and phrase answers.

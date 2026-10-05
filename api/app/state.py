@@ -1,4 +1,5 @@
 """Process-wide state for background jobs (demo data generation)."""
+import os
 import threading
 
 _lock = threading.Lock()
@@ -26,3 +27,13 @@ def set_job(name: str, **fields) -> None:
 def job_state(name: str) -> dict:
     with _lock:
         return dict(_jobs.get(name, {"running": False, "message": None}))
+
+
+def lower_thread_priority(niceness: int = 10) -> None:
+    """Run the calling background thread behind the request threads, so a long job uses spare CPU instead of
+    slowing the pages people are waiting on. Only for jobs that do not hold the database write lock while they
+    work (a starved lock holder would stall every writer). Linux only; a no-op elsewhere."""
+    try:
+        os.setpriority(os.PRIO_PROCESS, threading.get_native_id(), niceness)
+    except (AttributeError, OSError):
+        pass

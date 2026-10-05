@@ -227,6 +227,8 @@ def model_performance(c: Ctx) -> dict:
         spec = F.build_spec(c.db, "total", None, c.outlet_ids)
     try:
         fc = F.forecast_series(c.db, spec, horizon=14)
+    except F.ForecastBusy:
+        return result("Forecasts are busy right now - please ask again in a few seconds.")
     except ValueError as exc:
         return result(f"I couldn't evaluate the models for {spec.label}: {exc}", meta={"notes": [str(exc)]})
     scored = sorted([e for e in fc["evaluation"] if e.get("wape") is not None], key=lambda e: e["wape"])
