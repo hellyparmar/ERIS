@@ -2,7 +2,7 @@
 import threading
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
@@ -15,7 +15,7 @@ from app.services import analytics as A
 from app.services import forecasting as F
 from app.services.alerts import compute_alerts
 from app.services.assistant import engine, llm
-from app.state import job_state, set_job
+from app.state import job_state, lower_thread_priority, set_job
 
 router = APIRouter(prefix="/api", tags=["insights"])
 
@@ -26,8 +26,8 @@ def _range(db: Session, period: str | None, start: date | None, end: date | None
 
 # ------------------------------------------------------------------------------------------ dashboard
 @router.get("/dashboard")
-def dashboard(period: str = "30d", outlet_id: int | None = None, start: date | None = None, end: date | None = None,
-              user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def dashboard(response: Response, period: str = "30d", outlet_id: int | None = None, start: date | None = None,
+              end: date | None = None, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     outlet_ids = scoped_outlet_ids(user, outlet_id)
     rng = _range(db, period, start, end)
     prev = A.comparable_period(rng)[0]  # month to date is compared with the same days of last month
@@ -39,6 +39,8 @@ def dashboard(period: str = "30d", outlet_id: int | None = None, start: date | N
         fc = F.forecast_series(db, spec, horizon=14, persist=False)
         forecast = {"summary": fc["summary"], "forecast": fc["forecast"], "model_label": fc["model_label"],
                     "events": fc["events"]}
+    except F.ForecastBusy:
+        response.headers["Cache-Control"] = "no-store"  # the page is complete apart from the forecast: not kept
     except Exception:
         pass
     return {
@@ -269,6 +271,7 @@ def _run_evaluation(origins: int, products: int, user_id: int) -> None:
     from app.db import SessionLocal
     from app.evaluation import evaluate, save_run
 
+    lower_thread_priority()
     set_job("evaluation", running=True, message="Starting rolling-origin evaluation...", started=_t.time())
     try:
         with SessionLocal() as db:

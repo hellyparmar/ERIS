@@ -16,6 +16,7 @@ from app.db import SessionLocal, migrate, write_engine
 from app.routers import auth, catalog, imports, insights, inventory, outlets, partners, records, sales
 from app.routers import settings as settings_router
 from app.services import audit as _audit  # noqa: F401  (registers the audit hook)
+from app.services import forecasting as F
 from app.services import response_cache
 from app.state import seeding_state, set_seeding
 
@@ -28,7 +29,6 @@ WEB_DIST = Path(__file__).resolve().parents[2] / "web" / "dist"
 def _refresh_demo_dates() -> None:
     from app.seed.refresh import shift_demo_dates
     from app.services import analytics as A
-    from app.services import forecasting as F
 
     try:
         with SessionLocal(bind=write_engine()) as db:
@@ -107,6 +107,12 @@ app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins, allow_or
 
 for r in (auth, settings_router, outlets, catalog, partners, inventory, sales, imports, insights, records):
     app.include_router(r.router)
+
+
+@app.exception_handler(F.ForecastBusy)
+async def forecast_busy(_: Request, exc: F.ForecastBusy):
+    return JSONResponse(status_code=503, content={"detail": str(exc)},
+                        headers={"Retry-After": "5", "Cache-Control": "no-store"})
 
 
 @app.exception_handler(Exception)

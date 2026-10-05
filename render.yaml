@@ -1,7 +1,7 @@
 # Render Blueprint: a free hosted ERIS demo (https://render.com -> New -> Blueprint -> pick this repository).
-# The free plan has no persistent disk, so the SQLite database lives in the container: the synthetic demo is
-# generated on each start (about a minute) and changes made in the demo are lost when the service restarts or
-# sleeps. For a lasting deployment attach a PostgreSQL database and set DATABASE_URL.
+# The demo database is prepared while the image is built (see the Dockerfile), so the service starts in seconds
+# with data, forecasts and page answers ready. The free plan has no persistent disk: changes made in the demo are
+# lost when the service restarts or sleeps. For a lasting deployment attach PostgreSQL and set DATABASE_URL.
 services:
   - type: web
     name: eris

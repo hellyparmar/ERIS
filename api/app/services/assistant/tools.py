@@ -444,6 +444,8 @@ def forecast(c: Ctx) -> dict:
         else:
             spec = F.build_spec(c.db, "total", None, c.outlet_ids)
         fc = F.forecast_series(c.db, spec, horizon=horizon)
+    except F.ForecastBusy:
+        return result("Forecasts are busy right now - please ask again in a few seconds.")
     except ValueError as exc:
         return result(f"I couldn't build a forecast: {exc}")
     s = fc["summary"]

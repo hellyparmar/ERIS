@@ -3,6 +3,11 @@
 Flow: inspect (headers, suggested column mapping, sample rows) -> dry run (full validation, per-row errors,
 preview, nothing written) -> commit (all-or-nothing per file). Every run is recorded as an ImportJob with its
 error report (downloadable as CSV); committed sales carry the job id so an import can be traced afterwards.
+
+Isolation: each file is validated and written inside one database transaction that is committed only when the
+whole file is valid and the user asked to import (a dry run or a file with errors is rolled back, so other users
+never see its rows). Imports also run one at a time - SQLite's write lock does this already, PostgreSQL takes an
+advisory lock - so two uploads of the same file cannot both pass the duplicate-invoice check.
 """
 from __future__ import annotations
 
@@ -14,7 +19,7 @@ from collections import OrderedDict
 from datetime import datetime, time
 
 from fastapi import HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from app.models import PAYMENT_METHODS, Category, Customer, ImportJob, Outlet, Product, Sale, Supplier, User
@@ -25,6 +30,7 @@ from app.services.sales import LineInput, SaleInput, create_sale, normalize_phon
 MAX_ROWS = 50_000
 MAX_ERRORS = 200
 MAX_LINE_QTY = 100_000  # same limit as manual billing
+IMPORT_LOCK_KEY = 0x45524953  # "ERIS": PostgreSQL advisory lock that runs imports one at a time
 
 TEMPLATES: dict[str, dict] = {
     "sales": {
@@ -291,6 +297,8 @@ def run_import(db: Session, kind: str, content: bytes, user: User, dry_run: bool
               "errors": [], "warnings": [], "preview": [], "skipped_duplicates": 0, "job_id": job_id}
     db.info["audit_bulk"] = True
     try:
+        if db.get_bind().dialect.name == "postgresql":
+            db.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": IMPORT_LOCK_KEY})  # until commit/rollback
         handler(db, rows, user, result, {"update_stock": update_stock, "skip_duplicates": skip_duplicates,
                                          "import_id": job_id})
         committed = not dry_run and not result["errors"]

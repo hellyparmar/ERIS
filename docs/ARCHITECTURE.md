@@ -119,6 +119,32 @@ Moving a stale demo's dates forward (all dated rows, forecast runs included) run
 start-up in one transaction: the app serves the previous dates until it commits. Record timestamps use the
 business clock (Asia/Kolkata by default), like sales.
 
+## Isolation
+
+Each pipeline is kept apart from the others, so a slow or failing one cannot take the rest down:
+
+- **CI** (`.github/workflows`). The workflow token can only read the code; no job references a secret; checkout
+  leaves no git credentials for later steps; actions are pinned to commits (Dependabot proposes updates). The
+  weekly refresh workflow has no token and no checkout, and can read only its deploy-hook secret. CI runs the
+  built image with 512 MB, no Linux capabilities and `no-new-privileges`, and checks the server cannot write to
+  its own code.
+- **Demo data** (`Dockerfile`). Preparing the demo is its own build stage, run without network access, so the demo
+  comes only from this repository. The final image receives just the data directory; the server runs as a
+  non-root user that owns that directory and nothing else.
+- **Forecasting** (`services/forecasting.py`). Model fitting, the heaviest work, holds one of `FORECAST_WORKERS`
+  slots (default 1). A request that cannot get a slot within `FORECAST_WAIT_SECONDS` (default 20) gets a fast
+  503 with `Retry-After`, which the web app retries. So a burst of forecast requests cannot use up the request
+  threads, and the other pages keep answering. The dashboard then answers without its forecast, and that
+  partial answer is not cached. The assistant says forecasts are busy. The background model evaluation runs at
+  lower CPU priority.
+- **CSV imports** (`services/importer.py`). A file is validated and written in one transaction, committed only
+  when the whole file is valid and the user asked to import. A dry run, or a file with errors, is rolled back,
+  and other users never see its rows. Imports run one at a time: SQLite's write lock does this, and PostgreSQL
+  takes an advisory lock. So two uploads of the same file cannot both pass the duplicate-invoice check; the
+  later one skips the bill cleanly. A server failure mid-import rolls the data back and marks the import failed.
+
+`tests/test_isolation.py` covers the forecasting slots, the dry run, concurrent imports and a failed import.
+
 ## Starting without the demo data
 
 Set `SEED_DEMO_DATA=false` with `INITIAL_ADMIN_EMAIL` and `INITIAL_ADMIN_PASSWORD` and the first start creates an
@@ -296,6 +322,6 @@ flowchart LR
 
 | Layer | What |
 |---|---|
-| API (pytest, 105 tests) | Business rules, imports, roles, refresh tokens, audit, invoices, reports, forecasting, anomalies, drivers, assistant. Runs on SQLite and PostgreSQL (CI job `api-postgres`). |
+| API (pytest, 110 tests) | Business rules, imports, roles, refresh tokens, audit, invoices, reports, forecasting, anomalies, drivers, assistant. Runs on SQLite and PostgreSQL (CI job `api-postgres`). |
 | End-to-end (Playwright, `e2e/`) | Every page as admin; sale → invoice → PDF; import with column mapping; assistant provenance; purchase order delivered in parts; report downloads; viewer read-only; area manager outlet switching; token refresh; phone layout |
 | Model evaluations | `python -m app.evaluation` (forecasting), `python -m app.assistant_eval` (assistant grounding), anomaly precision and recall (Anomalies & drivers page, notebook) |

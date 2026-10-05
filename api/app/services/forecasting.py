@@ -24,6 +24,7 @@ import math
 import threading
 import time
 import warnings
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date, timedelta
 
@@ -33,6 +34,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app import clock
+from app.config import settings
 from app.db import write_session
 from app.models import (
     OPEN_PO_STATUSES,
@@ -242,6 +244,34 @@ CACHE_SECONDS = 900
 
 def _data_version(db: Session) -> tuple:
     return tuple(db.execute(select(func.count(Sale.id), func.max(Sale.id), func.max(Sale.sale_date))).one())
+
+
+class ForecastBusy(RuntimeError):
+    """No model-fitting slot came free in time: the caller should try again in a few seconds."""
+
+
+_fit_slots = threading.BoundedSemaphore(max(1, settings.FORECAST_WORKERS))
+
+
+@contextmanager
+def fit_slot():
+    """Hold one of the FORECAST_WORKERS model-fitting slots (see config.py) while fitting."""
+    if not _fit_slots.acquire(timeout=settings.FORECAST_WAIT_SECONDS):
+        raise ForecastBusy("Forecasts are busy right now - please try again in a few seconds.")
+    try:
+        yield
+    finally:
+        _fit_slots.release()
+
+
+def _cached(key: tuple):
+    with _cache_lock:
+        hit = _cache.get(key)
+    if hit and time.time() - hit[0] < CACHE_SECONDS:
+        if isinstance(hit[1], ValueError):
+            raise hit[1]  # the same data cannot be forecast: answer again without another failed run
+        return hit[1]
+    return None
 
 
 def clear_cache() -> None:
@@ -464,12 +494,9 @@ def forecast_series(db: Session, spec: SeriesSpec, horizon: int = 30, model: str
     end = A.anchor_date(db)
     key = (spec.scope, spec.target, tuple(spec.outlet_ids or []), spec.category_id, spec.product_id, horizon, model,
            _data_version(db))
-    with _cache_lock:
-        hit = _cache.get(key)
-        if hit and time.time() - hit[0] < CACHE_SECONDS:
-            if isinstance(hit[1], ValueError):
-                raise hit[1]  # the same data cannot be forecast: answer again without another failed run
-            return hit[1]
+    hit = _cached(key)
+    if hit is not None:
+        return hit
 
     t0 = time.time()
     series = None
@@ -481,8 +508,12 @@ def forecast_series(db: Session, spec: SeriesSpec, horizon: int = 30, model: str
         if result is not None:
             result.pop("cache_run_id", None)
         if result is None:
-            exog = load_exog(db, spec, series, horizon)
-            result = run_forecast(series, horizon, model, exog)
+            with fit_slot():
+                hit = _cached(key)  # an identical request may have finished while this one waited for the slot
+                if hit is not None:
+                    return hit
+                exog = load_exog(db, spec, series, horizon)
+                result = run_forecast(series, horizon, model, exog)
             # history runs show in Model comparison; "cache" runs only let the next identical request skip fitting
             result["run_id"] = _persist(spec, series, horizon, result, None, time.time() - t0, user_id,
                                         run_type="forecast" if persist else "cache", requested=model)
