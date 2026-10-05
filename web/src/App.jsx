@@ -22,6 +22,7 @@ const Insights = lazy(() => import('./pages/Insights'))
 const Reports = lazy(() => import('./pages/Reports'))
 const Invoices = lazy(() => import('./pages/Invoices'))
 const AuditLog = lazy(() => import('./pages/AuditLog'))
+const Help = lazy(() => import('./pages/Help'))
 
 /** Pages a role cannot use show a clear message instead of failing API calls (the API enforces it too). */
 function Guard({ allow, children }) {
@@ -60,6 +61,7 @@ export default function App() {
           <Route path="insights" element={<Insights />} />
           <Route path="reports" element={<Reports />} />
           <Route path="invoices" element={<Invoices />} />
+          <Route path="help" element={<Help />} />
           <Route path="audit" element={<Guard allow={['admin']}><AuditLog /></Guard>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>

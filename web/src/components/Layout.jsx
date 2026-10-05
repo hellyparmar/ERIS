@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  Activity, BarChart3, Bell, Boxes, Bot, Building2, Contact, FileSpreadsheet, FileText, FlaskConical, History,
-  LayoutDashboard, LogOut, Menu, Moon, Package, Receipt, Settings, Store, Sun, TrendingUp, Truck, Upload, Monitor, UserRound,
+  Activity, BarChart3, Bell, Boxes, Bot, Building2, Contact, FileSpreadsheet, FileText, FlaskConical, History, LayoutDashboard,
+  LifeBuoy, LogOut, Menu, Moon, Package, PanelLeftClose, PanelLeftOpen, Receipt, Settings, Store, Sun, TrendingUp, Truck, Upload,
+  Monitor, UserRound,
 } from 'lucide-react'
 import { api } from '../lib/api'
 import { useApp } from '../lib/app'
@@ -31,19 +32,30 @@ const NAV = [
   { to: '/outlets', label: 'Outlets', icon: Store },
   { to: '/import', label: 'Data import', icon: Upload, manager: true },
   { to: '/audit', label: 'Audit log', icon: History, admin: true },
-  { to: '/settings', label: 'Settings', icon: Settings },
 ]
+const SECTION_OF = {}
+let current = null
+NAV.forEach((n) => { if (n.section) current = n.section; else SECTION_OF[n.to] = [current, n.label] })
+SECTION_OF['/settings'] = ['Account', 'Settings']
+SECTION_OF['/help'] = ['Account', 'Help & Support']
+
+function Crumbs() {
+  const { pathname } = useLocation()
+  const [section, label] = SECTION_OF[pathname] || []
+  if (!label) return <div className="crumbs" />
+  return <div className="crumbs">{section}<span aria-hidden="true">/</span><b>{label}</b></div>
+}
 
 function OutletPicker() {
   const { user, outlets, outletId, setOutletId } = useApp()
   if (!user) return null
   const mine = user.role === 'admin' ? outlets : outlets.filter((o) => user.outlet_ids.includes(o.id))
   if (user.role !== 'admin' && mine.length <= 1) {
-    return <span className="badge info"><Building2 size={12} />{user.outlet_names?.[0] || 'My outlet'}</span>
+    return <span className="pill"><Building2 size={15} />{user.outlet_names?.[0] || 'My outlet'}</span>
   }
   return (
-    <select className="select" value={outletId || ''} onChange={(e) => setOutletId(e.target.value ? Number(e.target.value) : null)}
-      aria-label="Outlet filter" style={{ maxWidth: 220 }}>
+    <select className="pill" value={outletId || ''} onChange={(e) => setOutletId(e.target.value ? Number(e.target.value) : null)}
+      aria-label="Outlet filter" style={{ maxWidth: 230 }}>
       <option value="">{user.role === 'admin' ? 'All outlets' : 'All my outlets'}</option>
       {mine.map((o) => <option key={o.id} value={o.id}>{o.name}{o.is_active ? '' : ' (inactive)'}</option>)}
     </select>
@@ -58,9 +70,9 @@ function AlertsBell() {
   const navigate = useNavigate()
   return (
     <div style={{ position: 'relative' }}>
-      <button className="btn ghost icon" onClick={() => setOpen((o) => !o)} aria-label={`Alerts (${urgent} need attention)`} aria-expanded={open}>
+      <button className="btn icon round" onClick={() => setOpen((o) => !o)} aria-label={`Alerts (${urgent} need attention)`} aria-expanded={open}>
         <Bell />
-        {urgent > 0 && <span style={{ position: 'absolute', top: 2, right: 2, background: 'var(--bad)', color: '#fff', borderRadius: 999, fontSize: 10, minWidth: 16, height: 16, display: 'grid', placeItems: 'center', fontWeight: 700 }}>{urgent}</span>}
+        {urgent > 0 && <span style={{ position: 'absolute', top: -3, right: -3, background: 'var(--bad)', color: '#fff', borderRadius: 999, fontSize: 10, minWidth: 16, height: 16, display: 'grid', placeItems: 'center', fontWeight: 700 }}>{urgent}</span>}
       </button>
       {open && (
         <>
@@ -87,7 +99,7 @@ function ThemeButton() {
   const { theme, setTheme } = useApp()
   const next = { system: 'light', light: 'dark', dark: 'system' }[theme]
   const Icon = theme === 'light' ? Sun : theme === 'dark' ? Moon : Monitor
-  return <button className="btn ghost icon" onClick={() => setTheme(next)} aria-label={`Theme: ${theme}. Switch to ${next}`} title={`Theme: ${theme}`}><Icon /></button>
+  return <button className="btn icon round" onClick={() => setTheme(next)} aria-label={`Theme: ${theme}. Switch to ${next}`} title={`Theme: ${theme}`}><Icon /></button>
 }
 
 export const initialsOf = (name = '') => name.replace(/\(.*\)/, '').split(/[^A-Za-z]+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '?'
@@ -138,34 +150,55 @@ function PreparingBanner() {
   )
 }
 
+function readCollapsed() {
+  try { return localStorage.getItem('eris.sidebar') === 'collapsed' } catch { return false }
+}
+
 export default function Layout() {
   const { org, isManager, isAdmin } = useApp()
   const [open, setOpen] = useState(false)
+  const [collapsed, setCollapsed] = useState(readCollapsed)
   const location = useLocation()
   useEffect(() => setOpen(false), [location.pathname])
   const sys = useQuery({ queryKey: ['system'], queryFn: () => api('/settings/system'), staleTime: 300_000 })
+  const toggle = () => setCollapsed((c) => {
+    try { localStorage.setItem('eris.sidebar', c ? 'open' : 'collapsed') } catch { /* private mode: not remembered */ }
+    return !c
+  })
+  const link = (n) => (
+    <NavLink key={n.to} to={n.to} end={n.end} title={collapsed ? n.label : undefined}
+      className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+      <n.icon aria-hidden="true" /><span>{n.label}</span>{n.badge && <span className="nav-badge">{n.badge}</span>}
+    </NavLink>
+  )
 
   return (
-    <div className="app">
+    <div className={`app ${collapsed ? 'collapsed' : ''}`}>
       <div className={`scrim ${open ? 'open' : ''}`} onClick={() => setOpen(false)} />
       <nav className={`sidebar ${open ? 'open' : ''}`} aria-label="Main">
         <div className="brand">
           <div className="brand-mark">E</div>
-          <div><b>ERIS</b><small>Retail Intelligence</small></div>
+          <div className="brand-text"><b>ERIS</b><small>Retail Intelligence</small></div>
+          <button className="btn ghost sm icon collapse-btn" onClick={toggle} aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>{collapsed ? <PanelLeftOpen /> : <PanelLeftClose />}</button>
         </div>
         {NAV.filter((n) => (!n.manager || isManager) && (!n.admin || isAdmin)).map((n) => n.section
-          ? <div key={n.section} className="nav-section">{n.section}</div>
-          : <NavLink key={n.to} to={n.to} end={n.end} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><n.icon />{n.label}{n.badge && <span className="nav-badge">{n.badge}</span>}</NavLink>)}
+          ? <div key={n.section} className="nav-section">{n.section}</div> : link(n))}
         <div className="sidebar-foot">
-          <b>{org?.name || 'ERIS'}</b>
-          {sys.data?.data_to && <span className="live">Data to {date(sys.data.data_to)}</span>}
+          {link({ to: '/help', label: 'Help & Support', icon: LifeBuoy })}
+          {link({ to: '/settings', label: 'Settings', icon: Settings })}
+          <div className="sidebar-org">
+            <b>{org?.name || 'ERIS'}</b>
+            {sys.data?.data_to && <span className="live">Data to {date(sys.data.data_to)}</span>}
+          </div>
         </div>
       </nav>
       <div className="main">
         <header className="topbar">
           <button className="btn ghost icon menu-btn" onClick={() => setOpen(true)} aria-label="Open menu"><Menu /></button>
-          <OutletPicker />
+          <Crumbs />
           <div className="spacer" />
+          <OutletPicker />
           <AlertsBell />
           <ThemeButton />
           <UserMenu />

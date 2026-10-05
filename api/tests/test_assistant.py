@@ -134,3 +134,32 @@ def test_period_after_the_latest_data_answers_for_the_latest_week(client, admin)
     assert r["intent"] == "sales_summary"
     assert "No sales are recorded for" in r["answer"] and "latest 7 days" in r["answer"]
     assert "revenue was" in r["answer"]
+
+
+@pytest.mark.parametrize("question,intent", [
+    ("Create a spreadsheet of the top 10 products", "top_products"),
+    ("Export a csv of payment methods", "payment_mix"),
+    ("Show category mix this month as a spreadsheet", "category_mix"),
+])
+def test_spreadsheet_requests_are_answered_with_a_table(client, admin, question, intent):
+    """Asking for a spreadsheet, table or CSV is a request to see data, not to change it."""
+    body = client.post("/api/assistant/chat", headers=admin, json={"message": question}).json()
+    assert body["intent"] == intent
+    tables = [b for b in body["blocks"] if b["type"] == "table"]
+    assert tables and tables[0]["rows"] and tables[0]["columns"]
+
+
+def test_create_requests_that_change_data_are_still_refused(client, admin):
+    body = client.post("/api/assistant/chat", headers=admin, json={"message": "Create a new product called Tea"}).json()
+    assert body["intent"] == "action_request" and "never create" in body["answer"]
+
+
+@pytest.mark.parametrize("question", ["How do I transfer stock between outlets?", "How do I void a sale?"])
+def test_how_to_questions_are_answered_from_the_docs(client, admin, question):
+    body = client.post("/api/assistant/chat", headers=admin, json={"message": question}).json()
+    assert body["intent"] == "knowledge" and body["provenance"]["sources"]
+
+
+def test_moving_stock_is_left_to_the_inventory_page(client, admin):
+    body = client.post("/api/assistant/chat", headers=admin, json={"message": "Move stock from Andheri to Indiranagar"}).json()
+    assert body["intent"] == "action_request"

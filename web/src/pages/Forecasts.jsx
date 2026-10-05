@@ -164,7 +164,7 @@ function Result({ fc, showBacktest, setShowBacktest }) {
         </Card>
         <Card title="Daily forecast" subtitle="With the 80% range" flush>
           <DataTable maxHeight={430} rows={fc.forecast} sortable={false} columns={[
-            { key: 'date', label: 'Date', render: (r) => date(r.date, { weekday: 'short', day: 'numeric', month: 'short' }) },
+            { key: 'date', label: 'Date', render: (r) => <span className="nowrap">{date(r.date, { weekday: 'short', day: 'numeric', month: 'short' })}</span> },
             { key: 'yhat', label: 'Forecast', format: fmt }, { key: 'lower', label: 'Low', format: fmt }, { key: 'upper', label: 'High', format: fmt },
           ]} />
         </Card>

@@ -171,6 +171,22 @@ def _provenance(db: Session, parsed: Parsed, ctx: Ctx | None, out: dict, ms: flo
     }
 
 
+def _ensure_table(out: dict) -> None:
+    """Asked for a spreadsheet or table: when the answer has a chart but no table, add the chart's data as one."""
+    blocks = out.get("blocks") or []
+    if any(b.get("type") == "table" for b in blocks):
+        return
+    chart = next((b for b in blocks if b.get("type") == "chart" and b.get("data")), None)
+    if chart is None:
+        return
+    fmt = chart.get("format") or "number"
+    columns = [{"key": chart["x"], "label": chart["x"].replace("_", " ").capitalize()}]
+    columns += [{"key": s["key"], "label": s.get("label") or s["key"], "format": s.get("format") or fmt} for s in chart["series"]]
+    blocks.append({"type": "table", "title": chart.get("title") or "Data", "columns": columns,
+                   "rows": [{c["key"]: row.get(c["key"]) for c in columns} for row in chart["data"]]})
+    out["blocks"] = blocks
+
+
 def answer(db: Session, user: User, message: str) -> dict:
     message = (message or "").strip()[:500]
     anchor = A.anchor_date(db)
@@ -238,6 +254,8 @@ def answer(db: Session, user: User, message: str) -> dict:
         except Exception:
             log.exception("assistant tool %s failed", parsed.intent)
             out = result("Sorry - something went wrong while analysing that. Please try rephrasing the question.")
+    if "as_table" in parsed.flags:
+        _ensure_table(out)
     if ctx is not None and ctx.fallback:  # the period asked for has no data yet: say which one was answered
         asked, answered, latest = ctx.fallback
         out["answer"] = (f"No sales are recorded for **{asked}** yet - the data runs to **{latest:%a %d %b}**, so this "
