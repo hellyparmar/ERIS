@@ -51,3 +51,15 @@ test('a demo-account card signs in, and a suggested question opens the assistant
   await expect(page).toHaveURL(/\/assistant/)
   await expect(page.locator('.msg.bot .provenance')).toBeVisible({ timeout: 60_000 })
 })
+
+test('a newly opened page starts at its title, not where the last page was scrolled to', async ({ page }) => {
+  await login(page)
+  await page.getByRole('link', { name: 'Sales', exact: true }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Sales' })).toBeVisible()
+  await expect(page.locator('.pager')).toBeVisible()
+  await page.evaluate(() => window.scrollTo(0, 1500))
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(200)
+  await page.getByRole('link', { name: 'Products', exact: true }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Products' })).toBeInViewport()
+  expect(await page.evaluate(() => window.scrollY)).toBe(0)
+})
