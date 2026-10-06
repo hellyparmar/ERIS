@@ -10,6 +10,8 @@ several outlets (five by default, up to seven). It brings together:
 
 Every number traces back to the data.
 
+**Live demo:** [eris-retail.vercel.app](https://eris-retail.vercel.app), with the API on [eris-tvro.onrender.com](https://eris-tvro.onrender.com). Pick a demo role on the sign-in page. The free server sleeps when idle, so the first visit can take up to a minute.
+
 > **Synthetic-data project.** ERIS runs on a deterministic, documented synthetic dataset for a fictional
 > chain, *Urban Harvest Foods*. It is a portfolio and learning project. It is **not** a production ERP, and it
 > is **not** a GST-compliant invoicing system: the GSTINs are synthetic and every invoice is watermarked
