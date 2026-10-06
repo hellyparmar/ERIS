@@ -115,7 +115,10 @@ def test_explicit_dates_and_like_for_like_baseline(client, admin):
     first = body["provenance"]["filters"]["periods"][0]
     assert "-09-01 to " in first and first.endswith("-09-15")
     week = ask(client, admin, "sales this week")
-    assert "a week earlier" in week["provenance"]["filters"]["periods"][1]
+    # the same weekdays one week before: "the same day last week" when the week so far is one day (e.g. on a
+    # Tuesday with data to Monday), otherwise "the same days a week earlier"
+    baseline = week["provenance"]["filters"]["periods"][1]
+    assert baseline.startswith(("the same day last week", "the same days a week earlier")), baseline
     future = ask(client, admin, "sales between 2030-01-01 and 2030-01-31")
     assert "No sales are recorded for" in future["answer"] and "latest 31 days" in future["answer"]  # same length
 

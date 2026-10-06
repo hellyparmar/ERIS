@@ -6,6 +6,8 @@ import App from './App'
 import { AppProvider, ToastProvider } from './lib/app'
 import '@fontsource-variable/geist'
 import '@fontsource-variable/geist-mono'
+import '@fontsource-variable/fraunces/opsz.css'
+import '@fontsource-variable/fraunces/opsz-italic.css'
 import './styles.css'
 
 const queryClient = new QueryClient({

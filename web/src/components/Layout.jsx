@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
@@ -160,6 +160,8 @@ export default function Layout() {
   const [collapsed, setCollapsed] = useState(readCollapsed)
   const location = useLocation()
   useEffect(() => setOpen(false), [location.pathname])
+  // every page opens at its top (title in view), not at the previous page's scroll position
+  useLayoutEffect(() => { window.scrollTo(0, 0) }, [location.pathname])
   const sys = useQuery({ queryKey: ['system'], queryFn: () => api('/settings/system'), staleTime: 300_000 })
   const toggle = () => setCollapsed((c) => {
     try { localStorage.setItem('eris.sidebar', c ? 'open' : 'collapsed') } catch { /* private mode: not remembered */ }
