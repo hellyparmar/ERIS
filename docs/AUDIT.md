@@ -48,7 +48,7 @@ management, and a separate multi-store page. None of these exist in the code.
 
 ## Synthetic dataset
 
-All requirements are met: deterministic generation, 5 outlets with different profiles, 61 products in 9
+All requirements are met: deterministic generation, 5 outlets with different profiles, 68 products in 10
 categories, 2 years of bill lines, customers, suppliers, inventory movements and POs, promotions, price
 changes, weekday, monthly and annual seasonality, Indian festivals, weather, outlet-specific growth,
 substitutions and stockouts, and 26 labelled anomalies.
@@ -122,7 +122,7 @@ There is no IRN, filing, e-way bill or any claim of compliance.
 
 | Item | Status |
 |---|---|
-| Playwright end-to-end tests | `e2e/`, 13 scenarios, CI job `e2e` |
+| Playwright end-to-end tests | `e2e/`, 14 scenarios, CI job `e2e` |
 | PostgreSQL integration tests | Full suite runs on PostgreSQL 16 (CI job `api-postgres`) |
 | Docker Compose | `docker compose up` (SQLite); `--profile postgres` and `--profile ai` (Ollama) |
 | One-command demo seed | Automatic on first start, or `python -m app.seed` |

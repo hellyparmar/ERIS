@@ -1,10 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
 import { ArrowRight, ArrowUp, BookOpen, Bot, Boxes, FileText, LineChart, Receipt, ShieldCheck, Sparkles, Upload } from 'lucide-react'
-import { api } from '../lib/api'
 import { useApp } from '../lib/app'
-import { date, num } from '../lib/format'
 import { Card, PageHead } from '../components/ui'
 
 // Each topic is answered by the assistant from the project documentation (docs/knowledge), with its source shown.
@@ -33,13 +30,11 @@ export default function Help() {
   const navigate = useNavigate()
   const { user } = useApp()
   const [text, setText] = useState('')
-  const sys = useQuery({ queryKey: ['system'], queryFn: () => api('/settings/system'), staleTime: 300_000 })
   const ask = (q) => navigate(`/assistant?q=${encodeURIComponent(q)}`)
-  const s = sys.data
 
   return (
     <>
-      <PageHead title="Help & Support" subtitle="Answers come from the ERIS documentation, through the assistant, with their source shown." />
+      <PageHead title="Help & Support" subtitle="Answers come from the ERIS documentation." />
       <Card className="hero">
         <div className="stack" style={{ gap: 14, maxWidth: 760 }}>
           <div className="row" style={{ gap: 12 }}>
@@ -65,20 +60,7 @@ export default function Help() {
         ))}
       </div>
 
-      <div className="grid grid-3">
-        <Card title="Your workspace" subtitle="What this installation is running on">
-          {s ? (
-            <dl className="dl">
-              <dt>Data</dt><dd>{s.data_from ? `${date(s.data_from)} – ${date(s.data_to)}` : 'No sales yet'}</dd>
-              <dt>Sales</dt><dd className="mono">{num(s.counts.sales)} bills · {num(s.counts.sale_items)} lines</dd>
-              <dt>Catalogue</dt><dd>{num(s.counts.outlets)} outlets · {num(s.counts.products)} products · {num(s.counts.customers)} customers</dd>
-              <dt>Database</dt><dd>{s.database}</dd>
-              <dt>Forecasting</dt><dd>{s.forecast_models.length} models available</dd>
-              <dt>Assistant</dt><dd>{s.assistant?.available ? `Local LLM (${s.assistant.model})` : 'Built-in analytics engine'}</dd>
-              {s.dataset && <><dt>Dataset</dt><dd>{s.dataset.data_source === 'synthetic' ? 'Synthetic demo (seeded, reproducible)' : s.dataset.data_source}</dd></>}
-            </dl>
-          ) : <div className="skeleton" style={{ height: 170 }} />}
-        </Card>
+      <div className="grid">
         <Card title="Who can do what" subtitle={`You are signed in as ${user.role}`}>
           <div className="stack" style={{ gap: 0 }}>
             {ROLES.map(([r, d]) => (
@@ -88,12 +70,6 @@ export default function Help() {
               </div>
             ))}
           </div>
-        </Card>
-        <Card title="Go to" subtitle="Pages people look for most">
-          <div className="chip-row">
-            {LINKS.map(([to, label]) => <Link key={to} to={to} className="chip">{label}<ArrowRight size={13} /></Link>)}
-          </div>
-          <p className="small muted" style={{ marginTop: 16 }}>Demo data is synthetic, for a fictional chain. GST invoices are demos and not for tax filing.</p>
         </Card>
       </div>
     </>

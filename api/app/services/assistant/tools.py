@@ -791,7 +791,7 @@ def advice(c: Ctx) -> dict:
                      "Add a cashier and restock fast movers before evening peaks to cut queues and missed sales."))
     for ev in upcoming_events(c.anchor, 30)[:1]:
         recs.append((f"Prepare for {ev['name']}",
-                     f"{ev['name']} is {ev['days_away']} days away. Stock up on sweets, dry fruits and snacks; "
+                     f"{ev['name']} is {ev['days_away']} days away. Stock up on dry fruits, gift packs, snacks and cleaning supplies; "
                      "check the category forecasts for expected demand."))
     cats = A.category_breakdown(c.db, rng, c.outlet_ids)
     if cats:
@@ -822,7 +822,7 @@ I look up the live data and answer with numbers, charts and tables, and show whe
 - **Patterns & advice**: "When are our busiest hours?", "Which products are bought together?", "How can I increase sales?"
 - **How ERIS works**: "What is WAPE?", "How do I import sales?", "Is the GSTIN real?"
 
-You can name an outlet (Andheri, Indiranagar, "Outlet 2"...), a category (dairy, bakery...) or a product, \
+You can name an outlet (Andheri, Indiranagar, "Outlet 2"...), a category (dairy, snacks, household...) or a product, \
 and a time period (today, last week, March, last 90 days)."""
 
 

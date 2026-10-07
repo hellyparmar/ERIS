@@ -257,7 +257,6 @@ function NewPO({ onClose, onCreated }) {
           </tbody>
         </table></div>
       )}
-      <p className="small muted">Tip: the Inventory → Reorder tab creates purchase orders automatically from demand.</p>
     </Modal>
   )
 }

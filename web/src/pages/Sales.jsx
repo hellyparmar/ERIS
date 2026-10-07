@@ -24,7 +24,7 @@ export default function Sales() {
 
   return (
     <>
-      <PageHead title="Sales" subtitle="Every bill across your outlets. Record a sale manually or import sales from a CSV file.">
+      <PageHead title="Sales" subtitle="Every bill across your outlets.">
         {canWrite && <Link to="/import?type=sales" className="btn"><Upload />Import CSV</Link>}
         <button className="btn" onClick={() => download('/sales/export', { outlet_id: outletId, start: filters.start || undefined, end: filters.end || undefined })}><Download />Export</button>
         {canWrite && <button className="btn primary" onClick={() => setShowNew(true)}><Plus />New sale</button>}
@@ -213,7 +213,7 @@ function NewSale({ onClose, onCreated }) {
         </Field>
         <Field label="Bill discount (₹)"><input className="input" type="number" min="0" step="any" value={form.bill_discount} onChange={(e) => set('bill_discount', e.target.value)} /></Field>
       </div>
-      <p className="small muted">Prices include GST. Stock is reduced automatically; the sale is blocked if an item doesn't have enough stock.</p>
+      <p className="small muted">Prices include GST.</p>
     </Modal>
   )
 }

@@ -13,7 +13,7 @@ Every number traces back to the data.
 **Live demo:** [eris-retail.vercel.app](https://eris-retail.vercel.app), with the API on [eris-tvro.onrender.com](https://eris-tvro.onrender.com). Pick a demo role on the sign-in page. The free server sleeps when idle, so the first visit can take up to a minute.
 
 > **Synthetic-data project.** ERIS runs on a deterministic, documented synthetic dataset for a fictional
-> chain, *Urban Harvest Foods*. It is a portfolio and learning project. It is **not** a production ERP, and it
+> supermarket chain, *Urban Harvest Supermarkets*. It is a portfolio and learning project. It is **not** a production ERP, and it
 > is **not** a GST-compliant invoicing system: the GSTINs are synthetic and every invoice is watermarked
 > *DEMO - NOT FOR TAX FILING*.
 
@@ -23,12 +23,12 @@ Every number traces back to the data.
 
 | | |
 |---|---|
-| **Forecasting** | Seasonal naive, Holt-Winters, XGBoost, Prophet (Indian festival calendar plus promotion, price and weather regressors) and an ensemble. Each series is back-tested on two 28-day folds and every run is saved with its data range, features, parameters and metrics. In a rolling-origin study over 25 series the production pipeline scores **17.3% WAPE vs 20.2% for the seasonal-naive baseline** (about 14% lower error). |
+| **Forecasting** | Seasonal naive, Holt-Winters, XGBoost, Prophet (Indian festival calendar plus promotion, price and weather regressors) and an ensemble. Each series is back-tested on two 28-day folds and every run is saved with its data range, features, parameters and metrics. In a rolling-origin study over 26 series the production pipeline scores **17.6% WAPE vs 19.0% for the seasonal-naive baseline** (about 7% lower error). |
 | **AI assistant** | Answers questions such as *"Why was Outlet 3 revenue lower this week?"*, *"Which items may go out of stock in the next 14 days?"* and *"What forecast model performed best for beverages?"*. It maps each question to a validated intent template (no generated SQL), respects outlet permissions, and shows its data source, filters, timing, model version and caveats. Definition and how-to questions are answered from the project docs by retrieval. Optional local LLM through Ollama. **Grounding check: 27/27 intents and 19/19 answers match independent SQL.** |
-| **Anomalies and drivers** | Robust z-score detection of unusual outlet-days and suspicious bill lines: **precision 0.79, recall 0.73** against the 26 anomalies injected into the data. A "why did revenue change?" analysis splits the change exactly into bills × average bill, then by outlet and category, and estimates the calendar, promotion, stockout and rainfall contributions. |
+| **Anomalies and drivers** | Robust z-score detection of unusual outlet-days and suspicious bill lines: **precision 0.94, recall 0.65** against the 26 anomalies injected into the data. A "why did revenue change?" analysis splits the change exactly into bills × average bill, then by outlet and category, and estimates the calendar, promotion, stockout and rainfall contributions. |
 | **Data pipeline** | A deterministic generator (seed 42): 2 years of bill lines with seasonality, festivals, weather, promotions, price elasticity, substitutions and stockouts, plus full provenance. CSV import with column mapping, a dry run, duplicate handling, an error report, an atomic commit and import history. |
 | **Design** | A framed workspace in a warm palette: espresso `#4C4541`, gold `#F2C46A`, sage `#AEAC78`, cream `#FFF9F2`, parchment `#F3E6D5` and honey `#FCF0DA`. Geist type with monospaced figures, light and dark themes and phone layouts. Chart colours are an 8-colour set in the same warm family, checked for colour-blind separation and contrast in both themes. The assistant opens table answers as a spreadsheet that can be copied or downloaded. |
-| **Engineering** | FastAPI with SQLAlchemy 2 and Alembic on SQLite or PostgreSQL; React 19. JWT access and refresh tokens, 4 roles with application-level outlet scoping, and an automatic audit log. 117 API tests on SQLite and PostgreSQL, 13 Playwright end-to-end tests, and CI. |
+| **Engineering** | FastAPI with SQLAlchemy 2 and Alembic on SQLite or PostgreSQL; React 19. JWT access and refresh tokens, 4 roles with application-level outlet scoping, and an automatic audit log. 117 API tests on SQLite and PostgreSQL, 14 Playwright end-to-end tests, and CI. |
 
 ## Screenshots
 
@@ -150,9 +150,10 @@ only while the demo accounts exist and still use these passwords, so an install 
 The demo dataset has:
 
 - one organisation and 5 outlets (Mumbai, Pune, Bengaluru ×2, Ahmedabad), each with its own demand profile;
-- 61 products in 9 categories, 8 suppliers and about 2,600 customers;
-- **2 years of bill-level history** (about 216,000 bills and 789,000 lines);
-- 53 promotions, 103 price changes, daily weather, 597 stockout events with substitutes and 26 labelled
+- 68 supermarket products in 10 categories (staples, dairy, fresh produce, beverages, household and personal
+  care and more), 9 suppliers and about 2,600 customers;
+- **2 years of bill-level history** (about 214,000 bills and 789,000 lines);
+- 52 promotions, 115 price changes, daily weather, 597 stockout events with substitutes and 26 labelled
   anomalies.
 
 It is deterministic: the same seed and end date always produce the same data. Every synthetic bill references
@@ -173,13 +174,13 @@ System & data), then import CSVs or enter sales manually. Real data is never dat
   The selection rule is: Prophet is the incumbent, and a challenger must cut back-test WAPE by more than 10% to
   replace it. The 80% interval comes from back-test errors.
 
-  | Model | Mean WAPE (25 series × 3 origins) |
+  | Model | Mean WAPE (26 series × 3 origins) |
   |---|---:|
-  | Seasonal naive (baseline) | 20.2% |
-  | Holt-Winters | 19.6% |
-  | XGBoost | 22.0% |
-  | **Prophet** | **17.2%** |
-  | ERIS auto-selection | 17.3% |
+  | Seasonal naive (baseline) | 19.0% |
+  | Holt-Winters | 18.7% |
+  | XGBoost | 19.3% |
+  | **Prophet** | **17.4%** |
+  | ERIS auto-selection | 17.6% |
 
   The full report is in [docs/FORECAST_EVALUATION.md](docs/FORECAST_EVALUATION.md), with the model card in
   [docs/MODEL_CARD.md](docs/MODEL_CARD.md) and the notebook in

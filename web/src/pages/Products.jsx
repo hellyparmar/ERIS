@@ -26,7 +26,7 @@ export default function Products() {
 
   return (
     <>
-      <PageHead title="Products" subtitle="Your catalogue with prices, margins, stock and last-30-day sales.">
+      <PageHead title="Products" subtitle="Prices, margins, stock and sales for the last 30 days.">
         <button className="btn" onClick={() => download('/products/export')}><Download />Export</button>
         {isManager && <>
           <Link to="/import?type=products" className="btn"><Upload />Import CSV</Link>
@@ -164,7 +164,7 @@ function ProductDrawer({ id, onClose, onEdit }) {
             ]} />
           </Card>
           {p.bought_with.length > 0 && (
-            <Card title="Frequently bought with" subtitle="Lift = how much more often they're bought together than by chance">
+            <Card title="Frequently bought with" >
               <div className="stack">{p.bought_with.map((b) => {
                 const other = b.product_a_id === p.id ? b.product_b : b.product_a
                 return <div className="row between" key={other}><span>{other}</span><span className="small muted">{b.lift}× lift · {b.bills_together} bills</span></div>

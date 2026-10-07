@@ -256,7 +256,7 @@ export default function Assistant() {
 
   return (
     <>
-      <PageHead title="AI Assistant" subtitle="Answers about sales, stock, customers and forecasts from tested analyses of your data, each with its source.">
+      <PageHead title="AI Assistant" subtitle="Ask about sales, stock, customers or forecasts.">
         <Badge tone={llm?.available ? 'good' : 'info'}><Sparkles />{llm?.available ? `Local LLM: ${llm.model}` : 'Built-in analytics engine'}</Badge>
         <button className="btn sm only-narrow" onClick={() => clear.mutate()} disabled={!msgs.length}><SquarePen />New chat</button>
       </PageHead>

@@ -26,7 +26,7 @@ export default function Customers() {
 
   return (
     <>
-      <PageHead title="Customers" subtitle="Loyalty customers and business accounts. Bills are linked by phone number.">
+      <PageHead title="Customers" subtitle="Loyalty members and business accounts.">
         {isManager && <button className="btn" onClick={() => download('/customers/export')}><Download />Export</button>}
         {isManager && <Link to="/import?type=customers" className="btn"><Upload />Import CSV</Link>}
         {canWrite && <button className="btn primary" onClick={() => setEdit({})}><Plus />Add customer</button>}

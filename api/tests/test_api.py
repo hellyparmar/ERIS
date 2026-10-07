@@ -136,7 +136,7 @@ def test_sales_import_dry_run_then_commit(client, admin):
     today = (date.today() - timedelta(days=1)).isoformat()  # a past date in every time zone
     csv = ("invoice_no,date,time,outlet_code,sku,quantity,unit_price,discount,payment_method,customer_phone\n"
            f"IMP-1,{today},09:30,BLR-IND,DAI-001,2,,,upi,9000000001\n"
-           f"IMP-1,{today},09:30,BLR-IND,BAK-002,1,,,upi,9000000001\n"
+           f"IMP-1,{today},09:30,BLR-IND,BRK-001,1,,,upi,9000000001\n"
            f"IMP-2,{today},10:00,Indiranagar,Cola 750ml,3,45,5,gpay,\n")
     files = {"file": ("sales.csv", csv, "text/csv")}
     r = client.post("/api/imports/sales?dry_run=true", headers=admin, files=files)

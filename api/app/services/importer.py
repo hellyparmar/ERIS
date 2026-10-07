@@ -39,7 +39,7 @@ TEMPLATES: dict[str, dict] = {
         "required": ["date", "outlet_code", "sku", "quantity"],
         "example": [
             ["INV-1001", "2026-09-30", "10:15", "MUM-AND", "DAI-001", "2", "", "", "upi", "in_store", "9876543210", "Asha Verma"],
-            ["INV-1001", "2026-09-30", "10:15", "MUM-AND", "BAK-002", "1", "", "", "upi", "in_store", "9876543210", "Asha Verma"],
+            ["INV-1001", "2026-09-30", "10:15", "MUM-AND", "BRK-001", "1", "", "", "upi", "in_store", "9876543210", "Asha Verma"],
             ["INV-1002", "2026-09-30", "11:40", "MUM-AND", "BEV-001", "6", "18", "5", "cash", "in_store", "", ""],
         ],
         "help": "One row per product line. Rows sharing an invoice_no become one bill. outlet_code and sku must "

@@ -58,7 +58,7 @@ class Organization(TimestampMixin, Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(120))
-    industry: Mapped[str] = mapped_column(String(80), default="Food & Beverage Retail")
+    industry: Mapped[str] = mapped_column(String(80), default="Grocery Retail (Supermarkets)")
     currency: Mapped[str] = mapped_column(String(8), default="INR")
     currency_symbol: Mapped[str] = mapped_column(String(4), default="₹")
     timezone: Mapped[str] = mapped_column(String(64), default="Asia/Kolkata")

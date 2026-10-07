@@ -26,7 +26,7 @@ export default function Outlets() {
 
   return (
     <>
-      <PageHead title="Outlets" subtitle="How each store is doing over the last 30 days, compared with the 30 days before.">
+      <PageHead title="Outlets" subtitle="Last 30 days, compared with the 30 days before.">
         {isAdmin && <button className="btn primary" disabled={list.length >= 7} title={list.length >= 7 ? 'The 7-outlet limit is reached' : undefined}
           onClick={() => setEdit({})}><Plus />Add outlet</button>}
       </PageHead>
@@ -59,7 +59,6 @@ export default function Outlets() {
 
           <div className="stack" style={{ gap: 4, marginTop: 6 }}>
             <h2 style={{ fontSize: 22, fontWeight: 600, letterSpacing: '-0.02em' }}>Outlet details</h2>
-            <p className="small text-2">Pick an outlet to see its metrics.</p>
           </div>
           <div className="chip-row" role="group" aria-label="Outlet">
             {ranked.map((o) => (
@@ -97,22 +96,18 @@ function OutletDetail({ id, outlet, onOpen }) {
         <button className="btn sm" onClick={onOpen}>Products & categories</button>
       </div>
       <div className="grid grid-4">
-        <Kpi label="Revenue" value={money(k.revenue, { compact: true })} change={ch.revenue} hint="Compared to previous 30 days" />
-        <Kpi label="Bills" value={num(k.orders)} change={ch.orders} hint="Compared to previous 30 days" />
-        <Kpi label="Average bill" value={money(k.avg_basket)} change={ch.avg_basket} hint={`${num(k.items_per_basket, 1)} items per bill`} />
-        <Kpi label="Units sold" value={num(k.units)} change={ch.units} hint="Compared to previous 30 days" />
-        <Kpi label="Gross profit" value={money(k.gross_profit, { compact: true })} change={ch.gross_profit} hint={`${k.margin_pct}% margin on net sales`} />
-        <Kpi label="Loyalty customers" value={num(k.identified_customers)} change={ch.identified_customers} hint="Customers identified at the till" />
-        <Kpi label="Stock value" value={money(outlet?.stats.stock_value, { compact: true })} hint={`${outlet?.stats.low_stock_items ?? 0} products below reorder level`} />
-        <Kpi label="Share of revenue" value={`${outlet?.stats.share_pct ?? 0}%`} hint={`Team of ${outlet?.stats.users ?? 0}`} />
+        <Kpi label="Revenue" value={money(k.revenue, { compact: true })} change={ch.revenue} hint={`${outlet?.stats.share_pct ?? 0}% of all outlets`} />
+        <Kpi label="Gross profit" value={money(k.gross_profit, { compact: true })} change={ch.gross_profit} hint={`${k.margin_pct}% margin`} />
+        <Kpi label="Bills" value={num(k.orders)} change={ch.orders} hint={`${num(k.items_per_basket, 1)} items per bill`} />
+        <Kpi label="Average bill" value={money(k.avg_basket)} change={ch.avg_basket} hint={`${outlet?.stats.low_stock_items ?? 0} products low on stock`} />
       </div>
       <div className="grid grid-2">
-        <Card title="Weekly revenue" subtitle="Last 13 weeks, the latest highlighted"
+        <Card title="Weekly revenue"
           actions={last && <div style={{ textAlign: 'right' }}><div className="small muted">Latest week</div>
             <div className="row" style={{ gap: 8 }}><span className="big-number" style={{ fontSize: 26 }}>{money(last.revenue, { compact: true })}</span>{prev?.revenue > 0 && <Delta value={((last.revenue - prev.revenue) / prev.revenue) * 100} />}</div></div>}>
           <BarsChart data={trend} x="week" series={[{ key: 'revenue', label: 'Revenue' }]} height={230} highlight={(_, i) => i === trend.length - 1} />
         </Card>
-        <Card title="Average bill by week" subtitle="Revenue per bill"
+        <Card title="Average bill by week"
           actions={last?.basket && <div style={{ textAlign: 'right' }}><div className="small muted">Latest week</div>
             <div className="row" style={{ gap: 8 }}><span className="big-number" style={{ fontSize: 26 }}>{money(last.basket)}</span>{prev?.basket > 0 && <Delta value={((last.basket - prev.basket) / prev.basket) * 100} />}</div></div>}>
           <TrendChart data={trend} gran="week" height={230} series={[{ key: 'basket', label: 'Average bill' }]} />
