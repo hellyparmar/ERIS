@@ -1,31 +1,31 @@
 # Forecast model evaluation
 
-Generated with `python -m app.evaluation` on the demo dataset: 25 series (total, outlets, categories, top products), 3 forecast origins each, 28-day horizon - 375 model runs. Every model is trained only on data before each origin.
+Generated with `python -m app.evaluation` on the demo dataset: 26 series (total, outlets, categories, top products), 3 forecast origins each, 28-day horizon - 390 model runs. Every model is trained only on data before each origin.
 
 ## Mean WAPE (%) by series type
 
 | model                              |   category |   outlet |   product |   total |   all series |
 |:-----------------------------------|-----------:|---------:|----------:|--------:|-------------:|
-| Seasonal naive                     |      20.97 |    23.08 |     18.82 |   12.15 |        20.18 |
-| Holt-Winters exponential smoothing |      21.6  |    21.64 |     17.43 |   12.39 |        19.57 |
-| XGBoost                            |      23.09 |    29.02 |     18.29 |   14.83 |        22.03 |
-| Prophet                            |      17.41 |    20.47 |     16.14 |    8.6  |        17.16 |
-| ERIS auto-selection                |      17.48 |    20.47 |     16.37 |    8.6  |        17.28 |
+| Seasonal naive                     |      18.7  |    22.55 |     18.2  |   12.97 |        19.03 |
+| Holt-Winters exponential smoothing |      19.09 |    21.44 |     17.51 |   12.25 |        18.67 |
+| XGBoost                            |      19    |    24.44 |     17.96 |   10.61 |        19.32 |
+| Prophet                            |      16.92 |    20.99 |     16.86 |    9.55 |        17.4  |
+| ERIS auto-selection                |      17.01 |    20.98 |     17.14 |   11.61 |        17.62 |
 
-- **ERIS auto-selection: 17.3% WAPE** vs 20.2% for the seasonal-naive baseline (14% lower error).
-- Best single model overall: **Prophet** (17.2%).
-- 80% prediction-interval coverage of ERIS auto on the held-out windows: **80.0%** (target 80%).
+- **ERIS auto-selection: 17.6% WAPE** vs 19.0% for the seasonal-naive baseline (7% lower error).
+- Best single model overall: **Prophet** (17.4%).
+- 80% prediction-interval coverage of ERIS auto on the held-out windows: **80.5%** (target 80%).
 - Product-level series are noisier (small daily counts), so their errors are naturally higher than revenue series that aggregate many products.
 
 ## All metrics (mean over series and origins)
 
 | model                              |   wape |   smape |     mae |    rmse |   bias_pct |   seconds |
 |:-----------------------------------|-------:|--------:|--------:|--------:|-----------:|----------:|
-| Seasonal naive                     |  20.18 |   19.86 | 3655.91 | 4946.81 |      -2.7  |      0    |
-| Holt-Winters exponential smoothing |  19.57 |   19.56 | 3746.33 | 4855.68 |      -3.06 |      0.12 |
-| XGBoost                            |  22.03 |   21.07 | 4448.83 | 5732.4  |       3.18 |      0.25 |
-| Prophet                            |  17.16 |   17.41 | 3032.68 | 4024.69 |      -1.82 |      0.19 |
-| ERIS auto-selection                |  17.28 |   17.53 | 3043.93 | 4042.56 |      -1.33 |      1.25 |
+| Seasonal naive                     |  19.03 |   19.21 | 3848.35 | 5201.33 |      -4.71 |      0    |
+| Holt-Winters exponential smoothing |  18.67 |   18.62 | 3736.52 | 5053.97 |      -5.27 |      0.11 |
+| XGBoost                            |  19.32 |   19.04 | 3784.93 | 5028.6  |      -1.49 |      0.25 |
+| Prophet                            |  17.4  |   17.44 | 3331.69 | 4374.82 |      -2.07 |      0.24 |
+| ERIS auto-selection                |  17.62 |   17.67 | 3486.32 | 4630.48 |      -2.77 |      1.28 |
 
 sMAPE is symmetric MAPE; `seconds` is training + inference time per series and origin.
 
@@ -33,20 +33,20 @@ sMAPE is symmetric MAPE; `seconds` is training + inference time per series and o
 
 | model                              |   wins |
 |:-----------------------------------|-------:|
-| Prophet                            |     43 |
-| Holt-Winters exponential smoothing |     14 |
-| XGBoost                            |     11 |
-| Seasonal naive                     |      7 |
+| Prophet                            |     32 |
+| Holt-Winters exponential smoothing |     19 |
+| XGBoost                            |     18 |
+| Seasonal naive                     |      9 |
 
 ## What auto-selection picked
 
 | chosen                             |   times chosen |
 |:-----------------------------------|---------------:|
-| Prophet                            |             65 |
+| Prophet                            |             62 |
 | Ensemble                           |              6 |
+| XGBoost                            |              5 |
+| Holt-Winters exponential smoothing |              3 |
 | Seasonal naive                     |              2 |
-| XGBoost                            |              1 |
-| Holt-Winters exponential smoothing |              1 |
 
 ![chart](images/eval_wape_by_model.png)
 

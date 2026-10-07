@@ -15,7 +15,7 @@ export default function Inventory() {
   const [transfer, setTransfer] = useState(false)
   return (
     <>
-      <PageHead title="Inventory" subtitle="Stock on hand at every outlet, with days of cover based on recent demand.">
+      <PageHead title="Inventory" subtitle="Stock on hand and days of cover at every outlet.">
         {isManager && <button className="btn" onClick={() => setTransfer(true)}><ArrowLeftRight />Transfer stock</button>}
       </PageHead>
       <Tabs value={tab} onChange={(t) => setParams({ tab: t })} tabs={[
@@ -184,7 +184,7 @@ function ReorderTab() {
   if (q.isLoading) return <Spinner />
   if (q.isError) return <ErrorState error={q.error} />
   return (
-    <Card flush title="What to order now" subtitle="Based on the last 28 days of demand (trend-adjusted), supplier lead times, safety stock and orders already on the way."
+    <Card flush title="What to order now" subtitle="Based on recent demand, lead times and orders on the way"
       actions={isManager && rows.length > 0 && <button className="btn primary" disabled={!chosen.length || m.isPending} onClick={() => m.mutate()}><PackagePlus />Create {chosen.length} PO line{chosen.length === 1 ? '' : 's'} · {money(cost)}</button>}>
       {rows.length === 0 ? <div className="empty"><Boxes /><b>Nothing to reorder</b><div className="small">Stock covers expected demand plus supplier lead times.</div></div> : (
         <DataTable rows={rows} sortable={false} columns={[
@@ -219,7 +219,6 @@ function MovementsTab() {
           <option value="">All movements</option>
           {['sale', 'sale_void', 'purchase', 'adjustment', 'damage', 'transfer_in', 'transfer_out', 'import'].map((r) => <option key={r} value={r}>{titleCase(r)}</option>)}
         </select>
-        <span className="small muted">Every stock change is recorded with who made it and why.</span>
       </div>
       {q.isLoading ? <Spinner /> : q.isError ? <ErrorState error={q.error} /> : (
         <>

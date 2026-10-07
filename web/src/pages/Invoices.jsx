@@ -28,7 +28,7 @@ export default function Invoices() {
   const list = useQuery({ queryKey: ['invoices', q, outletId, page], queryFn: () => api('/invoices', { params: { q, outlet_id: outletId, page, page_size: 25 } }), placeholderData: (p) => p })
   return (
     <>
-      <PageHead title="Invoices (demo GST)" subtitle="GST-style tax invoices issued from sales: CGST + SGST within a state, IGST between states, HSN codes and a printable PDF. Issue one from any bill on the Sales page." />
+      <PageHead title="Invoices (demo GST)" subtitle="Demo GST invoices issued from sales. Issue one from any bill on the Sales page." />
       <div className="watermark-note" style={{ marginBottom: 16 }}>
         DEMO - NOT FOR TAX FILING. The GSTINs are synthetic and invoices are not registered on the Invoice Registration Portal (no IRN / QR code).
       </div>

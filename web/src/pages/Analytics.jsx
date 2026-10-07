@@ -16,7 +16,7 @@ export default function Analytics() {
   const [period, setPeriod] = useState('90d')
   return (
     <>
-      <PageHead title="Analytics" subtitle="Deeper analysis of sales patterns, products, outlets and customers.">
+      <PageHead title="Analytics" subtitle="Sales patterns, products, outlets and customers.">
         <Seg options={PERIODS} value={period} onChange={setPeriod} label="Period" />
       </PageHead>
       <Tabs value={tab} onChange={(t) => setParams({ tab: t })} tabs={[
@@ -62,7 +62,7 @@ function SalesTab({ period }) {
           <TrendChart data={d.series} gran={d.granularity} series={[{ key: 'revenue', label: 'Revenue' }, { key: 'profit', label: 'Gross profit' }]} height={300} />
         </Card>
         <div className="grid grid-3">
-          <Card title="When do customers shop?" subtitle="Average revenue per week by weekday and hour" className="span-2">
+          <Card title="When do customers shop?" subtitle="Average revenue by weekday and hour" className="span-2">
             <Heatmap cells={d.heatmap.cells} />
           </Card>
           <div className="stack" style={{ gap: 16 }}>
@@ -100,14 +100,14 @@ function ProductsTab({ period }) {
           <BarsChart data={d.categories} x="category" horizontal series={[{ key: 'profit', label: 'Gross profit' }]} />
         </Card>
       </div>
-      <Card title="Frequently bought together" subtitle="Market-basket analysis: pairs bought together more often than chance (lift > 1). Use for shelf placement and combos." flush>
+      <Card title="Frequently bought together" subtitle="Pairs bought together more often than chance" flush>
         <DataTable rows={d.affinity} columns={[
           { key: 'product_a', label: 'Product' }, { key: 'product_b', label: 'Bought with' },
           { key: 'bills_together', label: 'Bills together', format: 'number' }, { key: 'support_pct', label: 'Support', format: 'percent_plain' },
           { key: 'confidence_pct', label: 'Confidence', format: 'percent_plain' }, { key: 'lift', label: 'Lift', align: 'right', render: (r) => `${r.lift}×` },
         ]} />
       </Card>
-      <Card title="ABC analysis" subtitle="Products ranked by revenue. A = top ~80% of revenue, B = next 15%, C = last 5%." flush>
+      <Card title="ABC analysis" subtitle="A = top 80% of revenue, B = next 15%, C = the rest" flush>
         <DataTable maxHeight={520} rows={d.products} columns={[
           { key: 'class', label: 'Class', render: (r) => <Badge tone={r.class === 'A' ? 'good' : r.class === 'B' ? 'info' : 'warn'}>{r.class}</Badge> },
           { key: 'name', label: 'Product', render: (r) => <><b>{r.name}</b><div className="small muted">{r.category}</div></> },
@@ -154,7 +154,7 @@ function CustomersTab({ period }) {
         <Kpi label="Customers analysed (12m)" value={num(d.total_customers)} hint="RFM segmentation" />
       </div>
       <div className="grid grid-2">
-        <Card title="RFM segments" subtitle="Recency, frequency and monetary scores over the last 12 months" flush>
+        <Card title="RFM segments" subtitle="Last 12 months" flush>
           <DataTable rows={d.segments} columns={[
             { key: 'segment', label: 'Segment', render: (r) => <><b>{r.segment}</b><div className="small muted">{r.description}</div></> },
             { key: 'customers', label: 'Customers', format: 'number' }, { key: 'revenue_share_pct', label: 'Revenue share', format: 'percent_plain' },

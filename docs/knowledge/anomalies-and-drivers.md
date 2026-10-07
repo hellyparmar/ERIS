@@ -7,7 +7,7 @@ For each outlet, daily revenue is divided by the outlet's weekday profile and co
 A drop on a day with heavy rain (40 mm or more in the outlet's city) is reported as explained by weather rather than counted as an incident. For every flagged day ERIS lists the evidence it finds: bills compared with a typical day, a single very large bill, heavy rain, promotions running, products out of stock or a festival.
 
 ## Suspicious bill lines
-A bill line whose quantity is more than 20 times the product's typical quantity, and at least 30 units, is flagged as a likely data-entry error. Business customers such as caterers are compared with typical business purchases so their bulk orders are not flagged.
+A bill line whose quantity is more than 20 times the product's typical quantity, and at least 30 units, is flagged as a likely data-entry error. Business customers such as cafés and offices are compared with typical business purchases so their bulk orders are not flagged.
 
 ## Detection quality
 On the demo dataset the detector is scored against the generator's labelled anomalies with precision (share of flagged days that were real anomalies) and recall (share of real anomalies that were found). Local events with a modest effect are the hardest to detect.

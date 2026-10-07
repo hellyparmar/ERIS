@@ -120,7 +120,7 @@ function UsersTab() {
   const q = useQuery({ queryKey: ['users'], queryFn: () => api('/users') })
   const [edit, setEdit] = useState(null)
   return (
-    <Card flush title="Team" subtitle="Admins see every outlet. Managers run their outlets (stock, purchasing, imports, voids). Staff record sales and look up stock. Viewers can see reports and insights for their outlets but cannot change anything."
+    <Card flush title="Team" subtitle="Admins see everything; managers run their outlets; staff bill and check stock; viewers read reports."
       actions={<button className="btn primary" onClick={() => setEdit({})}><Plus />Add user</button>}>
       {q.isLoading ? <Spinner /> : (
         <DataTable rows={q.data} columns={[

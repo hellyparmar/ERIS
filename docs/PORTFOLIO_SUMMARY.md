@@ -10,18 +10,18 @@ reproducible synthetic dataset. (Python, FastAPI, React, Prophet, XGBoost.)
 ## Résumé bullets
 
 - Built **ERIS**, an open-source retail analytics platform (FastAPI, SQLAlchemy/Alembic, PostgreSQL or SQLite,
-  React) for a 5-outlet chain. It has 17 working pages, 4 roles with outlet-level access control,
-  refresh-token auth and an automatic audit trail. Verified by 117 API tests on SQLite and PostgreSQL and 13
+  React) for a 5-outlet chain. It has 18 working pages, 4 roles with outlet-level access control,
+  refresh-token auth and an automatic audit trail. Verified by 117 API tests on SQLite and PostgreSQL and 14
   Playwright end-to-end tests in CI.
-- Designed a **deterministic synthetic data generator**: 2 years, about 216K bills and 789K line items. It
+- Designed a **deterministic synthetic data generator**: 2 years, about 214K bills and 789K line items. It
   models seasonality, Indian festivals, weather, promotion and price elasticity, stockouts with substitution,
   and 26 injected, labelled anomalies, with full provenance (generator version, seed, period).
 - Built a **forecasting pipeline** that compares seasonal-naive, Holt-Winters, XGBoost and Prophet models and
   an ensemble.
   - Features: calendar, festival, promotion, price, weather and stockout features.
   - Back-test-based selection with empirical 80% intervals; every run is persisted.
-  - In a rolling-origin evaluation (25 series × 3 origins, 375 fits) the production pipeline had **14% lower
-    WAPE than the seasonal-naive baseline** (17.3% vs 20.2%). The evaluation also showed, and the docs
+  - In a rolling-origin evaluation (26 series × 3 origins, 390 fits) the production pipeline had **7% lower
+    WAPE than the seasonal-naive baseline** (17.6% vs 19.0%). The evaluation also showed, and the docs
     report, that XGBoost underperformed on this data.
 - Built a **safe natural-language analytics assistant**.
   - Rule-based intent and entity parsing maps questions to 29 validated answer templates, with no generated
@@ -31,7 +31,7 @@ reproducible synthetic dataset. (Python, FastAPI, React, Prophet, XGBoost.)
   - Every answer shows its data source, filters, timing, model version and caveats.
   - Scored **27/27 on intent recognition and 19/19 on numbers checked against independent SQL**.
 - Implemented **unsupervised anomaly detection**: a weekday-normalised robust z-score with MAD, plus a
-  quantity-outlier check on bill lines. It reached **precision 0.79 and recall 0.73** against injected ground
+  quantity-outlier check on bill lines. It reached **precision 0.94 and recall 0.65** against injected ground
   truth. Added an exact revenue decomposition (traffic × basket, by outlet and category) with estimated
   calendar, promotion, stockout and weather contributions.
 - Delivered a **CSV ingestion workflow** with:

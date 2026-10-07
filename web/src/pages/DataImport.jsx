@@ -18,7 +18,7 @@ export default function DataImport() {
   const t = types.data?.find((x) => x.kind === kind)
   return (
     <>
-      <PageHead title="Data import" subtitle="Bring in data from spreadsheets, POS exports or other systems. Every file is checked before anything is saved." />
+      <PageHead title="Data import" subtitle="Upload CSV files. Every file is checked before anything is saved." />
       <div className="grid grid-3">
         <Card title="1. What are you importing?" className="span-2">
           <div className="row">
@@ -30,7 +30,7 @@ export default function DataImport() {
             <div className="stack" style={{ marginTop: 14 }}>
               <p className="text-2">{t.help}</p>
               <div className="small"><b>Columns:</b> {t.columns.map((c) => <span key={c} className="kbd" style={{ marginRight: 4, display: 'inline-block', marginBottom: 4 }}>{c}{t.required.includes(c) ? '*' : ''}</span>)}</div>
-              <span className="small muted">* required. Column names are not case-sensitive. CSV files from Excel / Google Sheets work (comma, semicolon or tab separated).</span>
+              <span className="small muted">* required</span>
             </div>
           )}
         </Card>
@@ -40,7 +40,6 @@ export default function DataImport() {
             <button className="btn" onClick={() => download(`/imports/samples/${kind}`)}><Download />Sample file (valid)</button>
             <button className="btn" onClick={() => download(`/imports/samples/${kind}`, { with_errors: true })}><AlertTriangle />Sample with mistakes</button>
             <Link className="btn" to={MANUAL[kind]}><PenLine />Enter {LABELS[kind].toLowerCase()} manually</Link>
-            <span className="small muted">Samples use your real outlets and products, so they import cleanly - the second one shows what validation catches.</span>
           </div>
         </Card>
       </div>
@@ -103,7 +102,7 @@ function Uploader({ kind }) {
         {inspect && (
           <div className="stack">
             <b>Match your columns</b>
-            <span className="small muted">ERIS suggested a match for each field from your file's headers. Change any that are wrong; leave optional fields empty if your file doesn't have them.</span>
+            <span className="small muted">Check the suggested matches.</span>
             <div className="form-grid">
               {inspect.columns.map((col) => (
                 <label key={col} className="field">
@@ -127,9 +126,9 @@ function Uploader({ kind }) {
         {kind === 'sales' && (
           <>
             <label className="check"><input type="checkbox" checked={updateStock} onChange={(e) => setUpdateStock(e.target.checked)} />
-              Reduce stock for these sales <span className="small muted">(leave off when importing past sales that are already reflected in your stock count)</span></label>
+              Reduce stock for these sales <span className="small muted">(off for past sales already in your stock count)</span></label>
             <label className="check"><input type="checkbox" checked={skipDuplicates} onChange={(e) => { setSkipDuplicates(e.target.checked); setResult(null) }} />
-              Skip bills that are already in ERIS <span className="small muted">(same invoice number - safe to re-upload a file)</span></label>
+              Skip bills that are already in ERIS </label>
           </>
         )}
         <div className="row">
@@ -150,7 +149,7 @@ function History({ kind }) {
   const q = useQuery({ queryKey: ['import-history', kind, page], queryFn: () => api('/imports/history', { params: { kind, page, page_size: 10 } }) })
   const tone = { committed: 'good', validated: 'info', rejected: 'bad', failed: 'bad', running: 'warn' }
   return (
-    <Card title="Import history" subtitle="Every check and import of this type, with a downloadable error report." flush>
+    <Card title="Import history"  flush>
       <Query q={q}>{(d) => (
         <>
           <DataTable rows={d.items} sortable={false} empty="No imports yet" columns={[

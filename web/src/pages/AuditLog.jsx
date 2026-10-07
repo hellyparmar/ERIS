@@ -36,7 +36,7 @@ export default function AuditLog() {
   const set = (k, v) => { setF((x) => ({ ...x, [k]: v })); setPage(1) }
   return (
     <>
-      <PageHead title="Audit log" subtitle="Who created, changed, voided or deleted business records - recorded automatically for every signed-in user. Imports and bulk resets appear as one entry each." />
+      <PageHead title="Audit log" subtitle="Every change to business records, and who made it." />
       <Card>
         <div className="row" style={{ alignItems: 'flex-end', gap: 12 }}>
           <Field label="Record type">

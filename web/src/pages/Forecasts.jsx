@@ -44,7 +44,7 @@ export default function Forecasts() {
 
   return (
     <>
-      <PageHead title="Forecasts" subtitle="Demand and revenue forecasts. Seasonal naive, Holt-Winters, XGBoost, Prophet and an ensemble are back-tested on the latest weeks of every series; the most reliable one is used.">
+      <PageHead title="Forecasts" subtitle="The best model is picked automatically for each forecast.">
         <Link className="btn" to="/models"><FlaskConical />Model comparison</Link>
       </PageHead>
       <Card>
@@ -87,13 +87,12 @@ export default function Forecasts() {
           : q.isLoading ? <Card><Spinner label="Training and back-testing models… (a few seconds the first time)" /></Card>
             : <Result fc={q.data} showBacktest={showBacktest} setShowBacktest={setShowBacktest} />}
       {scope === 'total' && byOutlet.data?.length > 0 && (
-        <Card title={`Outlet outlook - next ${horizon} days`} subtitle="Each outlet forecast with its own best model" flush>
+        <Card title={`Outlets - next ${horizon} days`} flush>
           <DataTable rows={byOutlet.data} columns={[
-            { key: 'outlet', label: 'Outlet' },
+            { key: 'outlet', label: 'Outlet', render: (r) => <b>{r.outlet}</b> },
             { key: 'forecast_total', label: 'Forecast', format: 'currency' },
             { key: 'last_period', label: horizon >= 30 ? 'Last 30 days' : 'Last 7 days', format: 'currency' },
             { key: 'change_pct', label: 'Change', align: 'right', render: (r) => <Delta value={r.change_pct} /> },
-            { key: 'model', label: 'Model' }, { key: 'wape', label: 'Back-test error', align: 'right', render: (r) => `${r.wape}%` },
           ]} />
         </Card>
       )}
@@ -117,7 +116,7 @@ function Result({ fc, showBacktest, setShowBacktest }) {
         <Kpi label="Forecast error (back-test)" value={`${selected.wape}%`} hint={`WAPE · ${selected.label}`} />
       </div>
       <div className="grid grid-3">
-        <Card className="span-2" title={fc.series.label} subtitle={`Last ${fc.history.length} days of actuals and ${fc.horizon}-day forecast with 80% range · data to ${date(fc.as_of)}`}
+        <Card className="span-2" title={fc.series.label} subtitle={`Next ${fc.horizon} days, with an 80% range`}
           actions={<>
             <label className="check small"><input type="checkbox" checked={showBacktest} onChange={(e) => setShowBacktest(e.target.checked)} />Show back-test</label>
             <button className="btn sm" onClick={() => toCsv(fc)}><Download />CSV</button>
@@ -126,7 +125,7 @@ function Result({ fc, showBacktest, setShowBacktest }) {
         </Card>
         <div className="stack" style={{ gap: 16 }}>
           <Card title="What this means">
-            <div className="stack">{fc.insights.map((t) => <div key={t} className="row" style={{ alignItems: 'flex-start', flexWrap: 'nowrap' }}><Lightbulb size={16} style={{ flex: 'none', color: 'var(--s4)', marginTop: 2 }} /><span>{t}</span></div>)}</div>
+            <div className="stack">{fc.insights.slice(0, 3).map((t) => <div key={t} className="row" style={{ alignItems: 'flex-start', flexWrap: 'nowrap' }}><Lightbulb size={16} style={{ flex: 'none', color: 'var(--s4)', marginTop: 2 }} /><span>{t}</span></div>)}</div>
           </Card>
           {fc.events.length > 0 && (
             <Card title="Festivals in this window">
@@ -140,35 +139,21 @@ function Result({ fc, showBacktest, setShowBacktest }) {
                 <div className="row between"><span className="muted">Days of cover</span><b>{plan.days_of_cover ?? '-'}</b></div>
                 <div className="row between"><span className="muted">Projected stock-out</span><b className={plan.projected_stockout ? 'down' : ''}>{plan.projected_stockout ? date(plan.projected_stockout) : 'Not in window'}</b></div>
                 <div className="row between"><span className="muted">Safety stock</span><b>{num(plan.safety_stock)}</b></div>
-                <div className="alert info"><PackageCheck /><div><b>{plan.recommended_order_qty > 0 ? `Order ${num(plan.recommended_order_qty)} ${plan.unit}` : plan.reorder_by ? `No order needed yet - reorder by ${date(plan.reorder_by)}` : 'No order needed now'}</b><p>Covers {plan.lead_time_days}-day lead time + 1 week of forecast demand at ~95% service level.</p></div></div>
+                <div className="alert info"><PackageCheck /><div><b>{plan.recommended_order_qty > 0 ? `Order ${num(plan.recommended_order_qty)} ${plan.unit}` : plan.reorder_by ? `No order needed yet - reorder by ${date(plan.reorder_by)}` : 'No order needed now'}</b><p>Covers the {plan.lead_time_days}-day lead time plus a week of demand.</p></div></div>
               </div>
             </Card>
           )}
         </div>
       </div>
-      <div className="grid grid-3">
-        <Card title="Model leaderboard" subtitle={`Back-tested on the last ${fc.test_days} days (lower error is better)`} flush className="span-2">
-          <DataTable rows={[...fc.evaluation].sort((a, b) => (a.wape ?? 999) - (b.wape ?? 999))} sortable={false} columns={[
-            { key: 'label', label: 'Model', render: (r) => <span title={r.label}><b>{r.label.split(' (')[0]}</b> {r.selected && <Badge tone="good">used</Badge>}{r.error && <div className="small down">failed: {r.error}</div>}</span> },
-            { key: 'wape', label: 'WAPE', align: 'right', render: (r) => (r.wape != null ? `${r.wape}%` : '-') },
-            { key: 'smape', label: 'sMAPE', align: 'right', render: (r) => (r.smape != null ? `${r.smape}%` : '-') },
-            { key: 'mae', label: 'MAE', align: 'right', render: (r) => (r.mae != null ? formatValue(r.mae, fmt) : '-') },
-            { key: 'rmse', label: 'RMSE', align: 'right', render: (r) => (r.rmse != null ? formatValue(r.rmse, fmt) : '-') },
-            { key: 'interval_coverage', label: '80% band', align: 'right', render: (r) => (r.interval_coverage != null ? `${r.interval_coverage}%` : '-') },
-            { key: 'bias_pct', label: 'Bias', align: 'right', render: (r) => (r.bias_pct != null ? `${r.bias_pct > 0 ? '+' : ''}${r.bias_pct}%` : '-') },
-          ]} />
-          <p className="small muted" style={{ padding: 12 }}><FlaskConical size={13} style={{ verticalAlign: -2 }} /> WAPE = total absolute error ÷ total actual. 80% band = share of back-test days inside the prediction range (ideal ≈ 80%). Bias &gt; 0 means the model over-forecasts.</p>
-          <p className="small muted" style={{ padding: '0 12px 12px' }}>
-            Run {fc.run_id ? <Link to={`/models?run=${fc.run_id}`}>#{fc.run_id}</Link> : '(not saved)'} · model version {fc.model_version} · trained on {fc.data_range ? `${date(fc.data_range.start)} – ${date(fc.data_range.end)} (${fc.data_range.days} days)` : '-'} · {fc.features?.length || 0} features
-          </p>
-        </Card>
-        <Card title="Daily forecast" subtitle="With the 80% range" flush>
-          <DataTable maxHeight={430} rows={fc.forecast} sortable={false} columns={[
-            { key: 'date', label: 'Date', render: (r) => <span className="nowrap">{date(r.date, { weekday: 'short', day: 'numeric', month: 'short' })}</span> },
-            { key: 'yhat', label: 'Forecast', format: fmt }, { key: 'lower', label: 'Low', format: fmt }, { key: 'upper', label: 'High', format: fmt },
-          ]} />
-        </Card>
-      </div>
+      <Card title="Model leaderboard" subtitle={`Back-tested on the last ${fc.test_days} days · lower error is better`} flush
+        actions={fc.run_id && <Link to={`/models?run=${fc.run_id}`} className="small">Run details</Link>}>
+        <DataTable rows={[...fc.evaluation].sort((a, b) => (a.wape ?? 999) - (b.wape ?? 999))} sortable={false} columns={[
+          { key: 'label', label: 'Model', render: (r) => <span title={r.label}><b>{r.label.split(' (')[0]}</b> {r.selected && <Badge tone="good">used</Badge>}{r.error && <div className="small down">failed: {r.error}</div>}</span> },
+          { key: 'wape', label: 'Error (WAPE)', align: 'right', render: (r) => (r.wape != null ? `${r.wape}%` : '-') },
+          { key: 'mae', label: 'Avg miss per day', align: 'right', render: (r) => (r.mae != null ? formatValue(r.mae, fmt) : '-') },
+          { key: 'interval_coverage', label: 'Days inside 80% range', align: 'right', render: (r) => (r.interval_coverage != null ? `${r.interval_coverage}%` : '-') },
+        ]} />
+      </Card>
     </>
   )
 }

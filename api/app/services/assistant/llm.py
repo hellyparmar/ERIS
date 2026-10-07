@@ -101,7 +101,7 @@ def classify(question: str, outlets: list[str], categories: list[str]) -> dict |
 
 def general_answer(question: str, facts: str, org_name: str) -> str | None:
     system = (
-        f"You are ERIS, a friendly retail business assistant for {org_name}, a food & beverage retail chain. "
+        f"You are ERIS, a friendly retail business assistant for {org_name}, a neighbourhood supermarket chain. "
         "Answer briefly (under 150 words) in simple language for a non-technical shop owner. Use markdown. "
         "When you mention numbers, use ONLY the facts provided below - never invent figures. If the question "
         "needs data you don't have, say what the user can ask instead.\n\nFACTS:\n" + facts

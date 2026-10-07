@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  Activity, BarChart3, Bell, Boxes, Bot, Building2, Contact, FileSpreadsheet, FileText, FlaskConical, History, LayoutDashboard,
+  Activity, BarChart3, Bell, Boxes, Bot, Building2, Contact, FileSpreadsheet, FileText, History, LayoutDashboard,
   LifeBuoy, LogOut, Menu, Moon, Package, PanelLeftClose, PanelLeftOpen, Receipt, Settings, Store, Sun, TrendingUp, Truck, Upload,
   Monitor, UserRound,
 } from 'lucide-react'
@@ -24,7 +24,6 @@ const NAV = [
   { to: '/invoices', label: 'Invoices (demo GST)', icon: FileText },
   { section: 'Insights' },
   { to: '/forecasts', label: 'Forecasts', icon: TrendingUp },
-  { to: '/models', label: 'Model comparison', icon: FlaskConical },
   { to: '/insights', label: 'Anomalies & drivers', icon: Activity },
   { to: '/analytics', label: 'Analytics', icon: BarChart3 },
   { to: '/reports', label: 'Reports & export', icon: FileSpreadsheet },
@@ -38,6 +37,7 @@ let current = null
 NAV.forEach((n) => { if (n.section) current = n.section; else SECTION_OF[n.to] = [current, n.label] })
 SECTION_OF['/settings'] = ['Account', 'Settings']
 SECTION_OF['/help'] = ['Account', 'Help & Support']
+SECTION_OF['/models'] = ['Insights', 'Model comparison']
 
 function Crumbs() {
   const { pathname } = useLocation()

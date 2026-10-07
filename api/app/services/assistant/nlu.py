@@ -101,19 +101,27 @@ CATEGORY_SYNONYMS = {
     "beverage": "Beverages", "beverages": "Beverages", "drinks": "Beverages", "drink": "Beverages", "juices": "Beverages",
     "tea": "Tea & Coffee", "coffee": "Tea & Coffee", "chai": "Tea & Coffee",
     "dairy": "Dairy & Eggs", "eggs": "Dairy & Eggs",
-    "bakery": "Bakery", "breads": "Bakery", "baked": "Bakery",
-    "snacks": "Snacks & Confectionery", "snack": "Snacks & Confectionery", "confectionery": "Snacks & Confectionery",
+    "bread": "Bread & Breakfast", "breads": "Bread & Breakfast", "breakfast": "Bread & Breakfast",
+    "cereal": "Bread & Breakfast", "cereals": "Bread & Breakfast", "spreads": "Bread & Breakfast",
+    "snacks": "Snacks & Biscuits", "snack": "Snacks & Biscuits", "biscuits": "Snacks & Biscuits",
+    "chocolates": "Snacks & Biscuits", "namkeen": "Snacks & Biscuits",
     "staples": "Staples & Grains", "grains": "Staples & Grains", "groceries": "Staples & Grains", "grocery": "Staples & Grains",
+    "rice": "Staples & Grains", "dal": "Staples & Grains", "atta": "Staples & Grains",
     "fruits": "Fruits & Vegetables", "fruit": "Fruits & Vegetables", "vegetables": "Fruits & Vegetables",
     "veggies": "Fruits & Vegetables", "produce": "Fruits & Vegetables", "sabzi": "Fruits & Vegetables",
-    "frozen": "Frozen & Ready-to-eat", "ready to eat": "Frozen & Ready-to-eat", "ready-to-eat": "Frozen & Ready-to-eat",
-    "sweets": "Sweets & Festive", "mithai": "Sweets & Festive", "festive": "Sweets & Festive",
+    "frozen": "Frozen Foods", "ice cream": "Frozen Foods",
+    "household": "Household & Personal Care", "personal care": "Household & Personal Care",
+    "cleaning": "Household & Personal Care", "toiletries": "Household & Personal Care",
+    "home care": "Household & Personal Care",
+    "gifting": "Festive & Gifting", "gifts": "Festive & Gifting", "gift": "Festive & Gifting",
+    "festive": "Festive & Gifting", "dry fruits": "Festive & Gifting",
 }
 PRODUCT_STOPWORDS = {
     "and", "the", "with", "pack", "pcs", "fresh", "classic", "packaged", "premium", "organic", "farm", "box", "tin",
     "bag", "bar", "cup", "jar", "loaf", "roasted", "extra", "whole", "salted", "plain", "mix", "ready", "eat",
     "tender", "toned", "malai", "robusta", "shimla", "hass", "red", "baby", "belgian", "california", "alphonso",
-    "darjeeling", "assam", "refined", "virgin", "rolled", "gift", "frozen", "cold",
+    "darjeeling", "assam", "refined", "virgin", "rolled", "gift", "frozen", "cold", "natural", "thick", "nagpur",
+    "sona", "masoori", "iodised", "digestive", "assorted", "christmas", "refill", "anti", "dandruff", "liquid",
 }
 
 

@@ -26,7 +26,7 @@ export default function Reports() {
   }
   return (
     <>
-      <PageHead title="Reports & export" subtitle="Ready-made reports for your outlets. Preview here, then download as CSV or a formatted Excel workbook (with an 'About this report' sheet)." />
+      <PageHead title="Reports & export" subtitle="Preview a report, then download it as CSV or Excel." />
       <Query q={list}>{(reports) => (
         <div className="grid grid-side">
           <Card flush>

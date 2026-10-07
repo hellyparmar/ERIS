@@ -62,7 +62,7 @@ from app.seed import catalog
 from app.services.gst import demo_gstin
 from app.services.holidays import event_window
 
-GENERATOR_VERSION = "3.0.0"
+GENERATOR_VERSION = "3.1.0"  # 3.1: supermarket catalogue (packaged groceries, produce, dairy, household)
 DEMO_PASSWORDS = {"admin": "Admin@123", "manager": "Manager@123", "staff": "Staff@123", "viewer": "Viewer@123"}
 # Sign-in shortcuts shown on the login page of the demo: (role label, email, password key, what they can see)
 DEMO_LOGINS = [

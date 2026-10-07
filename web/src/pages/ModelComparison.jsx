@@ -17,7 +17,7 @@ export default function ModelComparison() {
   return (
     <>
       <PageHead title="Model comparison"
-        subtitle="How accurate each forecasting model is on this data: a rolling-origin evaluation across every series, and the history of every forecast run with its back-test." />
+        subtitle="How accurate each forecasting model is on your data." />
       <Evaluation />
       <RunHistory onOpen={(id) => setParams({ run: String(id) })} />
       {runId && <RunDrawer id={runId} onClose={() => setParams({})} />}
@@ -131,7 +131,7 @@ function RunHistory({ onOpen }) {
   const [page, setPage] = useState(1)
   const q = useQuery({ queryKey: ['forecast-runs', page], queryFn: () => api('/forecast/runs', { params: { page, page_size: 15 } }) })
   return (
-    <Card flush title="Forecast run history" subtitle="Every forecast is saved with its data range, features, parameters, back-test metrics and chosen model.">
+    <Card flush title="Forecast run history" >
       <Query q={q}>{(d) => (
         <>
           <DataTable rows={d.items} onRowClick={(r) => onOpen(r.id)} empty="No forecasts yet - open the Forecasts page to create one" columns={[

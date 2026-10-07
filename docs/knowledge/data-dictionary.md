@@ -7,7 +7,7 @@ organization holds the company name, currency, time zone, GSTIN (marked as demo 
 users have a role: admin (everything, all outlets), manager (their assigned outlets, purchasing and imports), staff (billing and stock at their outlets) or viewer (read-only). Managers, staff and viewers can be assigned to several outlets.
 
 ## Products and categories
-products have a SKU, name, category, unit, cost price, selling price, GST rate, HSN code, reorder level and preferred supplier. categories group products such as Beverages, Dairy & Eggs or Bakery.
+products have a SKU, name, category, unit, cost price, selling price, GST rate, HSN code, reorder level and preferred supplier. categories group products such as Staples & Grains, Dairy & Eggs or Household & Personal Care.
 
 ## Sales and sale items
 sales are bills: invoice number, outlet, customer, time, channel, payment method, subtotal, discount, tax, total, status (completed or void) and source (synthetic, manual or import). sale_items are the lines: product, quantity, unit price, regular list price when a promotion applied, discount, line total including tax, tax amount and cost amount.
