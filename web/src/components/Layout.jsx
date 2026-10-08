@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
@@ -134,13 +134,13 @@ function UserMenu() {
 /** While the demo data is being generated, say so on every page and refresh the page's data when it is ready. */
 function PreparingBanner() {
   const qc = useQueryClient()
-  const [was, setWas] = useState(false)
+  const was = useRef(false)
   const health = useQuery({ queryKey: ['health'], queryFn: () => api('/health'), refetchInterval: (q) => (q.state.data?.seeding?.running ? 3000 : false) })
   const running = !!health.data?.seeding?.running
   useEffect(() => {
-    if (running) setWas(true)
-    else if (was) { setWas(false); qc.invalidateQueries() }
-  }, [running, was, qc])
+    if (running) was.current = true
+    else if (was.current) { was.current = false; qc.invalidateQueries() }
+  }, [running, qc])
   if (!running) return null
   return (
     <div className="banner" role="status">
@@ -159,7 +159,9 @@ export default function Layout() {
   const [open, setOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(readCollapsed)
   const location = useLocation()
-  useEffect(() => setOpen(false), [location.pathname])
+  // close the mobile menu when the route changes
+  const [path, setPath] = useState(location.pathname)
+  if (path !== location.pathname) { setPath(location.pathname); setOpen(false) }
   // every page opens at its top (title in view), not at the previous page's scroll position
   useLayoutEffect(() => { window.scrollTo(0, 0) }, [location.pathname])
   const sys = useQuery({ queryKey: ['system'], queryFn: () => api('/settings/system'), staleTime: 300_000 })

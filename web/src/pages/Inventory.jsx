@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeftRight, Boxes, ClipboardList, Download, History, PackagePlus, Search, SlidersHorizontal } from 'lucide-react'
@@ -39,7 +39,8 @@ function StockTab({ initialStatus }) {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [adjust, setAdjust] = useState(null)
-  useEffect(() => setStatus(initialStatus), [initialStatus])
+  const [prevInitial, setPrevInitial] = useState(initialStatus)
+  if (prevInitial !== initialStatus) { setPrevInitial(initialStatus); setStatus(initialStatus) }
   const s = useDebounced(search)
   const params = { outlet_id: outletId, status, category_id: category, search: s, page, page_size: 30 }
   const q = useQuery({ queryKey: ['inventory', params], queryFn: () => api('/inventory', { params }), placeholderData: (p) => p })
@@ -165,11 +166,12 @@ function ReorderTab() {
   const qc = useQueryClient()
   const toast = useToast()
   const q = useQuery({ queryKey: ['reorder', outletId], queryFn: () => api('/inventory/reorder-suggestions', { params: { outlet_id: outletId } }) })
-  const [picked, setPicked] = useState({})
   const rows = useMemo(() => (q.data?.items || []).map((r) => ({ ...r, id: `${r.outlet_id}-${r.product_id}` })), [q.data])
-  useEffect(() => {
-    setPicked(Object.fromEntries(rows.map((r) => [r.id, { on: r.urgency === 'critical', qty: r.suggested_qty }])))
-  }, [rows])
+  // fresh suggestions reset the picks: critical lines ticked, suggested quantities
+  const initialPicks = (rs) => Object.fromEntries(rs.map((r) => [r.id, { on: r.urgency === 'critical', qty: r.suggested_qty }]))
+  const [picked, setPicked] = useState(() => initialPicks(rows))
+  const [pickedFor, setPickedFor] = useState(rows)
+  if (pickedFor !== rows) { setPickedFor(rows); setPicked(initialPicks(rows)) }
   const chosen = rows.filter((r) => picked[r.id]?.on && picked[r.id]?.qty > 0)
   const cost = chosen.reduce((a, r) => a + picked[r.id].qty * r.unit_cost, 0)
   const m = useMutation({

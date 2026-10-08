@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Bot, Building2, Database, KeyRound, LogOut, Pencil, Plus, RefreshCw, Trash2, UserCog, Users } from 'lucide-react'
@@ -35,8 +35,9 @@ function OrgTab() {
   const { org } = useApp()
   const qc = useQueryClient()
   const toast = useToast()
-  const [f, setF] = useState(null)
-  useEffect(() => { if (org) setF(org) }, [org])
+  const [f, setF] = useState(org)
+  const [formFor, setFormFor] = useState(org)
+  if (formFor !== org) { setFormFor(org); if (org) setF(org) }
   const save = useMutation({
     mutationFn: () => api('/settings/organization', { method: 'PUT', body: { ...f, low_stock_cover_days: Number(f.low_stock_cover_days) } }),
     onSuccess: () => { toast('Organization saved', 'success'); qc.invalidateQueries({ queryKey: ['org'] }) },
@@ -205,11 +206,11 @@ function SystemTab() {
     onSuccess: () => { toast('Sales, stock, purchase orders and customers cleared', 'success'); qc.invalidateQueries() },
     onError: (e) => toast(e.message, 'error'),
   })
-  const [wasRunning, setWasRunning] = useState(false)
+  const wasRunning = useRef(false)
   useEffect(() => {
-    if (q.data?.seeding?.running) setWasRunning(true)
-    else if (wasRunning && q.data) { setWasRunning(false); toast('Demo data ready - please sign in again', 'success'); logout() }
-  }, [q.data, wasRunning, logout, toast])
+    if (q.data?.seeding?.running) wasRunning.current = true
+    else if (wasRunning.current && q.data) { wasRunning.current = false; toast('Demo data ready - please sign in again', 'success'); logout() }
+  }, [q.data, logout, toast])
   if (q.isLoading) return <Spinner />
   const d = q.data
   const ai = d.assistant
