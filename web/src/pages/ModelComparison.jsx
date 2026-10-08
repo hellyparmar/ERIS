@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { FlaskConical, Play, Trophy } from 'lucide-react'
@@ -40,11 +40,11 @@ function Evaluation() {
     onError: (e) => toast(e.message, 'error'),
   })
   const running = q.data?.job?.running
-  const [wasRunning, setWasRunning] = useState(false)
+  const wasRunning = useRef(false)
   useEffect(() => {
-    if (running) setWasRunning(true)
-    else if (wasRunning) { setWasRunning(false); qc.invalidateQueries({ queryKey: ['forecast-runs'] }) }
-  }, [running, wasRunning, qc])
+    if (running) wasRunning.current = true
+    else if (wasRunning.current) { wasRunning.current = false; qc.invalidateQueries({ queryKey: ['forecast-runs'] }) }
+  }, [running, qc])
 
   return (
     <Card title="Rolling-origin evaluation"

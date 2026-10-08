@@ -11,7 +11,15 @@ export default defineConfig({
   build: {
     chunkSizeWarningLimit: 900,
     rollupOptions: {
-      output: { manualChunks: { charts: ['recharts'], vendor: ['react', 'react-dom', 'react-router-dom', '@tanstack/react-query'] } },
+      output: {
+        // function form: Vite 8 (Rolldown) no longer accepts the object form
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined
+          if (/node_modules\/(recharts|d3-|victory-vendor)/.test(id)) return 'charts'
+          if (/node_modules\/(react|react-dom|react-router|react-router-dom|scheduler|@tanstack)\//.test(id)) return 'vendor'
+          return undefined
+        },
+      },
     },
   },
 })
