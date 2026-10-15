@@ -26,9 +26,9 @@ log = logging.getLogger(__name__)
 UNCACHED_INTENTS = {"help", "knowledge", "general", "smalltalk", "action_request", "clarify"}
 # the questions the web app offers as one-click suggestions (also stored ahead of time in the demo build)
 SUGGESTED_QUESTIONS = [
-    "Which outlet had the highest revenue last month?", "Show the five fastest-growing products",
-    "Why was Outlet 3 revenue lower this week?", "Which items may go out of stock in the next 14 days?",
-    "Compare weekend sales between outlets", "What forecast model performed best for beverages?",
+    "Which outlet had the highest revenue last month?", "Show the five fastest-growing dishes",
+    "Why was Outlet 3 revenue lower this week?", "Which ingredients may run out in the next 14 days?",
+    "Compare weekend sales between outlets", "What forecast model performed best for desserts?",
     "Summarize the major anomalies this month", "How is business this week?",
     "Why did revenue change this week?", "What should I reorder?",
 ]
@@ -268,9 +268,9 @@ def answer(db: Session, user: User, message: str) -> dict:
             engine = "llm" if text else engine
         else:
             out = result(
-                "I'm not sure I understood that. I answer questions about your sales, products, outlets, stock, "
-                "customers and forecasts using your live data.\n\n" + HELP_TEXT.split("\n\n", 1)[1],
-                [], ["How is business this week?", "Top 5 products this month", "What should I reorder?"])
+                "I'm not sure I understood that. I answer questions about your sales, menu, restaurants, kitchen stock, "
+                "guests and forecasts using your live data.\n\n" + HELP_TEXT.split("\n\n", 1)[1],
+                [], ["How is business this week?", "Top 5 dishes this month", "What should I reorder?"])
         parsed.intent = "general"
     else:
         try:

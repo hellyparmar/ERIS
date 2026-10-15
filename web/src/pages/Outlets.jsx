@@ -93,13 +93,13 @@ function OutletDetail({ id, outlet, onOpen }) {
           <h2 style={{ fontSize: 17 }}>{o.name}</h2>
           <span className="small muted"><MapPin size={12} style={{ verticalAlign: -1 }} /> {o.city} · {o.code}{o.manager_name ? ` · Manager: ${o.manager_name}` : ''}{o.opened_on ? ` · opened ${date(o.opened_on, { month: 'short', year: 'numeric' })}` : ''}</span>
         </div>
-        <button className="btn sm" onClick={onOpen}>Products & categories</button>
+        <button className="btn sm" onClick={onOpen}>Dishes & categories</button>
       </div>
       <div className="grid grid-4">
         <Kpi label="Revenue" value={money(k.revenue, { compact: true })} change={ch.revenue} hint={`${outlet?.stats.share_pct ?? 0}% of all outlets`} />
         <Kpi label="Gross profit" value={money(k.gross_profit, { compact: true })} change={ch.gross_profit} hint={`${k.margin_pct}% margin`} />
         <Kpi label="Bills" value={num(k.orders)} change={ch.orders} hint={`${num(k.items_per_basket, 1)} items per bill`} />
-        <Kpi label="Average bill" value={money(k.avg_basket)} change={ch.avg_basket} hint={`${outlet?.stats.low_stock_items ?? 0} products low on stock`} />
+        <Kpi label="Average bill" value={money(k.avg_basket)} change={ch.avg_basket} hint={`${outlet?.stats.low_stock_items ?? 0} ingredients low on stock`} />
       </div>
       <div className="grid grid-2">
         <Card title="Weekly revenue"
@@ -131,8 +131,8 @@ function OutletDrawer({ id, onClose }) {
           </dl></Card>
           <Card title="Weekly revenue (90 days)"><TrendChart data={o.trend} series={[{ key: 'revenue', label: 'Revenue' }]} height={180} /></Card>
           <Card title="Category mix (30 days)"><ShareList rows={o.categories} labelKey="category" valueKey="revenue" /></Card>
-          <Card title="Top products (30 days)" flush>
-            <DataTable rows={o.top_products} sortable={false} columns={[{ key: 'name', label: 'Product' }, { key: 'units', label: 'Units', format: 'number' }, { key: 'revenue', label: 'Revenue', format: 'currency' }]} />
+          <Card title="Top dishes (30 days)" flush>
+            <DataTable rows={o.top_products} sortable={false} columns={[{ key: 'name', label: 'Dish' }, { key: 'units', label: 'Orders', format: 'number' }, { key: 'revenue', label: 'Revenue', format: 'currency' }]} />
           </Card>
         </>
       )}
@@ -151,7 +151,7 @@ function OutletForm({ outlet, onClose }) {
   const refresh = () => { qc.invalidateQueries({ queryKey: ['outlets'] }); qc.invalidateQueries({ queryKey: ['outlets-stats'] }) }
   const save = useMutation({
     mutationFn: () => api(isNew ? '/outlets' : `/outlets/${outlet.id}`, { method: isNew ? 'POST' : 'PUT', body: { ...f, opened_on: f.opened_on || null } }),
-    onSuccess: () => { toast(isNew ? 'Outlet created - every product starts at zero stock' : 'Outlet saved', 'success'); refresh(); onClose() },
+    onSuccess: () => { toast(isNew ? 'Outlet created - every ingredient starts at zero stock' : 'Outlet saved', 'success'); refresh(); onClose() },
     onError: (e) => toast(e.message, 'error'),
   })
   const del = useMutation({

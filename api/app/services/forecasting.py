@@ -45,7 +45,6 @@ from app.models import (
     Outlet,
     Product,
     Sale,
-    SaleItem,
     Supplier,
 )
 from app.services import analytics as A
@@ -623,13 +622,30 @@ def build_spec(db: Session, scope: str, target_id: int | None, outlet_ids: list[
 
 # ------------------------------------------------------------------------------------------ stock planning
 def product_stock_plan(db: Session, product_id: int, forecast: dict, outlet_ids: list[int] | None) -> dict:
-    """Days of cover, projected stock-out date and recommended order quantity for one product."""
+    """Days of cover and projected run-out for one item. For a dish: the portions its ingredients allow (the
+    scarcest ingredient decides) and which ingredient runs out first; for a stocked item: its own stock."""
+    from app.models import Recipe
+
     p = db.get(Product, product_id)
-    q = select(func.coalesce(func.sum(InventoryItem.quantity), 0)).where(InventoryItem.product_id == product_id)
+    lines = db.execute(select(Recipe.ingredient_id, Recipe.quantity).where(Recipe.menu_item_id == product_id)).all()
+    stock_q = select(InventoryItem.product_id, func.coalesce(func.sum(InventoryItem.quantity), 0)).group_by(
+        InventoryItem.product_id)
     if outlet_ids:
-        q = q.where(InventoryItem.outlet_id.in_(outlet_ids))
-    stock = float(db.scalar(q) or 0)
-    lead = (db.get(Supplier, p.supplier_id).lead_time_days if p.supplier_id else 3) or 3
+        stock_q = stock_q.where(InventoryItem.outlet_id.in_(outlet_ids))
+    stock_of = {i: float(q) for i, q in db.execute(stock_q).all()}
+    limiting = None
+    if lines:
+        portions = {i: stock_of.get(i, 0.0) / q for i, q in lines if q > 0}
+        limiting_id = min(portions, key=portions.get)
+        stock = max(0.0, portions[limiting_id])
+        ing = db.get(Product, limiting_id)
+        limiting = ing.name if ing else None
+        sup_ids = [db.get(Product, i).supplier_id for i, _ in lines]
+        leads = [db.get(Supplier, sid).lead_time_days for sid in sup_ids if sid]
+        lead = max(leads) if leads else 3
+    else:
+        stock = stock_of.get(product_id, 0.0)
+        lead = (db.get(Supplier, p.supplier_id).lead_time_days if p.supplier_id else 3) or 3
     fc = forecast["forecast"]
     cum, stockout = 0.0, None
     for f in fc:
@@ -645,6 +661,8 @@ def product_stock_plan(db: Session, product_id: int, forecast: dict, outlet_ids:
     avg = forecast["summary"]["avg_daily"]
     return {
         "current_stock": round(stock, 1),
+        "stock_basis": "portions" if lines else "stock",
+        "limiting_ingredient": limiting,
         "avg_daily_demand": avg,
         "days_of_cover": round(stock / avg, 1) if avg > 0 else None,
         "projected_stockout": stockout,
@@ -652,30 +670,36 @@ def product_stock_plan(db: Session, product_id: int, forecast: dict, outlet_ids:
         "safety_stock": round(safety, 1),
         "recommended_order_qty": recommended,
         "reorder_by": (date.fromisoformat(stockout) - timedelta(days=lead + 1)).isoformat() if stockout else None,
-        "unit": p.unit,
+        "unit": "portions" if lines else p.unit,
     }
 
 
-def reorder_suggestions(db: Session, outlet_ids: list[int] | None = None, limit: int | None = None) -> list[dict]:
-    """Fast demand-driven reorder list for every outlet x product.
+def _daily_usage(db: Session, start: date, end: date, outlet_ids: list[int] | None) -> pd.DataFrame:
+    """Daily use of every stocked item (ingredients via recipes) as a frame: outlet_id, product_id, d, units."""
+    df = pd.DataFrame(db.execute(A.usage_query(start, end, outlet_ids, by_day=True)).all(),
+                      columns=["outlet_id", "product_id", "d", "units"])
+    if df.empty:
+        return df
+    df["units"] = df["units"].astype(float)
+    df = df.groupby(["outlet_id", "product_id", "d"], as_index=False)["units"].sum()
+    df["d"] = pd.to_datetime(df["d"])
+    return df
 
-    Uses the last 28 days of sales with a recent-trend adjustment (last 14 vs previous 14 days) for the
-    demand rate, and day-to-day variability for safety stock. Pending purchase orders count as incoming stock.
+
+def reorder_suggestions(db: Session, outlet_ids: list[int] | None = None, limit: int | None = None) -> list[dict]:
+    """Fast demand-driven reorder list for every outlet x stocked ingredient.
+
+    Uses the last 28 days of ingredient use (dishes sold x recipes) with a recent-trend adjustment (last 14 vs
+    previous 14 days) for the usage rate, and day-to-day variability for safety stock. Pending purchase orders
+    count as incoming stock.
     """
     from app.models import PurchaseOrder, PurchaseOrderItem
 
     as_of = A.anchor_date(db)
     start = as_of - timedelta(days=27)
-    q = select(SaleItem.outlet_id, SaleItem.product_id, SaleItem.sale_date, func.sum(SaleItem.quantity)).join(
-        Sale, Sale.id == SaleItem.sale_id).where(A.COMPLETED, SaleItem.sale_date >= start,
-                                                 SaleItem.sale_date <= as_of)
-    if outlet_ids:
-        q = q.where(SaleItem.outlet_id.in_(outlet_ids))
-    df = pd.DataFrame(db.execute(q.group_by(SaleItem.outlet_id, SaleItem.product_id, SaleItem.sale_date)).all(),
-                      columns=["outlet_id", "product_id", "d", "units"])
+    df = _daily_usage(db, start, as_of, outlet_ids)
     stats: dict[tuple[int, int], tuple[float, float]] = {}
     if not df.empty:
-        df["d"] = pd.to_datetime(df["d"])
         days = pd.date_range(start, as_of, freq="D")
         for (o, p), g in df.groupby(["outlet_id", "product_id"]):
             s = g.set_index("d")["units"].reindex(days, fill_value=0.0)
@@ -724,23 +748,19 @@ def reorder_suggestions(db: Session, outlet_ids: list[int] | None = None, limit:
 
 
 def stockout_risk(db: Session, days: int = 14, outlet_ids: list[int] | None = None) -> list[dict]:
-    """Items expected to run out within `days`: stock + open purchase orders vs trend-adjusted demand.
+    """Ingredients expected to run out within `days`: stock + open purchase orders vs trend-adjusted use.
 
-    Uses the same demand-rate estimate as the reorder planner (last 28 days, recent-trend adjusted).
+    Uses the same usage-rate estimate as the reorder planner (last 28 days, recent-trend adjusted). Revenue at
+    risk = the daily sales of the dishes that need the ingredient, for the days it would be missing.
     """
     from app.models import PurchaseOrder, PurchaseOrderItem
 
     as_of = A.anchor_date(db)
     start = as_of - timedelta(days=27)
-    q = select(SaleItem.outlet_id, SaleItem.product_id, SaleItem.sale_date, func.sum(SaleItem.quantity)).join(
-        Sale, Sale.id == SaleItem.sale_id).where(A.COMPLETED, SaleItem.sale_date >= start, SaleItem.sale_date <= as_of)
-    if outlet_ids:
-        q = q.where(SaleItem.outlet_id.in_(outlet_ids))
-    df = pd.DataFrame(db.execute(q.group_by(SaleItem.outlet_id, SaleItem.product_id, SaleItem.sale_date)).all(),
-                      columns=["outlet_id", "product_id", "d", "units"])
+    df = _daily_usage(db, start, as_of, outlet_ids)
     if df.empty:
         return []
-    df["d"] = pd.to_datetime(df["d"])
+    dish_revenue = A.dish_revenue_by_ingredient(db, start, as_of, outlet_ids)
     full = pd.date_range(start, as_of, freq="D")
     rates = {}
     for (o, p), g in df.groupby(["outlet_id", "product_id"]):
@@ -781,6 +801,7 @@ def stockout_risk(db: Session, days: int = 14, outlet_ids: list[int] | None = No
                     "unit": p.unit, "current_stock": inv.quantity, "avg_daily_demand": round(rate, 2),
                     "on_order": round(sum(q for _, q in arrivals), 1), "runs_out_on": run_out.isoformat(),
                     "days_left": (run_out - today).days, "lost_revenue_estimate": round(
-                        rate * max(0, days - (run_out - today).days) * p.selling_price, 2)})
+                        dish_revenue.get((o.id, p.id), rate * p.selling_price) * max(0, days - (run_out - today).days),
+                        2)})
     out.sort(key=lambda r: (r["days_left"], -r["lost_revenue_estimate"]))
     return out

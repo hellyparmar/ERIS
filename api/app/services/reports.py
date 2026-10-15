@@ -73,17 +73,16 @@ def _gst(db: Session, rng: A.DateRange, outlet_ids: list[int] | None) -> list[di
 def _inventory(db: Session, _rng: A.DateRange, outlet_ids: list[int] | None) -> list[dict]:
     q = select(InventoryItem, Product, Outlet, Category.name).join(Product, Product.id == InventoryItem.product_id).join(
         Outlet, Outlet.id == InventoryItem.outlet_id).join(Category, Category.id == Product.category_id).where(
-        Product.is_active.is_(True)).order_by(Outlet.id, Product.sku)
+        Product.is_active.is_(True), Product.kind == "ingredient").order_by(Outlet.id, Product.sku)
     if outlet_ids:
         q = q.where(InventoryItem.outlet_id.in_(outlet_ids))
     out = []
     for inv, p, o, cat in db.execute(q).all():
         qty = inv.quantity
         status = "out of stock" if qty <= 0 else ("low" if qty <= inv.reorder_level else "ok")
-        out.append({"outlet": o.name, "sku": p.sku, "product": p.name, "category": cat, "unit": p.unit,
+        out.append({"outlet": o.name, "sku": p.sku, "ingredient": p.name, "category": cat, "unit": p.unit,
                     "quantity": qty, "reorder_level": inv.reorder_level, "status": status,
-                    "unit_cost": p.cost_price, "stock_value_cost": round(max(qty, 0) * p.cost_price, 2),
-                    "stock_value_retail": round(max(qty, 0) * p.selling_price, 2)})
+                    "unit_cost": p.cost_price, "stock_value": round(max(qty, 0) * p.cost_price, 2)})
     return out
 
 
@@ -107,40 +106,39 @@ def _anomalies(db: Session, rng: A.DateRange, outlet_ids: list[int] | None) -> l
 
 
 REPORTS: dict[str, Report] = {r.key: r for r in [
-    Report("sales-daily", "Daily sales by outlet", "Bills, revenue, average bill, units, discounts and tax per day.",
+    Report("sales-daily", "Daily sales by outlet", "Bills, revenue, average bill, dishes, discounts and tax per day.",
            [("date", "Date"), ("outlet", "Outlet"), ("bills", "Bills"), ("revenue", "Revenue (incl. tax)"),
-            ("avg_bill", "Average bill"), ("units", "Units"), ("discount", "Discount"), ("tax", "Tax"),
+            ("avg_bill", "Average bill"), ("units", "Dishes"), ("discount", "Discount"), ("tax", "Tax"),
             ("net_sales", "Net sales (excl. tax)")], _sales_daily),
     Report("outlets", "Outlet performance", "Revenue, bills, profit and growth per outlet versus the previous period.",
            [("code", "Code"), ("name", "Outlet"), ("city", "City"), ("revenue", "Revenue"), ("orders", "Bills"),
-            ("avg_basket", "Average bill"), ("units", "Units"), ("profit", "Gross profit"), ("margin_pct", "Margin %"),
+            ("avg_basket", "Average bill"), ("units", "Dishes"), ("profit", "Gross profit"), ("margin_pct", "Margin %"),
             ("share_pct", "Share %"), ("previous_revenue", "Previous period revenue"), ("change_pct", "Change %")],
            _outlets),
-    Report("products", "Product performance (ABC)", "Revenue, units and margin per product with ABC class.",
-           [("sku", "SKU"), ("name", "Product"), ("category", "Category"), ("units", "Units"), ("revenue", "Revenue"),
+    Report("products", "Menu performance (ABC)", "Orders, revenue and margin per dish with ABC class.",
+           [("sku", "Code"), ("name", "Dish"), ("category", "Category"), ("units", "Orders"), ("revenue", "Revenue"),
             ("profit", "Gross profit"), ("margin_pct", "Margin %"), ("share_pct", "Share %"),
             ("cumulative_pct", "Cumulative %"), ("class", "ABC class")], _products),
-    Report("categories", "Category performance", "Revenue, units, profit and growth per category.",
-           [("category", "Category"), ("revenue", "Revenue"), ("units", "Units"), ("profit", "Gross profit"),
+    Report("categories", "Menu category performance", "Revenue, orders, profit and growth per menu category.",
+           [("category", "Category"), ("revenue", "Revenue"), ("units", "Orders"), ("profit", "Gross profit"),
             ("margin_pct", "Margin %"), ("share_pct", "Share %"), ("change_pct", "Change vs previous %")],
            _categories),
     Report("gst-summary", "GST output tax summary (demo)",
-           "Taxable value and CGST/SGST by state, HSN code and rate. For analysis only - not for tax filing.",
-           [("state", "State"), ("hsn_code", "HSN"), ("tax_rate", "GST rate %"), ("quantity", "Quantity"),
+           "Taxable value and CGST/SGST by state, SAC/HSN code and rate. For analysis only - not for tax filing.",
+           [("state", "State"), ("hsn_code", "SAC / HSN"), ("tax_rate", "GST rate %"), ("quantity", "Quantity"),
             ("taxable_value", "Taxable value"), ("cgst", "CGST"), ("sgst", "SGST"), ("total_tax", "Total tax"),
             ("invoice_value", "Invoice value")], _gst, min_role="manager"),
-    Report("inventory", "Inventory valuation", "Current stock per outlet and product at cost and retail value.",
-           [("outlet", "Outlet"), ("sku", "SKU"), ("product", "Product"), ("category", "Category"), ("unit", "Unit"),
-            ("quantity", "Quantity"), ("reorder_level", "Reorder level"), ("status", "Status"),
-            ("unit_cost", "Unit cost"), ("stock_value_cost", "Value at cost"),
-            ("stock_value_retail", "Value at selling price")], _inventory, uses_period=False),
-    Report("reorder", "Reorder recommendations", "Demand-based order quantities for items running low.",
-           [("outlet", "Outlet"), ("sku", "SKU"), ("product", "Product"), ("supplier", "Supplier"),
-            ("current_stock", "Stock"), ("on_order", "On order"), ("avg_daily_demand", "Daily demand"),
+    Report("inventory", "Kitchen stock valuation", "Ingredient stock per outlet at cost.",
+           [("outlet", "Outlet"), ("sku", "Code"), ("ingredient", "Ingredient"), ("category", "Category"),
+            ("unit", "Unit"), ("quantity", "Quantity"), ("reorder_level", "Reorder level"), ("status", "Status"),
+            ("unit_cost", "Unit cost"), ("stock_value", "Value at cost")], _inventory, uses_period=False),
+    Report("reorder", "Reorder recommendations", "Order quantities for ingredients running low, from recent use.",
+           [("outlet", "Outlet"), ("sku", "Code"), ("product", "Ingredient"), ("supplier", "Supplier"), ("unit", "Unit"),
+            ("current_stock", "Stock"), ("on_order", "On order"), ("avg_daily_demand", "Daily use"),
             ("days_of_cover", "Days of cover"), ("lead_time_days", "Lead time (days)"),
             ("suggested_qty", "Suggested qty"), ("estimated_cost", "Estimated cost"), ("urgency", "Urgency")],
            _reorder, uses_period=False),
-    Report("customer-segments", "Customer segments (RFM)", "Customers grouped by recency, frequency and spend.",
+    Report("customer-segments", "Guest segments (RFM)", "Regular guests grouped by recency, frequency and spend.",
            [("segment", "Segment"), ("description", "Description"), ("customers", "Customers"),
             ("revenue", "Revenue"), ("revenue_share_pct", "Revenue share %"), ("avg_recency_days", "Avg days since visit"),
             ("avg_orders", "Avg bills"), ("avg_spend", "Avg spend")], _customers, uses_period=False),

@@ -1,9 +1,10 @@
-# ERIS: Enterprise Retail Intelligence System
+# ERIS: Enterprise Restaurant Intelligence System
 
-ERIS is an open-source **retail intelligence and decision-support platform** for one organisation running
-several outlets (five by default, up to seven). It brings together:
+ERIS is an open-source **intelligence and decision-support platform for a restaurant chain** running several
+outlets (five by default, up to seven). It brings together:
 
-- day-to-day operations: sales, stock, purchasing, customers and demo GST invoices;
+- day-to-day operations: dine-in, takeaway and delivery bills, the menu with a recipe for every dish, kitchen
+  stock that each sale draws down by recipe, supplier orders, guests and demo GST invoices;
 - **demand forecasting with model comparison**;
 - a **grounded natural-language assistant**;
 - **anomaly detection** and **revenue-driver analysis**.
@@ -13,7 +14,7 @@ Every number traces back to the data.
 **Live demo:** [eris-retail.vercel.app](https://eris-retail.vercel.app), with the API on [eris-tvro.onrender.com](https://eris-tvro.onrender.com). Pick a demo role on the sign-in page. The free server sleeps when idle, so the first visit can take up to a minute.
 
 > **Synthetic-data project.** ERIS runs on a deterministic, documented synthetic dataset for a fictional
-> supermarket chain, *Urban Harvest Supermarkets*. It is a portfolio and learning project. It is **not** a production ERP, and it
+> casual-dining restaurant chain, *Saffron Table*. It is a portfolio and learning project. It is **not** a production ERP, and it
 > is **not** a GST-compliant invoicing system: the GSTINs are synthetic and every invoice is watermarked
 > *DEMO - NOT FOR TAX FILING*.
 
@@ -23,17 +24,19 @@ Every number traces back to the data.
 
 | | |
 |---|---|
-| **Forecasting** | Seasonal naive, Holt-Winters, XGBoost, Prophet (Indian festival calendar plus promotion, price and weather regressors) and an ensemble. Each series is back-tested on two 28-day folds and every run is saved with its data range, features, parameters and metrics. In a rolling-origin study over 26 series the production pipeline scores **17.6% WAPE vs 19.0% for the seasonal-naive baseline** (about 7% lower error). |
-| **AI assistant** | Answers questions such as *"Why was Outlet 3 revenue lower this week?"*, *"Which items may go out of stock in the next 14 days?"* and *"What forecast model performed best for beverages?"*. It maps each question to a validated intent template (no generated SQL), respects outlet permissions, and shows its data source, filters, timing, model version and caveats. Definition and how-to questions are answered from the project docs by retrieval. Optional local LLM through Ollama. **Grounding check: 27/27 intents and 19/19 answers match independent SQL.** |
-| **Anomalies and drivers** | Robust z-score detection of unusual outlet-days and suspicious bill lines: **precision 0.94, recall 0.65** against the 26 anomalies injected into the data. A "why did revenue change?" analysis splits the change exactly into bills × average bill, then by outlet and category, and estimates the calendar, promotion, stockout and rainfall contributions. |
-| **Data pipeline** | A deterministic generator (seed 42): 2 years of bill lines with seasonality, festivals, weather, promotions, price elasticity, substitutions and stockouts, plus full provenance. CSV import with column mapping, a dry run, duplicate handling, an error report, an atomic commit and import history. |
+| **Forecasting** | Seasonal naive, Holt-Winters, XGBoost, Prophet (Indian festival calendar plus promotion, price and weather regressors) and an ensemble. Each series is back-tested on two 28-day folds and every run is saved with its data range, features, parameters and metrics. In a rolling-origin study over 25 series (whole business, outlets, menu categories and dishes) the production pipeline scores **14.1% WAPE vs 15.9% for the seasonal-naive baseline** (about 11% lower error). A dish forecast also says how many portions the kitchens' ingredient stock allows and which ingredient runs short first. |
+| **AI assistant** | Answers questions such as *"Why was Outlet 3 revenue lower this week?"*, *"Which ingredients may run out in the next 14 days?"*, *"How many guests did we serve last week?"* and *"What forecast model performed best for desserts?"*. It maps each question to a validated intent template (no generated SQL), respects outlet permissions, and shows its data source, filters, timing, model version and caveats. Definition and how-to questions are answered from the project docs by retrieval. Optional local LLM through Ollama. **Grounding check: 31/31 intents and 21/21 answers match independent SQL.** |
+| **Anomalies and drivers** | Robust z-score detection of unusual outlet-days (**precision 0.64, recall 0.69** against the 26 anomalies injected into the data) and suspicious bill lines (all 5 injected typing errors, no false alarms). A "why did revenue change?" analysis splits the change exactly into bills × average bill, then by outlet and category, and estimates the calendar, promotion, dish-outage and rainfall contributions. |
+| **Data pipeline** | A deterministic generator (seed 42): 2 years of restaurant bills built course by course (party size, channel, mains with breads, starters, drinks, desserts) with weekday and meal-time peaks, festivals, weather, promotions, price elasticity, ingredient outages and seasonal ingredient costs, plus full provenance. CSV import with column mapping, a dry run, duplicate handling, an error report, an atomic commit and import history. |
 | **Design** | A framed workspace in a warm palette: espresso `#4C4541`, gold `#F2C46A`, sage `#AEAC78`, cream `#FFF9F2`, parchment `#F3E6D5` and honey `#FCF0DA`. Geist type with monospaced figures, light and dark themes and phone layouts. Chart colours are an 8-colour set in the same warm family, checked for colour-blind separation and contrast in both themes. The assistant opens table answers as a spreadsheet that can be copied or downloaded. |
-| **Engineering** | FastAPI with SQLAlchemy 2 and Alembic on SQLite or PostgreSQL; React 19. JWT access and refresh tokens, 4 roles with application-level outlet scoping, and an automatic audit log. 117 API tests on SQLite and PostgreSQL, 14 Playwright end-to-end tests, and CI. |
+| **Engineering** | FastAPI with SQLAlchemy 2 and Alembic on SQLite or PostgreSQL; React 19. JWT access and refresh tokens, 4 roles with application-level outlet scoping, and an automatic audit log. 120 API tests on SQLite and PostgreSQL, 14 Playwright end-to-end tests, and CI. |
 
 ## Screenshots
 
-| AI assistant (with provenance) | Forecasts |
+| Menu: recipe, food cost, portions in stock | Kitchen stock: what to order now |
 |---|---|
+| ![Menu](docs/images/menu.png) | ![Reorder](docs/images/reorder.png) |
+| **AI assistant (with provenance)** | **Forecasts** |
 | ![Assistant](docs/images/assistant.png) | ![Forecasts](docs/images/forecasts.png) |
 | **Model comparison** | **Why did revenue change?** |
 | ![Model comparison](docs/images/model-comparison.png) | ![Drivers](docs/images/drivers.png) |
@@ -50,18 +53,18 @@ Screenshots are regenerated with `cd e2e && node screenshots.mjs` against a runn
 
 | Area | What you can do |
 |---|---|
-| Dashboard | KPIs vs the previous period, trend, 14-day forecast, outlet ranking, category mix and alerts (stock, overdue POs, unusual days, suspicious bills, festivals) |
-| AI Assistant | Plain-English questions about sales, products, outlets, stock, customers, forecasts, anomalies and *why* numbers changed; follow-up questions, voice input, and a "Source & method" panel under every answer |
-| Sales | Bill history with filters, manual billing (stock checked, GST-inclusive prices, customer by phone), voids with stock restore, a demo GST invoice for any bill, CSV export |
-| Inventory | Stock per outlet with days of cover, adjustments, transfers, movement history, demand-based reorder suggestions → purchase orders, 14-day stockout risk |
-| Products, Suppliers, Customers | Catalogue with HSN and GST; suppliers and POs with partial receiving; customers with GSTIN, RFM segment and history |
-| Forecasts | Total, outlet, category or product forecasts; 7, 14 or 30 days; 80% band; model leaderboard (WAPE, sMAPE, MAE, RMSE, band coverage, bias); stock plan |
+| Dashboard | Revenue, gross profit and food cost, guests and spend per guest, average bill vs the previous period; trend, 14-day forecast, outlet ranking, top dishes and alerts (ingredients out or low, overdue POs, unusual days, suspicious bills, festivals) |
+| AI Assistant | Plain-English questions about sales, guests, dishes, outlets, kitchen stock, forecasts, anomalies and *why* numbers changed; follow-up questions, voice input, and a "Source & method" panel under every answer |
+| Sales | Bill history with channel and guest filters, manual billing (dine-in with guests, takeaway or delivery; each dish's ingredients are checked and drawn from the kitchen's stock), voids that put the ingredients back, a demo GST invoice for any bill, CSV export |
+| Kitchen stock | Ingredient stock per outlet with daily use and days of cover, stock counts, wastage, transfers between kitchens, movement history, usage-based reorder suggestions → purchase orders, 14-day run-out risk |
+| Menu, Suppliers, Customers | Dishes with a recipe editor that shows the food cost live, portions each kitchen can make, ingredients with costs and suppliers; supplier POs with partial receiving; guests and company accounts with GSTIN, RFM segment and history |
+| Forecasts | Total, outlet, menu category or dish forecasts; 7, 14 or 30 days; 80% band; model leaderboard (WAPE, sMAPE, MAE, RMSE, band coverage, bias); kitchen check (portions in stock, ingredient that runs short first) |
 | Model comparison | Rolling-origin evaluation (start one from the page), WAPE per model, per series type and per series, and the history of every forecast run with full details |
 | Anomalies & drivers | Driver decomposition for 7, 14 or 30 days or month to date; unusual days with evidence; suspicious bill lines; detector precision and recall |
 | Analytics | Trends, weekday × hour heatmap, payment and channel mix, ABC, market basket (lift), outlets, RFM |
-| Reports & export | 9 reports (daily sales, outlets, products ABC, categories, GST summary, inventory valuation, reorder, customer segments, unusual days) as CSV or formatted Excel |
-| Data import | Sales, products, customers, suppliers and stock counts; templates and sample files (valid, and with mistakes), column mapping, dry run, error report CSV, history |
-| Invoices | Demo GST invoices: CGST + SGST or IGST by place of supply, HSN, amount in words, PDF, history |
+| Reports & export | 9 reports (daily sales, outlets, menu ABC, menu categories, GST summary, kitchen stock valuation, reorder, guest segments, unusual days) as CSV or formatted Excel |
+| Data import | Bills (with channel and covers; Swiggy/Zomato count as delivery), the menu and ingredients with recipes, customers, suppliers and stock counts; templates and sample files (valid, and with mistakes), column mapping, dry run, error report CSV, history |
+| Invoices | Demo GST invoices: CGST + SGST or IGST by place of supply, SAC 996331 at 5%, amount in words, PDF, history |
 | Audit log | Who created, changed, voided or deleted what, with field-level changes (admin) |
 | Settings | Organisation (GSTIN, state, time zone, currency), users with several outlets and 4 roles, profile, sign out everywhere, dataset info, demo reset, clear transactions |
 
@@ -97,9 +100,11 @@ Docker web service, not as serverless functions.
 - **Ready the moment it starts.** Render's free plan has about a tenth of a CPU and no persistent disk, and it
   sleeps when idle. Generating the two-year demo there would take about ten minutes after every wake-up, so the
   Docker build prepares it instead ([`app/seed/bake.py`](api/app/seed/bake.py)): the synthetic data, a few
-  genuine user operations (GST invoices, a part delivery, a stock count, a transfer), 145 pre-computed forecasts,
-  the model-comparison evaluation and every demo user's default page answers. Measured with a 0.1-CPU
-  emulation: start-up 16 s, every page 2–5 s, dashboard data 0.3 s, assistant answers 1–7 s. Edits made in the
+  genuine user operations (GST invoices, a part delivery, a stock count, wastage, a transfer), 145 pre-computed
+  forecasts, the model-comparison evaluation, every demo user's default page answers (including the bill, stock
+  and menu lists) and their answers to the assistant's suggested questions. Measured with a 0.1-CPU emulation:
+  default page data 0.1–0.4 s, filtered lists about 1 s, suggested assistant questions 0.4 s and other
+  questions 1–6 s. Edits made in the
   demo last until the service sleeps; set `DATABASE_URL` to a PostgreSQL database for a lasting deployment.
 - **Weekly refresh (optional):** add the service's Render *Deploy Hook* URL as the GitHub secret
   `RENDER_DEPLOY_HOOK_URL`; [`refresh-demo.yml`](.github/workflows/refresh-demo.yml) then rebuilds the demo every
@@ -128,8 +133,9 @@ port 8000.
 ### Start with your own data
 
 Set `SEED_DEMO_DATA=false`, `INITIAL_ADMIN_EMAIL` and `INITIAL_ADMIN_PASSWORD` before the first start (or run
-`python -m app.manage create-admin --email owner@shop.in --name "Owner" --org "My Shop"` in `api/`). Sign in, add
-your outlets, products and suppliers in the app, or load them with **Data import**. Forecasts need at least three weeks
+`python -m app.manage create-admin --email owner@myrestaurant.in --name "Owner" --org "My Restaurant"` in `api/`).
+Sign in, add your outlets, menu (with recipes), ingredients and suppliers in the app, or load them with
+**Data import**. Forecasts need at least three weeks
 with sales (more history gives better accuracy); until then the Forecasts page says so.
 
 ### Demo logins
@@ -150,11 +156,13 @@ only while the demo accounts exist and still use these passwords, so an install 
 The demo dataset has:
 
 - one organisation and 5 outlets (Mumbai, Pune, Bengaluru ×2, Ahmedabad), each with its own demand profile;
-- 68 supermarket products in 10 categories (staples, dairy, fresh produce, beverages, household and personal
-  care and more), 9 suppliers and about 2,600 customers;
-- **2 years of bill-level history** (about 214,000 bills and 789,000 lines);
-- 52 promotions, 115 price changes, daily weather, 597 stockout events with substitutes and 26 labelled
-  anomalies.
+- a 50-dish menu in 9 categories (soups, starters, main course, breads, rice & biryani, Indo-Chinese, desserts,
+  hot and cold beverages) with a recipe for every dish, 38 kitchen ingredients from 7 suppliers, and about 3,000
+  guests;
+- **2 years of bill-level history** (about 153,000 bills and 864,000 lines: 55% dine-in, 13% takeaway, 32%
+  delivery; about ₹10.8 Cr a year, ₹527 spent per dine-in guest, food cost about 21% of sales);
+- 53 promotions, 2 menu price revisions, monthly ingredient costs (tomato and onion spikes), daily weather, 637
+  dish outages caused by ingredients running out, and 26 labelled anomalies.
 
 It is deterministic: the same seed and end date always produce the same data. Every synthetic bill references
 a provenance record (generator version, seed, timestamp, period).
@@ -162,11 +170,11 @@ a provenance record (generator version, seed, timestamp, period).
 To regenerate it:
 
 ```bash
-cd api && python -m app.seed --days 730 --outlets 5 --seed 42 [--end-date 2026-09-30]
+cd api && python -m app.seed --days 730 --outlets 5 --seed 42 [--end-date 2026-10-14]
 ```
 
 Details are in [docs/DATASET.md](docs/DATASET.md). To use your own data, clear the transactions (Settings →
-System & data), then import CSVs or enter sales manually. Real data is never date-shifted or overwritten.
+System & data), then import CSVs (bills, the menu with recipes, ingredients, stock counts) or enter bills manually. Real data is never date-shifted or overwritten.
 
 ## Model design and results
 
@@ -174,13 +182,13 @@ System & data), then import CSVs or enter sales manually. Real data is never dat
   The selection rule is: Prophet is the incumbent, and a challenger must cut back-test WAPE by more than 10% to
   replace it. The 80% interval comes from back-test errors.
 
-  | Model | Mean WAPE (26 series × 3 origins) |
+  | Model | Mean WAPE (25 series × 3 origins) |
   |---|---:|
-  | Seasonal naive (baseline) | 19.0% |
-  | Holt-Winters | 18.7% |
-  | XGBoost | 19.3% |
-  | **Prophet** | **17.4%** |
-  | ERIS auto-selection | 17.6% |
+  | Seasonal naive (baseline) | 15.9% |
+  | Holt-Winters | 14.7% |
+  | XGBoost | 15.2% |
+  | **Prophet** | **14.1%** |
+  | ERIS auto-selection | 14.1% |
 
   The full report is in [docs/FORECAST_EVALUATION.md](docs/FORECAST_EVALUATION.md), with the model card in
   [docs/MODEL_CARD.md](docs/MODEL_CARD.md) and the notebook in
@@ -194,16 +202,17 @@ System & data), then import CSVs or enter sales manually. Real data is never dat
 
 - All accuracy figures come from **synthetic** data. They show how the models compare against a known demand
   process, not how they would perform for a real shop.
-- XGBoost is weaker than the baseline on aggregate series in this data, which is reported as is. LSTM was left
+- XGBoost is weaker than the baseline on the outlet series in this data, which is reported as is. LSTM was left
   out because the scope made it optional and simpler models already win.
-- The 80% prediction band covers 80.0% of held-out days on average (split-conformal calibration), but it can still
-  be too narrow around festivals that fall outside the back-test window.
+- The 80% prediction band covers 84.8% of held-out days on average (split-conformal calibration, slightly
+  conservative), but it can still be too narrow around festivals that fall outside the back-test window.
 - The assistant's rule-based parser covers the documented question types. Other phrasings fall back to help
   text, or to the local LLM when Ollama is installed. Check the licence of whichever model you pull.
 - Demo GST invoices are illustrations only: there is no IRN, e-way bill or GSTR filing.
 - Background jobs (demo generation, evaluation) run inside the API process. That is fine for a single-tenant
   demo; a production deployment would use a task queue.
-- Analytics answers are cached until the data changes (any sale, stock change or edit). On a demo whose data
+- Analytics answers and the default list views are cached until the data changes (any sale, stock change or
+  edit). On a demo whose data
   never changes, a date-dependent flag such as an overdue purchase order can lag by up to a week, until the
   weekly date refresh.
 
@@ -229,7 +238,7 @@ TEST_DATABASE_URL=postgresql+psycopg2://eris:eris@localhost:5432/eris_test E2E=1
 
 cd api
 pip install -r requirements-dev.txt -c constraints.txt
-ruff check app tests && pytest -q                       # 117 tests
+ruff check app tests && pytest -q                       # 120 tests
 python -m app.evaluation                                # forecast evaluation   -> docs/FORECAST_EVALUATION.md
 python -m app.assistant_eval                            # assistant grounding   -> docs/ASSISTANT_EVALUATION.md
 

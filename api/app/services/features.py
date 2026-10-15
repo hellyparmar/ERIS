@@ -65,7 +65,7 @@ def exogenous_features(db: Session, start: date, end: date, outlet_ids: list[int
     out["price_index"] = 1.0
 
     # product weights: revenue share over the last 180 days of history inside the series scope
-    pq = select(Product.id).where(Product.is_active.is_(True))
+    pq = select(Product.id).where(Product.is_active.is_(True), Product.kind == "menu")
     if product_id:
         pq = select(Product.id).where(Product.id == product_id)
     elif category_id:

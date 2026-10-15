@@ -27,16 +27,16 @@ async function shot(page, name) {
 // A sales file with the user's own column names and a few typical mistakes (shown on the import screenshot)
 const day = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10)
 const rows = [
-  'Bill No,date,time,Store,sku,Qty,unit_price,discount,payment_method,channel,customer_phone,customer_name',
-  `SHOT-1,${day},10:15,MUM-AND,BEV-001,1,,,upi,in_store,9800001021,Sample Customer 1`,
-  `SHOT-2,${day},11:15,PUN-KOR,BEV-002,2,,,cash,in_store,,`,
-  `SHOT-2,${day},11:16,PUN-KOR,BEV-003,3,,,cash,in_store,,`,
-  `SHOT-3,${day},12:15,BLR-IND,BEV-004,1,,,card,in_store,9802001021,Sample Customer 3`,
-  `SHOT-E1,${day},12:00,MUM-AND,NO-SUCH-SKU,1,,,cash,in_store,,`,
-  `SHOT-E2,${day},12:05,MUM-AND,BEV-001,-2,,,cash,in_store,,`,
-  `SHOT-E3,31-31-2025,12:10,MUM-AND,BEV-001,1,,,cash,in_store,,`,
-  `SHOT-E4,${day},12:15,XXX-000,BEV-001,1,,,cheque,in_store,,`,
-  `SHOT-E5,${day},12:20,MUM-AND,BEV-001,1,,,upi,in_store,12345,`,
+  'Bill No,date,time,Store,sku,Qty,unit_price,discount,payment_method,Order Type,Pax,customer_phone,customer_name',
+  `SHOT-1,${day},13:15,MUM-AND,MNC-007,1,,,upi,Dine In,2,9800001021,Sample Guest 1`,
+  `SHOT-1,${day},13:15,MUM-AND,BRD-001,3,,,upi,Dine In,2,9800001021,Sample Guest 1`,
+  `SHOT-2,${day},20:10,PUN-KOR,RIC-004,2,,,card,Swiggy,,,`,
+  `SHOT-3,${day},21:05,BLR-IND,STR-001,1,,,card,Takeaway,,9802001021,Sample Guest 3`,
+  `SHOT-E1,${day},12:00,MUM-AND,NO-SUCH-DISH,1,,,cash,Dine In,2,,`,
+  `SHOT-E2,${day},12:05,MUM-AND,MNC-001,-2,,,cash,Dine In,2,,`,
+  `SHOT-E3,31-31-2025,12:10,MUM-AND,MNC-001,1,,,cash,Dine In,2,,`,
+  `SHOT-E4,${day},12:15,XXX-000,MNC-001,1,,,cheque,Dine In,2,,`,
+  `SHOT-E5,${day},12:20,MUM-AND,MNC-001,1,,,upi,Dine In,2,12345,`,
 ]
 const csv = join(mkdtempSync(join(tmpdir(), 'eris-')), 'pos_export.csv')
 writeFileSync(csv, rows.join('\n') + '\n')
@@ -56,7 +56,7 @@ await p.locator('.msg.bot').last().evaluate((e) => e.scrollIntoView({ block: 'st
 await p.waitForTimeout(800)
 await shot(p, 'assistant')
 
-await p.goto(BASE + '/forecasts?scope=category&id=1')
+await p.goto(BASE + '/forecasts?scope=category&id=3') // Main Course
 await p.waitForSelector('text=Model leaderboard', { timeout: 120_000 })
 await p.waitForTimeout(1500)
 await shot(p, 'forecasts')
@@ -99,6 +99,13 @@ await shot(p, 'reports')
 await p.goto(BASE + '/analytics')
 await p.waitForTimeout(4000)
 await shot(p, 'analytics')
+
+await p.goto(BASE + '/products')
+await p.waitForSelector('main table tbody tr', { timeout: 60_000 })
+await p.locator('main table tbody tr').first().click()
+await p.waitForSelector('text=Portions the kitchens can make now', { timeout: 60_000 })
+await p.waitForTimeout(1000)
+await shot(p, 'menu')
 
 await p.goto(BASE + '/inventory?tab=reorder')
 await p.waitForSelector('table tbody tr', { timeout: 60_000 })

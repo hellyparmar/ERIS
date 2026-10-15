@@ -160,12 +160,16 @@ def business_overview(c: Ctx) -> dict:
     lines = [f"**Business snapshot for {c.scope_label} - last 7 days (to {c.anchor:%d %b %Y})**", ""]
     lines.append(f"- Revenue **{c.f.money(cur['revenue'])}** ({trend_word(ch['revenue'])} vs the previous week) "
                  f"from **{c.f.num(cur['orders'])}** bills, average bill **{c.f.money(cur['avg_basket'])}**.")
-    lines.append(f"- Gross profit **{c.f.money(cur['gross_profit'])}** at a **{cur['margin_pct']:.1f}%** margin.")
+    if cur["covers"]:
+        lines.append(f"- **{c.f.num(cur['covers'])}** guests dined in ({trend_word(ch['covers'])}), spending "
+                     f"**{c.f.money(cur['spend_per_cover'])}** each on average.")
+    lines.append(f"- Gross profit **{c.f.money(cur['gross_profit'])}** - food cost is **{cur['food_cost_pct']:.1f}%** "
+                 f"of sales (before tax).")
     if len(outlets) > 1:
         best = outlets[0]
         movers = [o for o in outlets if o["change_pct"] is not None]
         worst = min(movers, key=lambda o: o["change_pct"]) if movers else None
-        lines.append(f"- Top outlet: **{best['name']}** ({c.f.money(best['revenue'])}, {best['share_pct']:.0f}% of sales).")
+        lines.append(f"- Top restaurant: **{best['name']}** ({c.f.money(best['revenue'])}, {best['share_pct']:.0f}% of sales).")
         if worst and worst["change_pct"] < 0:
             lines.append(f"- Needs attention: **{worst['name']}** is {trend_word(worst['change_pct'])} week on week.")
     growing = [x for x in cats if (x["change_pct"] or 0) > 5]
@@ -185,13 +189,13 @@ def business_overview(c: Ctx) -> dict:
     blocks = [{"type": "kpis", "items": [
         kpi("Revenue (7d)", cur["revenue"], "currency", ch["revenue"]),
         kpi("Bills", cur["orders"], "number", ch["orders"]),
-        kpi("Avg bill", cur["avg_basket"], "currency", ch["avg_basket"]),
+        kpi("Spend per guest", cur["spend_per_cover"], "currency", ch["spend_per_cover"]),
         kpi("Gross profit", cur["gross_profit"], "currency", ch["gross_profit"]),
     ]}]
     if len(outlets) > 1:
-        blocks.append(chart("bar", "Revenue by outlet - last 7 days", outlets, "name", [("revenue", "Revenue")]))
+        blocks.append(chart("bar", "Revenue by restaurant - last 7 days", outlets, "name", [("revenue", "Revenue")]))
     return result("\n".join(lines), blocks, ["What should I reorder?", "Forecast sales for next week",
-                                             "Which products are growing fastest this month?"])
+                                             "Which dishes are growing fastest this month?"])
 
 
 def sales_summary(c: Ctx) -> dict:
@@ -214,17 +218,17 @@ def _sales_summary(c: Ctx, rng: A.DateRange, label: str) -> dict:
         profit = sum(s["profit"] for s in series)
         ch = A.pct_change(rev, prev_rev)
         ans = (f"**{p.category_name}** sales at {c.scope_label} for {label}: **{c.f.money(rev)}** "
-               f"({trend_word(ch)} vs {prev_label}), **{c.f.num(units)}** units sold, "
+               f"({trend_word(ch)} vs {prev_label}), **{c.f.num(units)}** dishes ordered, "
                f"gross profit **{c.f.money(profit)}**.")
         tops = A.top_products(c.db, rng, c.outlet_ids, 5, category_id=p.category_id)
-        blocks = [{"type": "kpis", "items": [kpi("Revenue", rev, "currency", ch), kpi("Units", units),
+        blocks = [{"type": "kpis", "items": [kpi("Revenue", rev, "currency", ch), kpi("Dishes ordered", units),
                                              kpi("Gross profit", profit, "currency")]},
                   chart("area", f"{p.category_name} - daily revenue", series, "date", [("revenue", "Revenue")])]
         if tops:
             ans += f" Best seller: **{tops[0]['name']}** ({c.f.money(tops[0]['revenue'])})."
-            blocks.append(table("Top products in category", [("name", "Product", "text"), ("units", "Units", "number"),
+            blocks.append(table("Top dishes in category", [("name", "Dish", "text"), ("units", "Orders", "number"),
                                                               ("revenue", "Revenue", "currency")], tops))
-        return result(ans, blocks, [f"Forecast {p.category_name} for next month", f"Slow moving {p.category_name} items"])
+        return result(ans, blocks, [f"Forecast {p.category_name} for next month", f"Slowest {p.category_name} dishes"])
 
     cur, ch = k["current"], k["change_pct"]
     if cur["orders"] == 0:
@@ -233,7 +237,10 @@ def _sales_summary(c: Ctx, rng: A.DateRange, label: str) -> dict:
     single_day = rng.days == 1
     ans = (f"For **{label}** at **{c.scope_label}**, revenue was **{c.f.money(cur['revenue'])}** from "
            f"**{c.f.num(cur['orders'])}** bills (average bill **{c.f.money(cur['avg_basket'])}**, "
-           f"{cur['items_per_basket']:.1f} items per bill).")
+           f"{cur['items_per_basket']:.1f} dishes per bill).")
+    if cur["covers"]:
+        ans += (f" **{c.f.num(cur['covers'])}** guests dined in, spending **{c.f.money(cur['spend_per_cover'])}** "
+                "each on average.")
     if ch["revenue"] is not None:
         ans += f" That is **{trend_word(ch['revenue'])}** compared with {prev_label} ({prev.start:%d %b}" + (
             f" to {prev.end:%d %b})." if not single_day else ").")
@@ -241,8 +248,8 @@ def _sales_summary(c: Ctx, rng: A.DateRange, label: str) -> dict:
     blocks = [{"type": "kpis", "items": [
         kpi("Revenue", cur["revenue"], "currency", ch["revenue"]),
         kpi("Bills", cur["orders"], "number", ch["orders"]),
+        kpi("Guests (dine-in)", cur["covers"], "number", ch["covers"]),
         kpi("Avg bill", cur["avg_basket"], "currency", ch["avg_basket"]),
-        kpi("Gross profit", cur["gross_profit"], "currency", ch["gross_profit"]),
     ]}]
     if rng.days > 1:
         gran = "month" if rng.days > 120 else ("week" if rng.days > 45 else "day")
@@ -252,7 +259,7 @@ def _sales_summary(c: Ctx, rng: A.DateRange, label: str) -> dict:
         outlets = A.outlet_performance(c.db, rng, c.outlet_ids)
         blocks.append(table("By outlet", [("name", "Outlet", "text"), ("revenue", "Revenue", "currency"),
                                           ("orders", "Bills", "number"), ("change_pct", "Change", "percent")], outlets))
-    return result(ans, blocks, ["Which products sold the most?", "Compare this month with last month",
+    return result(ans, blocks, ["Which dishes sold the most?", "Compare this month with last month",
                                 "Show the sales trend for the last 6 months"])
 
 
@@ -268,21 +275,18 @@ def product_performance(c: Ctx, rng: A.DateRange, label: str) -> dict:
     for r in rows:
         pr = prev.get(r["product_id"])
         ch = A.pct_change(r["units"], pr["units"]) if pr else None
-        lines.append(f"- **{r['name']}**: {c.f.num(r['units'])} units, {c.f.money(r['revenue'])} revenue, "
-                     f"{r['margin_pct']:.1f}% margin{f' ({trend_word(ch)} in units)' if ch is not None else ''}.")
-    stock_rows = _stock_rows(c, product_ids=p.product_ids)
-    total_stock = sum(s["quantity"] for s in stock_rows)
+        lines.append(f"- **{r['name']}**: {c.f.num(r['units'])} ordered, {c.f.money(r['revenue'])} revenue, "
+                     f"{r['margin_pct']:.1f}% margin{f' ({trend_word(ch)} in orders)' if ch is not None else ''}.")
     ans = f"Sales at **{c.scope_label}** for **{label}**:\n" + "\n".join(lines)
-    if stock_rows:
-        n_outlets = len({s["outlet"] for s in stock_rows})
-        ans += f"\n\nCurrent stock: **{c.f.num(total_stock)}** units across {n_outlets} outlet(s)."
     series = A.revenue_series(c.db, rng, c.outlet_ids, "day" if rng.days <= 60 else "week",
                               product_id=p.product_ids[0])
-    blocks = [chart("bar", f"{rows[0]['name']} - units sold", series, "date", [("units", "Units")], "number")]
-    if stock_rows:
-        blocks.append(table("Stock by outlet", [("outlet", "Outlet", "text"), ("product", "Product", "text"),
-                                                ("quantity", "In stock", "number"), ("days_of_cover", "Days of cover", "number"),
-                                                ("status", "Status", "status")], stock_rows))
+    blocks = [chart("bar", f"{rows[0]['name']} - orders", series, "date", [("units", "Orders")], "number")]
+    kitchen = _dish_portions(c, [rows[0]["product_id"]])
+    portions = [b for b in kitchen["blocks"] if b.get("type") == "table"]
+    if portions and portions[0]["rows"]:
+        total = sum(r["portions"] for r in portions[0]["rows"])
+        ans += f"\n\nThe kitchens' ingredient stock allows about **{c.f.num(total)}** more portions of {rows[0]['name']}."
+        blocks.append(portions[0])
     return result(ans, blocks, [f"Forecast demand for {rows[0]['name']}", "What should I reorder?"])
 
 
@@ -357,26 +361,27 @@ def top_products(c: Ctx, slow: bool = False) -> dict:
     sort = c.parsed.sort
     rows = A.top_products(c.db, rng, c.outlet_ids, n, sort=sort, ascending=slow, category_id=c.parsed.category_id)
     if not rows:
-        return result(f"No product sales found for {c.scope_label} in {label}.")
-    measure = {"revenue": "revenue", "units": "units sold", "profit": "gross profit"}[sort]
-    what = f"{c.parsed.category_name} products" if c.parsed.category_id else "products"
+        return result(f"No dish sales found for {c.scope_label} in {label}.")
+    measure = {"revenue": "revenue", "units": "orders", "profit": "gross profit"}[sort]
+    what = f"{c.parsed.category_name} dishes" if c.parsed.category_id else "dishes"
     head = f"{'Slowest' if slow else 'Top'} {len(rows)} {what} by {measure} at **{c.scope_label}** for **{label}**:"
-    lines = [f"{i}. **{r['name']}** - {c.f.money(r['revenue'])}, {c.f.num(r['units'])} units, {r['margin_pct']:.0f}% margin"
+    lines = [f"{i}. **{r['name']}** - {c.f.money(r['revenue'])}, {c.f.num(r['units'])} ordered, {r['margin_pct']:.0f}% margin"
              for i, r in enumerate(rows, 1)]
     ans = head + "\n" + "\n".join(lines[:10])
     if slow:
         abc = A.abc_analysis(c.db, rng, c.outlet_ids)
         if abc["not_sold"]:
-            ans += f"\n\n{len(abc['not_sold'])} active product(s) had **no sales at all**: " + ", ".join(
+            ans += f"\n\n{len(abc['not_sold'])} dish(es) on the menu had **no orders at all**: " + ", ".join(
                 x["name"] for x in abc["not_sold"][:5]) + "."
-        ans += "\n\nConsider promotions, smaller order quantities or delisting for items that keep appearing here."
+        ans += ("\n\nRework, promote or drop dishes that keep appearing here - a shorter menu means less prep and "
+                "less wastage.")
     else:
         share = sum(r["share_pct"] for r in rows)
         ans += f"\n\nTogether they make up **{share:.0f}%** of sales."
     key = {"revenue": "revenue", "units": "units", "profit": "profit"}[sort]
-    blocks = [chart("bar", f"{'Slowest' if slow else 'Top'} products by {measure}", rows, "name", [(key, measure.title())],
+    blocks = [chart("bar", f"{'Slowest' if slow else 'Top'} dishes by {measure}", rows, "name", [(key, measure.title())],
                     "number" if sort == "units" else "currency"),
-              table("Products", [("name", "Product", "text"), ("category", "Category", "text"), ("units", "Units", "number"),
+              table("Dishes", [("name", "Dish", "text"), ("category", "Category", "text"), ("units", "Orders", "number"),
                                  ("revenue", "Revenue", "currency"), ("margin_pct", "Margin", "percent_plain")], rows)]
     return result(ans, blocks, ["Forecast demand for " + rows[0]["name"], "Show category performance",
                                 "What should I reorder?"])
@@ -406,7 +411,7 @@ def outlet_ranking(c: Ctx) -> dict:
               table("Outlets", [("name", "Outlet", "text"), ("revenue", "Revenue", "currency"), ("orders", "Bills", "number"),
                                 ("avg_basket", "Avg bill", "currency"), ("margin_pct", "Margin", "percent_plain"),
                                 ("change_pct", "Change", "percent")], rows)]
-    return result(ans, blocks, [f"Why is {worst['name']} lower?", f"Top products at {best['name']}",
+    return result(ans, blocks, [f"Why is {worst['name']} lower?", f"Top dishes at {best['name']}",
                                 "Forecast revenue for each outlet"])
 
 
@@ -428,7 +433,7 @@ def category_mix(c: Ctx) -> dict:
                         table("Categories", [("category", "Category", "text"), ("revenue", "Revenue", "currency"),
                                              ("share_pct", "Share", "percent_plain"), ("margin_pct", "Margin", "percent_plain"),
                                              ("change_pct", "Change", "percent")], rows)],
-                  [f"Top products in {rows[0]['category']}", f"Forecast {rows[0]['category']} sales"])
+                  [f"Top dishes in {rows[0]['category']}", f"Forecast {rows[0]['category']} sales"])
 
 
 def forecast(c: Ctx) -> dict:
@@ -470,6 +475,15 @@ def forecast(c: Ctx) -> dict:
     if spec.scope == "product":
         plan = F.product_stock_plan(c.db, spec.product_id, fc, c.outlet_ids)
         cover = plan["days_of_cover"]
+    if spec.scope == "product" and plan["stock_basis"] == "portions":
+        ans += (f"\n\n**Kitchen check:** the ingredients in stock make about **{c.f.num(plan['current_stock'])} "
+                f"portions**{f' - roughly {cover:.0f} days at the forecast rate' if cover is not None else ''}; "
+                f"**{plan['limiting_ingredient']}** runs short first.")
+        if plan["projected_stockout"]:
+            by = f" by **{plan['reorder_by']}**" if plan["reorder_by"] else ""
+            ans += (f" At the forecast rate the dish can't be made from around **{plan['projected_stockout']}** - "
+                    f"order more {plan['limiting_ingredient']}{by}.")
+    elif spec.scope == "product":
         ans += (f"\n\n**Stock check:** {c.f.num(plan['current_stock'])} {plan['unit']} in stock"
                 f"{f' - about {cover:.0f} days of cover' if cover is not None else ''}.")
         if plan["projected_stockout"]:
@@ -493,14 +507,14 @@ def forecast(c: Ctx) -> dict:
 
 def _stock_rows(c: Ctx, product_ids: list[int] | None = None, category_id: int | None = None) -> list[dict]:
     q = select(InventoryItem, Product, Outlet).join(Product, Product.id == InventoryItem.product_id).join(
-        Outlet, Outlet.id == InventoryItem.outlet_id).where(Product.is_active.is_(True))
+        Outlet, Outlet.id == InventoryItem.outlet_id).where(Product.is_active.is_(True), Product.kind == "ingredient")
     if c.outlet_ids:
         q = q.where(InventoryItem.outlet_id.in_(c.outlet_ids))
     if product_ids:
         q = q.where(Product.id.in_(product_ids))
     if category_id:
         q = q.where(Product.category_id == category_id)
-    demand = A.avg_daily_units_by_outlet_product(c.db, 28, c.anchor)
+    demand = A.avg_daily_usage(c.db, 28, c.anchor, c.outlet_ids)
     rows = []
     for inv, p, o in c.db.execute(q).all():
         rate = demand.get((o.id, p.id), 0)
@@ -511,8 +525,47 @@ def _stock_rows(c: Ctx, product_ids: list[int] | None = None, category_id: int |
     return rows
 
 
+def _dish_portions(c: Ctx, dish_ids: list[int]) -> dict:
+    """'Stock of butter chicken': dishes are not stocked - say how many portions the kitchens can make."""
+    from app.models import Recipe
+
+    stock: dict[tuple[int, int], float] = {}
+    q = select(InventoryItem.outlet_id, InventoryItem.product_id, InventoryItem.quantity)
+    if c.outlet_ids:
+        q = q.where(InventoryItem.outlet_id.in_(c.outlet_ids))
+    for o, i, qty in c.db.execute(q).all():
+        stock[(o, i)] = qty
+    outlets = A.outlet_names(c.db)
+    rows, lines = [], []
+    for dish_id in dish_ids:
+        dish = c.db.get(Product, dish_id)
+        recipe = c.db.execute(select(Recipe.ingredient_id, Recipe.quantity, Product.name).join(
+            Product, Product.id == Recipe.ingredient_id).where(Recipe.menu_item_id == dish_id)).all()
+        if not recipe:
+            continue
+        for o in sorted({o for o, _ in stock}):
+            per = [(stock.get((o, i), 0.0) / q, name) for i, q, name in recipe if q > 0]
+            portions, limit = min(per)
+            rows.append({"outlet": outlets.get(o), "dish": dish.name, "portions": max(0, int(portions)),
+                         "limited_by": limit})
+        mine = [r for r in rows if r["dish"] == dish.name]
+        low = min(mine, key=lambda r: r["portions"]) if mine else None
+        lines.append(f"- **{dish.name}**: about **{c.f.num(sum(r['portions'] for r in mine))} portions** across "
+                     f"{c.scope_label}" + (f"; fewest at {low['outlet']} ({low['portions']}, limited by "
+                                           f"{low['limited_by']})" if low else ""))
+    ans = ("Dishes aren't stocked as such - kitchens stock their ingredients. From today's ingredient stock:\n"
+           + "\n".join(lines))
+    return result(ans, [table("Portions the kitchens can make", [("outlet", "Restaurant", "text"),
+                                                                ("dish", "Dish", "text"),
+                                                                ("portions", "Portions", "number"),
+                                                                ("limited_by", "Limited by", "text")], rows)],
+                  ["What should I reorder?", "Which ingredients are running low?"])
+
+
 def stock_status_intent(c: Ctx) -> dict:
     p = c.parsed
+    if p.product_ids and all(c.db.get(Product, i).kind == "menu" for i in p.product_ids):
+        return _dish_portions(c, p.product_ids)
     rows = _stock_rows(c, p.product_ids or None, p.category_id)
     if p.product_ids:
         total = sum(r["quantity"] for r in rows)
@@ -522,10 +575,10 @@ def stock_status_intent(c: Ctx) -> dict:
             flag = f" - **{r['status'].replace('_', ' ')}**" if r["status"] != "ok" else ""
             lines.append(f"- **{r['outlet']}**: {c.f.num(r['quantity'])} {r['unit']}{cover}{flag}")
         ans = f"Stock of **{', '.join(p.product_names)}** - total **{c.f.num(total)}**:\n" + "\n".join(lines)
-        return result(ans, [table("Stock", [("outlet", "Outlet", "text"), ("product", "Product", "text"),
+        return result(ans, [table("Stock", [("outlet", "Restaurant", "text"), ("product", "Ingredient", "text"),
                                             ("quantity", "In stock", "number"), ("days_of_cover", "Days of cover", "number"),
                                             ("status", "Status", "status")], rows)],
-                      [f"Forecast demand for {p.product_names[0]}", "What should I reorder?"])
+                      ["What should I reorder?", "Which ingredients are running low?"])
     out = [r for r in rows if r["status"] == "out_of_stock"]
     low = [r for r in rows if r["status"] == "low"]
     if "out_only" in p.flags:
@@ -535,26 +588,28 @@ def stock_status_intent(c: Ctx) -> dict:
     else:
         focus, title = out + low, "Out of stock or low"
     focus.sort(key=lambda r: (r["days_of_cover"] if r["days_of_cover"] is not None else 0))
-    value_q = select(func.sum(InventoryItem.quantity * Product.cost_price)).join(Product, Product.id == InventoryItem.product_id)
+    value_q = select(func.sum(InventoryItem.quantity * Product.cost_price)).join(
+        Product, Product.id == InventoryItem.product_id).where(Product.kind == "ingredient")
     if c.outlet_ids:
         value_q = value_q.where(InventoryItem.outlet_id.in_(c.outlet_ids))
     value = c.db.scalar(value_q) or 0
-    ans = (f"Inventory at **{c.scope_label}**{' in ' + p.category_name if p.category_name else ''}: "
-           f"**{len(rows)}** stock lines worth **{c.f.money(value)}** at cost. **{len(out)}** out of stock, "
+    ans = (f"Kitchen stock at **{c.scope_label}**{' in ' + p.category_name if p.category_name else ''}: "
+           f"**{len(rows)}** ingredient lines worth **{c.f.money(value)}** at cost. **{len(out)}** out of stock, "
            f"**{len(low)}** below reorder level.")
     if focus:
         urgent = []
         for r in focus[:8]:
             cover = f", ~{r['days_of_cover']:.1f} days of cover" if r["days_of_cover"] and r["quantity"] > 0 else ""
-            urgent.append(f"- **{r['product']}** at {r['outlet']}: {c.f.num(r['quantity'])} left{cover}")
+            urgent.append(f"- **{r['product']}** at {r['outlet']}: {c.f.num(r['quantity'])} {r['unit']} left{cover}")
         ans += "\n\nMost urgent:\n" + "\n".join(urgent)
     else:
         ans += " Everything is above its reorder level."
     blocks = [{"type": "kpis", "items": [kpi("Stock value (cost)", value, "currency"), kpi("Out of stock", len(out)),
                                          kpi("Low stock", len(low))]}]
     if focus:
-        blocks.append(table(title, [("outlet", "Outlet", "text"), ("product", "Product", "text"),
-                                    ("quantity", "In stock", "number"), ("reorder_level", "Reorder level", "number"),
+        blocks.append(table(title, [("outlet", "Restaurant", "text"), ("product", "Ingredient", "text"),
+                                    ("quantity", "In stock", "number"), ("unit", "Unit", "text"),
+                                    ("reorder_level", "Reorder level", "number"),
                                     ("days_of_cover", "Days of cover", "number"), ("status", "Status", "status")], focus[:50]))
     return result(ans, blocks, ["What should I reorder?", "Show pending purchase orders"])
 
@@ -567,26 +622,28 @@ def reorder(c: Ctx) -> dict:
     if c.parsed.product_ids:
         rows = [r for r in rows if r["product_id"] in c.parsed.product_ids]
     if not rows:
-        return result(f"Good news - nothing needs reordering at {c.scope_label} right now. Stock covers expected demand "
-                      "plus supplier lead times.", [], ["Show low stock items", "Forecast next week's sales"])
+        return result(f"Good news - nothing needs reordering at {c.scope_label} right now. Kitchen stock covers "
+                      "expected use plus supplier lead times.", [], ["Which ingredients are running low?",
+                                                                    "Forecast next week's sales"])
     total = sum(r["estimated_cost"] for r in rows)
     crit = [r for r in rows if r["urgency"] == "critical"]
     by_supplier: dict[str, float] = {}
     for r in rows:
         by_supplier[r["supplier"] or "No supplier"] = by_supplier.get(r["supplier"] or "No supplier", 0) + r["estimated_cost"]
-    ans = (f"I recommend reordering **{len(rows)} items** at {c.scope_label} (estimated cost **{c.f.money(total)}**). "
-           f"**{len(crit)}** are critical - already out of stock or running out before a new delivery can arrive.\n\n"
+    ans = (f"I recommend reordering **{len(rows)} ingredients** at {c.scope_label} (estimated cost "
+           f"**{c.f.money(total)}**). **{len(crit)}** are critical - already out of stock or running out before a new "
+           "delivery can arrive.\n\n"
            + "\n".join(f"- **{r['product']}** ({r['outlet']}): order **{r['suggested_qty']} {r['unit']}** - "
-                       f"{c.f.num(r['current_stock'])} left, selling ~{r['avg_daily_demand']:.1f}/day"
+                       f"{c.f.num(r['current_stock'])} {r['unit']} left, using ~{r['avg_daily_demand']:.1f} {r['unit']}/day"
                        for r in rows[:8]))
     ans += "\n\nBy supplier: " + ", ".join(f"{k} {c.f.money(v)}" for k, v in sorted(by_supplier.items(), key=lambda kv: -kv[1]))
     ans += "\n\nYou can raise purchase orders for these in one click from **Inventory → Reorder**."
-    return result(ans, [table("Reorder suggestions", [("outlet", "Outlet", "text"), ("product", "Product", "text"),
-                                                      ("current_stock", "In stock", "number"),
-                                                      ("avg_daily_demand", "Daily demand", "number"),
+    return result(ans, [table("Reorder suggestions", [("outlet", "Restaurant", "text"), ("product", "Ingredient", "text"),
+                                                      ("current_stock", "In stock", "number"), ("unit", "Unit", "text"),
+                                                      ("avg_daily_demand", "Daily use", "number"),
                                                       ("suggested_qty", "Order qty", "number"), ("estimated_cost", "Est. cost", "currency"),
                                                       ("supplier", "Supplier", "text"), ("urgency", "Urgency", "status")], rows[:60])],
-                  ["Show pending purchase orders", "Which items are out of stock?"])
+                  ["Show pending purchase orders", "Which ingredients are out of stock?"])
 
 
 def customers(c: Ctx) -> dict:
@@ -658,7 +715,8 @@ def peak_hours(c: Ctx) -> dict:
            f"- Busiest day: **{WEEKDAYS[best_day[0]]}**; quietest: **{WEEKDAYS[worst_day[0]]}** "
            f"({(best_day[1] / worst_day[1] - 1) * 100:.0f}% difference)\n"
            f"- Single busiest slot: **{WEEKDAYS[b['weekday']]} {b['hour']}:00** (~{c.f.money(b['revenue'])} per week)\n\n"
-           f"Schedule more staff and keep shelves full before the peaks; use quiet hours for restocking.")
+           f"Roster more cooks and servers for the lunch and dinner peaks, finish prep before them, and use the quiet "
+           f"afternoon for deliveries and stock counts.")
     hours = [{"hour": f"{h}:00", "revenue": round(v, 2)} for h, v in sorted(by_hour.items())]
     return result(ans, [chart("bar", "Average weekly revenue by hour", hours, "hour", [("revenue", "Revenue")]),
                         {"type": "heatmap", "title": "Revenue heatmap (weekday x hour)", "cells": hm["cells"]}],
@@ -671,10 +729,11 @@ def payment_mix(c: Ctx) -> dict:
     ch = A.channel_mix(c.db, rng, c.outlet_ids)
     ans = f"Payment mix at **{c.scope_label}** for **{label}**:\n" + "\n".join(
         f"- **{r['method'].upper()}**: {r['share_pct']:.0f}% of revenue ({c.f.num(r['orders'])} bills)" for r in rows)
-    for x in ch:
-        if x["channel"] == "delivery":
-            ans += (f"\n\nDelivery orders were **{x['share_pct']:.0f}%** of revenue with an average bill of "
-                    f"{c.f.money(x['avg_basket'])}.")
+    names = {"dine_in": "Dine-in", "takeaway": "Takeaway", "delivery": "Delivery"}
+    if ch:
+        ans += "\n\nBy channel: " + "; ".join(
+            f"**{names.get(x['channel'], x['channel'])}** {x['share_pct']:.0f}% of revenue (average bill "
+            f"{c.f.money(x['avg_basket'])})" for x in ch) + "."
     return result(ans, [chart("pie", "Revenue by payment method", rows, "method", [("revenue", "Revenue")])],
                   ["What is the average bill value?", "Show sales by outlet"])
 
@@ -689,16 +748,17 @@ def profitability(c: Ctx) -> dict:
     best_profit = sorted(prods, key=lambda r: -r["profit"])[:5]
     low_margin = sorted([r for r in prods if r["revenue"] > 0], key=lambda r: r["margin_pct"])[:5]
     ans = (f"Gross profit at **{c.scope_label}** for **{label}**: **{c.f.money(k['gross_profit'])}** on "
-           f"{c.f.money(k['revenue'])} revenue (**{k['margin_pct']:.1f}%** margin, after tax and cost of goods).\n\n"
+           f"{c.f.money(k['revenue'])} revenue (**{k['margin_pct']:.1f}%** margin after tax and food cost; food cost is "
+           f"{k['food_cost_pct']:.1f}% of sales).\n\n"
            "**Biggest profit contributors:**\n" + "\n".join(
                f"- {r['name']}: {c.f.money(r['profit'])} ({r['margin_pct']:.0f}% margin)" for r in best_profit) +
-           "\n\n**Lowest margins (review pricing or supplier cost):**\n" + "\n".join(
+           "\n\n**Lowest margins (review the recipe, portion size or menu price):**\n" + "\n".join(
                f"- {r['name']}: {r['margin_pct']:.1f}% margin" for r in low_margin))
     return result(ans, [chart("bar", "Gross profit by category", cats, "category", [("profit", "Gross profit")]),
                         table("Category margins", [("category", "Category", "text"), ("revenue", "Revenue", "currency"),
                                                    ("profit", "Gross profit", "currency"),
                                                    ("margin_pct", "Margin", "percent_plain")], cats)],
-                  ["Top products by profit", "Show category performance"])
+                  ["Top dishes by profit", "Show category performance"])
 
 
 def purchase_orders(c: Ctx) -> dict:
@@ -724,7 +784,7 @@ def purchase_orders(c: Ctx) -> dict:
     return result(ans, [table("Open purchase orders", [("po_number", "PO", "text"), ("supplier", "Supplier", "text"),
                                                        ("outlet", "Outlet", "text"), ("expected_date", "Expected", "date"),
                                                        ("total_cost", "Value", "currency"), ("status", "Status", "status")], rows)],
-                  ["What should I reorder?", "Which items are out of stock?"])
+                  ["What should I reorder?", "Which ingredients are out of stock?"])
 
 
 def basket_analysis(c: Ctx) -> dict:
@@ -735,17 +795,17 @@ def basket_analysis(c: Ctx) -> dict:
         pairs = [x for x in A.product_affinity(c.db, rng, c.outlet_ids, limit=200, min_pair_count=10)
                  if x["product_a_id"] in ids or x["product_b_id"] in ids][:10]
     if not pairs:
-        return result(f"I couldn't find products that are bought together more than by chance for {label}.")
-    ans = (f"**Frequently bought together** at {c.scope_label} ({label}, market-basket analysis). "
-           "Lift shows how many times more likely the pair is bought together than by chance:\n" + "\n".join(
+        return result(f"I couldn't find dishes that are ordered together more than by chance for {label}.")
+    ans = (f"**Often ordered together** at {c.scope_label} ({label}, market-basket analysis). "
+           "Lift shows how many times more likely the pair is on the same bill than by chance:\n" + "\n".join(
                f"- **{x['product_a']}** + **{x['product_b']}** - lift {x['lift']:.1f}x, "
-               f"{x['bills_together']} bills, {x['confidence_pct']:.0f}% of buyers of one also buy the other"
+               f"{x['bills_together']} bills, {x['confidence_pct']:.0f}% of orders with one also have the other"
                for x in pairs[:8]) +
-           "\n\nUse these for shelf placement, combo offers and 'customers also bought' suggestions at billing.")
-    return result(ans, [table("Product pairs", [("product_a", "Product", "text"), ("product_b", "Bought with", "text"),
+           "\n\nUse these for combo meals, menu placement and what servers suggest when taking the order.")
+    return result(ans, [table("Dish pairs", [("product_a", "Dish", "text"), ("product_b", "Ordered with", "text"),
                                                 ("bills_together", "Bills", "number"), ("lift", "Lift", "number"),
                                                 ("confidence_pct", "Confidence", "percent_plain")], pairs)],
-                  ["How can I increase sales?", "Top products this month"])
+                  ["How can I increase sales?", "Top dishes this month"])
 
 
 def advice(c: Ctx) -> dict:
@@ -754,15 +814,16 @@ def advice(c: Ctx) -> dict:
     recs: list[tuple[str, str]] = []
     lost = A.lost_sales_estimate(c.db, c.outlet_ids)
     if lost["items"]:
-        recs.append(("Fix stock-outs first",
-                     f"{len(lost['items'])} items that normally sell are out of stock ({', '.join(lost['items'][:3])}"
-                     f"{'...' if len(lost['items']) > 3 else ''}), putting about **{c.f.money(lost['revenue_at_risk_per_day'])} "
-                     "of sales per day** at risk. Raise purchase orders from Inventory → Reorder."))
+        recs.append(("Restock what's blocking dishes",
+                     f"{len(lost['items'])} ingredient(s) are out ({', '.join(lost['items'][:3])}"
+                     f"{'...' if len(lost['items']) > 3 else ''}), so {len(lost['dishes'])} dish(es) can't be served - "
+                     f"about **{c.f.money(lost['revenue_at_risk_per_day'])} of sales per day** at risk. Raise purchase "
+                     "orders from Inventory → Reorder."))
     pairs = A.product_affinity(c.db, A.DateRange(c.anchor - timedelta(days=89), c.anchor), c.outlet_ids, limit=3)
     if pairs:
-        recs.append(("Cross-sell items customers already pair",
+        recs.append(("Build combos from what guests already pair",
                      "; ".join(f"{x['product_a']} + {x['product_b']} ({x['lift']:.1f}x lift)" for x in pairs) +
-                     ". Shelve them together or create combo offers to lift the average bill "
+                     ". Offer them as a combo or have servers suggest them, to lift the average bill "
                      f"(currently {c.f.money(A.kpis(c.db, rng, c.outlet_ids)['avg_basket'])})."))
     week = A.DateRange(c.anchor - timedelta(days=13), c.anchor)
     outlets = [o for o in A.outlet_performance(c.db, week, c.outlet_ids) if o["change_pct"] is not None]
@@ -770,60 +831,62 @@ def advice(c: Ctx) -> dict:
         weak = min(outlets, key=lambda o: o["change_pct"])
         if weak["change_pct"] < 0:
             recs.append((f"Investigate {weak['name']}",
-                         f"Revenue is {trend_word(weak['change_pct'])} over the last 14 days. Compare its stock-outs, "
-                         "staffing and local competition with the best outlet, and run a local promotion."))
+                         f"Revenue is {trend_word(weak['change_pct'])} over the last 14 days. Compare its dish "
+                         "outages, service times, delivery ratings and local competition with the best restaurant, and "
+                         "run a local offer."))
     df = A.customer_rfm(c.db, c.outlet_ids)
     if not df.empty:
         at_risk = df[df["segment"] == "At Risk"]
         if len(at_risk):
             recs.append(("Win back lapsed regulars",
-                         f"{len(at_risk)} customers who used to buy often haven't visited recently (worth "
+                         f"{len(at_risk)} guests who used to come often haven't visited recently (worth "
                          f"{c.f.money(float(at_risk['monetary'].sum()))} in the last year). Send them a personal offer - "
                          "ask me \"which customers are at risk?\" for the list."))
     slow = A.top_products(c.db, rng, c.outlet_ids, 3, ascending=True)
     if slow:
-        recs.append(("Clear slow movers", "Bundle or discount " + ", ".join(s["name"] for s in slow) +
-                     " and order them in smaller quantities to free up cash."))
+        recs.append(("Review slow dishes", "Rework or drop " + ", ".join(s["name"] for s in slow) +
+                     " - slow dishes tie up ingredients and add prep work; a shorter menu cuts wastage."))
     hm = A.hourly_heatmap(c.db, A.DateRange(c.anchor - timedelta(days=55), c.anchor), c.outlet_ids)
     if hm["busiest"]:
         b = hm["busiest"]
         recs.append(("Staff for the peaks", f"The busiest slot is {WEEKDAYS[b['weekday']]} around {b['hour']}:00. "
-                     "Add a cashier and restock fast movers before evening peaks to cut queues and missed sales."))
+                     "Add a server and a line cook, and finish prep before the dinner rush to cut waiting times."))
     for ev in upcoming_events(c.anchor, 30)[:1]:
         recs.append((f"Prepare for {ev['name']}",
-                     f"{ev['name']} is {ev['days_away']} days away. Stock up on dry fruits, gift packs, snacks and cleaning supplies; "
-                     "check the category forecasts for expected demand."))
+                     f"{ev['name']} is {ev['days_away']} days away. Plan staffing and stock for the change in "
+                     "footfall, add a festive special or dessert, and check the category forecasts."))
     cats = A.category_breakdown(c.db, rng, c.outlet_ids)
     if cats:
         hi = max(cats, key=lambda x: x["margin_pct"])
         recs.append(("Promote high-margin categories",
                      f"{hi['category']} earns a {hi['margin_pct']:.0f}% margin but is only {hi['share_pct']:.0f}% of sales - "
-                     "give it better shelf space and sampling."))
+                     "feature it on the menu and suggest it when taking orders."))
     ans = "Here are data-driven actions to grow sales and profit, based on your latest numbers:\n\n" + "\n".join(
         f"{i}. **{t}** - {d}" for i, (t, d) in enumerate(recs, 1))
     blocks = []
     if pairs:
-        blocks.append(table("Products bought together", [("product_a", "Product", "text"), ("product_b", "Bought with", "text"),
+        blocks.append(table("Dishes ordered together", [("product_a", "Dish", "text"), ("product_b", "Ordered with", "text"),
                                                          ("lift", "Lift", "number"), ("bills_together", "Bills", "number")], pairs))
-    return result(ans, blocks, ["Which customers are at risk?", "What should I reorder?", "Which products are bought together?"])
+    return result(ans, blocks, ["Which customers are at risk?", "What should I reorder?", "Which dishes are ordered together?"])
 
 
-HELP_TEXT = """I'm your ERIS business assistant. Ask me in plain English about your sales, stock and customers - \
-I look up the live data and answer with numbers, charts and tables, and show where every number came from. For example:
+HELP_TEXT = """I'm your ERIS restaurant assistant. Ask me in plain English about your sales, menu, kitchen stock and \
+guests - I look up the live data and answer with numbers, charts and tables, and show where every number came from. \
+For example:
 
 - **Sales**: "How much did we sell yesterday?", "Revenue at Indiranagar last month", "Compare September with August"
 - **Why it changed**: "Why was Outlet 3 revenue lower this week?", "What caused the drop at Andheri last month?"
-- **Products**: "Top 5 products this week", "Show the five fastest-growing products", "How is paneer selling?"
-- **Outlets**: "Which outlet had the highest revenue last month?", "Compare weekend sales between outlets"
-- **Forecasts**: "Forecast sales for next week", "What forecast model performed best for beverages?"
-- **Inventory**: "Which items may go out of stock in the next 14 days?", "What should I reorder?", "Stock of eggs"
+- **Menu**: "Top 5 dishes this week", "Show the five fastest-growing dishes", "How is paneer tikka selling?"
+- **Restaurants**: "Which outlet had the highest revenue last month?", "Compare weekend sales between outlets"
+- **Forecasts**: "Forecast sales for next week", "What forecast model performed best for desserts?"
+- **Kitchen stock**: "Which ingredients may run out in the next 14 days?", "What should I reorder?", "Stock of paneer"
 - **Unusual activity**: "Summarize the major anomalies this month"
-- **Customers**: "Who are my top customers?", "Which customers are at risk?"
-- **Patterns & advice**: "When are our busiest hours?", "Which products are bought together?", "How can I increase sales?"
+- **Guests**: "Who are my top customers?", "Which customers are at risk?"
+- **Patterns & advice**: "When are our busiest hours?", "Which dishes are ordered together?", "How can I increase sales?"
 - **How ERIS works**: "What is WAPE?", "How do I import sales?", "Is the GSTIN real?"
 
-You can name an outlet (Andheri, Indiranagar, "Outlet 2"...), a category (dairy, snacks, household...) or a product, \
-and a time period (today, last week, March, last 90 days)."""
+You can name a restaurant (Andheri, Indiranagar, "Outlet 2"...), a menu category (starters, biryani, desserts...), \
+a dish or an ingredient, and a time period (today, last week, March, last 90 days)."""
 
 
 def help_intent(c: Ctx) -> dict:

@@ -16,11 +16,11 @@ export default function Analytics() {
   const [period, setPeriod] = useState('90d')
   return (
     <>
-      <PageHead title="Analytics" subtitle="Sales patterns, products, outlets and customers.">
+      <PageHead title="Analytics" subtitle="Sales patterns, dishes, outlets and guests.">
         <Seg options={PERIODS} value={period} onChange={setPeriod} label="Period" />
       </PageHead>
       <Tabs value={tab} onChange={(t) => setParams({ tab: t })} tabs={[
-        { id: 'sales', label: 'Sales patterns', icon: BarChart3 }, { id: 'products', label: 'Products', icon: Package },
+        { id: 'sales', label: 'Sales patterns', icon: BarChart3 }, { id: 'products', label: 'Dishes', icon: Package },
         { id: 'outlets', label: 'Outlets', icon: Store }, { id: 'customers', label: 'Customers', icon: Users },
       ]} />
       {tab === 'sales' && <SalesTab period={period} />}
@@ -84,7 +84,7 @@ function ProductsTab({ period }) {
     <>
       <div className="grid grid-3">
         {['A', 'B', 'C'].map((cls) => (
-          <Kpi key={cls} label={`Class ${cls} products`} value={`${d.summary[cls].products} products`}
+          <Kpi key={cls} label={`Class ${cls} dishes`} value={`${d.summary[cls].products} dishes`}
             hint={`${d.summary[cls].share_pct}% of revenue · ${{ A: 'protect stock, never run out', B: 'review regularly', C: 'candidates for promotion or delisting' }[cls]}`} />
         ))}
       </div>
@@ -110,7 +110,7 @@ function ProductsTab({ period }) {
       <Card title="ABC analysis" subtitle="A = top 80% of revenue, B = next 15%, C = the rest" flush>
         <DataTable maxHeight={520} rows={d.products} columns={[
           { key: 'class', label: 'Class', render: (r) => <Badge tone={r.class === 'A' ? 'good' : r.class === 'B' ? 'info' : 'warn'}>{r.class}</Badge> },
-          { key: 'name', label: 'Product', render: (r) => <><b>{r.name}</b><div className="small muted">{r.category}</div></> },
+          { key: 'name', label: 'Dish', render: (r) => <><b>{r.name}</b><div className="small muted">{r.category}</div></> },
           { key: 'units', label: 'Units', format: 'number' }, { key: 'revenue', label: 'Revenue', format: 'currency' },
           { key: 'margin_pct', label: 'Margin', format: 'percent_plain' }, { key: 'share_pct', label: 'Share', format: 'percent_plain' },
           { key: 'cumulative_pct', label: 'Cumulative', format: 'percent_plain' },

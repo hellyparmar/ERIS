@@ -58,8 +58,8 @@ INTENT_DESCRIPTIONS = {
     "compare_periods": "compare two time periods",
     "sales_trend": "revenue trend over months/weeks, growth or decline",
     "top_products": "best selling products",
-    "slow_products": "slow moving / worst selling products",
-    "outlet_ranking": "compare or rank outlets/stores",
+    "slow_products": "slow moving / worst selling dishes",
+    "outlet_ranking": "compare or rank outlets/restaurants",
     "category_mix": "sales by category",
     "forecast": "predict future sales or demand",
     "stock_status": "current stock, low stock, out of stock",
@@ -69,9 +69,9 @@ INTENT_DESCRIPTIONS = {
     "payment_mix": "payment methods (UPI, cash, card)",
     "profitability": "profit and margins",
     "purchase_orders": "open or overdue purchase orders",
-    "growth_products": "fastest growing (or declining) products",
+    "growth_products": "fastest growing (or declining) dishes",
     "why_change": "why revenue went up or down, drivers of a change",
-    "stockout_risk": "items that may run out of stock in the coming days",
+    "stockout_risk": "ingredients that may run out in the coming days",
     "weekend_compare": "weekend versus weekday sales by outlet",
     "model_performance": "which forecasting model is most accurate",
     "anomalies": "unusual days, spikes, drops, suspicious bills",
@@ -101,7 +101,7 @@ def classify(question: str, outlets: list[str], categories: list[str]) -> dict |
 
 def general_answer(question: str, facts: str, org_name: str) -> str | None:
     system = (
-        f"You are ERIS, a friendly retail business assistant for {org_name}, a neighbourhood supermarket chain. "
+        f"You are ERIS, a friendly business assistant for {org_name}, a casual-dining restaurant chain. "
         "Answer briefly (under 150 words) in simple language for a non-technical shop owner. Use markdown. "
         "When you mention numbers, use ONLY the facts provided below - never invent figures. If the question "
         "needs data you don't have, say what the user can ask instead.\n\nFACTS:\n" + facts

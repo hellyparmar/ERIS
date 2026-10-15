@@ -6,7 +6,7 @@ test('admin can open every page without errors', async ({ page }) => {
   const errors = watchErrors(page)
   await login(page)
   const pages = [
-    ['/assistant', 'AI Assistant'], ['/sales', 'Sales'], ['/inventory', 'Inventory'], ['/products', 'Products'],
+    ['/assistant', 'AI Assistant'], ['/sales', 'Sales'], ['/inventory', 'Kitchen stock'], ['/products', 'Menu'],
     ['/suppliers', 'Suppliers'], ['/customers', 'Customers'], ['/invoices', 'Invoices (demo GST)'],
     ['/forecasts', 'Forecasts'], ['/models', 'Model comparison'], ['/insights', 'Anomalies & drivers'],
     ['/analytics', 'Analytics'], ['/reports', 'Reports & export'], ['/outlets', 'Outlets'], ['/import', 'Data import'],
@@ -24,15 +24,17 @@ test('admin can open every page without errors', async ({ page }) => {
   expect(errors).toEqual([])
 })
 
-test('record a sale, issue a demo GST invoice and void the sale', async ({ page }) => {
+test('bill a dine-in table, issue a demo GST invoice', async ({ page }) => {
   await login(page)
   await page.goto('/sales')
-  await page.getByRole('button', { name: 'New sale' }).click()
+  await page.getByRole('button', { name: 'New bill' }).click()
   await page.locator('.modal select').first().selectOption({ label: 'Andheri West' })
-  await page.getByLabel('Search products').fill('milk')
-  await page.getByRole('button', { name: /Toned Milk 1L/ }).click()
+  await page.getByLabel('Guests at the table').fill('3')
+  await page.getByLabel('Search dishes').fill('tandoori roti')
+  await page.getByRole('button', { name: /Tandoori Roti/ }).click()
   await page.getByRole('button', { name: /Save bill/ }).click()
   await expect(page.getByText('Total paid')).toBeVisible()
+  await expect(page.locator('.drawer').getByText('Dine-in · 3 guests')).toBeVisible()
   await page.getByRole('button', { name: /Issue GST invoice/ }).click()
   await expect(page).toHaveURL(/invoices\?id=/)
   await expect(page.getByText('Tax summary')).toBeVisible()
@@ -101,8 +103,8 @@ test('purchase order can be delivered in parts, then completed', async ({ page }
   await page.getByRole('button', { name: 'New purchase order' }).click()
   const modal = page.locator('.modal')
   await modal.locator('label:has-text("Supplier") select').selectOption({ index: 1 })
-  await modal.getByLabel('Search products').fill('milk')
-  await page.getByRole('button', { name: /Toned Milk 1L/ }).click()
+  await modal.getByLabel('Search ingredients').fill('paneer')
+  await page.getByRole('button', { name: /^Paneer/ }).click()
   await modal.getByRole('button', { name: /Create/ }).last().click()
   const toast = page.locator('.toast', { hasText: /Purchase order .* created/ })
   await expect(toast).toBeVisible()
@@ -123,11 +125,11 @@ test('purchase order can be delivered in parts, then completed', async ({ page }
 test('a spreadsheet request opens the answer as a sheet that can be downloaded', async ({ page }) => {
   await login(page)
   await page.goto('/assistant')
-  await page.getByLabel('Ask a question').fill('Create a spreadsheet of the top 10 products')
+  await page.getByLabel('Ask a question').fill('Create a spreadsheet of the top 10 dishes')
   await page.getByRole('button', { name: 'Ask' }).click()
   const sheet = page.locator('.sheet')
   await expect(sheet).toBeVisible({ timeout: 60_000 })
-  await expect(sheet.locator('tr.hdr')).toContainText('Product')
+  await expect(sheet.locator('tr.hdr')).toContainText('Dish')
   await expect(sheet.locator('tbody tr:not(.hdr) td.n').first()).toBeVisible()
   const [csv] = await Promise.all([page.waitForEvent('download'), sheet.getByRole('button', { name: 'CSV' }).click()])
   expect(fs.readFileSync(await csv.path(), 'utf8').split('\n').length).toBeGreaterThan(10)

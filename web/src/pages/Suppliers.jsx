@@ -42,7 +42,7 @@ function SupplierList({ onEdit }) {
           { key: 'phone', label: 'Phone', sortable: false },
           { key: 'lead_time_days', label: 'Lead time', render: (r) => `${r.lead_time_days} day${r.lead_time_days === 1 ? '' : 's'}`, align: 'right' },
           { key: 'payment_terms', label: 'Terms' },
-          { key: 'products', label: 'Products', format: 'number' },
+          { key: 'products', label: 'Ingredients', format: 'number' },
           { key: 'open_orders', label: 'Open POs', format: 'number' },
           { key: 'open_order_value', label: 'On order', format: 'currency' },
           { key: 'purchases_90d', label: 'Bought (90d)', format: 'currency' },
@@ -68,8 +68,8 @@ function SupplierDrawer({ id, onClose }) {
             <dt>On-time delivery</dt><dd>{s.on_time_rate_pct === null ? '-' : `${s.on_time_rate_pct}% of recent orders`}</dd>
             {s.notes && <><dt>Notes</dt><dd>{s.notes}</dd></>}
           </dl></Card>
-          <Card title={`Products (${s.products.length})`} flush>
-            <DataTable rows={s.products} sortable={false} columns={[{ key: 'name', label: 'Product', render: (p) => <>{p.name} <span className="small muted">{p.sku}</span></> }, { key: 'cost_price', label: 'Cost', format: 'currency' }]} />
+          <Card title={`Ingredients (${s.products.length})`} flush>
+            <DataTable rows={s.products} sortable={false} columns={[{ key: 'name', label: 'Ingredient', render: (p) => <>{p.name} <span className="small muted">{p.sku}</span></> }, { key: 'cost_price', label: 'Cost', format: 'currency' }]} />
           </Card>
           <Card title="Recent purchase orders" flush>
             <DataTable rows={s.recent_orders} sortable={false} columns={[
@@ -242,10 +242,10 @@ function NewPO({ onClose, onCreated }) {
         <Field label="Deliver to outlet"><OutletSelect value={outlet} onChange={setOutlet} /></Field>
         <Field label="Expected delivery" hint="Defaults to today + supplier lead time"><input className="input" type="date" value={expected} onChange={(e) => setExpected(e.target.value)} /></Field>
       </div>
-      <Field label="Add products"><ProductSearch onPick={add} /></Field>
+      <Field label="Add ingredients"><ProductSearch kind="ingredient" onPick={add} /></Field>
       {lines.length > 0 && (
         <div className="table-wrap"><table className="table">
-          <thead><tr><th>Product</th><th className="num">Quantity</th><th className="num">Unit cost</th><th className="num">Total</th><th /></tr></thead>
+          <thead><tr><th>Ingredient</th><th className="num">Quantity</th><th className="num">Unit cost</th><th className="num">Total</th><th /></tr></thead>
           <tbody>{lines.map((l, i) => (
             <tr key={l.product.id}>
               <td><b>{l.product.name}</b>{l.product.supplier && String(l.product.supplier_id) !== supplier && <div><Badge tone="warn">usually from {l.product.supplier}</Badge></div>}</td>

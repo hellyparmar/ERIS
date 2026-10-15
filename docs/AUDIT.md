@@ -1,12 +1,12 @@
 # Scope audit
 
-This document compares the agreed product scope (*retail intelligence and decision-support platform for one
-organization with five configurable outlets*) with what is implemented. For each item it says where to find
+This document compares the agreed product scope (*intelligence and decision-support platform for one
+organization with five configurable outlets*; the demo business is a restaurant chain) with what is implemented. For each item it says where to find
 the work and how it is verified. Deviations from the recommended stack are listed with their reasons.
 
 Verification shorthand:
 
-- **T**: pytest API tests (`api/tests`, 117 tests, SQLite and PostgreSQL).
+- **T**: pytest API tests (`api/tests`, 120 tests, SQLite and PostgreSQL).
 - **E**: Playwright end-to-end tests (`e2e/`).
 - **Ev**: evaluation scripts and reports.
 
@@ -29,7 +29,7 @@ Verification shorthand:
 | Outlet management | Done: CRUD, GST state, deactivate instead of delete when history exists | Outlets page |
 | Sales history and manual entry | Done: filters, bill drawer, stock check, void with stock restore | Sales page |
 | CSV sales import | Done (see below) | Data import page |
-| Products and inventory | Done: catalogue (HSN, GST), stock per outlet, adjustments, transfers, movement history | Products and Inventory pages |
+| Menu and kitchen stock | Done: menu items with recipes and food cost, ingredients (cost, supplier), ingredient stock per outlet drawn down by recipe on every sale, counts, wastage, transfers, movement history | Menu and Kitchen stock pages |
 | Customer analytics | Done: RFM segments, repeat rate, top customers, at-risk list | Customers and Analytics pages |
 | Forecasting | Done (see below) | Forecasts page |
 | AI assistant | Done (see below) | AI Assistant page |
@@ -48,8 +48,8 @@ management, and a separate multi-store page. None of these exist in the code.
 
 ## Synthetic dataset
 
-All requirements are met: deterministic generation, 5 outlets with different profiles, 68 products in 10
-categories, 2 years of bill lines, customers, suppliers, inventory movements and POs, promotions, price
+All requirements are met: deterministic generation, 5 outlets with different profiles, a 50-dish menu in 9
+categories made from 38 ingredients by recipe, 2 years of bill lines (with channel and covers), customers, suppliers, inventory movements and POs, promotions, price
 changes, weekday, monthly and annual seasonality, Indian festivals, weather, outlet-specific growth,
 substitutions and stockouts, and 26 labelled anomalies.
 
@@ -69,7 +69,7 @@ substitutions and stockouts, and 26 labelled anomalies.
 | 2 | Size and type validation | 15 MB / 50,000 rows; CSV, TXT or TSV only; Excel files and binary content rejected with guidance |
 | 3 | Column-mapping preview | `POST /imports/{kind}/inspect` suggests a mapping (POS aliases such as Bill No, Store, Item Code, Qty); editable in the UI with the first 5 rows shown |
 | 4 | Date, amount, product, outlet and quantity validation | Per row, with original values quoted in messages |
-| 5 | Duplicate detection | Within the file (same invoice for different outlets or dates, duplicate SKUs or phones) and against the database (existing invoice numbers: skipped with a warning or rejected) |
+| 5 | Duplicate detection | Within the file (same invoice for different outlets or dates, duplicate item codes or phones) and against the database (existing invoice numbers: skipped with a warning or rejected) |
 | 6 | Dry run | Default mode; nothing is written |
 | 7 | Summary | Rows, bills, created, updated, errors, skipped duplicates, preview |
 | 8 | Error report | `GET /imports/history/{id}/errors.csv` |
@@ -83,7 +83,7 @@ Verified by T (`test_imports.py`) and E (`import with column mapping…`).
 | Requirement | Status |
 |---|---|
 | Seasonal naive, exponential smoothing, Prophet, XGBoost, optional ensemble | Done. **LSTM is not implemented.** The scope makes it optional, and the evaluation shows that even XGBoost does not beat Prophet on this data. |
-| Outlet, product and category; horizons 7, 14 and 30 | Done; total revenue too; outlet filter for product and category series |
+| Outlet, dish and menu category; horizons 7, 14 and 30 | Done; total revenue too; outlet filter for dish and category series |
 | Features: lags, rolling level, calendar (DOW, month, quarter, weekend), festivals, promotions, price, weather, stockouts | Done (`services/features.py`). The rolling mean is used as the scale ("level") for the lags. Outlet and category are handled by fitting one model per series rather than as features. |
 | Rolling CV with MAE, RMSE, WAPE, sMAPE, interval coverage, training and inference time | Done (`app/evaluation.py`, two back-test folds per forecast in production) |
 | Persist each run with data range, features, parameters, metrics, selected model, version and timestamp | Done (`forecast_runs`, `forecast_results`); scoped by outlet |
@@ -111,7 +111,7 @@ Every item is done:
 - A deterministic synthetic GSTIN, flagged `tax_id_is_demo` and shown with a Demo badge.
 - A per-outlet GSTIN for each state.
 - CGST and SGST within a state, IGST between states.
-- HSN codes on products and invoices.
+- SAC 996331 (restaurant service, 5% GST) on menu items and invoices.
 - A printable PDF with the **DEMO - NOT FOR TAX FILING** watermark.
 - Invoice history.
 - A GST summary report, labelled "for analysis only".

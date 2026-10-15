@@ -46,14 +46,16 @@ flowchart LR
 erDiagram
   organization ||--o{ outlets : has
   outlets ||--o{ inventory : stocks
-  products ||--o{ inventory : ""
+  products ||--o{ inventory : "ingredients"
+  products ||--o{ recipes : "menu item"
+  recipes }o--|| products : "ingredient"
   categories ||--o{ products : groups
   suppliers ||--o{ products : supplies
   users }o--o{ outlets : "user_outlets"
   outlets ||--o{ sales : records
   customers ||--o{ sales : buys
   sales ||--|{ sale_items : contains
-  products ||--o{ sale_items : ""
+  products ||--o{ sale_items : "menu items"
   sales ||--o| invoices : "demo GST invoice"
   import_jobs ||--o{ sales : "import_id"
   dataset_info ||--o{ sales : "dataset_id"
@@ -68,9 +70,9 @@ erDiagram
 | Group | Tables |
 |---|---|
 | Organisation | `organization` (GSTIN, demo flag, state), `outlets` (state and GST state code, up to 7), `users` and `user_outlets` (many-to-many) |
-| Catalogue | `categories`, `products` (SKU, HSN, GST rate, cost, selling price), `suppliers` |
-| Operations | `inventory`, `stock_movements` (every stock change), `purchase_orders`, `purchase_order_items`, `customers` (GSTIN, state) |
-| Sales | `sales` (source: synthetic, manual or import; `dataset_id`, `import_id`), `sale_items` (list price, promotion, tax and cost snapshot) |
+| Catalogue | `categories`, `products` (kind = menu item or ingredient; code, unit, cost, menu price, GST rate, SAC/HSN), `recipes` (ingredient quantity per portion of each dish), `suppliers` |
+| Operations | `inventory` (ingredient stock per outlet), `stock_movements` (every stock change: sale by recipe, void, purchase, count, wastage, transfer), `purchase_orders`, `purchase_order_items`, `customers` (GSTIN, state) |
+| Sales | `sales` (channel: dine-in, takeaway or delivery; covers; source: synthetic, manual or import; `dataset_id`, `import_id`), `sale_items` (list price, promotion, tax and food-cost snapshot) |
 | Demand drivers | `promotions`, `price_history`, `weather_daily`, `stockout_events` |
 | Ground truth | `anomaly_labels` (injected anomalies) and `dataset_info` (generator provenance) |
 | Models and records | `forecast_runs`, `forecast_results`, `import_jobs`, `invoices`, `audit_log`, `chat_messages` |
@@ -149,11 +151,11 @@ Each pipeline is kept apart from the others, so a slow or failing one cannot tak
 
 Set `SEED_DEMO_DATA=false` with `INITIAL_ADMIN_EMAIL` and `INITIAL_ADMIN_PASSWORD` and the first start creates an
 empty organisation and its admin. Alternatively run `python -m app.manage create-admin --email ... --name ...
---password ... --org ...`. Then add outlets, products and suppliers in Settings, or import CSVs. The demo
+--password ... --org ...`. Then add outlets, the menu with recipes, ingredients and suppliers, or import CSVs. The demo
 generator needs at least 90 days of history; a demo created with `SEED_END_DATE` keeps its dates, while the
 default demo moves forward to yesterday on each start (unless `DEMO_SHIFT_DATES=false`, as on the hosted demo).
 
-The assistant stores each analytics answer by what the question *meant* (intent, period, outlets, products), the
+The assistant stores each analytics answer by what the question *meant* (intent, period, outlets, dishes), the
 asker and the data version, so a repeated or reworded question is served from the database. The suggested
 questions are stored for every demo user when the image is built.
 
@@ -203,7 +205,7 @@ their outlet opened.
 
 ## Forecasting
 
-**Series:** daily revenue for the whole business, an outlet or a category, or daily units for a product.
+**Series:** daily revenue for the whole business, an outlet or a menu category, or daily portions of a dish.
 History goes back up to 730 days. Horizons are 7, 14 or 30 days in the UI (up to 90 through the API).
 
 | Model | Idea |
@@ -276,7 +278,7 @@ The same change is also broken down by outlet and by category; each breakdown ad
 the analysis estimates:
 
 - calendar effects (weekday mix and festival lift);
-- promotion uplift over the products' normal sales;
+- promotion uplift over the dishes' normal sales;
 - stockout lost sales (days out × normal daily revenue, 40% when a substitute exists);
 - rainfall, as an association measured on the past year;
 - unusual days.
@@ -285,7 +287,7 @@ the analysis estimates:
 
 ```mermaid
 flowchart LR
-  Q[question] --> N["rule-based NLU<br/>intent · periods · outlets ('Outlet 3') ·<br/>category · product · top N · horizon"]
+  Q[question] --> N["rule-based NLU<br/>intent · periods · outlets ('Outlet 3') ·<br/>category · dish or ingredient · top N · horizon"]
   N -->|low confidence + Ollama running| L[LLM classifies to the same JSON schema]
   N --> T["intent template<br/>(fixed analytics function)"]
   L --> T
@@ -326,6 +328,6 @@ flowchart LR
 
 | Layer | What |
 |---|---|
-| API (pytest, 117 tests) | Business rules, imports, roles, refresh tokens, audit, invoices, reports, forecasting, anomalies, drivers, assistant. Runs on SQLite and PostgreSQL (CI job `api-postgres`). |
+| API (pytest, 120 tests) | Business rules, imports, roles, refresh tokens, audit, invoices, reports, forecasting, anomalies, drivers, assistant. Runs on SQLite and PostgreSQL (CI job `api-postgres`). |
 | End-to-end (Playwright, `e2e/`) | Every page as admin; sale → invoice → PDF; import with column mapping; assistant provenance; purchase order delivered in parts; report downloads; viewer read-only; area manager outlet switching; token refresh; phone layout |
 | Model evaluations | `python -m app.evaluation` (forecasting), `python -m app.assistant_eval` (assistant grounding), anomaly precision and recall (Anomalies & drivers page, notebook) |

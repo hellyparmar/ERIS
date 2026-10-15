@@ -79,8 +79,8 @@ def create_outlet(body: OutletIn, admin: User = Depends(require_admin), db: Sess
     o = Outlet(**body.model_dump(), organization_id=org.id if org else None)
     db.add(o)
     db.flush()
-    # Start every product at zero stock so the outlet appears in inventory immediately.
-    for p in db.scalars(select(Product).where(Product.is_active.is_(True))).all():
+    # Start every ingredient at zero stock so the new kitchen appears in inventory immediately.
+    for p in db.scalars(select(Product).where(Product.is_active.is_(True), Product.kind == "ingredient")).all():
         db.add(InventoryItem(outlet_id=o.id, product_id=p.id, quantity=0, reorder_level=p.reorder_level))
     db.commit()
     return outlet_dict(o)

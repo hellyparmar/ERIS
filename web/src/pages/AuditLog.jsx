@@ -51,7 +51,7 @@ export default function AuditLog() {
           </Field>
           <Field label="From"><input className="input" type="date" value={f.start} onChange={(e) => set('start', e.target.value)} /></Field>
           <Field label="To"><input className="input" type="date" value={f.end} onChange={(e) => set('end', e.target.value)} /></Field>
-          <Field label="Search"><div className="search"><Search /><input className="input" value={text} placeholder="e.g. invoice number, SKU" onChange={(e) => { setText(e.target.value); setPage(1) }} /></div></Field>
+          <Field label="Search"><div className="search"><Search /><input className="input" value={text} placeholder="e.g. bill number, item code" onChange={(e) => { setText(e.target.value); setPage(1) }} /></div></Field>
         </div>
       </Card>
       <Card flush>

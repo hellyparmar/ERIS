@@ -41,7 +41,7 @@ def growth_products(c: Ctx) -> dict:
     notes = []
     skipped = len(cur) - len(rows)
     if skipped:
-        notes.append(f"{skipped} product(s) with very small sales in the previous period were left out, because "
+        notes.append(f"{skipped} dish(es) with very small sales in the previous period were left out, because "
                      "percentage growth on a tiny base is misleading.")
     if not rows:
         return result(f"There is not enough sales history at {c.scope_label} to compare {label} with the period "
@@ -49,18 +49,18 @@ def growth_products(c: Ctx) -> dict:
     rows.sort(key=lambda r: (r["change_pct"] or 0), reverse=not decline)
     rows = rows[:n]
     word = "declining" if decline else "growing"
-    ans = (f"The **{len(rows)} fastest-{word} products** at **{c.scope_label}** - **{label}** "
+    ans = (f"The **{len(rows)} fastest-{word} dishes** at **{c.scope_label}** - **{label}** "
            f"({rng.start:%d %b} to {rng.end:%d %b}) vs {prev_label} ({prev.start:%d %b} to {prev.end:%d %b}), "
            "by revenue:\n" + "\n".join(
                f"{i}. **{r['name']}** ({r['category']}): {c.f.money(r['revenue'])} vs {c.f.money(r['previous'])} "
                f"(**{trend_word(r['change_pct'])}**, {c.f.num(r['units'])} vs {c.f.num(r['previous_units'])} units)"
                for i, r in enumerate(rows, 1)))
-    blocks = [chart("bar", f"Fastest-{word} products (revenue change %)", rows, "name", [("change_pct", "Change %")],
+    blocks = [chart("bar", f"Fastest-{word} dishes (revenue change %)", rows, "name", [("change_pct", "Change %")],
                     "percent"),
-              table("Products", [("name", "Product", "text"), ("category", "Category", "text"),
+              table("Dishes", [("name", "Dish", "text"), ("category", "Category", "text"),
                                  ("revenue", "Revenue", "currency"), ("previous", "Previous", "currency"),
                                  ("change_pct", "Change", "percent")], rows)]
-    return result(ans, blocks, [f"Forecast demand for {rows[0]['name']}", "Show the slowest products",
+    return result(ans, blocks, [f"Forecast demand for {rows[0]['name']}", "Show the slowest dishes",
                                 "Which categories are growing?"], {"notes": notes})
 
 
@@ -118,7 +118,7 @@ def why_change(c: Ctx) -> dict:
                                         ("previous", "Comparison", "currency"), ("change", "Change", "currency")],
                         r["categories"]))
     return result("\n".join(lines), blocks, ["Summarize the major anomalies this month",
-                                             "Which items may go out of stock in the next 14 days?"],
+                                             "Which ingredients may run out in the next 14 days?"],
                   {"notes": notes})
 
 
@@ -126,10 +126,10 @@ def why_change(c: Ctx) -> dict:
 def _risk_line(c: Ctx, r: dict) -> str:
     on_order = f"; {c.f.num(r['on_order'])} on order" if r["on_order"] else ""
     if r["current_stock"] <= 0:
-        return (f"- **{r['product']}** at {r['outlet']}: **out of stock now**, normally sells "
-                f"~{r['avg_daily_demand']:.1f}/day{on_order}")
-    return (f"- **{r['product']}** at {r['outlet']}: {c.f.num(r['current_stock'])} {r['unit']} left, selling "
-            f"~{r['avg_daily_demand']:.1f}/day - runs out around **{r['runs_out_on']}**{on_order}")
+        return (f"- **{r['product']}** at {r['outlet']}: **out of stock now**, normally uses "
+                f"~{r['avg_daily_demand']:.1f} {r['unit']}/day{on_order}")
+    return (f"- **{r['product']}** at {r['outlet']}: {c.f.num(r['current_stock'])} {r['unit']} left, using "
+            f"~{r['avg_daily_demand']:.1f} {r['unit']}/day - runs out around **{r['runs_out_on']}**{on_order}")
 
 
 def stockout_risk(c: Ctx) -> dict:
@@ -142,22 +142,23 @@ def stockout_risk(c: Ctx) -> dict:
         rows = [r for r in rows if r["product_id"] in ids]
     if c.parsed.product_ids:
         rows = [r for r in rows if r["product_id"] in c.parsed.product_ids]
-    notes = ["Demand is the average of the last 28 days adjusted for the recent trend; open purchase orders count "
-             "as stock on their expected delivery date."]
+    notes = ["Use is the average of the last 28 days (dishes sold x recipes) adjusted for the recent trend; open "
+             "purchase orders count as stock on their expected delivery date."]
     if asked > 60:
         notes.append(f"Stock-out risk is projected at most 60 days ahead (you asked for {asked}).")
     if not rows:
-        return result(f"No items at {c.scope_label} are expected to run out in the next **{days} days** - current "
-                      "stock plus open purchase orders covers the expected demand.", [],
-                      ["What should I reorder?", "Show low stock items"], {"notes": notes})
+        return result(f"No ingredients at {c.scope_label} are expected to run out in the next **{days} days** - "
+                      "current stock plus open purchase orders covers the expected use.", [],
+                      ["What should I reorder?", "Which ingredients are running low?"], {"notes": notes})
     lost = sum(r["lost_revenue_estimate"] for r in rows)
     now = [r for r in rows if r["days_left"] <= 0]
-    ans = (f"**{len(rows)} item(s)** at **{c.scope_label}** may run out of stock in the next **{days} days**"
-           f"{f' ({len(now)} already out or running out today)' if now else ''}. If nothing is ordered, about "
-           f"**{c.f.money(lost)}** of sales could be lost.\n\n" + "\n".join(_risk_line(c, r) for r in rows[:10]))
-    return result(ans, [table(f"Items at risk of running out within {days} days",
-                              [("outlet", "Outlet", "text"), ("product", "Product", "text"),
-                               ("current_stock", "In stock", "number"), ("avg_daily_demand", "Daily demand", "number"),
+    ans = (f"**{len(rows)} ingredient(s)** at **{c.scope_label}** may run out in the next **{days} days**"
+           f"{f' ({len(now)} already out or running out today)' if now else ''}. If nothing is ordered, the "
+           f"dishes that need them could lose about **{c.f.money(lost)}** of sales.\n\n" + "\n".join(_risk_line(c, r) for r in rows[:10]))
+    return result(ans, [table(f"Ingredients at risk of running out within {days} days",
+                              [("outlet", "Restaurant", "text"), ("product", "Ingredient", "text"),
+                               ("current_stock", "In stock", "number"), ("unit", "Unit", "text"),
+                               ("avg_daily_demand", "Daily use", "number"),
                                ("on_order", "On order", "number"), ("runs_out_on", "Runs out", "date"),
                                ("lost_revenue_estimate", "Sales at risk", "currency")], rows[:60])],
                   ["What should I reorder?", "Show pending purchase orders"], {"notes": notes})
@@ -319,11 +320,11 @@ def anomalies(c: Ctx) -> dict:
                                              ("explanation", "Evidence", "text")], rows))
     if lines_:
         blocks.append(table("Suspicious bill lines", [("day", "Date", "date"), ("invoice_no", "Bill", "text"),
-                                                      ("outlet", "Outlet", "text"), ("product", "Product", "text"),
+                                                      ("outlet", "Outlet", "text"), ("product", "Dish", "text"),
                                                       ("quantity", "Qty", "number"),
                                                       ("typical_quantity", "Typical qty", "number"),
                                                       ("line_total", "Amount", "currency")], lines_))
-    return result("\n".join(ans), blocks, ["Why was revenue lower this week?", "Show the five fastest-growing products"],
+    return result("\n".join(ans), blocks, ["Why was revenue lower this week?", "Show the five fastest-growing dishes"],
                   {"notes": notes})
 
 
@@ -401,9 +402,11 @@ def suppliers(c: Ctx) -> dict:
 
 
 # ------------------------------------------------------------------------------------------ guard rails
-PAGES_FOR = {"invoice": "Sales → open a bill → Issue GST invoice", "sale": "Sales → New sale (or Void on a bill)",
-             "bill": "Sales", "product": "Products", "price": "Products", "stock": "Inventory → Adjust / Transfer",
-             "inventory": "Inventory", "order": "Suppliers & orders or Inventory → Reorder",
+PAGES_FOR = {"invoice": "Sales → open a bill → Issue GST invoice", "sale": "Sales → New bill (or Void on a bill)",
+             "bill": "Sales", "dish": "Menu", "recipe": "Menu → edit the dish", "menu": "Menu", "product": "Menu",
+             "ingredient": "Menu → Ingredients", "price": "Menu", "wastage": "Kitchen stock → Adjust",
+             "stock": "Kitchen stock → Adjust / Transfer", "inventory": "Kitchen stock",
+             "order": "Suppliers & orders or Kitchen stock → Reorder suggestions",
              "purchase": "Suppliers & orders", "supplier": "Suppliers & orders", "customer": "Customers",
              "user": "Settings → Users & roles", "outlet": "Outlets", "password": "Settings → My profile",
              "import": "Data import", "data": "Data import or Settings → System & data"}

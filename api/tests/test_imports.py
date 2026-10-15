@@ -8,7 +8,7 @@ from app.models import AuditLog, Sale
 
 def test_inspect_suggests_mapping_from_pos_headers(client, admin):
     day = (date.today() - timedelta(days=1)).isoformat()
-    csv = f"Bill No,Bill Date,Store,Item Code,Qty,Mode\nPOS-77,{day},MUM-AND,DAI-001,2,upi\n"
+    csv = f"Bill No,Bill Date,Store,Item Code,Qty,Mode\nPOS-77,{day},MUM-AND,MNC-007,2,upi\n"
     r = client.post("/api/imports/sales/inspect", headers=admin, files={"file": ("pos.csv", csv, "text/csv")})
     assert r.status_code == 200, r.text
     m = r.json()["mapping"]
@@ -66,10 +66,10 @@ def test_import_edge_cases(client, admin):
         return client.post("/api/imports/sales", headers=admin, files={"file": (name, content, "text/csv")}).json()
 
     head = "date,outlet_code,sku,quantity\n"
-    assert check("u16.csv", (head + f"{y},MUM-AND,DAI-001,1\n").encode("utf-16"))["error_count"] == 0
-    assert "not a number" in check("nan.csv", head + f"{y},MUM-AND,DAI-001,nan\n")["errors"][0]["message"]
-    assert "too large" in check("big.csv", head + f"{y},MUM-AND,DAI-001,1e9\n")["errors"][0]["message"]
-    assert "before Andheri West opened" in check("old.csv", head + "1990-01-01,MUM-AND,DAI-001,1\n")["errors"][0]["message"]
+    assert check("u16.csv", (head + f"{y},MUM-AND,MNC-007,1\n").encode("utf-16"))["error_count"] == 0
+    assert "not a number" in check("nan.csv", head + f"{y},MUM-AND,MNC-007,nan\n")["errors"][0]["message"]
+    assert "too large" in check("big.csv", head + f"{y},MUM-AND,MNC-007,1e9\n")["errors"][0]["message"]
+    assert "before Andheri West opened" in check("old.csv", head + "1990-01-01,MUM-AND,MNC-007,1\n")["errors"][0]["message"]
 
 
 def test_exports_neutralise_spreadsheet_formulas(client, admin):

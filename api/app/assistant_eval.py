@@ -163,6 +163,21 @@ def unknown_outlet(db: Session, r: dict):
     return r["intent"] == "clarify" and "no outlet 9" in r["answer"].lower(), "asks instead of answering for all outlets"
 
 
+def guests_last_week(db: Session, r: dict):
+    start, end = [date.fromisoformat(x) for x in r["provenance"]["filters"]["periods"][0].split(": ")[1].split(" to ")]
+    covers = db.scalar(select(func.coalesce(func.sum(Sale.covers), 0)).where(
+        Sale.status == "completed", Sale.sale_date >= start, Sale.sale_date <= end))
+    return f"**{F.num(covers)}** guests dined in" in r["answer"], f"{F.num(covers)} guests"
+
+
+def paneer_stock(db: Session, r: dict):
+    from app.models import InventoryItem
+
+    total = db.scalar(select(func.sum(InventoryItem.quantity)).join(Product, Product.id == InventoryItem.product_id)
+                      .where(Product.name == "Paneer"))
+    return f"total **{F.num(total)}**" in r["answer"], f"paneer stock {F.num(total)} kg"
+
+
 def manager_scoped(db: Session, r: dict):
     start, end = _last_month(db)
     other = _revenue(db, start, end, [_outlet(db, "Koregaon Park").id])
@@ -173,20 +188,24 @@ def manager_scoped(db: Session, r: dict):
 
 CASES = [
     Case("Which outlet had the highest revenue last month?", "outlet_ranking", top_outlet_last_month),
-    Case("Show the five fastest-growing products.", "growth_products", growth_first_product),
+    Case("Show the five fastest-growing dishes.", "growth_products", growth_first_product),
     Case("Why was Outlet 3 revenue lower this week?", "why_change", why_outlet3),
-    Case("Which items may go out of stock in the next 14 days?", "stockout_risk"),
+    Case("Which ingredients may run out in the next 14 days?", "stockout_risk"),
     Case("Compare weekend sales between outlets.", "weekend_compare", weekend_andheri),
-    Case("What forecast model performed best for beverages?", "model_performance", best_model_beverages),
+    Case("What forecast model performed best for desserts?", "model_performance", best_model_beverages),
     Case("Summarize the major anomalies this month.", "anomalies"),
     Case("How much did we sell yesterday?", "sales_summary", yesterday_revenue),
     Case("Revenue at Indiranagar last month", "sales_summary", outlet_revenue_last_month("Indiranagar")),
-    Case("Top 5 products this week", "top_products", top_product_week),
+    Case("Top 5 dishes this week", "top_products", top_product_week),
     Case("Compare this month with last month", "compare_periods"),
     Case("Forecast sales for next week", "forecast"),
     Case("What should I reorder?", "reorder"),
     Case("Which customers are at risk?", "customers"),
-    Case("Which products are bought together?", "basket_analysis"),
+    Case("Which dishes are ordered together?", "basket_analysis"),
+    Case("How many guests did we serve last week?", "sales_summary", guests_last_week),
+    Case("Stock of paneer", "stock_status", paneer_stock),
+    Case("How is paneer tikka selling?", "sales_summary"),
+    Case("What share of orders comes from delivery?", "payment_mix"),
     Case("What is WAPE?", "knowledge", knowledge_source("glossary.md")),
     Case("How do I import sales?", "knowledge", knowledge_source("imports.md")),
     Case("Is the GSTIN real?", "knowledge", knowledge_source("invoices.md")),

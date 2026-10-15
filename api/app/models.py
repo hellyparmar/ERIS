@@ -1,8 +1,11 @@
 """ORM models.
 
-ERIS manages a single organization (a retail business) that runs several outlets.
-Money values are stored as floats rounded to 2 decimals; selling prices are tax-inclusive (MRP style),
-and the tax portion of a line is derived from the product's tax rate.
+ERIS manages a single organization (a restaurant chain) that runs several outlets.
+The catalogue holds two kinds of item in one table: menu items (dishes and drinks, which are sold) and
+ingredients (which are stocked and bought from suppliers). A recipe says how much of each ingredient one portion
+of a menu item uses, so every sale draws its ingredients down.
+Money values are stored as floats rounded to 2 decimals; menu prices are tax-inclusive, and the tax portion of a
+line is derived from the item's tax rate.
 """
 from datetime import date, datetime
 
@@ -34,7 +37,8 @@ MAX_OUTLETS = 7
 OPEN_PO_STATUSES = ("ordered", "partial")  # partial = some goods received, the rest still expected
 SALE_SOURCES = ("synthetic", "manual", "import")
 PAYMENT_METHODS = ("cash", "upi", "card", "credit")
-CHANNELS = ("in_store", "delivery")
+CHANNELS = ("dine_in", "takeaway", "delivery")
+ITEM_KINDS = ("menu", "ingredient")
 SALE_STATUSES = ("completed", "void")
 PO_STATUSES = ("ordered", "received", "cancelled")
 MOVEMENT_REASONS = (
@@ -43,6 +47,7 @@ MOVEMENT_REASONS = (
     "purchase",
     "adjustment",
     "damage",
+    "wastage",
     "transfer_in",
     "transfer_out",
     "import",
@@ -58,7 +63,7 @@ class Organization(TimestampMixin, Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(120))
-    industry: Mapped[str] = mapped_column(String(80), default="Grocery Retail (Supermarkets)")
+    industry: Mapped[str] = mapped_column(String(80), default="Restaurants (Casual Dining)")
     currency: Mapped[str] = mapped_column(String(8), default="INR")
     currency_symbol: Mapped[str] = mapped_column(String(4), default="₹")
     timezone: Mapped[str] = mapped_column(String(64), default="Asia/Kolkata")
@@ -141,9 +146,12 @@ class Supplier(TimestampMixin, Base):
 
 
 class Product(TimestampMixin, Base):
+    """A menu item (kind="menu": sold, priced, made from a recipe) or an ingredient (kind="ingredient": stocked,
+    bought from a supplier at cost_price per unit)."""
     __tablename__ = "products"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    kind: Mapped[str] = mapped_column(String(12), default="menu", server_default="menu", index=True)
     sku: Mapped[str] = mapped_column(String(32), unique=True, index=True)
     name: Mapped[str] = mapped_column(String(160), index=True)
     category_id: Mapped[int] = mapped_column(ForeignKey("categories.id"))
@@ -158,6 +166,21 @@ class Product(TimestampMixin, Base):
 
     category: Mapped[Category] = relationship()
     supplier: Mapped[Supplier | None] = relationship()
+    recipe: Mapped[list["Recipe"]] = relationship(foreign_keys="Recipe.menu_item_id", cascade="all, delete-orphan",
+                                                  order_by="Recipe.id")
+
+
+class Recipe(Base):
+    """One ingredient line of a menu item's recipe: `quantity` of the ingredient (in its unit) per portion."""
+    __tablename__ = "recipes"
+    __table_args__ = (UniqueConstraint("menu_item_id", "ingredient_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    menu_item_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), index=True)
+    ingredient_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), index=True)
+    quantity: Mapped[float] = mapped_column(Float)
+
+    ingredient: Mapped[Product] = relationship(foreign_keys=[ingredient_id])
 
 
 class InventoryItem(Base):
@@ -214,6 +237,7 @@ class Sale(TimestampMixin, Base):
     __table_args__ = (
         Index("ix_sales_outlet_date", "outlet_id", "sale_date"),
         Index("ix_sales_status_date", "status", "sale_date"),
+        Index("ix_sales_sold_at", "sold_at", "id"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -222,7 +246,8 @@ class Sale(TimestampMixin, Base):
     customer_id: Mapped[int | None] = mapped_column(ForeignKey("customers.id", ondelete="SET NULL"), index=True)
     sold_at: Mapped[datetime] = mapped_column(DateTime)
     sale_date: Mapped[date] = mapped_column(Date, index=True)
-    channel: Mapped[str] = mapped_column(String(16), default="in_store")
+    channel: Mapped[str] = mapped_column(String(16), default="dine_in")
+    covers: Mapped[int | None] = mapped_column(Integer)  # guests at the table (dine-in bills)
     payment_method: Mapped[str] = mapped_column(String(16), default="cash")
     subtotal: Mapped[float] = mapped_column(Float)  # before discount, tax inclusive
     discount: Mapped[float] = mapped_column(Float, default=0)

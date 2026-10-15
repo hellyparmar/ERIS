@@ -421,6 +421,7 @@ table.table { width: 100%; border-collapse: separate; border-spacing: 0; font-si
 .drawer { position: fixed; top: 10px; right: 10px; bottom: 10px; width: min(640px, calc(100% - 20px)); background: var(--frame); z-index: 51; box-shadow: var(--shadow-lg);
   display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 22px; overflow: hidden; animation: slide 0.2s ease; }
 .drawer-body { padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+.drawer-body > * { flex-shrink: 0; } /* a long drawer scrolls; its cards never squash */
 @keyframes fade { from { opacity: 0; } }
 @keyframes pop { from { opacity: 0; transform: translateY(8px) scale(0.98); } }
 @keyframes slide { from { transform: translateX(24px); opacity: 0.6; } }

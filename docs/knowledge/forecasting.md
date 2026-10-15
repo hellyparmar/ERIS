@@ -1,13 +1,13 @@
 # How ERIS forecasts sales and demand
 
 ## What can be forecast
-ERIS forecasts daily revenue for the whole business, for each outlet and for each category, and daily units for each product. Every forecast can be limited to one or more outlets. Forecast horizons are 7, 14 or 30 days (up to 90 through the API).
+ERIS forecasts daily revenue for the whole business, for each outlet and for each menu category, and daily orders (portions) for each dish. A dish forecast also shows how many portions the kitchens' ingredient stock allows and which ingredient runs short first. Every forecast can be limited to one or more outlets. Forecast horizons are 7, 14 or 30 days (up to 90 through the API).
 
 ## Candidate models
 Five candidates are compared for every forecast. Seasonal naive repeats the average of the same weekday over the last four weeks and is the baseline every model must beat. Holt-Winters is exponential smoothing with a damped trend and weekly seasonality. XGBoost is a gradient-boosted tree model that forecasts day by day using weekly lags, calendar, festival and external features. Prophet is Meta's additive model with weekly and yearly seasonality, the Indian festival calendar as holidays and promotions, price and weather as extra regressors. The ensemble averages the two best non-baseline models.
 
 ## Features used
-Calendar features are day of week, weekend flag, day of month, month, quarter and day-of-year seasonality. Festival features mark Diwali, Holi, Ganesh Chaturthi, Christmas and other events with a build-up window. Lag features are sales 7, 14, 21 and 28 days earlier, scaled by the recent 28-day level. External drivers are promotion depth, a price index, maximum temperature, rainfall and the share of products that were out of stock. Planned promotions and climatological weather are known in advance, so they are also used for future days; future stockouts are unknown and set to zero to avoid leakage.
+Calendar features are day of week, weekend flag, day of month, month, quarter and day-of-year seasonality. Festival features mark Diwali, Holi, Ganesh Chaturthi, Christmas and other events with a build-up window. Lag features are sales 7, 14, 21 and 28 days earlier, scaled by the recent 28-day level. External drivers are promotion depth, a price index, maximum temperature, rainfall and the share of dishes that were off the menu because an ingredient ran out. Planned promotions and climatological weather are known in advance, so they are also used for future days; future stockouts are unknown and set to zero to avoid leakage.
 
 ## How the model is chosen
 Each candidate is trained only on data before two consecutive 28-day validation folds at the end of the history and scored with WAPE. Prophet is the incumbent model; another model replaces it only when its WAPE is more than 10% lower. This rule came from the rolling-origin study, which showed that switching models on small differences adds noise rather than accuracy. The selected model is then refitted on the full history to produce the forecast.

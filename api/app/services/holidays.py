@@ -1,4 +1,4 @@
-"""Retail calendar: Indian festivals and events that move F&B demand.
+"""Restaurant calendar: Indian festivals and events that move F&B demand.
 
 Used both by the demo-data generator (to create realistic spikes) and by the
 forecasting models (as known future regressors), so forecasts anticipate festivals.
@@ -14,6 +14,7 @@ EVENTS: list[tuple[str, date, int, int]] = [
     ("Diwali", date(2024, 11, 1), 12, 2),
     ("Christmas", date(2024, 12, 25), 4, 0),
     ("New Year", date(2024, 12, 31), 2, 1),
+    ("Valentine's Day", date(2025, 2, 14), 1, 0),
     ("Holi", date(2025, 3, 14), 3, 0),
     ("Eid", date(2025, 3, 31), 2, 1),
     ("Raksha Bandhan", date(2025, 8, 9), 4, 0),
@@ -22,6 +23,7 @@ EVENTS: list[tuple[str, date, int, int]] = [
     ("Diwali", date(2025, 10, 20), 12, 2),
     ("Christmas", date(2025, 12, 25), 4, 0),
     ("New Year", date(2025, 12, 31), 2, 1),
+    ("Valentine's Day", date(2026, 2, 14), 1, 0),
     ("Holi", date(2026, 3, 4), 3, 0),
     ("Eid", date(2026, 3, 20), 2, 1),
     ("Raksha Bandhan", date(2026, 8, 28), 4, 0),
@@ -30,6 +32,7 @@ EVENTS: list[tuple[str, date, int, int]] = [
     ("Diwali", date(2026, 11, 8), 12, 2),
     ("Christmas", date(2026, 12, 25), 4, 0),
     ("New Year", date(2026, 12, 31), 2, 1),
+    ("Valentine's Day", date(2027, 2, 14), 1, 0),
     ("Holi", date(2027, 3, 22), 3, 0),
     ("Raksha Bandhan", date(2027, 8, 17), 4, 0),
     ("Diwali", date(2027, 10, 29), 12, 2),

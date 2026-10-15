@@ -8,7 +8,7 @@ import { useToast } from '../lib/app'
 import { dateTime, titleCase } from '../lib/format'
 import { Badge, Card, DataTable, PageHead, Pager, Query, Spinner } from '../components/ui'
 
-const LABELS = { sales: 'Sales / bills', products: 'Products', customers: 'Customers', suppliers: 'Suppliers', inventory: 'Stock count' }
+const LABELS = { sales: 'Sales / bills', products: 'Menu & ingredients', customers: 'Customers', suppliers: 'Suppliers', inventory: 'Ingredient stock count' }
 const MANUAL = { sales: '/sales', products: '/products', customers: '/customers', suppliers: '/suppliers', inventory: '/inventory' }
 
 export default function DataImport() {
@@ -126,7 +126,7 @@ function Uploader({ kind }) {
         {kind === 'sales' && (
           <>
             <label className="check"><input type="checkbox" checked={updateStock} onChange={(e) => setUpdateStock(e.target.checked)} />
-              Reduce stock for these sales <span className="small muted">(off for past sales already in your stock count)</span></label>
+              Draw ingredients from stock for these bills <span className="small muted">(off for past bills already in your stock count)</span></label>
             <label className="check"><input type="checkbox" checked={skipDuplicates} onChange={(e) => { setSkipDuplicates(e.target.checked); setResult(null) }} />
               Skip bills that are already in ERIS </label>
           </>

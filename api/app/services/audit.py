@@ -22,6 +22,7 @@ from app.models import (
     Product,
     Promotion,
     PurchaseOrder,
+    Recipe,
     Sale,
     Supplier,
     User,
@@ -29,7 +30,7 @@ from app.models import (
 
 TRACKED = {Sale: "sale", Product: "product", Category: "category", Outlet: "outlet", Supplier: "supplier",
            Customer: "customer", PurchaseOrder: "purchase_order", InventoryItem: "stock_level", User: "user",
-           Organization: "organization", Promotion: "promotion", Invoice: "invoice"}
+           Organization: "organization", Promotion: "promotion", Invoice: "invoice", Recipe: "recipe"}
 HIDDEN_FIELDS = {"password_hash", "token_version", "updated_at", "created_at", "last_login_at"}
 LABEL_FIELDS = ("invoice_no", "po_number", "number", "sku", "code", "email", "name")
 

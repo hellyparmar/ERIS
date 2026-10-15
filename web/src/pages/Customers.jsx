@@ -47,7 +47,7 @@ export default function Customers() {
       <Card flush>
         <div className="row" style={{ padding: 12, borderBottom: '1px solid var(--border)' }}>
           <div className="search"><Search /><input className="input" placeholder="Name, phone or email" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} aria-label="Search customers" /></div>
-          <select className="select" value={type} onChange={(e) => { setType(e.target.value); setPage(1) }} aria-label="Type"><option value="">All types</option><option value="retail">Retail</option><option value="business">Business</option></select>
+          <select className="select" value={type} onChange={(e) => { setType(e.target.value); setPage(1) }} aria-label="Type"><option value="">All types</option><option value="retail">Individual</option><option value="business">Company account</option></select>
           <select className="select" value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort">
             <option value="spend">Highest spend</option><option value="orders">Most visits</option><option value="recent">Most recent</option><option value="new">Newest</option><option value="name">Name</option>
           </select>
@@ -55,7 +55,7 @@ export default function Customers() {
         {q.isError ? <ErrorState error={q.error} /> : q.isLoading ? <Spinner /> : (
           <>
             <DataTable rows={q.data.items} onRowClick={(r) => setDetail(r.id)} sortable={false} columns={[
-              { key: 'name', label: 'Customer', render: (r) => <><b>{r.name}</b>{r.customer_type === 'business' && <> <Badge tone="info">Business</Badge></>}<div className="small muted">{r.city || ''}</div></> },
+              { key: 'name', label: 'Customer', render: (r) => <><b>{r.name}</b>{r.customer_type === 'business' && <> <Badge tone="info">Company</Badge></>}<div className="small muted">{r.city || ''}</div></> },
               { key: 'phone', label: 'Phone' },
               { key: 'orders', label: 'Visits', format: 'number' },
               { key: 'spend', label: 'Total spend', format: 'currency' },
@@ -100,7 +100,7 @@ function CustomerForm({ customer, onClose }) {
         <Field label="Mobile number" hint="Used to link bills"><input className="input" inputMode="tel" value={f.phone} onChange={(e) => set('phone', e.target.value)} /></Field>
         <Field label="Email"><input className="input" type="email" value={f.email} onChange={(e) => set('email', e.target.value)} /></Field>
         <Field label="City"><input className="input" value={f.city} onChange={(e) => set('city', e.target.value)} /></Field>
-        <Field label="Type"><select className="select" value={f.customer_type} onChange={(e) => set('customer_type', e.target.value)}><option value="retail">Retail</option><option value="business">Business (can buy on credit)</option></select></Field>
+        <Field label="Type"><select className="select" value={f.customer_type} onChange={(e) => set('customer_type', e.target.value)}><option value="retail">Individual</option><option value="business">Company account (can order on credit)</option></select></Field>
         <Field label="GSTIN (business buyers)" hint="Optional - printed on demo invoices; decides CGST/SGST vs IGST">
           <input className="input" value={f.gstin} maxLength={15} onChange={(e) => set('gstin', e.target.value.toUpperCase())} placeholder="e.g. 27AAPFU0939F1ZV" />
         </Field>
