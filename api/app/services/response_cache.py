@@ -27,10 +27,12 @@ from starlette.responses import Response
 
 log = logging.getLogger(__name__)
 
-# GET endpoints whose answers depend only on the data and the user (exports and lists stay live)
+# GET endpoints whose answers depend only on the data and the user. The bill, stock and menu lists qualify too: every
+# sale, stock movement and (audited) edit starts a new data version. Lists that depend on today's date (overdue
+# purchase orders) and exports stay live.
 CACHED_PREFIXES = ("/api/dashboard", "/api/alerts", "/api/analytics/", "/api/anomalies", "/api/forecast/outlets",
-                   "/api/forecast/stockout-risk", "/api/reports/", "/api/inventory/reorder")
-CACHED_EXACT = ("/api/forecast",)
+                   "/api/forecast/stockout-risk", "/api/reports/", "/api/inventory", "/api/products")
+CACHED_EXACT = ("/api/forecast", "/api/sales")
 NEVER = ("/export",)
 MAX_ROWS = 5000
 
@@ -92,6 +94,28 @@ def _lookup(key: str, user_id: int) -> tuple[str | None, str | None]:
         version = data_version(db)
         row = db.get(ResponseCache, key)
         return version, (row.body if row is not None and row.version == version else None)
+
+
+def assistant_key(user_id: int, ref, context: dict) -> str:
+    """Key of an assistant answer: who asked, which day 'today' means, and what was understood (not the wording)."""
+    payload = json.dumps({"kind": "assistant", "u": user_id, "ref": str(ref), "c": context}, sort_keys=True, default=str)
+    return hashlib.sha256(payload.encode()).hexdigest()  # 64 characters, like every key in response_cache
+
+
+def get_answer(db, key: str) -> dict | None:
+    from app.models import ResponseCache
+
+    row = db.get(ResponseCache, key)
+    if row is None or row.version != data_version(db):
+        return None
+    try:
+        return json.loads(row.body)
+    except ValueError:
+        return None
+
+
+def store_answer(db, key: str, response: dict) -> None:
+    _store(key, data_version(db), json.dumps(response, default=str))
 
 
 def _store(key: str, version: str, body: str) -> None:

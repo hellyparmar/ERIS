@@ -5,8 +5,8 @@ import { api } from '../lib/api'
 import { useApp } from '../lib/app'
 
 const FEATURES = [
-  { icon: LineChart, text: 'Forecasts for every store, product and category' },
-  { icon: PackageCheck, text: 'Stock, reorders and purchase orders in one place' },
+  { icon: LineChart, text: 'Forecasts for every restaurant, dish and menu category' },
+  { icon: PackageCheck, text: 'Kitchen stock, recipes and supplier orders in one place' },
   { icon: Bot, text: 'Ask questions in plain English, with sources' },
 ]
 
@@ -47,15 +47,15 @@ export default function Login() {
       <section className="login-hero">
         <div className="brand">
           <div className="brand-mark">E</div>
-          <div><b>ERIS</b><small>Retail intelligence for multi-store grocers</small></div>
+          <div><b>ERIS</b><small>Intelligence for multi-outlet restaurants</small></div>
         </div>
         <div className="stack" style={{ gap: 18 }}>
-          <h1>Every store, every number, <span style={{ color: '#F2C46A' }}>explained.</span></h1>
+          <h1>Every table, every dish, <span style={{ color: '#F2C46A' }}>explained.</span></h1>
           <div className="feature-list">
             {FEATURES.map((f) => <div className="feature" key={f.text}><f.icon size={16} /><span>{f.text}</span></div>)}
           </div>
         </div>
-        <p className="small" style={{ color: '#BCAE9E' }}>Demo data is synthetic, for a fictional supermarket chain.</p>
+        <p className="small" style={{ color: '#BCAE9E' }}>Demo data is synthetic, for a fictional restaurant chain.</p>
       </section>
 
       <section className="login-form">

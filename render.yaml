@@ -23,6 +23,8 @@ services:
         value: "5"
       - key: LLM_ENABLED  # no Ollama on the free plan; the assistant uses its built-in engine
         value: "false"
+      - key: DEMO_SHIFT_DATES  # moving old demo data forward takes minutes on 0.1 CPU; each deploy refreshes it
+        value: "false"
       - key: MALLOC_ARENA_MAX  # keeps memory well inside the free plan's 512 MB
         value: "2"
       # If the web app is also hosted on Vercel (VITE_API_URL pointing here), allow its address:

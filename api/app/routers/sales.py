@@ -20,7 +20,7 @@ def sale_dict(s: Sale, detail: bool = False) -> dict:
     d = {"id": s.id, "invoice_no": s.invoice_no, "outlet_id": s.outlet_id, "outlet": s.outlet.name,
          "customer_id": s.customer_id, "customer": s.customer.name if s.customer else None,
          "customer_phone": s.customer.phone if s.customer else None, "sold_at": s.sold_at.isoformat(),
-         "channel": s.channel, "payment_method": s.payment_method, "subtotal": s.subtotal, "discount": s.discount,
+         "channel": s.channel, "covers": s.covers, "payment_method": s.payment_method, "subtotal": s.subtotal, "discount": s.discount,
          "tax_amount": s.tax_amount, "total": s.total, "items_count": s.items_count, "status": s.status,
          "source": s.source, "notes": s.notes}
     if detail:
@@ -78,17 +78,18 @@ def export_sales(outlet_id: int | None = None, start: date | None = None, end: d
         raise HTTPException(400, "Export at most ~13 months at a time")
     outlet_ids = scoped_outlet_ids(user, outlet_id)
     q = select(Sale.invoice_no, Sale.sold_at, Outlet.code, Product.sku, SaleItem.quantity, SaleItem.unit_price,
-               SaleItem.discount, Sale.payment_method, Sale.channel, Customer.phone, Customer.name, SaleItem.line_total).join(
+               SaleItem.discount, Sale.payment_method, Sale.channel, Sale.covers, Customer.phone, Customer.name,
+               SaleItem.line_total).join(
         SaleItem, SaleItem.sale_id == Sale.id).join(Outlet, Outlet.id == Sale.outlet_id).join(
         Product, Product.id == SaleItem.product_id).outerjoin(Customer, Customer.id == Sale.customer_id).where(
         Sale.status == "completed", Sale.sale_date >= start, Sale.sale_date <= end).order_by(Sale.sold_at)
     if outlet_ids:
         q = q.where(Sale.outlet_id.in_(outlet_ids))
-    rows = ([inv, ts.date().isoformat(), ts.strftime("%H:%M"), oc, sku, qty, price, disc, pm, ch, ph or "", cn or "", lt]
-            for inv, ts, oc, sku, qty, price, disc, pm, ch, ph, cn, lt in db.execute(q))
+    rows = ([inv, ts.date().isoformat(), ts.strftime("%H:%M"), oc, sku, qty, price, disc, pm, ch, cov or "", ph or "",
+             cn or "", lt] for inv, ts, oc, sku, qty, price, disc, pm, ch, cov, ph, cn, lt in db.execute(q))
     return csv_response(f"sales_{start}_{end}.csv",
                         ["invoice_no", "date", "time", "outlet_code", "sku", "quantity", "unit_price", "discount",
-                         "payment_method", "channel", "customer_phone", "customer_name", "line_total"], rows)
+                         "payment_method", "channel", "covers", "customer_phone", "customer_name", "line_total"], rows)
 
 
 @router.get("/{sale_id}")
@@ -109,6 +110,7 @@ def record_sale(body: SaleIn, user: User = Depends(require_writer), db: Session 
         raise HTTPException(403, "Staff can only record sales for today or yesterday")
     sale = create_sale(db, SaleInput(
         outlet_id=body.outlet_id, sold_at=sold_at, payment_method=body.payment_method, channel=body.channel,
+        covers=body.covers,
         customer_id=body.customer_id, customer_phone=body.customer_phone, customer_name=body.customer_name,
         bill_discount=body.bill_discount, notes=body.notes,
         lines=[LineInput(i.product_id, i.quantity, i.unit_price, i.discount) for i in body.items]), user, "manual")

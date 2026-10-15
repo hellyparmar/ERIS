@@ -63,3 +63,20 @@ def staff(client):
 @pytest.fixture(scope="session")
 def viewer(client):
     return _login(client, "analyst@eris.demo", DEMO_PASSWORDS["viewer"])
+
+
+def product_id(sku: str) -> int:
+    from app.models import Product
+
+    with SessionLocal() as db:
+        return db.query(Product.id).filter_by(sku=sku).scalar()
+
+
+def stock_up(client, headers, outlet_id: int, dish_sku: str, quantity: float = 50) -> int:
+    """Give a kitchen plenty of every ingredient a dish needs, so a test bill can be made. Returns the dish id."""
+    dish = product_id(dish_sku)
+    for line in client.get(f"/api/products/{dish}", headers=headers).json()["recipe"]:
+        r = client.post("/api/inventory/adjust", headers=headers, json={
+            "outlet_id": outlet_id, "product_id": line["ingredient_id"], "mode": "set", "quantity": quantity})
+        assert r.status_code == 200, r.text
+    return dish

@@ -98,18 +98,26 @@ class CategoryIn(BaseModel):
     name: str = Field(min_length=2, max_length=80)
 
 
+class RecipeLineIn(BaseModel):
+    ingredient_id: int
+    quantity: float = Field(gt=0)  # per portion, in the ingredient's unit
+
+
 class ProductIn(BaseModel):
+    """A menu item (sold; its food cost comes from the recipe) or an ingredient (stocked; bought at cost_price)."""
+    kind: str = Field(default="menu", pattern="^(menu|ingredient)$")
     sku: str = Field(min_length=2, max_length=32, pattern=r"^[A-Za-z0-9_.-]+$")
     name: str = Field(min_length=2, max_length=160)
     category_id: int
     supplier_id: int | None = None
     unit: str = Field(default="pcs", max_length=16)
     cost_price: float = Field(ge=0)
-    selling_price: float = Field(gt=0)
+    selling_price: float = Field(default=0, ge=0)
     tax_rate: float = Field(default=5, ge=0, le=40)
     reorder_level: float = Field(default=10, ge=0)
     hsn_code: str | None = Field(default=None, pattern=r"^\d{4,8}$")
     is_active: bool = True
+    recipe: list[RecipeLineIn] | None = None  # menu items: replaces the recipe when given
 
     @field_validator("sku")
     @classmethod
@@ -119,8 +127,13 @@ class ProductIn(BaseModel):
     @model_validator(mode="after")
     def price_covers_cost(self) -> "ProductIn":
         # same rule as the CSV importer; temporary discounts belong in promotions, not in the base price
-        if self.selling_price < self.cost_price:
-            raise ValueError("selling_price is below cost_price")
+        if self.kind == "menu":
+            if self.selling_price <= 0:
+                raise ValueError("a menu item needs a selling_price")
+            if not self.recipe and self.selling_price < self.cost_price:
+                raise ValueError("selling_price is below cost_price")
+        elif self.recipe:
+            raise ValueError("only menu items have a recipe")
         return self
 
 
@@ -171,7 +184,8 @@ class SaleIn(BaseModel):
     items: list[SaleLineIn] = Field(min_length=1, max_length=200)
     sold_at: datetime | None = None
     payment_method: str = "cash"
-    channel: str = "in_store"
+    channel: str = "dine_in"
+    covers: int | None = Field(default=None, ge=1, le=200)  # guests at the table (dine-in)
     customer_id: int | None = None
     customer_phone: str | None = None
     customer_name: str | None = None
@@ -188,7 +202,7 @@ class StockAdjustIn(BaseModel):
     product_id: int
     mode: str = Field(pattern="^(set|add|remove)$")
     quantity: float = Field(ge=0)
-    reason: str = Field(default="adjustment", pattern="^(adjustment|damage|purchase)$")
+    reason: str = Field(default="adjustment", pattern="^(adjustment|damage|wastage|purchase)$")
     note: str | None = Field(default=None, max_length=255)
 
 

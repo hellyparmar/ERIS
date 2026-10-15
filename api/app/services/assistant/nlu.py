@@ -14,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app import clock
-from app.models import Category, Outlet, Product
+from app.models import Category, Outlet, Product, Recipe
 from app.services.analytics import DateRange
 
 MONTHS = {m.lower(): i for i, m in enumerate(calendar.month_name) if m}
@@ -59,7 +59,7 @@ INTENT_PATTERNS: list[tuple[str, float, str]] = [
     ("growth_products", 4.5, r"\b(fastest[- ]growing|growing (the )?fastest|grew (the )?(most|fastest)|biggest (growth|"
                              r"gainers?|increases?)|top gainers?|trending( up)?|rising( fastest)?|gaining)\b"),
     ("growth_products", 4.5, r"\b(fastest[- ]declining|declining (the )?(most|fastest)|biggest (drops?|declines?|"
-                             r"losers?|falls?)|falling (the )?fastest)\b.*\b(products?|items?|skus?)\b"),
+                             r"losers?|falls?)|falling (the )?fastest)\b.*\b(products?|items?|skus?|dish(es)?)\b"),
     ("knowledge", 4, rf"\b(what (is|are|does|do)|what's|whats|define|definition of|meaning of|explain)\b.*\b({GLOSSARY_TERMS})\b"),
     ("knowledge", 4, r"\b(how (do|can|should) (i|we|you) (import|upload|add|create|record|issue|export|download|"
                      r"enter|use|reset|clear|change|transfer|move|adjust|void|count|receive|correct)|how (does|do|is|are) .*\b(calculated|computed|measured|chosen|"
@@ -70,58 +70,62 @@ INTENT_PATTERNS: list[tuple[str, float, str]] = [
     ("forecast", 2.5, r"\b(next|coming|upcoming)\s+(\d+\s+)?(day|days|week|weeks|month|months|fortnight|quarter)\b"),
     ("forecast", 2, r"\b(tomorrow|will (we|i|it)|going to sell|future demand|demand for)\b"),
     ("reorder", 3, r"\b(reorder|re-order|restock|replenish|what should (i|we) (order|buy)|purchase suggestion|order more)\b"),
-    ("stock_status", 3, r"\b(out of stock|stock ?out|low stock|running low|stock level|in stock|inventory|stock khatam|how much .* (left|have))\b"),
+    ("stock_status", 3, r"\b(out of stock|stock ?out|low stock|running low|stock level|in stock|inventory|stock khatam|kitchen stock|how much .* (left|have)|how many portions)\b"),
     ("stock_status", 1.5, r"\bstock\b"),
-    ("top_products", 3, r"\b(top|best|most|highest|popular|fast)[\s-]*(\d+\s+)?(selling|seller|sellers|sold|moving|products?|items?|skus?)\b"),
-    ("top_products", 1.5, r"\b(best|top)\s+\d*\s*(products?|items?)\b|\bbestsellers?\b"),
-    ("slow_products", 3, r"\b(slow|least|worst|lowest|poor(ly)?|bottom|dead)[\s-]*(\d+\s+)?(selling|seller|sellers|sold|moving|performing|products?|items?|stock)\b|\bnot selling\b"),
-    ("outlet_ranking", 3, r"\b(outlets?|stores?|branch(es)?|shops?|locations?)\b.*\b(best|worst|top|rank|ranking|compare|comparison|performance|performing|perform|which)\b"),
-    ("outlet_ranking", 3, r"\b(best|worst|top|rank|ranking|compare|comparison|which)\b.*\b(outlets?|stores?|branch(es)?|shops?|locations?)\b"),
+    ("top_products", 3, r"\b(top|best|most|highest|popular|fast)[\s-]*(\d+\s+)?(selling|seller|sellers|sold|moving|products?|items?|skus?|dish(es)?)\b"),
+    ("top_products", 1.5, r"\b(best|top)\s+\d*\s*(products?|items?|dish(es)?)\b|\bbestsellers?\b|\b(most|best) (ordered|loved)\b"),
+    ("slow_products", 3, r"\b(slow|least|worst|lowest|poor(ly)?|bottom|dead)[\s-]*(\d+\s+)?(selling|seller|sellers|sold|moving|performing|products?|items?|stock|dish(es)?)\b|\bnot selling\b"),
+    ("outlet_ranking", 3, r"\b(outlets?|stores?|branch(es)?|shops?|locations?|restaurants?|kitchens?)\b.*\b(best|worst|top|rank|ranking|compare|comparison|performance|performing|perform|which)\b"),
+    ("outlet_ranking", 3, r"\b(best|worst|top|rank|ranking|compare|comparison|which)\b.*\b(outlets?|stores?|branch(es)?|shops?|locations?|restaurants?|kitchens?)\b"),
     ("category_mix", 3, r"\b(categor(y|ies)|department|segment mix|sales mix|product mix)\b"),
-    ("customers", 3, r"\b(customers?|clients?|shoppers?|loyal(ty)?|churn|at risk|repeat|rfm|segments?)\b"),
+    ("customers", 3, r"\b(customers?|clients?|shoppers?|guests?|diners?|regulars|loyal(ty)?|churn|at risk|repeat|rfm|segments?)\b"),
     ("peak_hours", 3, r"\b(peak|busiest|rush|footfall|what time|which (hour|day)|busy (hours?|days?)|slowest (hour|day|time)|"
                       r"best (day|days|weekday|time|hours?)|worst (day|weekday)|days? of the week)\b"),
-    ("payment_mix", 3, r"\b(payment|upi|cash|card|credit|digital payments?)\b"),
+    ("payment_mix", 3, r"\b(payment|upi|cash|card|credit|digital payments?|channels?|dine[- ]?in|take[- ]?away|delivery|swiggy|zomato)\b"),
     ("profitability", 3, r"\b(margin|margins|profitab\w*|most profitable|least profitable|markup)\b"),
     ("profitability", 1, r"\bprofit\b"),
     ("purchase_orders", 3, r"\b(purchase orders?|pos?\b|pending orders?|supplier orders?|deliver(y|ies) from|overdue orders?)\b"),
     ("sales_trend", 3, r"\b(trend|trends|growth|grow|grew|growing|declin\w*|over time|month on month|month-over-month|monthly sales|weekly sales|yoy|year over year)\b"),
     ("compare_periods", 3, r"\b(compare|comparison|versus|vs\.?|compared (to|with))\b"),
-    ("sales_summary", 2, r"\b(sales|sell|sold|revenue|turnover|income|earn\w*|orders?|bills?|transactions?|basket|bikri|kitna)\b"),
+    ("sales_summary", 2, r"\b(sales|sell|sold|revenue|turnover|income|earn\w*|orders?|bills?|transactions?|basket|covers|bikri|kitna)\b"),
     ("sales_summary", 1, r"\b(how much|how many|total)\b"),
+    # "how many guests did we serve" is a headcount (covers), not a question about regular customers
+    ("sales_summary", 5, r"\bhow many (guests|covers|diners|people|tables)\b|\b(covers|guests) (served|dined)\b|"
+                         r"\bspend per (cover|guest|head)\b"),
     ("business_overview", 3, r"\b(how (is|was|are) (the )?(business|we doing|things|sales going)|overview|summary|summari[sz]e|brief(ing)?|insights?|focus on|health|kpis?|dashboard|highlights?|what('s| is) happening)\b"),
     ("advice", 3.5, r"\b(how (can|do|should|could|to) (i|we)? ?(increase|improve|boost|grow|raise|reduce|cut|get more|sell more|attract|win)|ways to|tips|recommendations?|advice|advise|ideas|action items|what (can|should) (i|we) do)\b"),
     ("advice", 3, r"\b(increase|improve|boost|grow|maximi[sz]e) (my |our |the )?(sales|revenue|profits?|margins?|footfall|customers|business)\b"),
-    ("basket_analysis", 4, r"\b(bought together|buy together|cross[- ]?sell|bundle|bundles|basket analysis|market basket|combo|combos|pairs? well|affinity|goes (well )?with|go (well )?with|bought with|buy with|along with|paired with)\b"),
+    ("basket_analysis", 4, r"\b(ordered together|order together|bought together|buy together|cross[- ]?sell|bundle|bundles|basket analysis|market basket|combo|combos|pairs? well|affinity|goes (well )?with|go (well )?with|bought with|buy with|ordered with|along with|paired with)\b"),
     ("help", 4, r"^\s*(hi|hello|hey|namaste|help|what can you do|who are you)\b[\s!?.]*$"),
     ("help", 3, r"\b(what can you do|how do i use|what can i ask|capabilities)\b"),
 ]
 
 CATEGORY_SYNONYMS = {
-    "beverage": "Beverages", "beverages": "Beverages", "drinks": "Beverages", "drink": "Beverages", "juices": "Beverages",
-    "tea": "Tea & Coffee", "coffee": "Tea & Coffee", "chai": "Tea & Coffee",
-    "dairy": "Dairy & Eggs", "eggs": "Dairy & Eggs",
-    "bread": "Bread & Breakfast", "breads": "Bread & Breakfast", "breakfast": "Bread & Breakfast",
-    "cereal": "Bread & Breakfast", "cereals": "Bread & Breakfast", "spreads": "Bread & Breakfast",
-    "snacks": "Snacks & Biscuits", "snack": "Snacks & Biscuits", "biscuits": "Snacks & Biscuits",
-    "chocolates": "Snacks & Biscuits", "namkeen": "Snacks & Biscuits",
-    "staples": "Staples & Grains", "grains": "Staples & Grains", "groceries": "Staples & Grains", "grocery": "Staples & Grains",
-    "rice": "Staples & Grains", "dal": "Staples & Grains", "atta": "Staples & Grains",
-    "fruits": "Fruits & Vegetables", "fruit": "Fruits & Vegetables", "vegetables": "Fruits & Vegetables",
-    "veggies": "Fruits & Vegetables", "produce": "Fruits & Vegetables", "sabzi": "Fruits & Vegetables",
-    "frozen": "Frozen Foods", "ice cream": "Frozen Foods",
-    "household": "Household & Personal Care", "personal care": "Household & Personal Care",
-    "cleaning": "Household & Personal Care", "toiletries": "Household & Personal Care",
-    "home care": "Household & Personal Care",
-    "gifting": "Festive & Gifting", "gifts": "Festive & Gifting", "gift": "Festive & Gifting",
-    "festive": "Festive & Gifting", "dry fruits": "Festive & Gifting",
+    # menu
+    "starter": "Starters", "starters": "Starters", "appetizer": "Starters", "appetizers": "Starters",
+    "appetisers": "Starters", "kebabs": "Starters", "tandoori starters": "Starters",
+    "main": "Main Course", "mains": "Main Course", "main course": "Main Course", "curry": "Main Course",
+    "curries": "Main Course", "gravies": "Main Course", "sabzi": "Main Course",
+    "bread": "Breads", "breads": "Breads", "roti": "Breads", "rotis": "Breads", "naan": "Breads", "naans": "Breads",
+    "biryani": "Rice & Biryani", "biryanis": "Rice & Biryani", "rice": "Rice & Biryani",
+    "chinese": "Indo-Chinese", "indo chinese": "Indo-Chinese", "noodles": "Indo-Chinese",
+    "dessert": "Desserts", "desserts": "Desserts", "sweets": "Desserts", "sweet dishes": "Desserts",
+    "soup": "Soups", "soups": "Soups",
+    "tea": "Hot Beverages", "coffee": "Hot Beverages", "chai": "Hot Beverages", "hot drinks": "Hot Beverages",
+    "hot beverages": "Hot Beverages",
+    "drinks": "Cold Beverages", "drink": "Cold Beverages", "beverages": "Cold Beverages", "beverage": "Cold Beverages",
+    "cold drinks": "Cold Beverages", "soft drinks": "Cold Beverages", "mocktails": "Cold Beverages",
+    "lassi": "Cold Beverages", "juices": "Cold Beverages", "shakes": "Cold Beverages",
+    # kitchen stock
+    "dairy": "Dairy", "milk products": "Dairy",
+    "meat": "Meat & Seafood", "seafood": "Meat & Seafood", "poultry": "Meat & Seafood",
+    "vegetables": "Vegetables", "veggies": "Vegetables", "produce": "Vegetables",
+    "groceries": "Dry Store", "grocery": "Dry Store", "dry store": "Dry Store", "staples": "Dry Store",
+    "spices": "Dry Store", "frozen": "Frozen", "ice cream": "Frozen",
 }
 PRODUCT_STOPWORDS = {
-    "and", "the", "with", "pack", "pcs", "fresh", "classic", "packaged", "premium", "organic", "farm", "box", "tin",
-    "bag", "bar", "cup", "jar", "loaf", "roasted", "extra", "whole", "salted", "plain", "mix", "ready", "eat",
-    "tender", "toned", "malai", "robusta", "shimla", "hass", "red", "baby", "belgian", "california", "alphonso",
-    "darjeeling", "assam", "refined", "virgin", "rolled", "gift", "frozen", "cold", "natural", "thick", "nagpur",
-    "sona", "masoori", "iodised", "digestive", "assorted", "christmas", "refill", "anti", "dandruff", "liquid",
+    "and", "the", "with", "pack", "pcs", "fresh", "classic", "half", "full", "scoop", "scoops", "dry", "gravy", "dum",
+    "special", "plate", "bowl", "glass", "can", "bottle", "300ml", "mix", "style", "house",
 }
 
 
@@ -340,6 +344,10 @@ class EntityIndex:
         self.outlets = db.scalars(select(Outlet).order_by(Outlet.id)).all()
         self.categories = db.scalars(select(Category)).all()
         self.products = db.scalars(select(Product).where(Product.is_active.is_(True))).all()
+        self.dishes_using: dict[int, list[int]] = {}
+        for dish, ing in db.execute(select(Recipe.menu_item_id, Recipe.ingredient_id)).all():
+            self.dishes_using.setdefault(ing, []).append(dish)
+        self.by_id = {p.id: p for p in self.products}
         self.cat_by_name = {c.name.lower(): c for c in self.categories}
         self.product_tokens = {p.id: self._tokens(p.name) for p in self.products}
         token_count: dict[str, int] = {}
@@ -394,9 +402,10 @@ class EntityIndex:
 
     def match_products(self, text: str) -> list[Product]:
         t = text.lower()
-        for p in self.products:  # exact SKU or full name
-            if re.search(rf"\b{re.escape(p.sku.lower())}\b", t) or p.name.lower() in t:
-                return [p]
+        named = [p for p in self.products  # exact SKU or full name; the longest name wins ("paneer tikka" > "paneer")
+                 if re.search(rf"\b{re.escape(p.sku.lower())}\b", t) or re.search(rf"\b{re.escape(p.name.lower())}\b", t)]
+        if named:
+            return [max(named, key=lambda p: len(p.name))]
         words = {_stem(w) for w in re.findall(r"[a-z]+", t)}
         scored = []
         for p in self.products:
@@ -442,7 +451,7 @@ def parse(db: Session, text: str, anchor: date, index: EntityIndex | None = None
     p.horizon = parse_horizon(t)
     num_t = re.sub(r"\b(" + "|".join(WORD_NUMBERS) + r")\b", lambda m: str(WORD_NUMBERS[m.group(1)]), t)
     m = re.search(r"\b(?:top|best|bottom|worst|least|first)\s+(\d{1,2})\b|\b(\d{1,2})\s+(?:best|top|worst|slowest|"
-                  r"fastest|biggest|most|products|items)\b", num_t)
+                  r"fastest|biggest|most|products|items|dishes)\b", num_t)
     if m:
         p.top_n = int(m.group(1) or m.group(2))
     if re.search(r"\b(declin\w*|drop\w*|fall\w*|losers?|lower|less|down|decrease\w*)\b", t):
@@ -509,4 +518,26 @@ def parse(db: Session, text: str, anchor: date, index: EntityIndex | None = None
         p.intent, p.confidence = "sales_summary", 0.4
     else:
         p.intent, p.confidence = "general", 0.0
+    _resolve_item_kind(p, index)
     return p
+
+
+STOCK_INTENTS = {"stock_status", "reorder", "stockout_risk", "suppliers", "purchase_orders"}
+
+
+def _resolve_item_kind(p: Parsed, index: EntityIndex) -> None:
+    """Kitchens stock ingredients and sell dishes. In a stock question an ingredient stays itself; in a sales or
+    forecast question ("how is paneer selling?") it stands for the dishes made with it."""
+    items = [index.by_id[i] for i in p.product_ids if i in index.by_id]
+    if not items or p.intent in STOCK_INTENTS:
+        return
+    if all(x.kind == "menu" for x in items):
+        return
+    dishes: list[int] = []
+    for x in items:
+        for d in ([x.id] if x.kind == "menu" else index.dishes_using.get(x.id, [])):
+            if d not in dishes and d in index.by_id:
+                dishes.append(d)
+    if dishes:
+        p.product_ids = dishes
+        p.product_names = [index.by_id[d].name for d in dishes]

@@ -48,9 +48,9 @@ function Body({ d }) {
     <>
       <div className="grid grid-4">
         <Kpi label="Revenue" value={money(k.revenue, { compact: true })} change={ch.revenue} hint="vs the previous period" />
-        <Kpi label="Gross profit" value={money(k.gross_profit, { compact: true })} change={ch.gross_profit} hint={`${k.margin_pct}% margin`} />
-        <Kpi label="Bills" value={num(k.orders)} change={ch.orders} hint={`${num(k.items_per_basket, 1)} items per bill`} />
-        <Kpi label="Average bill" value={money(k.avg_basket)} change={ch.avg_basket} hint="vs the previous period" />
+        <Kpi label="Gross profit" value={money(k.gross_profit, { compact: true })} change={ch.gross_profit} hint={`food cost ${k.food_cost_pct}% of sales`} />
+        <Kpi label="Guests (dine-in)" value={num(k.covers)} change={ch.covers} hint={`${money(k.spend_per_cover)} spent per guest`} />
+        <Kpi label="Average bill" value={money(k.avg_basket)} change={ch.avg_basket} hint={`${num(k.orders)} bills`} />
       </div>
 
       <div className="grid grid-3">
@@ -86,12 +86,12 @@ function Body({ d }) {
             <RankList rows={d.categories.slice(0, 6).map((x) => ({ key: x.category, name: x.category, value: x.revenue, change: x.change_pct }))} />
           </Card>
         )}
-        <Card title="Top products" actions={<Link to="/products" className="small">All products <ArrowRight size={13} style={{ verticalAlign: -2 }} /></Link>}>
+        <Card title="Top dishes" actions={<Link to="/products" className="small">Full menu <ArrowRight size={13} style={{ verticalAlign: -2 }} /></Link>}>
           <div className="stack" style={{ gap: 0 }}>
             {d.top_products.slice(0, 6).map((p, i) => (
               <div key={p.product_id ?? p.name} className="list-row">
                 <span className={`rank ${i < 3 ? 'top' : ''}`}>{i + 1}</span>
-                <div style={{ minWidth: 0, flex: 1 }}><b className="small" style={{ fontWeight: 550 }}>{p.name}</b><div className="small muted">{num(p.units)} sold</div></div>
+                <div style={{ minWidth: 0, flex: 1 }}><b className="small" style={{ fontWeight: 550 }}>{p.name}</b><div className="small muted">{num(p.units)} ordered</div></div>
                 <span className="mono small">{money(p.revenue, { compact: true })}</span>
               </div>
             ))}

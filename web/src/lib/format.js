@@ -25,6 +25,10 @@ export function money(v, { compact = false, decimals = false } = {}) {
 export const num = (v, digits = 0) =>
   v === null || v === undefined ? '-' : (digits ? nf1 : nf0).format(Number(v))
 
+/** A measured quantity (kg, L, pcs) with up to 3 decimals: 0.012 kg, 2.5 L, 40 pcs. */
+export const qty = (v) =>
+  v === null || v === undefined ? '-' : Number(v).toLocaleString('en-IN', { maximumFractionDigits: 3 })
+
 export const pct = (v, { signed = true } = {}) =>
   v === null || v === undefined ? '-' : `${signed && v > 0 ? '+' : ''}${Number(v).toFixed(1)}%`
 

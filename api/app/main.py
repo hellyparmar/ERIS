@@ -54,7 +54,8 @@ def _bootstrap() -> None:
         if has_users:
             # moving a stale demo forward rewrites every dated row: done in the background in one transaction,
             # so the app answers at once (from the previous dates) instead of after a minute on a small server
-            threading.Thread(target=_refresh_demo_dates, daemon=True).start()
+            if settings.DEMO_SHIFT_DATES:
+                threading.Thread(target=_refresh_demo_dates, daemon=True).start()
             return
     if not settings.SEED_DEMO_DATA:
         if settings.INITIAL_ADMIN_EMAIL and settings.INITIAL_ADMIN_PASSWORD:

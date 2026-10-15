@@ -5,7 +5,7 @@ test('viewer is read-only', async ({ page }) => {
   await login(page, 'viewer')
   await page.goto('/sales')
   await expect(page.locator('table')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'New sale' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'New bill' })).toHaveCount(0)
   await page.goto('/customers')
   await expect(page.locator('table')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Add customer' })).toHaveCount(0)
@@ -34,7 +34,7 @@ test('expired access token is renewed with the refresh token', async ({ page }) 
 test('phone layout has no horizontal scrolling', async ({ browser }) => {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } })
   await login(page)
-  for (const path of ['/', '/insights', '/reports', '/models', '/invoices', '/import', '/assistant', '/forecasts']) {
+  for (const path of ['/', '/insights', '/reports', '/models', '/invoices', '/import', '/assistant', '/forecasts', '/products', '/inventory', '/sales']) {
     await page.goto(path)
     await page.waitForLoadState('networkidle')
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
@@ -61,7 +61,7 @@ test('a newly opened page starts at its title, not where the last page was scrol
   await expect(page.locator('.pager')).toBeVisible()
   await page.evaluate(() => window.scrollTo(0, 1500))
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(200)
-  await page.getByRole('link', { name: 'Products', exact: true }).click()
-  await expect(page.getByRole('heading', { level: 1, name: 'Products' })).toBeInViewport()
+  await page.getByRole('link', { name: 'Menu', exact: true }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Menu' })).toBeInViewport()
   expect(await page.evaluate(() => window.scrollY)).toBe(0)
 })

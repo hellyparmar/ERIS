@@ -147,7 +147,7 @@ def clear_transactions(admin: User = Depends(require_admin), db: Session = Depen
                   WeatherDaily, DatasetInfo):
         db.execute(delete(model))
     outlets = db.scalars(select(Outlet.id)).all()
-    products = db.execute(select(Product.id, Product.reorder_level)).all()
+    products = db.execute(select(Product.id, Product.reorder_level).where(Product.kind == "ingredient")).all()
     rows = [{"outlet_id": o, "product_id": p, "quantity": 0.0, "reorder_level": r} for o in outlets for p, r in products]
     if rows:
         db.execute(insert(InventoryItem), rows)

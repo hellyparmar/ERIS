@@ -2,7 +2,7 @@
 
     python -m app.evaluation [--origins 3] [--horizon 28] [--products 10] [--out ../docs]
 
-For every series (total, each outlet, each category and the top-N products) and several forecast origins,
+For every series (total, each outlet, each menu category and the top-N dishes) and several forecast origins,
 each model is trained on data before the origin and scored on the following `horizon` days. "ERIS auto" is the
 production pipeline itself: inner back-test on the training data, pick the best model, forecast — so its
 score is what users actually get. Writes a Markdown report, a CSV of all scores and charts.
@@ -19,7 +19,7 @@ import pandas as pd
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Category, Outlet
+from app.models import Category, Outlet, Product
 from app.services import analytics as A
 from app.services import forecasting as F
 
@@ -31,11 +31,30 @@ LABELS = {**{k: v.split(" (")[0] for k, v in F.MODEL_LABELS.items()}, "auto": "E
 def series_specs(db: Session, products: int) -> list[F.SeriesSpec]:
     specs = [F.build_spec(db, "total", None, None)]
     specs += [F.build_spec(db, "outlet", o.id, None) for o in db.scalars(select(Outlet).order_by(Outlet.id))]
-    specs += [F.build_spec(db, "category", c.id, None) for c in db.scalars(select(Category).order_by(Category.name))]
+    menu_cats = select(Product.category_id).where(Product.kind == "menu")
+    specs += [F.build_spec(db, "category", c.id, None)
+              for c in db.scalars(select(Category).where(Category.id.in_(menu_cats)).order_by(Category.name))]
     anchor = A.anchor_date(db)
     top = A.top_products(db, A.DateRange(anchor - pd.Timedelta(days=89).to_pytimedelta(), anchor), None, products, sort="units")
     specs += [F.build_spec(db, "product", p["product_id"], None) for p in top]
     return specs
+
+
+def _reading(s: dict) -> str:
+    """Plain-language reading of the results, worded from the numbers (so it stays true when the data changes)."""
+    w = s["wape"]
+    best = w["all series"].drop("auto").idxmin()
+    parts = [f"on this synthetic dataset {LABELS[best]} is the strongest single model overall"]
+    if "xgboost" in w.index:
+        worse = [scope for scope in w.columns if scope != "all series"
+                 and w.loc["xgboost", scope] > w.loc["seasonal_naive", scope]]
+        if worse:
+            parts.append(f"the recursive XGBoost model is weaker than the seasonal-naive baseline on {', '.join(worse)} "
+                         "series")
+        else:
+            parts.append("XGBoost beats the seasonal-naive baseline on every series type")
+    parts.append("XGBoost stays as a challenger because it wins on individual series")
+    return "; ".join(parts) + "."
 
 
 def evaluate(db: Session, origins: int = 3, horizon: int = 28, products: int = 10, progress=print) -> pd.DataFrame:
@@ -181,7 +200,7 @@ def write_report(df: pd.DataFrame, out: Path, db: Session, origins: int, horizon
         "# Forecast model evaluation",
         "",
         f"Generated with `python -m app.evaluation` on the demo dataset: {df['series'].nunique()} series "
-        f"(total, outlets, categories, top products), {origins} forecast origins each, {horizon}-day horizon - "
+        f"(total, outlets, menu categories, top dishes), {origins} forecast origins each, {horizon}-day horizon - "
         f"{len(df)} model runs. Every model is trained only on data before each origin.",
         "",
         "## Mean WAPE (%) by series type",
@@ -193,8 +212,8 @@ def write_report(df: pd.DataFrame, out: Path, db: Session, origins: int, horizon
         f"- Best single model overall: **{LABELS[best_single]}** ({s['wape'].loc[best_single, 'all series']:.1f}%).",
         f"- 80% prediction-interval coverage of ERIS auto on the held-out windows: **{s['coverage']}%** "
         "(target 80%).",
-        "- Product-level series are noisier (small daily counts), so their errors are naturally higher than revenue "
-        "series that aggregate many products.",
+        "- Dish-level series (portions per day) are noisier than revenue series that aggregate the whole menu, so "
+        "their errors are naturally higher.",
         "",
         "## All metrics (mean over series and origins)",
         "",
@@ -222,9 +241,7 @@ def write_report(df: pd.DataFrame, out: Path, db: Session, origins: int, horizon
         "- **Features**: XGBoost and Prophet use calendar and festival features plus promotions, price index, "
         "weather and stockouts; planned promotions and climatological weather are known for the test window, "
         "future stockouts are not (set to zero).",
-        "- **Honest reading**: on this synthetic dataset Prophet is the strongest model and the recursive XGBoost "
-        "model is weaker than the seasonal-naive baseline on aggregate revenue, so auto-selection almost always "
-        "keeps Prophet. XGBoost is kept as a challenger because it can win on individual series.",
+        f"- **Honest reading**: {_reading(s)}",
     ]
     path = out / "FORECAST_EVALUATION.md"
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")

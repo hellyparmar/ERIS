@@ -87,7 +87,7 @@ def _sample_row(db, invoice):
     from app.models import Outlet, Product
 
     o = db.scalar(select(Outlet).order_by(Outlet.id))
-    p = db.scalar(select(Product).order_by(Product.id))
+    p = db.scalar(select(Product).where(Product.kind == "menu").order_by(Product.id))
     day = db.scalar(select(func.max(Sale.sale_date)))
     return f"{invoice},{day.isoformat()},{o.code},{p.sku},1"
 

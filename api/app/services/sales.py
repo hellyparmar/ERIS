@@ -1,4 +1,9 @@
-"""Creating and voiding sales (shared by manual entry and CSV import)."""
+"""Creating and voiding sales (shared by manual entry and CSV import).
+
+A sale of a menu item draws its ingredients down by the recipe quantities (an item without a recipe draws itself
+down). If an ingredient would run short, the dish cannot be made and the bill is refused (manual billing only:
+imported history never blocks).
+"""
 from __future__ import annotations
 
 import re
@@ -11,7 +16,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app import clock
-from app.models import CHANNELS, PAYMENT_METHODS, Customer, Outlet, Product, Sale, SaleItem, StockMovement, User
+from app.models import CHANNELS, PAYMENT_METHODS, Customer, Outlet, Product, Recipe, Sale, SaleItem, StockMovement, User
 from app.services.inventory import change_stock
 
 
@@ -29,7 +34,8 @@ class SaleInput:
     lines: list[LineInput]
     sold_at: datetime | None = None
     payment_method: str = "cash"
-    channel: str = "in_store"
+    channel: str = "dine_in"
+    covers: int | None = None
     customer_id: int | None = None
     customer_phone: str | None = None
     customer_name: str | None = None
@@ -68,6 +74,24 @@ def next_invoice_no(db: Session, outlet: Outlet, when: datetime) -> str:
     last = db.scalar(select(func.max(Sale.invoice_no)).where(Sale.invoice_no.like(f"{prefix}%")))
     seq = int(last.rsplit("-", 1)[1]) + 1 if last and last.rsplit("-", 1)[1].isdigit() else 1
     return f"{prefix}{seq:04d}"
+
+
+def _ingredient_needs(db: Session, built: list) -> list[tuple[int, float, list[int]]]:
+    """What the bill uses up: (stocked item id, quantity, the dishes that need it). Dishes use their recipe's
+    ingredients; an item sold without a recipe uses itself."""
+    ids = [b[0].id for b in built]
+    recipes: dict[int, list[tuple[int, float]]] = {}
+    for dish, ing, q in db.execute(select(Recipe.menu_item_id, Recipe.ingredient_id, Recipe.quantity).where(
+            Recipe.menu_item_id.in_(ids))).all():
+        recipes.setdefault(dish, []).append((ing, q))
+    need: dict[int, list] = {}
+    for product, qty, *_ in built:
+        for item_id, per in recipes.get(product.id, [(product.id, 1.0)]):
+            entry = need.setdefault(item_id, [0.0, []])
+            entry[0] += round(per * qty, 4)
+            if product.id not in entry[1]:
+                entry[1].append(product.id)
+    return [(item_id, round(q, 4), dishes) for item_id, (q, dishes) in need.items()]
 
 
 def create_sale(db: Session, data: SaleInput, user: User | None, source: str = "manual",
@@ -121,6 +145,8 @@ def create_sale(db: Session, data: SaleInput, user: User | None, source: str = "
             raise HTTPException(404, f"Product {line.product_id} not found")
         if not product.is_active:
             raise HTTPException(400, f"{product.name} is not active")
+        if product.kind != "menu":
+            raise HTTPException(400, f"{product.name} is an ingredient, not a menu item")
         price = float(product.selling_price if line.unit_price is None else line.unit_price)
         gross = round(price * line.quantity, 2)
         if line.discount > gross:
@@ -152,6 +178,7 @@ def create_sale(db: Session, data: SaleInput, user: User | None, source: str = "
 
     sale = Sale(invoice_no=invoice_no, outlet_id=outlet.id, customer_id=customer.id if customer else None,
                 sold_at=sold_at, sale_date=sold_at.date(), channel=data.channel,
+                covers=data.covers if data.channel == "dine_in" else None,
                 payment_method=data.payment_method, status="completed", source=source,
                 created_by=user.id if user else None, notes=data.notes, subtotal=0, total=0)
     subtotal = discount = tax_total = total = qty_total = 0.0
@@ -183,9 +210,15 @@ def create_sale(db: Session, data: SaleInput, user: User | None, source: str = "
             sale.invoice_no = next_invoice_no(db, outlet, sold_at)
 
     if update_stock:
-        for product, qty, *_ in built:
-            change_stock(db, outlet.id, product.id, -qty, "sale", user.id if user else None, reference=sale.invoice_no,
-                         allow_negative=source == "import")
+        for item_id, qty, dishes in _ingredient_needs(db, built):
+            try:
+                change_stock(db, outlet.id, item_id, -qty, "sale", user.id if user else None,
+                             reference=sale.invoice_no, allow_negative=source == "import")
+            except HTTPException as exc:
+                if dishes == [item_id]:
+                    raise
+                names = ", ".join(db.get(Product, d).name for d in dishes)
+                raise HTTPException(400, f"Cannot make {names}: {exc.detail}") from None
     if commit:
         db.commit()
         db.refresh(sale)
@@ -197,13 +230,13 @@ def void_sale(db: Session, sale: Sale, user: User, reason: str | None) -> Sale:
         raise HTTPException(400, "Sale is already void")
     sale.status = "void"
     sale.notes = f"VOID: {reason}" if reason else "VOID"
-    # Only restore stock if this sale actually decremented it (demo history and
-    # imported historical sales may not have).
-    decremented = db.scalar(select(func.count(StockMovement.id)).where(
-        StockMovement.reference == sale.invoice_no, StockMovement.reason == "sale"))
-    if decremented:
-        for item in sale.items:
-            change_stock(db, sale.outlet_id, item.product_id, item.quantity, "sale_void", user.id,
+    # Put back exactly what this sale drew down (demo history and imported historical sales drew nothing).
+    drawn = db.execute(select(StockMovement.product_id, func.sum(StockMovement.change)).where(
+        StockMovement.reference == sale.invoice_no, StockMovement.reason == "sale",
+        StockMovement.outlet_id == sale.outlet_id).group_by(StockMovement.product_id)).all()
+    for item_id, change in drawn:
+        if change:
+            change_stock(db, sale.outlet_id, item_id, -change, "sale_void", user.id,
                          reference=sale.invoice_no, note=reason)
     db.commit()
     return sale

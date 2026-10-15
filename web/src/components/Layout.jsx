@@ -3,7 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Activity, BarChart3, Bell, Boxes, Bot, Building2, Contact, FileSpreadsheet, FileText, History, LayoutDashboard,
-  LifeBuoy, LogOut, Menu, Moon, Package, PanelLeftClose, PanelLeftOpen, Receipt, Settings, Store, Sun, TrendingUp, Truck, Upload,
+  LifeBuoy, LogOut, Menu, Moon, PanelLeftClose, PanelLeftOpen, Receipt, Settings, Store, Sun, TrendingUp, Truck, Upload, UtensilsCrossed,
   Monitor, UserRound,
 } from 'lucide-react'
 import { api } from '../lib/api'
@@ -17,8 +17,8 @@ const NAV = [
   { to: '/assistant', label: 'AI Assistant', icon: Bot, badge: 'AI' },
   { section: 'Operate' },
   { to: '/sales', label: 'Sales', icon: Receipt },
-  { to: '/inventory', label: 'Inventory', icon: Boxes },
-  { to: '/products', label: 'Products', icon: Package },
+  { to: '/products', label: 'Menu', icon: UtensilsCrossed },
+  { to: '/inventory', label: 'Kitchen stock', icon: Boxes },
   { to: '/suppliers', label: 'Suppliers & orders', icon: Truck },
   { to: '/customers', label: 'Customers', icon: Contact },
   { to: '/invoices', label: 'Invoices (demo GST)', icon: FileText },
@@ -182,7 +182,7 @@ export default function Layout() {
       <nav className={`sidebar ${open ? 'open' : ''}`} aria-label="Main">
         <div className="brand">
           <div className="brand-mark">E</div>
-          <div className="brand-text"><b>ERIS</b><small>Retail Intelligence</small></div>
+          <div className="brand-text"><b>ERIS</b><small>Restaurant Intelligence</small></div>
           <button className="btn ghost sm icon collapse-btn" onClick={toggle} aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>{collapsed ? <PanelLeftOpen /> : <PanelLeftClose />}</button>
         </div>

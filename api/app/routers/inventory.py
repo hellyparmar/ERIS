@@ -1,4 +1,6 @@
-"""Stock levels, adjustments, transfers, purchase orders and reorder suggestions."""
+"""Ingredient stock levels, adjustments, wastage, transfers, purchase orders and reorder suggestions.
+
+Kitchens stock ingredients, not dishes: a dish's stock is whatever its recipe's ingredients allow."""
 from collections import defaultdict
 from datetime import timedelta
 
@@ -32,6 +34,12 @@ from app.services.inventory import change_stock, set_stock, stock_status
 router = APIRouter(prefix="/api", tags=["inventory & purchasing"])
 
 
+def _stocked(p: Product) -> Product:
+    if p.kind == "menu":
+        raise HTTPException(400, f"{p.name} is a dish: kitchens stock its ingredients, not the dish itself")
+    return p
+
+
 @router.get("/inventory")
 def list_inventory(outlet_id: int | None = None, category_id: int | None = None, status: str | None = None,
                    search: str | None = None, page: int = 1, page_size: int = Query(50, le=500),
@@ -42,6 +50,7 @@ def list_inventory(outlet_id: int | None = None, category_id: int | None = None,
         Product.is_active.is_(True))
     if outlet_ids:
         q = q.where(InventoryItem.outlet_id.in_(outlet_ids))
+    q = q.where(Product.kind == "ingredient")
     if category_id:
         q = q.where(Product.category_id == category_id)
     if search:
@@ -55,7 +64,7 @@ def list_inventory(outlet_id: int | None = None, category_id: int | None = None,
     elif status == "ok":
         q = q.where(InventoryItem.quantity > InventoryItem.reorder_level)
 
-    demand = A.avg_daily_units_by_outlet_product(db, 28)
+    demand = A.avg_daily_usage(db, 28, outlet_ids=outlet_ids)
     rows = db.execute(q).all()
     items = []
     for inv, p, o, cat in rows:
@@ -103,8 +112,8 @@ def export_inventory(outlet_id: int | None = None, user: User = Depends(get_curr
 def adjust_stock(body: StockAdjustIn, user: User = Depends(require_manager), db: Session = Depends(get_db)):
     ensure_outlet_access(user, body.outlet_id)
     get_or_404(db, Outlet, body.outlet_id, "Outlet")
-    get_or_404(db, Product, body.product_id, "Product")
-    reason = "damage" if body.reason == "damage" else body.reason
+    _stocked(get_or_404(db, Product, body.product_id, "Product"))
+    reason = body.reason
     if body.mode == "set":
         item = set_stock(db, body.outlet_id, body.product_id, body.quantity, user.id, reason, "MANUAL", body.note)
     else:
@@ -123,7 +132,7 @@ def transfer_stock(body: TransferIn, user: User = Depends(require_manager), db: 
     ensure_outlet_access(user, body.from_outlet_id)
     src = get_or_404(db, Outlet, body.from_outlet_id, "Outlet")
     dst = get_or_404(db, Outlet, body.to_outlet_id, "Outlet")
-    get_or_404(db, Product, body.product_id, "Product")
+    _stocked(get_or_404(db, Product, body.product_id, "Product"))
     ref = f"TRF-{src.code}-{dst.code}"
     change_stock(db, src.id, body.product_id, -body.quantity, "transfer_out", user.id, ref, body.note or f"To {dst.name}")
     change_stock(db, dst.id, body.product_id, body.quantity, "transfer_in", user.id, ref, body.note or f"From {src.name}")
@@ -184,7 +193,7 @@ def create_orders_from_suggestions(body: ReorderCreateIn, user: User = Depends(r
         if qty <= 0:
             continue
         ensure_outlet_access(user, outlet_id)
-        p = get_or_404(db, Product, product_id, "Product")
+        p = _stocked(get_or_404(db, Product, product_id, "Product"))
         if not p.supplier_id:
             skipped.append(p.name)  # can't be ordered until a supplier is set - the rest still goes ahead
             continue
@@ -245,7 +254,7 @@ def _create_po(db: Session, body: PurchaseOrderIn, user: User) -> PurchaseOrder:
     total = 0.0
     merged: dict[int, list] = {}
     for line in body.items:
-        p = get_or_404(db, Product, line.product_id, "Product")
+        p = _stocked(get_or_404(db, Product, line.product_id, "Product"))
         cost = p.cost_price if line.unit_cost is None else line.unit_cost
         if p.id in merged:
             merged[p.id][1] += line.quantity

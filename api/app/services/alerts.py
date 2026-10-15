@@ -36,12 +36,13 @@ def compute_alerts(db: Session, outlet_ids: list[int] | None = None) -> list[dic
     if out:
         sample = ", ".join(f"{r.name} ({names.get(r.outlet_id)})" for r in out[:3])
         alerts.append({"id": "stock-out", "severity": "critical", "type": "inventory",
-                       "title": f"{len(out)} item{'s' if len(out) > 1 else ''} out of stock",
-                       "message": f"{sample}{' and more' if len(out) > 3 else ''}. Lost sales are likely until restocked.",
+                       "title": f"{len(out)} ingredient{'s' if len(out) > 1 else ''} out of stock",
+                       "message": f"{sample}{' and more' if len(out) > 3 else ''}. Dishes that need "
+                                  f"{'them' if len(out) > 1 else 'it'} cannot be served until restocked.",
                        "link": "/inventory?status=out_of_stock"})
     if low:
         alerts.append({"id": "stock-low", "severity": "warning", "type": "inventory",
-                       "title": f"{len(low)} item{'s' if len(low) > 1 else ''} below reorder level",
+                       "title": f"{len(low)} ingredient{'s' if len(low) > 1 else ''} below reorder level",
                        "message": "Review the reorder suggestions to raise purchase orders in one click.",
                        "link": "/inventory?tab=reorder"})
 

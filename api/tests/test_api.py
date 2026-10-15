@@ -1,6 +1,8 @@
 """End-to-end API tests against a small generated demo database."""
 from datetime import date
 
+from conftest import product_id, stock_up
+
 from app.db import SessionLocal
 from app.models import InventoryItem, Product
 
@@ -49,47 +51,59 @@ def test_manager_is_scoped_to_own_outlet(client, manager):
     assert client.get("/api/users", headers=manager).status_code == 403
 
 
-def test_manual_sale_updates_stock_and_void_restores(client, admin):
-    product_id = 14  # Toned Milk 1L
-    client.post("/api/inventory/adjust", headers=admin,
-                json={"outlet_id": 1, "product_id": product_id, "mode": "set", "quantity": 50})
-    before = stock_of(1, product_id)
+def test_manual_sale_draws_ingredients_by_recipe_and_void_restores(client, admin):
+    dish = stock_up(client, admin, 1, "MNC-007")  # Butter Chicken: 0.22 kg boneless chicken per portion
+    naan = stock_up(client, admin, 1, "BRD-001")
+    chicken = product_id("ING-008")
+    before = stock_of(1, chicken)
     r = client.post("/api/sales", headers=admin, json={
-        "outlet_id": 1, "payment_method": "upi", "customer_phone": "+91 98765 43210", "customer_name": "Test Buyer",
-        "items": [{"product_id": product_id, "quantity": 3}, {"product_id": 22, "quantity": 1, "discount": 5}],
+        "outlet_id": 1, "payment_method": "upi", "channel": "dine_in", "covers": 2,
+        "customer_phone": "+91 98765 43210", "customer_name": "Test Guest",
+        "items": [{"product_id": dish, "quantity": 3}, {"product_id": naan, "quantity": 1, "discount": 5}],
         "bill_discount": 10})
     assert r.status_code == 201, r.text
     sale = r.json()
-    milk_price = next(i["unit_price"] for i in sale["items"] if i["product_id"] == product_id)
-    bread = next(i for i in sale["items"] if i["product_id"] == 22)
-    assert sale["subtotal"] == round(3 * milk_price + bread["unit_price"], 2)
+    price = next(i["unit_price"] for i in sale["items"] if i["product_id"] == dish)
+    bread = next(i for i in sale["items"] if i["product_id"] == naan)
+    assert sale["subtotal"] == round(3 * price + bread["unit_price"], 2)
     assert sale["discount"] == 15
     assert sale["total"] == round(sale["subtotal"] - 15, 2)
-    assert sale["customer"] == "Test Buyer"
-    assert stock_of(1, product_id) == before - 3
+    assert sale["customer"] == "Test Guest" and sale["covers"] == 2
+    assert stock_of(1, chicken) == round(before - 3 * 0.22, 3)  # the recipe drew the chicken down
 
     r = client.post(f"/api/sales/{sale['id']}/void", headers=admin, json={"reason": "entered twice"})
     assert r.status_code == 200 and r.json()["status"] == "void"
-    assert stock_of(1, product_id) == before
+    assert stock_of(1, chicken) == before
     assert client.post(f"/api/sales/{sale['id']}/void", headers=admin, json={"reason": "again"}).status_code == 400
 
 
-def test_sale_rejects_overselling(client, admin):
+def test_dish_cannot_be_sold_without_its_ingredients(client, admin):
+    dish = stock_up(client, admin, 1, "MNC-009")  # Mutton Rogan Josh: 0.25 kg mutton per portion
     client.post("/api/inventory/adjust", headers=admin,
-                json={"outlet_id": 1, "product_id": 5, "mode": "set", "quantity": 2})
-    r = client.post("/api/sales", headers=admin, json={"outlet_id": 1, "items": [{"product_id": 5, "quantity": 5}]})
-    assert r.status_code == 400 and "Not enough stock" in r.json()["detail"]
+                json={"outlet_id": 1, "product_id": product_id("ING-010"), "mode": "set", "quantity": 0.3})
+    r = client.post("/api/sales", headers=admin, json={"outlet_id": 1, "items": [{"product_id": dish, "quantity": 5}]})
+    assert r.status_code == 400
+    assert "Mutton Rogan Josh" in r.json()["detail"] and "Not enough stock for Mutton" in r.json()["detail"]
+
+
+def test_ingredients_are_stocked_dishes_are_sold(client, admin):
+    r = client.post("/api/sales", headers=admin, json={"outlet_id": 1, "items": [{"product_id": product_id("ING-001"),
+                                                                                    "quantity": 1}]})
+    assert r.status_code == 400 and "ingredient" in r.json()["detail"]
+    r = client.post("/api/inventory/adjust", headers=admin, json={"outlet_id": 1, "product_id": product_id("STR-001"),
+                                                                 "mode": "set", "quantity": 5})
+    assert r.status_code == 400 and "ingredients" in r.json()["detail"]
 
 
 def test_credit_sale_needs_customer(client, admin):
-    r = client.post("/api/sales", headers=admin,
-                    json={"outlet_id": 1, "payment_method": "credit", "items": [{"product_id": 14, "quantity": 1}]})
+    r = client.post("/api/sales", headers=admin, json={
+        "outlet_id": 1, "payment_method": "credit", "items": [{"product_id": product_id("MNC-007"), "quantity": 1}]})
     assert r.status_code == 400
 
 
 def test_staff_cannot_backdate(client, staff):
     r = client.post("/api/sales", headers=staff, json={
-        "outlet_id": 1, "sold_at": "2024-01-01T10:00:00", "items": [{"product_id": 14, "quantity": 1}]})
+        "outlet_id": 1, "sold_at": "2024-01-01T10:00:00", "items": [{"product_id": product_id("MNC-007"), "quantity": 1}]})
     assert r.status_code == 403
 
 
@@ -134,10 +148,11 @@ def test_sales_import_dry_run_then_commit(client, admin):
     from datetime import timedelta
 
     today = (date.today() - timedelta(days=1)).isoformat()  # a past date in every time zone
-    csv = ("invoice_no,date,time,outlet_code,sku,quantity,unit_price,discount,payment_method,customer_phone\n"
-           f"IMP-1,{today},09:30,BLR-IND,DAI-001,2,,,upi,9000000001\n"
-           f"IMP-1,{today},09:30,BLR-IND,BRK-001,1,,,upi,9000000001\n"
-           f"IMP-2,{today},10:00,Indiranagar,Cola 750ml,3,45,5,gpay,\n")
+    csv = ("invoice_no,date,time,outlet_code,sku,quantity,unit_price,discount,payment_method,channel,covers,"
+           "customer_phone\n"
+           f"IMP-1,{today},13:30,BLR-IND,MNC-007,2,,,upi,Dine In,3,9000000001\n"
+           f"IMP-1,{today},13:30,BLR-IND,BRD-001,4,,,upi,Dine In,3,9000000001\n"
+           f"IMP-2,{today},20:00,Indiranagar,Soft Drink (300ml),3,65,5,gpay,Swiggy,,\n")
     files = {"file": ("sales.csv", csv, "text/csv")}
     r = client.post("/api/imports/sales?dry_run=true", headers=admin, files=files)
     res = r.json()
@@ -154,18 +169,30 @@ def test_sales_import_dry_run_then_commit(client, admin):
 
 
 def test_sales_import_reports_row_errors(client, admin):
-    csv = "date,outlet_code,sku,quantity\n2026-01-01,NOPE,DAI-001,1\nnot-a-date,MUM-AND,DAI-001,1\n2026-01-01,MUM-AND,XXX,1\n"
+    csv = ("date,outlet_code,sku,quantity,channel\n2026-01-01,NOPE,MNC-007,1,dine_in\nnot-a-date,MUM-AND,MNC-007,1,\n"
+           "2026-01-01,MUM-AND,XXX,1,\n2026-01-01,MUM-AND,MNC-007,1,drone\n")
     res = client.post("/api/imports/sales", headers=admin, files={"file": ("s.csv", csv, "text/csv")}).json()
-    assert res["error_count"] == 3
-    assert {e["row"] for e in res["errors"]} == {2, 3, 4}
+    assert res["error_count"] == 4
+    assert {e["row"] for e in res["errors"]} == {2, 3, 4, 5}
 
 
-def test_product_and_customer_import(client, admin):
-    products = "sku,name,category,unit,cost_price,selling_price,tax_rate\nNEW-001,Test Granola 500g,Breakfast,pack,150,240,12\n"
+def test_menu_and_ingredient_import(client, admin):
+    # a new ingredient and the dish that uses it, in one file (the dish row comes first on purpose)
+    products = ("kind,sku,name,category,unit,cost_price,selling_price,tax_rate,supplier,recipe\n"
+                "menu,NEW-001,Crispy Baby Corn,Starters,plate,,279,5,,NEW-ING=0.15; ING-028=0.05\n"
+                "ingredient,NEW-ING,Baby Corn,Vegetables,kg,140,,,AgroFresh Farms,\n")
     r = client.post("/api/imports/products?dry_run=false", headers=admin, files={"file": ("p.csv", products, "text/csv")})
-    assert r.json()["created"] == 1
+    assert r.json()["created"] == 2, r.json()
     with SessionLocal() as db:
-        assert db.query(Product).filter_by(sku="NEW-001").one().category.name == "Breakfast"
+        dish = db.query(Product).filter_by(sku="NEW-001").one()
+        assert dish.kind == "menu" and dish.category.name == "Starters" and len(dish.recipe) == 2
+        assert dish.cost_price == round(0.15 * 140 + 0.05 * db.query(Product).filter_by(sku="ING-028").one().cost_price, 2)
+        ing = db.query(Product).filter_by(sku="NEW-ING").one()
+        assert ing.kind == "ingredient" and db.query(InventoryItem).filter_by(product_id=ing.id).count() >= 5
+    bad = ("kind,sku,name,category,selling_price,cost_price,recipe\nmenu,NEW-002,No Price,Starters,,,\n"
+           "ingredient,NEW-003,Odd,Vegetables,,10,ING-001=1\nmenu,NEW-004,Bad Recipe,Starters,99,,NOPE=1\n")
+    r = client.post("/api/imports/products", headers=admin, files={"file": ("b.csv", bad, "text/csv")}).json()
+    assert r["error_count"] == 3
     customers = "name,phone,city\nRita Sen,9811122233,Pune\nBad Phone,123,Pune\n"
     r = client.post("/api/imports/customers?dry_run=false", headers=admin, files={"file": ("c.csv", customers, "text/csv")})
     assert r.json()["error_count"] == 1 and not r.json()["committed"]
@@ -183,8 +210,10 @@ def test_forecast_endpoints(client, admin):
     assert len(fc["forecast"]) == 14
     assert all(f["lower"] <= f["yhat"] <= f["upper"] for f in fc["forecast"])
     assert sum(1 for e in fc["evaluation"] if e.get("selected")) == 1
-    r = client.get("/api/forecast?scope=product&target_id=14&horizon=30", headers=admin)
-    assert r.status_code == 200 and "stock_plan" in r.json()
+    r = client.get(f"/api/forecast?scope=product&target_id={product_id('MNC-007')}&horizon=30", headers=admin)
+    assert r.status_code == 200, r.text
+    plan = r.json()["stock_plan"]
+    assert plan["stock_basis"] == "portions" and plan["limiting_ingredient"] and plan["unit"] == "portions"
     assert client.get("/api/forecast?scope=product&target_id=99999", headers=admin).status_code == 404
 
 
@@ -249,6 +278,46 @@ def test_assistant_answers_core_questions(client, admin):
     assert r["intent"] == "sales_summary" and "Koregaon Park" in r["answer"]
     history = client.get("/api/assistant/history", headers=admin).json()
     assert len(history) >= 2
+
+
+def test_assistant_reuses_an_answer_until_the_data_changes(client, admin):
+    """The same question (however worded) is answered from storage, and a new sale makes it recompute."""
+    ask = lambda q: client.post("/api/assistant/chat", headers=admin, json={"message": q}).json()  # noqa: E731
+    first = ask("Top 3 dishes this week")
+    assert first["provenance"].get("cached") is not True
+    second = ask("top 3 dishes this week?")  # different wording, same meaning
+    assert second["provenance"]["cached"] is True
+    assert second["answer"] == first["answer"] and second["blocks"] == first["blocks"]
+    assert any(m["role"] == "assistant" for m in client.get("/api/assistant/history", headers=admin).json())
+    dish = stock_up(client, admin, 1, "MNC-001")
+    r = client.post("/api/sales", headers=admin, json={"outlet_id": 1, "payment_method": "cash",
+                                                        "items": [{"product_id": dish, "quantity": 1}]})
+    assert r.status_code == 201, r.text
+    assert ask("Top 3 dishes this week")["provenance"].get("cached") is not True
+    # documentation and small talk read the wording itself: never reused
+    assert ask("hello")["provenance"].get("cached") is not True
+
+
+def test_demo_dates_are_only_shifted_when_enabled(client, monkeypatch):
+    """DEMO_SHIFT_DATES=false (the hosted demo) leaves the baked data, and its stored answers, as they are."""
+    from app import main
+
+    started = []
+
+    class FakeThread:
+        def __init__(self, target=None, **_):
+            started.append(target)
+
+        def start(self):
+            pass
+
+    monkeypatch.setattr(main.threading, "Thread", FakeThread)
+    monkeypatch.setattr(main.settings, "DEMO_SHIFT_DATES", False)
+    main._bootstrap()
+    assert started == []
+    monkeypatch.setattr(main.settings, "DEMO_SHIFT_DATES", True)
+    main._bootstrap()
+    assert started == [main._refresh_demo_dates]
 
 
 def test_assistant_uses_llm_when_rules_are_unsure(client, admin, monkeypatch):
@@ -366,7 +435,8 @@ def test_purchase_order_partial_receiving(client, admin):
 
 def test_input_validation_rules(client, admin):
     bad_phone = client.post("/api/sales", headers=admin, json={"outlet_id": 1, "customer_phone": "12",
-                                                               "items": [{"product_id": 22, "quantity": 1}]})
+                                                               "items": [{"product_id": product_id("MNC-007"),
+                                                                          "quantity": 1}]})
     assert bad_phone.status_code == 400
     loss = client.post("/api/products", headers=admin, json={"sku": "LOSS-1", "name": "Below cost", "category_id": 1,
                                                              "cost_price": 10, "selling_price": 5})

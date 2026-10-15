@@ -1,13 +1,14 @@
-"""Static reference data for the demo organization, a neighbourhood supermarket chain: outlets, suppliers and its
-product catalogue (packaged groceries, fresh produce, dairy, and household & personal care - all retail SKUs)."""
+"""Static reference data for the demo organization, a casual-dining restaurant chain: outlets, suppliers, the
+ingredients its kitchens stock, and its menu with a recipe for every dish (how much of each ingredient one portion
+uses). Food costs follow from the recipes; prices are typical for Indian metro casual dining (2026)."""
 
 ORGANIZATION = {
-    "name": "Urban Harvest Supermarkets Pvt. Ltd.",
-    "industry": "Grocery Retail (Supermarkets)",
+    "name": "Saffron Table Restaurants Pvt. Ltd.",
+    "industry": "Restaurants (Casual Dining)",
     "currency": "INR",
     "currency_symbol": "₹",
     "timezone": "Asia/Kolkata",
-    "email": "hello@urbanharvest.example",
+    "email": "hello@saffrontable.example",
     "phone": "+91 22 4000 1234",
     "address": "4th Floor, Lotus Corporate Park, Goregaon East, Mumbai 400063",
     "state": "Maharashtra",
@@ -15,7 +16,7 @@ ORGANIZATION = {
     # tax_id: a synthetic, checksum-valid GSTIN is generated from the seed (see services/gst.py) and marked demo.
 }
 
-# The demo company runs five outlets by default (SEED_OUTLETS, up to 7) - each with a different demand profile.
+# The chain runs five restaurants by default (SEED_OUTLETS, up to 7) - each with a different demand profile.
 # code, name, city, state, state code, address, manager, size, growth/yr, opened N days before data end (None = long open)
 OUTLETS = [
     ("MUM-AND", "Andheri West", "Mumbai", "Maharashtra", "27", "Lokhandwala Complex, Andheri West, Mumbai",
@@ -23,9 +24,9 @@ OUTLETS = [
     ("PUN-KOR", "Koregaon Park", "Pune", "Maharashtra", "27", "North Main Road, Koregaon Park, Pune",
      "Sneha Kulkarni", 0.95, 0.16, None),  # fastest-growing established outlet
     ("BLR-IND", "Indiranagar", "Bengaluru", "Karnataka", "29", "100 Feet Road, Indiranagar, Bengaluru",
-     "Arjun Rao", 1.10, 0.10, None),       # mild climate, high delivery share
+     "Arjun Rao", 1.10, 0.10, None),       # tech crowd: high delivery share
     ("AMD-SGH", "SG Highway", "Ahmedabad", "Gujarat", "24", "Sindhu Bhavan Road, SG Highway, Ahmedabad",
-     "Kavya Patel", 0.85, -0.08, None),    # losing ground to a new competitor
+     "Kavya Patel", 0.85, -0.08, None),    # mostly vegetarian guests; losing ground to a new competitor
     ("BLR-WHF", "Whitefield", "Bengaluru", "Karnataka", "29", "ITPL Main Road, Whitefield, Bengaluru",
      "Vikram Nair", 0.90, 0.10, 240),      # new outlet ramping up
     ("MUM-BAN", "Bandra", "Mumbai", "Maharashtra", "27", "Hill Road, Bandra West, Mumbai",
@@ -54,123 +55,189 @@ CLIMATE = {
                   [2, 2, 4, 5, 8, 10, 12, 12, 14, 10, 6, 2]),
 }
 
-# HSN codes (first 4 digits of the Harmonised System chapter heading) used on demo GST invoices.
-HSN = {
-    "STA-001": "1006", "STA-002": "1006", "STA-003": "1101", "STA-004": "0713", "STA-005": "0713", "STA-006": "1512",
-    "STA-007": "2501", "STA-008": "1701", "STA-009": "1904",
-    "DAI-001": "0401", "DAI-002": "0403", "DAI-003": "0406", "DAI-004": "0405", "DAI-005": "0406", "DAI-006": "0407",
-    "DAI-007": "0403",
-    "FRV-001": "0803", "FRV-002": "0808", "FRV-003": "0702", "FRV-004": "0703", "FRV-005": "0805", "FRV-006": "0804",
-    "FRV-007": "0709", "FRV-008": "0701",
-    "BEV-001": "2201", "BEV-002": "2202", "BEV-003": "2009", "BEV-004": "2202", "BEV-005": "2202", "BEV-006": "2201",
-    "BEV-007": "2202", "BEV-008": "2009",
-    "TEA-001": "0902", "TEA-002": "0902", "TEA-003": "0901", "TEA-004": "2101", "TEA-005": "2101",
-    "BRK-001": "1905", "BRK-002": "1905", "BRK-003": "1104", "BRK-004": "1904", "BRK-005": "2008", "BRK-006": "2007",
-    "BRK-007": "0409",
-    "SNK-001": "2005", "SNK-002": "1904", "SNK-003": "2106", "SNK-004": "1905", "SNK-005": "1905", "SNK-006": "1806",
-    "SNK-007": "0802", "SNK-008": "2106",
-    "FRZ-001": "0710", "FRZ-002": "2105", "FRZ-003": "2004", "FRZ-004": "0710",
-    "HPC-001": "3402", "HPC-002": "3402", "HPC-003": "3402", "HPC-004": "3402", "HPC-005": "3401", "HPC-006": "3305",
-    "HPC-007": "3306", "HPC-008": "3401",
-    "GFT-001": "0801", "GFT-002": "0813", "GFT-003": "1806", "GFT-004": "1905",
+# Taste differences between the restaurants: how much non-vegetarian food sells (1 = chain average) and the share
+# of orders that come through delivery apps.
+OUTLET_TASTE = {
+    "MUM-AND": {"nonveg": 1.05, "delivery": 0.30},
+    "PUN-KOR": {"nonveg": 1.0, "delivery": 0.28},
+    "BLR-IND": {"nonveg": 1.15, "delivery": 0.40},
+    "AMD-SGH": {"nonveg": 0.45, "delivery": 0.24},
+    "BLR-WHF": {"nonveg": 1.1, "delivery": 0.42},
+    "MUM-BAN": {"nonveg": 1.1, "delivery": 0.32},
+    "HYD-JUB": {"nonveg": 1.35, "delivery": 0.34},
 }
+
+RESTAURANT_SAC = "996331"  # GST services code for restaurant food & beverage, printed on demo invoices
+MENU_TAX_RATE = 5.0  # GST on restaurant service (no input tax credit)
 
 # name, contact, phone, email, city, lead time days, payment terms
 SUPPLIERS = [
     ("Gokul Dairy Co-operative", "Suresh Patil", "+91 98200 11223", "orders@gokuldairy.example", "Kolhapur", 1, "Weekly"),
-    ("Morning Fresh Breads & Cereals", "Anita D'Souza", "+91 98201 33445", "sales@morningfresh.example", "Mumbai", 1, "Weekly"),
+    ("Fresh Catch Meats & Poultry", "Imran Qureshi", "+91 98201 33445", "orders@freshcatch.example", "Mumbai", 1, "Weekly"),
+    ("AgroFresh Farms", "Mahesh Jadhav", "+91 97300 99001", "fresh@agrofresh.example", "Nashik", 1, "Cash on delivery"),
+    ("Bharat Staples Wholesale", "Rakesh Agarwal", "+91 98250 12121", "orders@bharatstaples.example", "Ahmedabad", 3, "Net 30"),
     ("Coastal Beverages Distributors", "Imran Shaikh", "+91 98673 55667", "dispatch@coastalbev.example", "Mumbai", 3, "Net 15"),
     ("Nilgiri Tea & Coffee Traders", "Lakshmi Iyer", "+91 94430 77889", "trade@nilgiritc.example", "Coimbatore", 5, "Net 30"),
-    ("AgroFresh Farms", "Mahesh Jadhav", "+91 97300 99001", "fresh@agrofresh.example", "Nashik", 1, "Cash on delivery"),
-    ("Bharat Staples Wholesale", "Rakesh Agarwal", "+91 98250 12121", "orders@bharatstaples.example", "Ahmedabad", 4, "Net 30"),
-    ("SnackWorld Distributors", "Neha Kapoor", "+91 99100 34343", "sales@snackworld.example", "Delhi", 5, "Net 30"),
-    ("Polar Frozen Foods", "Joseph Mathew", "+91 98450 56565", "orders@polarfrozen.example", "Bengaluru", 3, "Net 15"),
-    ("CleanHome Distributors", "Pradeep Menon", "+91 98860 78787", "orders@cleanhome.example", "Bengaluru", 4, "Net 30"),
+    ("Polar Frozen Desserts", "Joseph Mathew", "+91 98450 56565", "orders@polarfrozen.example", "Bengaluru", 3, "Net 15"),
 ]
 
-# sku, name, category, unit, cost, price (tax incl.), tax %, popularity weight, seasonal profile, supplier index.
-# Every item is a retail SKU a supermarket shelf would carry: packaged groceries, fresh produce sold by weight,
-# dairy, and household & personal care. Prices are typical Indian MRPs (2026).
-PRODUCTS = [
-    # Staples & Grains
-    ("STA-001", "Basmati Rice 5kg", "Staples & Grains", "bag", 520, 699, 5, 1.4, "staple", 5),
-    ("STA-002", "Sona Masoori Rice 5kg", "Staples & Grains", "bag", 340, 430, 5, 1.6, "staple", 5),
-    ("STA-003", "Whole Wheat Atta 5kg", "Staples & Grains", "bag", 215, 285, 5, 1.9, "staple", 5),
-    ("STA-004", "Toor Dal 1kg", "Staples & Grains", "pack", 135, 175, 5, 2.4, "staple", 5),
-    ("STA-005", "Moong Dal 1kg", "Staples & Grains", "pack", 118, 155, 5, 1.5, "staple", 5),
-    ("STA-006", "Sunflower Oil 1L", "Staples & Grains", "pouch", 118, 150, 5, 2.8, "festive", 5),
-    ("STA-007", "Iodised Salt 1kg", "Staples & Grains", "pack", 20, 28, 0, 2.2, "staple", 5),
-    ("STA-008", "Refined Sugar 1kg", "Staples & Grains", "pack", 42, 52, 5, 3.0, "festive", 5),
-    ("STA-009", "Thick Poha 500g", "Staples & Grains", "pack", 32, 45, 5, 1.4, "flat", 5),
-    # Dairy & Eggs
-    ("DAI-001", "Toned Milk 1L", "Dairy & Eggs", "pack", 58, 68, 0, 12.0, "flat", 0),
-    ("DAI-002", "Fresh Curd 400g", "Dairy & Eggs", "cup", 32, 45, 5, 5.5, "summer", 0),
-    ("DAI-003", "Malai Paneer 200g", "Dairy & Eggs", "pack", 72, 95, 5, 4.2, "festive", 0),
-    ("DAI-004", "Salted Butter 100g", "Dairy & Eggs", "pack", 48, 62, 12, 3.4, "winter", 0),
-    ("DAI-005", "Cheese Slices 200g", "Dairy & Eggs", "pack", 105, 145, 12, 2.3, "flat", 0),
-    ("DAI-006", "Farm Eggs (12)", "Dairy & Eggs", "tray", 72, 96, 0, 5.0, "winter", 0),
-    ("DAI-007", "Greek Yogurt 100g", "Dairy & Eggs", "cup", 32, 50, 5, 2.0, "summer", 0),
-    # Fruits & Vegetables
-    ("FRV-001", "Robusta Bananas (dozen)", "Fruits & Vegetables", "dozen", 42, 60, 0, 5.5, "flat", 4),
-    ("FRV-002", "Shimla Apples 1kg", "Fruits & Vegetables", "kg", 140, 199, 0, 2.6, "winter", 4),
-    ("FRV-003", "Tomatoes 1kg", "Fruits & Vegetables", "kg", 30, 45, 0, 5.2, "flat", 4),
-    ("FRV-004", "Red Onions 1kg", "Fruits & Vegetables", "kg", 32, 45, 0, 5.0, "flat", 4),
-    ("FRV-005", "Nagpur Oranges 1kg", "Fruits & Vegetables", "kg", 70, 99, 0, 1.8, "winter", 4),
-    ("FRV-006", "Alphonso Mangoes 1kg", "Fruits & Vegetables", "kg", 320, 480, 0, 2.5, "mango", 4),
-    ("FRV-007", "Baby Spinach 200g", "Fruits & Vegetables", "pack", 30, 49, 0, 2.2, "winter", 4),
-    ("FRV-008", "Potatoes 1kg", "Fruits & Vegetables", "kg", 26, 38, 0, 4.4, "flat", 4),
-    # Beverages
-    ("BEV-001", "Packaged Drinking Water 1L", "Beverages", "bottle", 12, 20, 18, 9.0, "summer", 2),
-    ("BEV-002", "Tender Coconut Water 200ml", "Beverages", "pack", 28, 45, 12, 3.5, "summer", 2),
-    ("BEV-003", "Mango Juice 1L", "Beverages", "pack", 78, 120, 12, 2.6, "summer", 2),
-    ("BEV-004", "Cold Coffee 200ml", "Beverages", "bottle", 28, 45, 12, 2.2, "summer", 2),
-    ("BEV-005", "Lemon Iced Tea 500ml", "Beverages", "bottle", 38, 60, 12, 2.4, "summer", 2),
-    ("BEV-006", "Sparkling Water 300ml", "Beverages", "can", 42, 70, 18, 1.6, "party", 2),
-    ("BEV-007", "Cola 750ml", "Beverages", "bottle", 30, 45, 28, 3.2, "party", 2),
-    ("BEV-008", "Orange Juice 1L", "Beverages", "pack", 85, 130, 12, 1.4, "flat", 2),
-    # Tea & Coffee
-    ("TEA-001", "Assam CTC Tea 500g", "Tea & Coffee", "pack", 190, 275, 5, 1.8, "winter", 3),
-    ("TEA-002", "Darjeeling Green Tea 25 bags", "Tea & Coffee", "box", 140, 220, 5, 1.1, "flat", 3),
-    ("TEA-003", "Filter Coffee Powder 250g", "Tea & Coffee", "pack", 165, 245, 5, 1.3, "winter", 3),
-    ("TEA-004", "Instant Coffee 100g", "Tea & Coffee", "jar", 260, 380, 18, 1.0, "winter", 3),
-    ("TEA-005", "Masala Chai Premix 10 sachets", "Tea & Coffee", "box", 95, 150, 18, 1.0, "monsoon", 3),
-    # Bread & Breakfast
-    ("BRK-001", "Whole Wheat Bread 400g", "Bread & Breakfast", "loaf", 34, 50, 0, 6.5, "flat", 1),
-    ("BRK-002", "Multigrain Bread 400g", "Bread & Breakfast", "loaf", 42, 65, 0, 3.0, "weekend", 1),
-    ("BRK-003", "Rolled Oats 1kg", "Bread & Breakfast", "pack", 150, 215, 5, 1.4, "winter", 1),
-    ("BRK-004", "Corn Flakes 475g", "Bread & Breakfast", "box", 130, 195, 18, 1.6, "flat", 1),
-    ("BRK-005", "Peanut Butter 340g", "Bread & Breakfast", "jar", 140, 210, 12, 1.2, "flat", 1),
-    ("BRK-006", "Mixed Fruit Jam 500g", "Bread & Breakfast", "jar", 110, 165, 12, 1.1, "weekend", 1),
-    ("BRK-007", "Natural Honey 250g", "Bread & Breakfast", "jar", 120, 180, 5, 0.9, "winter", 1),
-    # Snacks & Biscuits
-    ("SNK-001", "Classic Salted Chips 90g", "Snacks & Biscuits", "pack", 30, 50, 12, 5.0, "party", 6),
-    ("SNK-002", "Peri Peri Nachos 150g", "Snacks & Biscuits", "pack", 58, 99, 12, 2.2, "party", 6),
-    ("SNK-003", "Bhujia Namkeen 400g", "Snacks & Biscuits", "pack", 75, 110, 12, 2.6, "festive", 6),
-    ("SNK-004", "Digestive Biscuits 250g", "Snacks & Biscuits", "pack", 38, 55, 18, 3.6, "flat", 6),
-    ("SNK-005", "Butter Cookies 300g", "Snacks & Biscuits", "box", 120, 199, 18, 1.4, "festive", 6),
-    ("SNK-006", "Dark Chocolate 70% 100g", "Snacks & Biscuits", "bar", 110, 175, 18, 2.0, "festive", 6),
-    ("SNK-007", "California Almonds 200g", "Snacks & Biscuits", "pack", 210, 299, 12, 1.6, "festive", 6),
-    ("SNK-008", "Protein Bar 60g", "Snacks & Biscuits", "bar", 55, 90, 18, 1.8, "flat", 6),
-    # Frozen Foods
-    ("FRZ-001", "Frozen Green Peas 500g", "Frozen Foods", "pack", 75, 110, 5, 1.6, "flat", 7),
-    ("FRZ-002", "Chocolate Ice Cream 500ml", "Frozen Foods", "tub", 165, 260, 18, 2.2, "summer", 7),
-    ("FRZ-003", "Frozen French Fries 750g", "Frozen Foods", "pack", 110, 170, 12, 1.5, "party", 7),
-    ("FRZ-004", "Frozen Sweet Corn 500g", "Frozen Foods", "pack", 70, 105, 5, 1.0, "monsoon", 7),
-    # Household & Personal Care
-    ("HPC-001", "Detergent Powder 1kg", "Household & Personal Care", "pack", 90, 135, 18, 2.4, "staple", 8),
-    ("HPC-002", "Dishwash Liquid 750ml", "Household & Personal Care", "bottle", 102, 155, 18, 2.0, "staple", 8),
-    ("HPC-003", "Floor Cleaner 1L", "Household & Personal Care", "bottle", 130, 199, 18, 1.4, "festive", 8),
-    ("HPC-004", "Toilet Cleaner 500ml", "Household & Personal Care", "bottle", 67, 99, 18, 1.2, "staple", 8),
-    ("HPC-005", "Bath Soap (pack of 4)", "Household & Personal Care", "pack", 112, 170, 18, 1.8, "staple", 8),
-    ("HPC-006", "Anti-dandruff Shampoo 340ml", "Household & Personal Care", "bottle", 245, 375, 18, 1.0, "flat", 8),
-    ("HPC-007", "Toothpaste 150g", "Household & Personal Care", "tube", 67, 105, 18, 2.2, "staple", 8),
-    ("HPC-008", "Hand Wash Refill 750ml", "Household & Personal Care", "pouch", 88, 140, 18, 1.2, "monsoon", 8),
-    # Festive & Gifting
-    ("GFT-001", "Premium Cashews 500g", "Festive & Gifting", "pack", 420, 599, 5, 1.1, "festive", 6),
-    ("GFT-002", "Dry Fruit Gift Box", "Festive & Gifting", "box", 780, 1199, 12, 0.3, "diwali", 6),
-    ("GFT-003", "Assorted Chocolate Gift Pack", "Festive & Gifting", "box", 330, 499, 18, 0.7, "festive", 6),
-    ("GFT-004", "Christmas Plum Cake 500g", "Festive & Gifting", "pack", 210, 350, 18, 0.25, "christmas", 1),
+# Ingredients the kitchens stock: sku, name, store category, unit, cost per unit (₹), supplier index,
+# cost profile ("" = steady inflation, "tomato" / "onion" = seasonal price spikes, "carrot" = winter crop).
+INGREDIENTS = [
+    ("ING-001", "Paneer", "Dairy", "kg", 400, 0, ""),
+    ("ING-002", "Fresh Cream", "Dairy", "L", 250, 0, ""),
+    ("ING-003", "Butter", "Dairy", "kg", 520, 0, ""),
+    ("ING-004", "Curd", "Dairy", "kg", 70, 0, ""),
+    ("ING-005", "Milk", "Dairy", "L", 58, 0, ""),
+    ("ING-006", "Ghee", "Dairy", "kg", 620, 0, ""),
+    ("ING-007", "Khoya", "Dairy", "kg", 380, 0, ""),
+    ("ING-008", "Chicken (Boneless)", "Meat & Seafood", "kg", 340, 1, ""),
+    ("ING-009", "Chicken (Curry Cut)", "Meat & Seafood", "kg", 240, 1, ""),
+    ("ING-010", "Mutton", "Meat & Seafood", "kg", 720, 1, ""),
+    ("ING-011", "Basa Fish Fillet", "Meat & Seafood", "kg", 380, 1, ""),
+    ("ING-012", "Eggs", "Meat & Seafood", "pcs", 6.5, 1, ""),
+    ("ING-013", "Onion", "Vegetables", "kg", 32, 2, "onion"),
+    ("ING-014", "Tomato", "Vegetables", "kg", 36, 2, "tomato"),
+    ("ING-015", "Potato", "Vegetables", "kg", 28, 2, ""),
+    ("ING-016", "Capsicum", "Vegetables", "kg", 70, 2, ""),
+    ("ING-017", "Ginger-Garlic Paste", "Vegetables", "kg", 120, 2, ""),
+    ("ING-018", "Coriander & Green Chilli", "Vegetables", "kg", 120, 2, ""),
+    ("ING-019", "Mixed Vegetables", "Vegetables", "kg", 90, 2, ""),
+    ("ING-020", "Carrot", "Vegetables", "kg", 45, 2, "carrot"),
+    ("ING-021", "Lemon", "Vegetables", "pcs", 4, 2, ""),
+    ("ING-022", "Basmati Rice", "Dry Store", "kg", 120, 3, ""),
+    ("ING-023", "Wheat Flour (Atta)", "Dry Store", "kg", 38, 3, ""),
+    ("ING-024", "Refined Flour (Maida)", "Dry Store", "kg", 40, 3, ""),
+    ("ING-025", "Black Urad Dal", "Dry Store", "kg", 140, 3, ""),
+    ("ING-026", "Toor Dal", "Dry Store", "kg", 135, 3, ""),
+    ("ING-027", "Kabuli Chana", "Dry Store", "kg", 110, 3, ""),
+    ("ING-028", "Cooking Oil", "Dry Store", "L", 165, 3, ""),
+    ("ING-029", "Spice Mix & Masalas", "Dry Store", "kg", 650, 3, ""),
+    ("ING-030", "Hakka Noodles", "Dry Store", "kg", 160, 3, ""),
+    ("ING-031", "Soy & Chilli Sauces", "Dry Store", "L", 140, 3, ""),
+    ("ING-032", "Sugar", "Dry Store", "kg", 44, 3, ""),
+    ("ING-033", "Alphonso Mango Pulp", "Dry Store", "kg", 160, 3, ""),
+    ("ING-034", "Tea Leaves", "Beverage Stock", "kg", 520, 5, ""),
+    ("ING-035", "Filter Coffee Powder", "Beverage Stock", "kg", 900, 5, ""),
+    ("ING-036", "Soft Drink Can 300ml", "Beverage Stock", "pcs", 28, 4, ""),
+    ("ING-037", "Mineral Water 1L", "Beverage Stock", "pcs", 14, 4, ""),
+    ("ING-038", "Vanilla Ice Cream", "Frozen", "L", 260, 6, ""),
 ]
+
+# The menu: sku, name, category, unit, price (₹, GST inclusive), popularity weight, demand profile,
+# vegetarian?, recipe {ingredient sku: quantity per portion in the ingredient's unit}.
+# Demand profiles: "" steady, "summer" (hot days), "winter", "monsoon" (rainy days), "mango" (Apr-Jun),
+# "weekend", "festive" (sweets around festivals), "date" (Valentine's / New Year desserts).
+MENU = [
+    # Soups
+    ("SUP-001", "Tomato Shorba", "Soups", "bowl", 179, 0.9, "winter", True,
+     {"ING-014": 0.15, "ING-002": 0.01, "ING-003": 0.005, "ING-029": 0.004, "ING-018": 0.012, "ING-028": 0.01}),
+    ("SUP-002", "Sweet Corn Soup", "Soups", "bowl", 189, 0.8, "winter", True,
+     {"ING-019": 0.08, "ING-031": 0.01, "ING-024": 0.01, "ING-018": 0.012, "ING-028": 0.01}),
+    ("SUP-003", "Chicken Manchow Soup", "Soups", "bowl", 219, 0.7, "winter", False,
+     {"ING-008": 0.05, "ING-019": 0.05, "ING-031": 0.015, "ING-030": 0.02, "ING-018": 0.012, "ING-028": 0.01}),
+    # Starters
+    ("STR-001", "Paneer Tikka", "Starters", "plate", 329, 2.2, "", True,
+     {"ING-001": 0.18, "ING-004": 0.05, "ING-016": 0.05, "ING-013": 0.05, "ING-029": 0.008, "ING-028": 0.01, "ING-018": 0.012}),
+    ("STR-002", "Hara Bhara Kebab", "Starters", "plate", 259, 1.0, "", True,
+     {"ING-019": 0.12, "ING-015": 0.06, "ING-029": 0.006, "ING-028": 0.02, "ING-018": 0.012}),
+    ("STR-003", "Onion & Veg Pakora", "Starters", "plate", 219, 0.9, "monsoon", True,
+     {"ING-019": 0.08, "ING-013": 0.1, "ING-015": 0.05, "ING-024": 0.05, "ING-028": 0.05, "ING-018": 0.012}),
+    ("STR-004", "Chicken Tikka", "Starters", "plate", 389, 2.4, "", False,
+     {"ING-008": 0.22, "ING-004": 0.05, "ING-029": 0.01, "ING-028": 0.01, "ING-021": 1, "ING-018": 0.012}),
+    ("STR-005", "Tandoori Chicken (Half)", "Starters", "plate", 419, 1.8, "weekend", False,
+     {"ING-009": 0.45, "ING-004": 0.06, "ING-029": 0.012, "ING-003": 0.01, "ING-021": 1, "ING-018": 0.012, "ING-028": 0.01}),
+    ("STR-006", "Chilli Paneer (Dry)", "Starters", "plate", 309, 1.4, "", True,
+     {"ING-001": 0.16, "ING-016": 0.06, "ING-013": 0.05, "ING-031": 0.02, "ING-024": 0.02, "ING-028": 0.03, "ING-018": 0.012}),
+    ("STR-007", "Fish Amritsari", "Starters", "plate", 429, 0.7, "", False,
+     {"ING-011": 0.2, "ING-024": 0.03, "ING-029": 0.008, "ING-028": 0.05, "ING-021": 1, "ING-018": 0.012}),
+    ("STR-008", "Chicken 65", "Starters", "plate", 359, 1.5, "", False,
+     {"ING-008": 0.2, "ING-004": 0.03, "ING-029": 0.01, "ING-028": 0.05, "ING-017": 0.01, "ING-018": 0.012}),
+    # Main Course
+    ("MNC-001", "Paneer Butter Masala", "Main Course", "bowl", 349, 2.6, "", True,
+     {"ING-001": 0.18, "ING-014": 0.15, "ING-003": 0.02, "ING-002": 0.03,
+      "ING-029": 0.008, "ING-017": 0.01, "ING-018": 0.012, "ING-028": 0.01}),
+    ("MNC-002", "Kadai Paneer", "Main Course", "bowl", 339, 1.3, "", True,
+     {"ING-001": 0.17, "ING-016": 0.07, "ING-013": 0.08, "ING-014": 0.1, "ING-029": 0.01, "ING-028": 0.02, "ING-018": 0.012}),
+    ("MNC-003", "Dal Makhani", "Main Course", "bowl", 289, 2.8, "", True,
+     {"ING-025": 0.09, "ING-003": 0.02, "ING-002": 0.025, "ING-014": 0.06, "ING-029": 0.006, "ING-018": 0.012, "ING-028": 0.01}),
+    ("MNC-004", "Dal Tadka", "Main Course", "bowl", 239, 1.9, "", True,
+     {"ING-026": 0.1, "ING-006": 0.01, "ING-014": 0.04, "ING-013": 0.04, "ING-029": 0.005, "ING-018": 0.012, "ING-028": 0.01}),
+    ("MNC-005", "Chole Masala", "Main Course", "bowl", 259, 1.2, "", True,
+     {"ING-027": 0.1, "ING-013": 0.07, "ING-014": 0.07, "ING-029": 0.01, "ING-028": 0.02, "ING-018": 0.012}),
+    ("MNC-006", "Mix Veg Curry", "Main Course", "bowl", 269, 1.0, "", True,
+     {"ING-019": 0.2, "ING-013": 0.06, "ING-014": 0.06, "ING-029": 0.008, "ING-028": 0.02, "ING-018": 0.012}),
+    ("MNC-007", "Butter Chicken", "Main Course", "bowl", 419, 3.0, "", False,
+     {"ING-008": 0.22, "ING-014": 0.15, "ING-003": 0.03, "ING-002": 0.04, "ING-029": 0.01, "ING-018": 0.012, "ING-028": 0.01}),
+    ("MNC-008", "Chicken Kadai", "Main Course", "bowl", 399, 1.3, "", False,
+     {"ING-009": 0.28, "ING-016": 0.06, "ING-013": 0.08, "ING-014": 0.1, "ING-029": 0.012, "ING-028": 0.02, "ING-018": 0.012}),
+    ("MNC-009", "Mutton Rogan Josh", "Main Course", "bowl", 579, 1.0, "weekend", False,
+     {"ING-010": 0.25, "ING-004": 0.05, "ING-013": 0.08, "ING-029": 0.015, "ING-006": 0.02, "ING-018": 0.012, "ING-028": 0.01}),
+    ("MNC-010", "Goan Fish Curry", "Main Course", "bowl", 449, 0.6, "", False,
+     {"ING-011": 0.22, "ING-014": 0.08, "ING-013": 0.06, "ING-029": 0.01, "ING-028": 0.02, "ING-018": 0.012}),
+    ("MNC-011", "Egg Curry", "Main Course", "bowl", 249, 0.6, "", False,
+     {"ING-012": 2, "ING-013": 0.08, "ING-014": 0.08, "ING-029": 0.008, "ING-028": 0.02, "ING-018": 0.012}),
+    # Breads
+    ("BRD-001", "Butter Naan", "Breads", "pcs", 79, 4.0, "", True, {"ING-024": 0.09, "ING-003": 0.01, "ING-004": 0.01}),
+    ("BRD-002", "Tandoori Roti", "Breads", "pcs", 45, 3.2, "", True, {"ING-023": 0.08}),
+    ("BRD-003", "Garlic Naan", "Breads", "pcs", 95, 2.2, "", True, {"ING-024": 0.09, "ING-003": 0.012, "ING-017": 0.005}),
+    ("BRD-004", "Lachha Paratha", "Breads", "pcs", 85, 1.5, "", True, {"ING-023": 0.09, "ING-006": 0.012}),
+    ("BRD-005", "Amritsari Kulcha", "Breads", "pcs", 129, 0.9, "", True,
+     {"ING-024": 0.1, "ING-015": 0.06, "ING-003": 0.01}),
+    # Rice & Biryani
+    ("RIC-001", "Jeera Rice", "Rice & Biryani", "bowl", 199, 1.8, "", True, {"ING-022": 0.12, "ING-006": 0.008, "ING-029": 0.002}),
+    ("RIC-002", "Steamed Rice", "Rice & Biryani", "bowl", 159, 1.1, "", True, {"ING-022": 0.13}),
+    ("RIC-003", "Veg Dum Biryani", "Rice & Biryani", "plate", 329, 1.6, "weekend", True,
+     {"ING-022": 0.16, "ING-019": 0.12, "ING-004": 0.04, "ING-006": 0.015,
+      "ING-029": 0.01, "ING-013": 0.05, "ING-018": 0.012, "ING-028": 0.01}),
+    ("RIC-004", "Chicken Dum Biryani", "Rice & Biryani", "plate", 399, 2.8, "weekend", False,
+     {"ING-022": 0.16, "ING-009": 0.22, "ING-004": 0.05, "ING-006": 0.02,
+      "ING-029": 0.012, "ING-013": 0.06, "ING-018": 0.012, "ING-028": 0.01}),
+    ("RIC-005", "Mutton Biryani", "Rice & Biryani", "plate", 519, 1.1, "weekend", False,
+     {"ING-022": 0.16, "ING-010": 0.2, "ING-004": 0.05, "ING-006": 0.02,
+      "ING-029": 0.014, "ING-013": 0.06, "ING-018": 0.012, "ING-028": 0.01}),
+    # Indo-Chinese
+    ("CHN-001", "Veg Hakka Noodles", "Indo-Chinese", "plate", 249, 1.6, "", True,
+     {"ING-030": 0.14, "ING-019": 0.1, "ING-031": 0.02, "ING-028": 0.02, "ING-018": 0.012}),
+    ("CHN-002", "Chicken Hakka Noodles", "Indo-Chinese", "plate", 299, 1.3, "", False,
+     {"ING-030": 0.14, "ING-008": 0.1, "ING-019": 0.06, "ING-031": 0.02, "ING-028": 0.02, "ING-018": 0.012}),
+    ("CHN-003", "Veg Fried Rice", "Indo-Chinese", "plate", 239, 1.4, "", True,
+     {"ING-022": 0.14, "ING-019": 0.1, "ING-031": 0.015, "ING-028": 0.02, "ING-018": 0.012}),
+    ("CHN-004", "Veg Manchurian (Gravy)", "Indo-Chinese", "plate", 269, 1.2, "monsoon", True,
+     {"ING-019": 0.18, "ING-024": 0.04, "ING-031": 0.025, "ING-028": 0.04, "ING-018": 0.012}),
+    ("CHN-005", "Chicken Manchurian", "Indo-Chinese", "plate", 319, 0.9, "", False,
+     {"ING-008": 0.18, "ING-024": 0.03, "ING-031": 0.025, "ING-028": 0.04, "ING-018": 0.012}),
+    # Desserts
+    ("DST-001", "Gulab Jamun (2 pcs)", "Desserts", "plate", 119, 1.6, "festive", True,
+     {"ING-007": 0.06, "ING-032": 0.06, "ING-028": 0.02}),
+    ("DST-002", "Gajar Ka Halwa", "Desserts", "bowl", 159, 0.9, "winter", True,
+     {"ING-020": 0.2, "ING-005": 0.1, "ING-032": 0.04, "ING-006": 0.015, "ING-007": 0.02}),
+    ("DST-003", "Kulfi Falooda", "Desserts", "glass", 179, 0.9, "summer", True,
+     {"ING-005": 0.2, "ING-032": 0.04, "ING-038": 0.05}),
+    ("DST-004", "Sizzling Brownie with Ice Cream", "Desserts", "plate", 249, 0.8, "date", True,
+     {"ING-024": 0.04, "ING-032": 0.04, "ING-003": 0.02, "ING-038": 0.08}),
+    ("DST-005", "Vanilla Ice Cream (2 scoops)", "Desserts", "bowl", 129, 0.8, "summer", True, {"ING-038": 0.12}),
+    # Hot Beverages
+    ("HBV-001", "Masala Chai", "Hot Beverages", "cup", 69, 1.8, "monsoon", True,
+     {"ING-005": 0.1, "ING-034": 0.004, "ING-032": 0.012, "ING-017": 0.002}),
+    ("HBV-002", "Filter Coffee", "Hot Beverages", "cup", 89, 1.2, "winter", True,
+     {"ING-005": 0.12, "ING-035": 0.008, "ING-032": 0.012}),
+    # Cold Beverages
+    ("CBV-001", "Sweet Lassi", "Cold Beverages", "glass", 119, 1.4, "summer", True, {"ING-004": 0.25, "ING-032": 0.03}),
+    ("CBV-002", "Fresh Lime Soda", "Cold Beverages", "glass", 99, 2.0, "summer", True, {"ING-021": 1, "ING-032": 0.02}),
+    ("CBV-003", "Mango Lassi", "Cold Beverages", "glass", 149, 0.9, "mango", True,
+     {"ING-004": 0.2, "ING-033": 0.1, "ING-032": 0.02}),
+    ("CBV-004", "Soft Drink (300ml)", "Cold Beverages", "can", 70, 1.8, "summer", True, {"ING-036": 1}),
+    ("CBV-005", "Mineral Water (1L)", "Cold Beverages", "bottle", 40, 2.2, "", True, {"ING-037": 1}),
+    ("CBV-006", "Cold Coffee", "Cold Beverages", "glass", 169, 1.1, "summer", True,
+     {"ING-005": 0.25, "ING-035": 0.008, "ING-032": 0.03, "ING-038": 0.04}),
+]
+
+# How a bill is built: each menu category is a course. Curries (Main Course) come with breads or a rice side.
+COURSE_OF = {"Soups": "soup", "Starters": "starter", "Main Course": "main", "Rice & Biryani": "main",
+             "Indo-Chinese": "main", "Breads": "bread", "Desserts": "dessert", "Hot Beverages": "drink",
+             "Cold Beverages": "drink"}
+RICE_SIDES = ("RIC-001", "RIC-002")  # served with curries; biryanis are a meal on their own
 
 FIRST_NAMES = [
     "Aarav", "Aditi", "Akash", "Ananya", "Arjun", "Bhavna", "Chetan", "Deepa", "Dev", "Divya", "Farhan", "Gauri",
@@ -184,21 +251,9 @@ LAST_NAMES = [
     "Menon", "Pillai", "Kapoor", "Singh", "Verma", "D'Souza", "Fernandes", "Khan", "Bhat", "Chopra", "Banerjee",
     "Das", "Hegde", "Shetty", "Agarwal", "Malhotra", "Jain", "Kamath",
 ]
+# companies that order on account (office lunches, team dinners, party orders)
 BUSINESS_NAMES = [
-    "Cafe Brewster", "The Daily Grind Cafe", "Spice Route Kitchen", "Green Bowl Salads", "Corner Bistro",
-    "Sunrise Caterers", "Little Italy Pizzeria", "Chai Sutta Point", "Bombay Brunch Co.", "Hearth & Oven Bakery",
-    "Saffron Tiffin Services", "Urban Eats Cloud Kitchen",
-]
-
-# Items that are often bought together: (anchor sku, companion sku, probability the companion is added)
-COMPANIONS = [
-    ("BRK-001", "DAI-004", 0.28), ("BRK-001", "DAI-006", 0.22), ("BRK-002", "DAI-005", 0.20),
-    ("BRK-004", "DAI-001", 0.35), ("BRK-003", "DAI-001", 0.30), ("BRK-005", "BRK-001", 0.25),
-    ("BRK-006", "BRK-001", 0.25), ("SNK-001", "BEV-007", 0.35), ("SNK-002", "BEV-007", 0.30),
-    ("SNK-002", "BEV-006", 0.18), ("FRZ-003", "BEV-007", 0.20), ("TEA-001", "DAI-001", 0.40),
-    ("TEA-001", "STA-008", 0.30), ("TEA-003", "DAI-001", 0.40), ("TEA-005", "SNK-004", 0.25),
-    ("DAI-003", "FRV-003", 0.30), ("DAI-003", "FRV-004", 0.25), ("STA-001", "STA-004", 0.30),
-    ("STA-002", "STA-005", 0.25), ("STA-003", "STA-006", 0.22), ("HPC-001", "HPC-002", 0.25),
-    ("HPC-005", "HPC-007", 0.20), ("GFT-001", "GFT-002", 0.20), ("FRV-004", "FRV-003", 0.30),
-    ("DAI-007", "FRV-001", 0.18),
+    "Infosys Campus Events", "Lotus Corporate Park Office", "Brightstar Consulting", "Northwind Software",
+    "Sunrise Event Planners", "Apex Realty", "Bluewave Media", "Greenleaf Pharma", "Orbit Fintech",
+    "Harbour Logistics", "Vertex Architects", "Crimson Advertising",
 ]

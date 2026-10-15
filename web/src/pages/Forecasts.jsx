@@ -9,7 +9,7 @@ import { Badge, Card, DataTable, Delta, Empty, ErrorState, Field, Kpi, PageHead,
 import { ForecastChart } from '../components/charts'
 import { ProductSearch, useCategories } from '../components/pickers'
 
-const SCOPES = [{ value: 'total', label: 'Total sales' }, { value: 'outlet', label: 'Outlet' }, { value: 'category', label: 'Category' }, { value: 'product', label: 'Product' }]
+const SCOPES = [{ value: 'total', label: 'Total sales' }, { value: 'outlet', label: 'Outlet' }, { value: 'category', label: 'Menu category' }, { value: 'product', label: 'Dish' }]
 const HORIZONS = [7, 14, 30].map((h) => ({ value: h, label: `${h} days` }))
 
 function toCsv(fc) {
@@ -23,7 +23,7 @@ function toCsv(fc) {
 
 export default function Forecasts() {
   const { outlets, outletId, user } = useApp()
-  const cats = useCategories()
+  const cats = useCategories('menu')
   const [params, setParams] = useSearchParams()
   const scope = params.get('scope') || 'total'
   const targetId = params.get('id') ? Number(params.get('id')) : null
@@ -65,8 +65,8 @@ export default function Forecasts() {
             </Field>
           )}
           {scope === 'product' && (
-            <Field label={productName ? `Product: ${productName}` : q.data?.series.scope === 'product' ? q.data.series.label.replace('Units - ', 'Product: ') : 'Product'}>
-              <div style={{ width: 280 }}><ProductSearch onPick={(p) => { setProductName(p.name); setTarget(p.id) }} placeholder={targetId ? 'Change product…' : 'Search a product…'} /></div>
+            <Field label={productName ? `Dish: ${productName}` : q.data?.series.scope === 'product' ? q.data.series.label.replace('Units - ', 'Dish: ') : 'Dish'}>
+              <div style={{ width: 280 }}><ProductSearch kind="menu" onPick={(p) => { setProductName(p.name); setTarget(p.id) }} placeholder={targetId ? 'Change dish…' : 'Search a dish…'} /></div>
             </Field>
           )}
           <Field label="Horizon"><Seg options={HORIZONS} value={horizon} onChange={setHorizon} label="Horizon" /></Field>
@@ -104,7 +104,7 @@ function Result({ fc, showBacktest, setShowBacktest }) {
   const s = fc.summary
   const isUnits = fc.series.target === 'units'
   const fmt = isUnits ? 'number' : 'currency'
-  const val = (v) => (isUnits ? `${num(v)} units` : money(v, { compact: true }))
+  const val = (v) => (isUnits ? `${num(v)} portions` : money(v, { compact: true }))
   const selected = fc.evaluation.find((e) => e.selected)
   const plan = fc.stock_plan
   return (
@@ -132,14 +132,24 @@ function Result({ fc, showBacktest, setShowBacktest }) {
               <div className="stack">{fc.events.map((e) => <div key={e.date} className="row between"><span><CalendarDays size={14} style={{ verticalAlign: -2 }} /> {e.name}</span><span className="small muted">{date(e.date)} · in {e.days_away} days</span></div>)}</div>
             </Card>
           )}
-          {plan && (
+          {plan && plan.stock_basis === 'portions' && (
+            <Card title="Kitchen check">
+              <div className="stack">
+                <div className="row between"><span className="muted">Portions the stock allows</span><b>{num(plan.current_stock)}</b></div>
+                <div className="row between"><span className="muted">Days of cover</span><b>{plan.days_of_cover ?? '-'}</b></div>
+                <div className="row between"><span className="muted">Runs short first</span><b>{plan.limiting_ingredient}</b></div>
+                <div className="row between"><span className="muted">Can't be made from</span><b className={plan.projected_stockout ? 'down' : ''}>{plan.projected_stockout ? date(plan.projected_stockout) : 'Not in window'}</b></div>
+                <div className="alert info"><PackageCheck /><div><b>{plan.projected_stockout ? `Order more ${plan.limiting_ingredient}${plan.reorder_by ? ` by ${date(plan.reorder_by)}` : ''}` : 'Ingredients cover the forecast'}</b><p>From today's ingredient stock in the selected kitchens.</p></div></div>
+              </div>
+            </Card>
+          )}
+          {plan && plan.stock_basis !== 'portions' && (
             <Card title="Stock plan">
               <div className="stack">
                 <div className="row between"><span className="muted">In stock</span><b>{num(plan.current_stock)} {plan.unit}</b></div>
                 <div className="row between"><span className="muted">Days of cover</span><b>{plan.days_of_cover ?? '-'}</b></div>
                 <div className="row between"><span className="muted">Projected stock-out</span><b className={plan.projected_stockout ? 'down' : ''}>{plan.projected_stockout ? date(plan.projected_stockout) : 'Not in window'}</b></div>
-                <div className="row between"><span className="muted">Safety stock</span><b>{num(plan.safety_stock)}</b></div>
-                <div className="alert info"><PackageCheck /><div><b>{plan.recommended_order_qty > 0 ? `Order ${num(plan.recommended_order_qty)} ${plan.unit}` : plan.reorder_by ? `No order needed yet - reorder by ${date(plan.reorder_by)}` : 'No order needed now'}</b><p>Covers the {plan.lead_time_days}-day lead time plus a week of demand.</p></div></div>
+                <div className="alert info"><PackageCheck /><div><b>{plan.recommended_order_qty > 0 ? `Order ${num(plan.recommended_order_qty)} ${plan.unit}` : 'No order needed now'}</b><p>Covers the {plan.lead_time_days}-day lead time plus a week of demand.</p></div></div>
               </div>
             </Card>
           )}

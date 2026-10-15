@@ -1,4 +1,6 @@
 """The analytics response cache only ever serves answers that are still true for the current data and user."""
+from conftest import stock_up
+
 from app.db import SessionLocal
 from app.models import User
 
@@ -11,7 +13,10 @@ def test_repeat_request_is_served_from_cache_and_a_sale_invalidates_it(client, a
     assert second.headers.get("x-cache") == "hit" and second.json() == first.json()
 
     orders_before = second.json()["kpis"]["current"]["orders"]
-    sale = client.post("/api/sales", headers=admin, json={"outlet_id": 1, "items": [{"product_id": 3, "quantity": 1}]})
+    dish = stock_up(client, admin, 1, "BRD-002")
+    after_stock = client.get(url, headers=admin)  # a stock change is a data change too: answer recomputed
+    assert after_stock.headers.get("x-cache") == "miss"
+    sale = client.post("/api/sales", headers=admin, json={"outlet_id": 1, "items": [{"product_id": dish, "quantity": 1}]})
     assert sale.status_code == 201
     after = client.get(url, headers=admin)
     assert after.headers.get("x-cache") == "miss"
@@ -49,7 +54,7 @@ def test_exports_and_unauthenticated_requests_are_not_cached(client, admin):
 
 def test_prepared_page_requests_are_valid_for_every_demo_role(client):
     """The Docker build stores the answers to WARM_URLS; each must be a request the app really answers."""
-    from app.seed.bake import user_warm_urls
+    from app.seed.bake import WARM_URLS_UNPINNED, user_warm_urls
     from app.seed.generator import DEMO_LOGINS, DEMO_PASSWORDS
 
     for _, email, key, _ in DEMO_LOGINS:
@@ -58,7 +63,8 @@ def test_prepared_page_requests_are_valid_for_every_demo_role(client):
         me = client.get("/api/auth/me", headers=headers).json()
         urls = user_warm_urls(me)
         if me["role"] != "admin" and len(me["outlet_ids"]) == 1:  # the web app pins single-outlet users
-            assert all(f"outlet_id={me['outlet_ids'][0]}" in u for u in urls)
+            # (the menu is the same for every restaurant, so its requests carry no outlet)
+            assert all(f"outlet_id={me['outlet_ids'][0]}" in u for u in urls if u not in WARM_URLS_UNPINNED)
         for url in urls:
             r = client.get(url, headers=headers)
             assert r.status_code == 200, (email, url, r.status_code, r.text[:200])

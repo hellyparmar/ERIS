@@ -1,7 +1,8 @@
 """Reusable analytics queries shared by the dashboard, analytics pages, forecasting and the AI assistant.
 
 All functions take an optional list of outlet ids (None = all outlets) and an inclusive date range.
-Revenue is tax-inclusive amount paid; gross profit = revenue excluding tax - cost of goods.
+Revenue is tax-inclusive amount paid; gross profit = revenue excluding tax - food cost (the recipe cost of the
+dishes sold). Ingredient use is derived from dishes sold x recipe quantities.
 """
 from __future__ import annotations
 
@@ -14,7 +15,7 @@ from sqlalchemy import Select, case, distinct, extract, func, select
 from sqlalchemy.orm import Session
 
 from app import clock
-from app.models import Category, Customer, Outlet, Product, Sale, SaleItem
+from app.models import Category, Customer, Outlet, Product, Recipe, Sale, SaleItem
 
 COMPLETED = Sale.status == "completed"
 _CACHE: dict[tuple, tuple[float, object]] = {}
@@ -123,9 +124,11 @@ def kpis(db: Session, rng: DateRange, outlet_ids: list[int] | None = None) -> di
             func.coalesce(func.sum(Sale.discount), 0),
             func.coalesce(func.sum(Sale.tax_amount), 0),
             func.count(distinct(Sale.customer_id)),
+            func.coalesce(func.sum(Sale.covers), 0),
+            func.coalesce(func.sum(case((Sale.channel == "dine_in", Sale.total), else_=0)), 0),
         ).where(*_sale_filters(rng, outlet_ids))
     ).one()
-    revenue, orders, units, discount, tax, customers = row
+    revenue, orders, units, discount, tax, customers, covers, dine_in = row
     cost = db.scalar(_item_query(rng, outlet_ids, func.coalesce(func.sum(SaleItem.cost_amount), 0))) or 0
     net = revenue - tax
     gp = net - cost
@@ -141,6 +144,9 @@ def kpis(db: Session, rng: DateRange, outlet_ids: list[int] | None = None) -> di
         "margin_pct": round(gp / net * 100, 1) if net else 0,
         "identified_customers": customers,
         "avg_daily_revenue": round(revenue / rng.days, 2),
+        "covers": int(covers),  # guests served at the table (dine-in bills)
+        "spend_per_cover": round(dine_in / covers, 2) if covers else 0,
+        "food_cost_pct": round(cost / net * 100, 1) if net else 0,
     }
 
 
@@ -165,7 +171,8 @@ def kpis_with_comparison(db: Session, rng: DateRange, outlet_ids: list[int] | No
         "current": cur,
         "previous": prev,
         "change_pct": {k: pct_change(cur[k], prev[k]) for k in
-                       ("revenue", "orders", "avg_basket", "gross_profit", "units", "identified_customers")},
+                       ("revenue", "orders", "avg_basket", "gross_profit", "units", "identified_customers", "covers",
+                        "spend_per_cover")},
     }
 
 
@@ -367,7 +374,7 @@ def abc_analysis(db: Session, rng: DateRange, outlet_ids: list[int] | None = Non
                         "share_pct": round(sum(r["revenue"] for r in items) / total * 100, 1)}
     sold_ids = {r["product_id"] for r in rows}
     unsold = db.execute(select(Product.id, Product.sku, Product.name).where(
-        Product.is_active.is_(True), Product.id.not_in(sold_ids) if sold_ids else True)).all()
+        Product.is_active.is_(True), Product.kind == "menu", Product.id.not_in(sold_ids) if sold_ids else True)).all()
     return {"products": rows, "summary": summary,
             "not_sold": [{"product_id": u.id, "sku": u.sku, "name": u.name} for u in unsold]}
 
@@ -483,14 +490,47 @@ def product_daily_units(db: Session, product_id: int, start: date, end: date,
     return s.reindex(idx, fill_value=0.0)
 
 
-def avg_daily_units_by_outlet_product(db: Session, days: int = 28, as_of: date | None = None) -> dict[tuple[int, int], float]:
+def usage_query(start: date, end: date, outlet_ids: list[int] | None = None, by_day: bool = False) -> Select:
+    """Ingredient use in a period: dishes sold x recipe quantities, as rows of (outlet, ingredient[, day], qty).
+    An item sold without a recipe (a stocked item sold as it is) uses itself."""
+    from sqlalchemy import exists, union_all
+
+    day = [SaleItem.sale_date] if by_day else []
+    base = [COMPLETED, SaleItem.sale_date >= start, SaleItem.sale_date <= end]
+    if outlet_ids:
+        base.append(SaleItem.outlet_id.in_(outlet_ids))
+    via_recipe = select(SaleItem.outlet_id, Recipe.ingredient_id.label("item_id"), *day,
+                        func.sum(SaleItem.quantity * Recipe.quantity).label("qty")).join(
+        Recipe, Recipe.menu_item_id == SaleItem.product_id).join(Sale, Sale.id == SaleItem.sale_id).where(
+        *base).group_by(SaleItem.outlet_id, Recipe.ingredient_id, *day)
+    direct = select(SaleItem.outlet_id, SaleItem.product_id.label("item_id"), *day,
+                    func.sum(SaleItem.quantity).label("qty")).join(Sale, Sale.id == SaleItem.sale_id).where(
+        *base, ~exists().where(Recipe.menu_item_id == SaleItem.product_id)).group_by(
+        SaleItem.outlet_id, SaleItem.product_id, *day)
+    return union_all(via_recipe, direct)
+
+
+def avg_daily_usage(db: Session, days: int = 28, as_of: date | None = None,
+                    outlet_ids: list[int] | None = None) -> dict[tuple[int, int], float]:
+    """Average daily use of every stocked item per (outlet, item) over the last `days` days."""
     as_of = as_of or anchor_date(db)
-    start = as_of - timedelta(days=days - 1)
-    q = select(SaleItem.outlet_id, SaleItem.product_id, func.sum(SaleItem.quantity)).join(
-        Sale, Sale.id == SaleItem.sale_id).where(COMPLETED, SaleItem.sale_date >= start,
-                                                 SaleItem.sale_date <= as_of).group_by(SaleItem.outlet_id,
-                                                                                       SaleItem.product_id)
-    return {(o, p): float(q_) / days for o, p, q_ in db.execute(q).all()}
+    rows = db.execute(usage_query(as_of - timedelta(days=days - 1), as_of, outlet_ids)).all()
+    out: dict[tuple[int, int], float] = {}
+    for o, item, qty in rows:
+        out[(o, item)] = out.get((o, item), 0.0) + float(qty or 0) / days
+    return out
+
+
+def dish_revenue_by_ingredient(db: Session, start: date, end: date,
+                               outlet_ids: list[int] | None = None) -> dict[tuple[int, int], float]:
+    """Average daily revenue of the dishes that use each ingredient, per (outlet, ingredient)."""
+    days = (end - start).days + 1
+    q = select(SaleItem.outlet_id, Recipe.ingredient_id, func.sum(SaleItem.line_total)).join(
+        Recipe, Recipe.menu_item_id == SaleItem.product_id).join(Sale, Sale.id == SaleItem.sale_id).where(
+        COMPLETED, SaleItem.sale_date >= start, SaleItem.sale_date <= end)
+    if outlet_ids:
+        q = q.where(SaleItem.outlet_id.in_(outlet_ids))
+    return {(o, i): float(v) / days for o, i, v in db.execute(q.group_by(SaleItem.outlet_id, Recipe.ingredient_id))}
 
 
 def outlet_names(db: Session) -> dict[int, str]:
@@ -545,18 +585,33 @@ def product_affinity(db: Session, rng: DateRange, outlet_ids: list[int] | None =
 
 
 def lost_sales_estimate(db: Session, outlet_ids: list[int] | None = None) -> dict:
-    """Revenue at risk per day from items that are out of stock but normally sell."""
+    """Revenue at risk per day: the dishes that cannot be made because an ingredient is out of stock."""
     from app.models import InventoryItem
 
-    demand = avg_daily_units_by_outlet_product(db, 28)
-    q = select(InventoryItem.outlet_id, InventoryItem.product_id, Product.selling_price, Product.name).join(
+    as_of = anchor_date(db)
+    start = as_of - timedelta(days=27)
+    q = select(InventoryItem.outlet_id, InventoryItem.product_id, Product.name).join(
         Product, Product.id == InventoryItem.product_id).where(InventoryItem.quantity <= 0, Product.is_active.is_(True))
     if outlet_ids:
         q = q.where(InventoryItem.outlet_id.in_(outlet_ids))
-    items, total = [], 0.0
-    for o, p, price, name in db.execute(q).all():
-        rate = demand.get((o, p), 0)
-        if rate > 0:
-            total += rate * price
+    out_of_stock = db.execute(q).all()
+    if not out_of_stock:
+        return {"revenue_at_risk_per_day": 0.0, "items": [], "dishes": []}
+    uses: dict[int, list[int]] = {}
+    for dish, ing in db.execute(select(Recipe.menu_item_id, Recipe.ingredient_id)).all():
+        uses.setdefault(ing, []).append(dish)
+    rev_q = select(SaleItem.outlet_id, SaleItem.product_id, func.sum(SaleItem.line_total)).join(
+        Sale, Sale.id == SaleItem.sale_id).where(COMPLETED, SaleItem.sale_date >= start, SaleItem.sale_date <= as_of)
+    if outlet_ids:
+        rev_q = rev_q.where(SaleItem.outlet_id.in_(outlet_ids))
+    daily = {(o, p): float(v) / 28 for o, p, v in db.execute(rev_q.group_by(SaleItem.outlet_id, SaleItem.product_id))}
+    blocked: set[tuple[int, int]] = set()
+    items = []
+    for o, item, name in out_of_stock:
+        dishes = uses.get(item, [item])  # an item without a recipe blocks only itself
+        if any(daily.get((o, d), 0) > 0 for d in dishes):
             items.append(name)
-    return {"revenue_at_risk_per_day": round(total, 2), "items": items}
+            blocked.update((o, d) for d in dishes)
+    names = dict(db.execute(select(Product.id, Product.name).where(Product.id.in_({d for _, d in blocked}))).all())
+    return {"revenue_at_risk_per_day": round(sum(daily.get(k, 0) for k in blocked), 2),
+            "items": list(dict.fromkeys(items)), "dishes": sorted({names[d] for _, d in blocked if d in names})}

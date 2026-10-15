@@ -8,7 +8,7 @@ import { date, dateTime } from '../lib/format'
 import { Badge, Card, DataTable, Drawer, Empty, Kpi, PageHead, Pager, Query, Spinner } from '../components/ui'
 import { BarsChart, ForecastChart } from '../components/charts'
 
-const SCOPE_LABELS = { total: 'Whole business', outlet: 'Outlets', category: 'Categories', product: 'Products', 'all series': 'All series' }
+const SCOPE_LABELS = { total: 'Whole business', outlet: 'Outlets', category: 'Categories', product: 'Dishes', 'all series': 'All series' }
 const fmtPct = (v) => (v === null || v === undefined ? '-' : `${Number(v).toFixed(1)}%`)
 
 export default function ModelComparison() {
@@ -48,7 +48,7 @@ function Evaluation() {
 
   return (
     <Card title="Rolling-origin evaluation"
-      subtitle="Each model is trained on data before several cut-off dates and scored on the following 28 days, for the whole business, every outlet, every category and the top products. 'ERIS auto' is the production pipeline (inner back-test, then model choice)."
+      subtitle="Each model is trained on data before several cut-off dates and scored on the following 28 days, for the whole business, every outlet, every menu category and the top dishes. 'ERIS auto' is the production pipeline (inner back-test, then model choice)."
       actions={isManager && <button className="btn primary" disabled={running || start.isPending} onClick={() => start.mutate()}><Play />{running ? 'Running…' : 'Run evaluation'}</button>}>
       <Query q={q}>{(d) => {
         const job = d.job || {}

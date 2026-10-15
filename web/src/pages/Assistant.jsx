@@ -119,7 +119,7 @@ function Provenance({ p }) {
         {f.outlets && <><dt>Outlets</dt><dd>{f.outlets}</dd></>}
         {f.periods?.length > 0 && <><dt>Periods</dt><dd>{f.periods.join('; ')}</dd></>}
         {f.category && <><dt>Category</dt><dd>{f.category}</dd></>}
-        {f.products?.length > 0 && <><dt>Products</dt><dd>{f.products.join(', ')}</dd></>}
+        {f.products?.length > 0 && <><dt>Dishes</dt><dd>{f.products.join(', ')}</dd></>}
         {f.horizon_days && <><dt>Horizon</dt><dd>{f.horizon_days} days</dd></>}
         {p.sources?.length > 0 && <><dt>Sources</dt><dd>{p.sources.join('; ')}</dd></>}
         <dt>Method</dt><dd>{p.method} · engine: {p.engine}{p.forecast_run_id ? ` · forecast run #${p.forecast_run_id}` : ''}</dd>
@@ -285,7 +285,7 @@ export default function Assistant() {
                 <span className="avatar" style={{ width: 52, height: 52, borderRadius: 16 }}><Bot style={{ width: 26, height: 26 }} /></span>
                 <div>
                   <h2 style={{ fontSize: 22, fontWeight: 600, letterSpacing: '-0.02em' }}>How can I help with the business today?</h2>
-                  <div className="small" style={{ maxWidth: 560, marginTop: 6 }}>Mention an outlet, product, category or period - for example “last month at Indiranagar”. Ask for a spreadsheet and table answers open as one.</div>
+                  <div className="small" style={{ maxWidth: 560, marginTop: 6 }}>Mention an outlet, dish, category or period - for example “last month at Indiranagar”. Ask for a spreadsheet and table answers open as one.</div>
                 </div>
                 <div className="prompt-grid">
                   {(status.data?.suggestions || []).map((x, i) => {

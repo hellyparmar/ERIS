@@ -22,9 +22,9 @@ import logging
 import time
 from datetime import timedelta
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 
-from app.db import SessionLocal, engine, migrate
+from app.db import SessionLocal, engine, migrate, write_session
 
 log = logging.getLogger("eris.bake")
 HORIZON = 30  # the longest horizon offered in the app; shorter ones are served from the same result
@@ -70,7 +70,8 @@ def prewarm_forecasts(products: int = 10) -> int:
     t0 = time.time()
     with SessionLocal() as db:
         outlets = db.scalars(select(Outlet.id).where(Outlet.is_active.is_(True)).order_by(Outlet.id)).all()
-        categories = db.scalars(select(Category.id).order_by(Category.id)).all()
+        categories = db.scalars(select(Category.id).where(Category.id.in_(
+            select(Product.category_id).where(Product.kind == "menu"))).order_by(Category.id)).all()
         best = db.scalars(select(Product.id).join(SaleItem, SaleItem.product_id == Product.id)
                           .group_by(Product.id).order_by(func.sum(SaleItem.line_total).desc()).limit(products)).all()
         specs = [F.build_spec(db, "outlet", o, None) for o in outlets]
@@ -128,7 +129,7 @@ def demo_activity() -> None:
     Everything goes through the API as the respective user (permissions and audit trail included); no sales are
     added, so the demo stays an untouched synthetic dataset.
     """
-    from app.models import AuditLog, Customer, InventoryItem, Invoice, PurchaseOrder, Sale
+    from app.models import AuditLog, Customer, InventoryItem, Invoice, Product, PurchaseOrder, Sale
 
     with SessionLocal() as db:
         if db.scalar(select(func.count(Invoice.id))) or db.scalar(select(func.count(AuditLog.id))):
@@ -143,12 +144,16 @@ def demo_activity() -> None:
         open_po = db.scalar(select(PurchaseOrder).where(PurchaseOrder.status == "ordered", PurchaseOrder.outlet_id == 1)
                             .order_by(PurchaseOrder.expected_date))
         po_line = (open_po.id, open_po.items[0].product_id, open_po.items[0].quantity) if open_po and open_po.items else None
-        count_fix = db.scalar(select(InventoryItem).where(InventoryItem.outlet_id == 1, InventoryItem.quantity >= 12)
+        kg = select(InventoryItem).join(Product, Product.id == InventoryItem.product_id).where(Product.unit == "kg")
+        count_fix = db.scalar(kg.where(InventoryItem.outlet_id == 1, InventoryItem.quantity >= 3)
                               .order_by(InventoryItem.product_id))
         count_fix = (count_fix.product_id, count_fix.quantity) if count_fix else None
-        transfer = db.scalar(select(InventoryItem).where(InventoryItem.outlet_id == 3, InventoryItem.quantity >= 40)
+        spoiled = db.scalar(select(InventoryItem).join(Product, Product.id == InventoryItem.product_id).where(
+            InventoryItem.outlet_id == 1, Product.sku == "ING-002", InventoryItem.quantity >= 1))  # fresh cream
+        spoiled = spoiled.product_id if spoiled else None
+        transfer = db.scalar(kg.where(InventoryItem.outlet_id == 3, InventoryItem.quantity >= 8)
                              .order_by(InventoryItem.quantity.desc()))
-        transfer = transfer.product_id if transfer else None
+        transfer = (transfer.product_id, round(min(transfer.quantity * 0.25, 5.0), 1)) if transfer else None
 
     done = []
     with _client() as c:
@@ -163,16 +168,22 @@ def demo_activity() -> None:
             if c.post(f"/api/purchase-orders/{po_id}/receive", headers=manager,
                       json={"items": [{"product_id": product_id, "quantity": arrived}]}).status_code == 200:
                 done.append("delivery")
-        if count_fix:  # a shelf count finds two units fewer than the system thought
+        if count_fix:  # the closing stock count finds half a kilo less than the system expected
             product_id, qty = count_fix
             if c.post("/api/inventory/adjust", headers=manager, json={
-                    "outlet_id": 1, "product_id": product_id, "mode": "set", "quantity": qty - 2,
-                    "reason": "adjustment", "note": "Weekly shelf count"}).status_code == 200:
+                    "outlet_id": 1, "product_id": product_id, "mode": "set", "quantity": round(qty - 0.5, 2),
+                    "reason": "adjustment", "note": "Closing stock count"}).status_code == 200:
                 done.append("count")
+        if spoiled:  # a litre of cream went off in a fridge fault
+            if c.post("/api/inventory/adjust", headers=manager, json={
+                    "outlet_id": 1, "product_id": spoiled, "mode": "remove", "quantity": 1,
+                    "reason": "wastage", "note": "Spoiled - walk-in fridge fault"}).status_code == 200:
+                done.append("wastage")
         area = _login(c, "arjun.ind@eris.demo")
-        if transfer:  # the area manager moves surplus stock from Indiranagar to Whitefield
+        if transfer:  # the area manager sends surplus stock from Indiranagar's kitchen to Whitefield's
+            product_id, qty = transfer
             if c.post("/api/inventory/transfer", headers=area, json={
-                    "from_outlet_id": 3, "to_outlet_id": 5, "product_id": transfer, "quantity": 12,
+                    "from_outlet_id": 3, "to_outlet_id": 5, "product_id": product_id, "quantity": qty,
                     "note": "Rebalance for the weekend"}).status_code == 200:
                 done.append("transfer")
     _say(f"demo activity: {len(done)} operations ({', '.join(sorted(set(done)))})")
@@ -191,6 +202,16 @@ WARM_URLS = [
     "/api/forecast/outlets?horizon=30",
     "/api/inventory/reorder-suggestions",
     "/api/reports/sales-daily?period=30d&limit=100",
+    # the list pages' first view: bills, kitchen stock and its movement history
+    "/api/sales?page=1&page_size=25",
+    "/api/inventory?page=1&page_size=30",
+    "/api/inventory/movements?page=1&page_size=30",
+]
+# requests the web app never pins to an outlet (the menu is the same for every restaurant)
+WARM_URLS_UNPINNED = [
+    "/api/products?active=true&kind=menu&page=1&page_size=30&sort=revenue",
+    "/api/products?active=true&kind=ingredient&page=1&page_size=30&sort=name",
+    "/api/products?kind=menu&page_size=8&sort=revenue",  # the dish picker on a new bill, before typing
 ]
 
 
@@ -199,8 +220,8 @@ def user_warm_urls(me: dict) -> list[str]:
     requests carry outlet_id."""
     ids = me.get("outlet_ids") or []
     if me.get("role") == "admin" or len(ids) != 1:
-        return list(WARM_URLS)
-    return [f"{u}{'&' if '?' in u else '?'}outlet_id={ids[0]}" for u in WARM_URLS]
+        return WARM_URLS + WARM_URLS_UNPINNED
+    return [f"{u}{'&' if '?' in u else '?'}outlet_id={ids[0]}" for u in WARM_URLS] + WARM_URLS_UNPINNED
 
 
 def warm_cache() -> None:
@@ -215,6 +236,28 @@ def warm_cache() -> None:
                 r = c.get(url, headers=headers)
                 stored += r.status_code == 200 and r.headers.get("x-cache") == "miss"
     _say(f"stored {stored} page answers for {len(DEMO_LOGINS)} demo users in {time.time() - t0:.0f}s")
+
+
+def warm_assistant() -> None:
+    """Store every demo user's answers to the suggested questions, so the first click is instant. The questions
+    asked here are removed from their chat history again."""
+    from app.models import ChatMessage
+    from app.seed.generator import DEMO_LOGINS
+    from app.services.assistant.engine import SUGGESTED_QUESTIONS
+
+    t0 = time.time()
+    with SessionLocal() as db:
+        before = db.scalar(select(func.max(ChatMessage.id))) or 0
+    with _client() as c:
+        for _, email, _, _ in DEMO_LOGINS:
+            headers = _login(c, email)
+            for q in SUGGESTED_QUESTIONS:
+                c.post("/api/assistant/chat", json={"message": q}, headers=headers)
+    with write_session() as db:
+        db.execute(delete(ChatMessage).where(ChatMessage.id > before))
+        db.commit()
+    _say(f"stored assistant answers for {len(SUGGESTED_QUESTIONS)} questions x {len(DEMO_LOGINS)} users "
+         f"in {time.time() - t0:.0f}s")
 
 
 def compact() -> None:
@@ -245,6 +288,7 @@ def main() -> None:
     if not a.no_evaluation:
         store_evaluation()
     warm_cache()
+    warm_assistant()
     compact()
     _say(f"demo database ready in {time.time() - t0:.0f}s")
 

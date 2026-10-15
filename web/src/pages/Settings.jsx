@@ -252,7 +252,7 @@ function SystemTab() {
               <button className="btn" disabled={regen.isPending || d.seeding?.running} onClick={() => window.confirm('This deletes ALL data and users and regenerates the demo. Continue?') && regen.mutate()}><RefreshCw />Regenerate demo</button>
             </div>
             <div className="row between">
-              <div><b>Start fresh with your own data</b><p className="small text-2">Deletes sales, stock levels, purchase orders and customers. Keeps outlets, products, suppliers and users - then import your data.</p></div>
+              <div><b>Start fresh with your own data</b><p className="small text-2">Deletes sales, stock levels, purchase orders and customers. Keeps outlets, the menu, ingredients, suppliers and users - then import your data.</p></div>
               <button className="btn danger" disabled={clear.isPending} onClick={() => window.confirm('Delete all sales, stock, purchase orders and customers? This cannot be undone.') && clear.mutate()}><Trash2 />Clear transactions</button>
             </div>
           </div>

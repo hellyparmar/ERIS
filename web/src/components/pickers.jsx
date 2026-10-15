@@ -1,37 +1,43 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Search } from 'lucide-react'
 import { api } from '../lib/api'
 import { useApp } from '../lib/app'
-import { money, num } from '../lib/format'
+import { money } from '../lib/format'
 import { useDebounced } from './ui'
 
-/** Typeahead product search; calls onPick(product). */
-export function ProductSearch({ onPick, placeholder = 'Search product name or SKU…', autoFocus = false }) {
+/** Typeahead search over the menu (kind="menu", most-ordered first) or the ingredients (kind="ingredient");
+ * calls onPick(item). */
+export function ProductSearch({ onPick, kind = 'menu', placeholder, autoFocus = false }) {
   const [text, setText] = useState('')
   const [open, setOpen] = useState(false)
+  const closing = useRef(null) // a pending close after blur, cancelled if the field is used again
+  const show = () => { clearTimeout(closing.current); setOpen(true) }
   const q = useDebounced(text, 200)
+  const dish = kind === 'menu'
   const res = useQuery({
-    queryKey: ['product-search', q],
-    queryFn: () => api('/products', { params: { search: q, page_size: 8, sort: 'revenue' } }),
+    queryKey: ['product-search', kind, q],
+    queryFn: () => api('/products', { params: dish ? { search: q, kind, page_size: 8, sort: 'revenue' }
+      : { search: q, kind, page_size: 8, fields: 'basic' } }),
     enabled: open,
     staleTime: 30_000,
   })
+  const label = dish ? 'Search dishes' : 'Search ingredients'
   return (
     <div style={{ position: 'relative' }}>
       <div className="search">
         <Search />
-        <input className="input" style={{ width: '100%' }} value={text} placeholder={placeholder} autoFocus={autoFocus}
-          onChange={(e) => { setText(e.target.value); setOpen(true) }} onFocus={() => setOpen(true)}
-          onBlur={() => setTimeout(() => setOpen(false), 150)} aria-label="Search products" />
+        <input className="input" style={{ width: '100%' }} value={text} placeholder={placeholder || `${label} by name or code…`} autoFocus={autoFocus}
+          onChange={(e) => { setText(e.target.value); show() }} onFocus={show}
+          onBlur={() => { closing.current = setTimeout(() => setOpen(false), 150) }} aria-label={label} />
       </div>
       {open && res.data?.items?.length > 0 && (
         <div className="card" style={{ position: 'absolute', left: 0, right: 0, top: 38, zIndex: 10, padding: 4, maxHeight: 300, overflowY: 'auto' }}>
           {res.data.items.map((p) => (
             <button type="button" key={p.id} className="btn ghost" style={{ width: '100%', justifyContent: 'space-between', height: 'auto', padding: '7px 8px' }}
               onMouseDown={(e) => { e.preventDefault(); onPick(p); setText(''); setOpen(false) }}>
-              <span style={{ textAlign: 'left' }}><b>{p.name}</b><br /><span className="small muted">{p.sku} · {p.category} · stock {num(p.stock)}</span></span>
-              <span className="tabular">{money(p.selling_price)}</span>
+              <span style={{ textAlign: 'left' }}><b>{p.name}</b><br /><span className="small muted">{p.sku} · {p.category}{dish ? '' : ` · per ${p.unit}`}</span></span>
+              <span className="tabular">{money(dish ? p.selling_price : p.cost_price)}</span>
             </button>
           ))}
         </div>
@@ -53,8 +59,9 @@ export function OutletSelect({ value, onChange, allowAll = false, required = fal
   )
 }
 
-export function useCategories() {
-  return useQuery({ queryKey: ['categories'], queryFn: () => api('/categories'), staleTime: 300_000 })
+/** Categories; kind="menu" or "ingredient" keeps the ones holding that kind of item. */
+export function useCategories(kind) {
+  return useQuery({ queryKey: ['categories', kind || 'all'], queryFn: () => api('/categories', { params: { kind } }), staleTime: 300_000 })
 }
 
 export function useSuppliers() {

@@ -1,4 +1,4 @@
-"""CSV import for sales, products, customers, suppliers and stock levels.
+"""CSV import for sales, the menu & ingredients (with recipes), customers, suppliers and stock levels.
 
 Flow: inspect (headers, suggested column mapping, sample rows) -> dry run (full validation, per-row errors,
 preview, nothing written) -> commit (all-or-nothing per file). Every run is recorded as an ImportJob with its
@@ -22,7 +22,19 @@ from fastapi import HTTPException
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
-from app.models import PAYMENT_METHODS, Category, Customer, ImportJob, Outlet, Product, Sale, Supplier, User
+from app.models import (
+    PAYMENT_METHODS,
+    Category,
+    Customer,
+    ImportJob,
+    InventoryItem,
+    Outlet,
+    Product,
+    Recipe,
+    Sale,
+    Supplier,
+    User,
+)
 from app.services.audit import audit
 from app.services.inventory import set_stock
 from app.services.sales import LineInput, SaleInput, create_sale, normalize_phone
@@ -35,24 +47,31 @@ IMPORT_LOCK_KEY = 0x45524953  # "ERIS": PostgreSQL advisory lock that runs impor
 TEMPLATES: dict[str, dict] = {
     "sales": {
         "columns": ["invoice_no", "date", "time", "outlet_code", "sku", "quantity", "unit_price", "discount",
-                    "payment_method", "channel", "customer_phone", "customer_name"],
+                    "payment_method", "channel", "covers", "customer_phone", "customer_name"],
         "required": ["date", "outlet_code", "sku", "quantity"],
         "example": [
-            ["INV-1001", "2026-09-30", "10:15", "MUM-AND", "DAI-001", "2", "", "", "upi", "in_store", "9876543210", "Asha Verma"],
-            ["INV-1001", "2026-09-30", "10:15", "MUM-AND", "BRK-001", "1", "", "", "upi", "in_store", "9876543210", "Asha Verma"],
-            ["INV-1002", "2026-09-30", "11:40", "MUM-AND", "BEV-001", "6", "18", "5", "cash", "in_store", "", ""],
+            ["INV-1001", "2026-09-30", "20:15", "MUM-AND", "MNC-007", "1", "", "", "upi", "dine_in", "2", "9876543210", "Asha Verma"],
+            ["INV-1001", "2026-09-30", "20:15", "MUM-AND", "BRD-001", "3", "", "", "upi", "dine_in", "2", "9876543210", "Asha Verma"],
+            ["INV-1002", "2026-09-30", "21:40", "MUM-AND", "RIC-004", "2", "", "40", "card", "delivery", "", "", ""],
         ],
-        "help": "One row per product line. Rows sharing an invoice_no become one bill. outlet_code and sku must "
-                "already exist (outlet name and product name also work). unit_price defaults to the product's "
-                "selling price; discount is a rupee amount for the line. Dates: YYYY-MM-DD or DD-MM-YYYY.",
+        "help": "One row per dish on a bill. Rows sharing an invoice_no become one bill. outlet_code and sku must "
+                "already exist (outlet name and dish name also work). unit_price defaults to the menu price; "
+                "discount is a rupee amount for the line. channel: dine_in, takeaway or delivery (Swiggy / Zomato "
+                "count as delivery); covers = guests at the table. Dates: YYYY-MM-DD or DD-MM-YYYY.",
     },
     "products": {
-        "columns": ["sku", "name", "category", "unit", "cost_price", "selling_price", "tax_rate", "reorder_level",
-                    "supplier"],
-        "required": ["sku", "name", "category", "cost_price", "selling_price"],
-        "example": [["BEV-101", "Ginger Ale 300ml", "Beverages", "can", "35", "60", "18", "12", "Coastal Beverages Distributors"]],
-        "help": "Existing SKUs are updated, new SKUs are created. New categories are created automatically; "
-                "supplier must match an existing supplier name (or be left empty).",
+        "columns": ["kind", "sku", "name", "category", "unit", "cost_price", "selling_price", "tax_rate",
+                    "reorder_level", "supplier", "recipe"],
+        "required": ["sku", "name", "category"],
+        "example": [
+            ["ingredient", "ING-101", "Baby Corn", "Vegetables", "kg", "140", "", "", "3", "AgroFresh Farms", ""],
+            ["menu", "STR-101", "Crispy Baby Corn", "Starters", "plate", "", "279", "5", "", "",
+             "ING-101=0.15; ING-024=0.04; ING-028=0.05"],
+        ],
+        "help": "kind is menu (a dish or drink you sell) or ingredient (something you stock and buy). Existing SKUs "
+                "are updated, new SKUs are created; new categories are created automatically. A dish needs a "
+                "selling_price; its recipe lists ingredient_sku=quantity per portion (separated by ;) and sets its "
+                "food cost. An ingredient needs a cost_price and may name its supplier.",
     },
     "customers": {
         "columns": ["name", "phone", "email", "city", "customer_type"],
@@ -69,8 +88,9 @@ TEMPLATES: dict[str, dict] = {
     "inventory": {
         "columns": ["outlet_code", "sku", "quantity", "reorder_level"],
         "required": ["outlet_code", "sku", "quantity"],
-        "example": [["MUM-AND", "DAI-001", "120", "40"]],
-        "help": "Sets the counted stock level (stock-take). A stock movement is recorded for the difference.",
+        "example": [["MUM-AND", "ING-001", "6.5", "3"]],
+        "help": "Sets the counted stock of an ingredient (closing stock-take). A stock movement is recorded for "
+                "the difference.",
     },
 }
 
@@ -94,13 +114,15 @@ ALIASES: dict[str, set[str]] = {
     "date": {"sale_date", "bill_date", "invoice_date", "order_date", "transaction_date"},
     "time": {"sale_time", "bill_time"},
     "outlet_code": {"outlet", "outlet_name", "store", "store_code", "branch", "location"},
-    "sku": {"product", "product_name", "item", "item_code", "product_code", "barcode"},
+    "sku": {"product", "product_name", "item", "item_name", "item_code", "product_code", "dish", "menu_item"},
     "quantity": {"qty", "units", "quantity_sold"},
     "unit_price": {"price", "rate", "mrp", "selling_price"},
     "discount": {"discount_amount", "disc"},
     "payment_method": {"payment", "payment_mode", "mode", "tender"},
     "customer_phone": {"phone", "mobile", "customer_mobile", "contact"},
-    "customer_name": {"customer"},
+    "customer_name": {"customer", "guest", "guest_name"},
+    "channel": {"order_type", "order_source", "service_type", "source"},
+    "covers": {"guests", "pax", "persons", "people"},
     "cost_price": {"cost", "purchase_price"},
     "tax_rate": {"gst", "gst_rate", "tax"},
     "reorder_level": {"reorder", "min_stock"},
@@ -271,7 +293,7 @@ class _Lookup:
             raise ValueError("sku is required")
         p = self.products.get(raw.lower())
         if not p:
-            raise ValueError(f"unknown product '{raw}' - add it under Products first")
+            raise ValueError(f"unknown item '{raw}' - add it to the menu (or ingredients) first")
         return p
 
 
@@ -366,7 +388,9 @@ def sample_csv(db: Session, kind: str, with_errors: bool = False) -> str:
     if kind not in TEMPLATES:
         raise HTTPException(404, "Unknown import type")
     outlets = db.scalars(select(Outlet).where(Outlet.is_active.is_(True)).order_by(Outlet.id).limit(3)).all()
-    products = db.scalars(select(Product).where(Product.is_active.is_(True)).order_by(Product.id).limit(8)).all()
+    kind_of = "ingredient" if kind == "inventory" else "menu"
+    products = db.scalars(select(Product).where(Product.is_active.is_(True), Product.kind == kind_of)
+                          .order_by(Product.id).limit(8)).all()
     if not outlets or not products:
         return template_csv(kind)
     day = clock.today() - timedelta(days=1)
@@ -380,31 +404,31 @@ def sample_csv(db: Session, kind: str, with_errors: bool = False) -> str:
             for k in range(1 + b % 3):
                 p = products[(b + k) % len(products)]
                 w.writerow([f"SAMPLE-{stamp}-{b + 1}", day.isoformat(), f"{10 + b}:{15 + k:02d}", o.code, p.sku,
-                            1 + (b + k) % 3, "", "", ("upi", "cash", "card")[b % 3], "in_store",
+                            1 + (b + k) % 3, "", "", ("upi", "cash", "card")[b % 3], "dine_in", 2 + b % 3,
                             f"98{b:02d}00{stamp}"[:10] if b % 2 == 0 else "", f"Sample Customer {b + 1}" if b % 2 == 0 else ""])
         if with_errors:
             o, p = outlets[0], products[0]
             w.writerow([f"SAMPLE-{stamp}-E1", day.isoformat(), "12:00", o.code, "NO-SUCH-SKU", 1, "", "", "cash",
-                        "in_store", "", ""])
+                        "dine_in", "2", "", ""])
             w.writerow([f"SAMPLE-{stamp}-E2", day.isoformat(), "12:05", o.code, p.sku, -2, "", "", "cash",
-                        "in_store", "", ""])
+                        "dine_in", "2", "", ""])
             w.writerow([f"SAMPLE-{stamp}-E3", "31-31-2025", "12:10", o.code, p.sku, 1, "", "", "cash",
-                        "in_store", "", ""])
+                        "dine_in", "2", "", ""])
             w.writerow([f"SAMPLE-{stamp}-E4", day.isoformat(), "12:15", "XXX-000", p.sku, 1, "", "", "cheque",
-                        "in_store", "", ""])
+                        "dine_in", "2", "", ""])
             w.writerow([f"SAMPLE-{stamp}-E5", day.isoformat(), "12:20", o.code, p.sku, 1, "", "", "upi",
-                        "in_store", "12345", ""])
+                        "dine_in", "2", "12345", ""])
     elif kind == "inventory":
         for o in outlets:
             for p in products[:4]:
-                w.writerow([o.code, p.sku, 50, ""])
+                w.writerow([o.code, p.sku, 5 if p.unit in ("kg", "L") else 40, ""])
         if with_errors:
             w.writerow([outlets[0].code, "NO-SUCH-SKU", 10, ""])
             w.writerow([outlets[0].code, products[0].sku, "ten", ""])
     else:
         w.writerows(TEMPLATES[kind]["example"])
         if with_errors:
-            bad = {"products": ["", "Nameless SKU", "Snacks", "pcs", "10", "8", "5", "", ""],
+            bad = {"products": ["menu", "", "Nameless Dish", "Starters", "plate", "", "199", "5", "", "", ""],
                    "customers": ["No Phone", "12", "", "", "retail"],
                    "suppliers": ["Bad Lead Time", "", "", "", "", "soon", ""]}[kind]
             w.writerow(bad)
@@ -417,6 +441,13 @@ def _err(result: dict, row_no: int, msg: str) -> None:
 
 def _warn(result: dict, row_no: int, msg: str) -> None:
     result["warnings"].append({"row": row_no, "severity": "warning", "message": msg})
+
+
+CHANNEL_ALIASES = {
+    "store": "dine_in", "instore": "dine_in", "in_store": "dine_in", "dine": "dine_in", "dinein": "dine_in",
+    "table": "dine_in", "take_away": "takeaway", "pickup": "takeaway", "pick_up": "takeaway", "parcel": "takeaway",
+    "online": "delivery", "swiggy": "delivery", "zomato": "delivery", "home_delivery": "delivery",
+}
 
 
 # ------------------------------------------------------------------------------------------ sales
@@ -444,8 +475,13 @@ def _import_sales(db: Session, rows: list[dict], user: User, result: dict, opts:
             pm = {"gpay": "upi", "phonepe": "upi", "paytm": "upi", "debit_card": "card", "credit_card": "card"}.get(pm, pm)
             if pm not in PAYMENT_METHODS:
                 raise ValueError(f"payment_method '{pm}' must be one of {', '.join(PAYMENT_METHODS)}")
-            channel = (row.get("channel") or "in_store").lower().replace(" ", "_").replace("-", "_")
-            channel = {"store": "in_store", "instore": "in_store", "online": "delivery"}.get(channel, channel)
+            channel = (row.get("channel") or "dine_in").lower().replace(" ", "_").replace("-", "_")
+            channel = CHANNEL_ALIASES.get(channel, channel)
+            if channel not in ("dine_in", "takeaway", "delivery"):
+                raise ValueError(f"channel '{row.get('channel')}' must be dine_in, takeaway or delivery")
+            covers = _num(row.get("covers", ""), "covers", allow_empty=True)
+            if covers is not None and (covers < 1 or covers != int(covers)):
+                raise ValueError("covers must be a whole number of guests")
             phone = normalize_phone(row.get("customer_phone"))
             if row.get("customer_phone") and (not phone or len(phone) != 10):
                 raise ValueError(f"customer_phone '{row.get('customer_phone')}' is not a valid phone number")
@@ -454,7 +490,8 @@ def _import_sales(db: Session, rows: list[dict], user: User, result: dict, opts:
             continue
         key = row.get("invoice_no") or f"__row{i}"
         bill = bills.setdefault(key, {"row": i, "outlet": outlet, "when": datetime.combine(d, t), "payment": pm,
-                                      "channel": channel, "phone": phone, "name": row.get("customer_name"),
+                                      "channel": channel, "covers": int(covers) if covers else None,
+                                      "phone": phone, "name": row.get("customer_name"),
                                       "lines": [], "invoice_no": row.get("invoice_no") or None})
         if bill["outlet"].id != outlet.id:
             _err(result, i, f"invoice {key} has rows for different outlets")
@@ -482,7 +519,8 @@ def _import_sales(db: Session, rows: list[dict], user: User, result: dict, opts:
             with db.begin_nested():
                 sale = create_sale(db, SaleInput(
                     outlet_id=bill["outlet"].id, lines=bill["lines"], sold_at=bill["when"],
-                    payment_method=bill["payment"], channel=bill["channel"], customer_phone=bill["phone"],
+                    payment_method=bill["payment"], channel=bill["channel"], covers=bill["covers"],
+                    customer_phone=bill["phone"],
                     customer_name=bill["name"], invoice_no=bill["invoice_no"]), user, source="import",
                     update_stock=opts["update_stock"], commit=False)
                 sale.import_id = opts["import_id"]
@@ -497,12 +535,38 @@ def _import_sales(db: Session, rows: list[dict], user: User, result: dict, opts:
 
 
 # ------------------------------------------------------------------------------------------ master data
+def _parse_recipe(text_: str, known: dict[str, Product]) -> list[tuple[Product, float]]:
+    lines = []
+    for part in re.split(r"[;|]", text_ or ""):
+        part = part.strip()
+        if not part:
+            continue
+        if "=" not in part:
+            raise ValueError(f"recipe part '{part}' should look like ING-001=0.15")
+        sku, qty = (x.strip() for x in part.split("=", 1))
+        ing = known.get(sku.lower())
+        if ing is None or ing.kind != "ingredient":
+            raise ValueError(f"recipe ingredient '{sku}' is not a known ingredient SKU")
+        q = _num(qty, f"recipe quantity for {sku}")
+        if q <= 0:
+            raise ValueError(f"recipe quantity for {sku} must be greater than zero")
+        lines.append((ing, q))
+    return lines
+
+
 def _import_products(db: Session, rows: list[dict], user: User, result: dict, _opts: dict) -> None:
+    """Menu items and ingredients. Ingredients are handled first, so a file can add an ingredient and the dish
+    that uses it together."""
     lk = _Lookup(db)
     cats = {c.name.lower(): c for c in db.scalars(select(Category)).all()}
     seen = set()
-    for i, row in enumerate(rows, start=2):
+    numbered = sorted(enumerate(rows, start=2), key=lambda r: (r[1].get("kind", "menu").lower() != "ingredient", r[0]))
+    for i, row in numbered:
         try:
+            kind = (row.get("kind") or "menu").strip().lower()
+            kind = {"dish": "menu", "menu_item": "menu", "item": "menu", "raw_material": "ingredient"}.get(kind, kind)
+            if kind not in ("menu", "ingredient"):
+                raise ValueError("kind must be menu or ingredient")
             sku = row.get("sku", "").upper()
             if not sku:
                 raise ValueError("sku is required")
@@ -512,10 +576,21 @@ def _import_products(db: Session, rows: list[dict], user: User, result: dict, _o
             name = row.get("name", "")
             if not name:
                 raise ValueError("name is required")
-            cost = _num(row.get("cost_price", ""), "cost_price")
-            price = _num(row.get("selling_price", ""), "selling_price")
-            if price < cost:
-                raise ValueError("selling_price is below cost_price")
+            existing = lk.products.get(sku.lower())
+            if existing and existing.kind != kind:
+                raise ValueError(f"{sku} is already a {existing.kind} item - kind cannot change")
+            cost = _num(row.get("cost_price", ""), "cost_price", allow_empty=kind == "menu")
+            price = _num(row.get("selling_price", ""), "selling_price", allow_empty=kind == "ingredient") or 0.0
+            recipe = _parse_recipe(row.get("recipe", ""), lk.products) if kind == "menu" else []
+            if kind == "ingredient" and row.get("recipe"):
+                raise ValueError("only menu items have a recipe")
+            if kind == "menu":
+                if price <= 0:
+                    raise ValueError("a menu item needs a selling_price")
+                if recipe:
+                    cost = round(sum(ing.cost_price * q for ing, q in recipe), 2)
+                elif cost is not None and price < cost:
+                    raise ValueError("selling_price is below cost_price")
             tax = _num(row.get("tax_rate", ""), "tax_rate", allow_empty=True)
             if tax is not None and tax > 40:
                 raise ValueError("tax_rate looks wrong (should be a percentage like 5 or 18)")
@@ -537,26 +612,40 @@ def _import_products(db: Session, rows: list[dict], user: User, result: dict, _o
             db.add(cat)
             db.flush()
             cats[cat_name.lower()] = cat
-        p = lk.products.get(sku.lower())
-        fields = {"name": name, "category_id": cat.id, "cost_price": cost, "selling_price": price}
+        fields = {"name": name, "category_id": cat.id, "selling_price": price}
+        if cost is not None:
+            fields["cost_price"] = cost
         if row.get("unit"):
             fields["unit"] = row["unit"]
         if tax is not None:
             fields["tax_rate"] = tax
+        elif kind == "ingredient":
+            fields["tax_rate"] = 0.0
         if reorder is not None:
             fields["reorder_level"] = reorder
         if supplier:
             fields["supplier_id"] = supplier.id
+        p = existing
         if p:
             for k, v in fields.items():
                 setattr(p, k, v)
             result["updated"] += 1
         else:
-            p = Product(sku=sku, **fields)
+            p = Product(sku=sku, kind=kind, **{"cost_price": 0.0, **fields})
             db.add(p)
+            db.flush()
+            lk.products[sku.lower()] = p
+            if kind == "ingredient":
+                for o in db.scalars(select(Outlet)).all():  # every kitchen gets a stock line
+                    db.add(InventoryItem(outlet_id=o.id, product_id=p.id, quantity=0,
+                                         reorder_level=p.reorder_level or 0))
             result["created"] += 1
+        if recipe:
+            p.recipe = [Recipe(ingredient_id=ing.id, quantity=q) for ing, q in recipe]
         if len(result["preview"]) < 10:
-            result["preview"].append({"sku": sku, "name": name, "category": cat_name, "selling_price": price})
+            result["preview"].append({"kind": kind, "sku": sku, "name": name, "category": cat_name,
+                                      "selling_price": price, "cost_price": fields.get("cost_price"),
+                                      "recipe_lines": len(recipe)})
 
 
 def _import_customers(db: Session, rows: list[dict], user: User, result: dict, _opts: dict) -> None:
@@ -631,6 +720,8 @@ def _import_inventory(db: Session, rows: list[dict], user: User, result: dict, _
             if user.role != "admin" and outlet.id not in user.outlet_ids:
                 raise ValueError("you can only update stock for your own outlets")
             product = lk.product(row)
+            if product.kind != "ingredient":
+                raise ValueError(f"{product.name} is a dish - stock is counted for ingredients")
             qty = _num(row.get("quantity", ""), "quantity")
             reorder = _num(row.get("reorder_level", ""), "reorder_level", allow_empty=True)
             if (outlet.id, product.id) in seen:
