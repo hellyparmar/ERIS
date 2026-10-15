@@ -14,12 +14,24 @@ from app.db import write_session
 from app.models import ChatMessage, DatasetInfo, Organization, Outlet, Sale, User
 from app.security import scoped_outlet_ids
 from app.services import analytics as A
+from app.services import response_cache
 from app.services.assistant import knowledge, llm
 from app.services.assistant.insight_tools import DISPATCH
 from app.services.assistant.nlu import EntityIndex, Parsed, parse, parse_horizon, parse_periods
 from app.services.assistant.tools import HELP_TEXT, Ctx, Fmt, result
 
 log = logging.getLogger(__name__)
+# answers worked out only from the question's meaning, the data and the asker: stored for reuse (see response_cache).
+# The rest read the wording itself (documentation, small talk, requests to act) or are not analytics.
+UNCACHED_INTENTS = {"help", "knowledge", "general", "smalltalk", "action_request", "clarify"}
+# the questions the web app offers as one-click suggestions (also stored ahead of time in the demo build)
+SUGGESTED_QUESTIONS = [
+    "Which outlet had the highest revenue last month?", "Show the five fastest-growing products",
+    "Why was Outlet 3 revenue lower this week?", "Which items may go out of stock in the next 14 days?",
+    "Compare weekend sales between outlets", "What forecast model performed best for beverages?",
+    "Summarize the major anomalies this month", "How is business this week?",
+    "Why did revenue change this week?", "What should I reorder?",
+]
 FOLLOWUP = re.compile(r"^\s*(what about|how about|and|same for|now|also|for|in|at|what of|ok and|okay and)\b", re.I)
 
 
@@ -219,6 +231,19 @@ def answer(db: Session, user: User, message: str) -> dict:
     org = db.scalar(select(Organization))
     ctx = None
     t0 = time.perf_counter()
+    cache_key = None
+    if parsed.intent in DISPATCH and parsed.intent not in UNCACHED_INTENTS and not parsed.unknown_outlets:
+        cache_key = response_cache.assistant_key(user.id, ref, parsed.to_context())
+        try:
+            hit = response_cache.get_answer(db, cache_key)
+        except Exception:  # a cache problem must never stop an answer
+            log.warning("assistant cache unavailable", exc_info=True)
+            hit = None
+        if hit:
+            hit["provenance"]["query_ms"] = round((time.perf_counter() - t0) * 1000)
+            hit["provenance"]["cached"] = True
+            _save_chat(user, message, hit)
+            return hit
     if parsed.intent == "general" and message and knowledge.best_match(db, message):
         parsed.intent = "knowledge"  # a documentation question the patterns did not recognise
     if parsed.unknown_outlets and parsed.intent not in ("knowledge", "help", "smalltalk", "action_request", "general"):
@@ -273,10 +298,16 @@ def answer(db: Session, user: User, message: str) -> dict:
         "data_as_of": anchor.isoformat(),
         "provenance": provenance,
     }
+    if cache_key and parsed.intent in DISPATCH and out.get("blocks") is not None and "went wrong" not in out["answer"]:
+        response_cache.store_answer(db, cache_key, response)
+    _save_chat(user, message, response)
+    return response
+
+
+def _save_chat(user: User, message: str, response: dict) -> None:
     with write_session() as wdb:  # short write transaction: the answer itself only reads
         wdb.add(ChatMessage(user_id=user.id, role="user", content=message))
-        wdb.add(ChatMessage(user_id=user.id, role="assistant", content=out["answer"],
+        wdb.add(ChatMessage(user_id=user.id, role="assistant", content=response["answer"],
                             payload={k: response[k] for k in ("blocks", "suggestions", "intent", "engine", "context",
                                                               "provenance")}))
         wdb.commit()
-    return response

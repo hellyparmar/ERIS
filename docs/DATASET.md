@@ -94,6 +94,10 @@ When the API starts on a demo database whose data has gone stale (for example, t
 later), it shifts every date forward so the history ends yesterday. This applies only when the database
 contains nothing but synthetic data. Real or imported data is never moved.
 
+The move rewrites every dated row, which takes minutes on a very small server and replaces the answers stored in the
+build. The hosted demo therefore sets `DEMO_SHIFT_DATES=false`: it keeps the dates it was built with, answers
+relative to the last day of data, and each deploy refreshes the data.
+
 ## Limitations
 
 - The demand model is hand-built from plausible retail patterns and public climate normals. It is not fitted

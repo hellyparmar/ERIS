@@ -94,6 +94,28 @@ def _lookup(key: str, user_id: int) -> tuple[str | None, str | None]:
         return version, (row.body if row is not None and row.version == version else None)
 
 
+def assistant_key(user_id: int, ref, context: dict) -> str:
+    """Key of an assistant answer: who asked, which day 'today' means, and what was understood (not the wording)."""
+    payload = json.dumps({"u": user_id, "ref": str(ref), "c": context}, sort_keys=True, default=str)
+    return "assistant|" + hashlib.sha256(payload.encode()).hexdigest()
+
+
+def get_answer(db, key: str) -> dict | None:
+    from app.models import ResponseCache
+
+    row = db.get(ResponseCache, key)
+    if row is None or row.version != data_version(db):
+        return None
+    try:
+        return json.loads(row.body)
+    except ValueError:
+        return None
+
+
+def store_answer(db, key: str, response: dict) -> None:
+    _store(key, data_version(db), json.dumps(response, default=str))
+
+
 def _store(key: str, version: str, body: str) -> None:
     from app.db import write_session
     from app.models import ResponseCache

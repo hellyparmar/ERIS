@@ -217,6 +217,7 @@ Every setting has a default; see [`api/.env.example`](api/.env.example).
 | `JWT_SECRET_KEY` | development value | **Change this for any shared deployment** (the app warns at startup) |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` / `REFRESH_TOKEN_EXPIRE_DAYS` | 60 / 14 | Session lifetime |
 | `SEED_DEMO_DATA`, `SEED_DAYS`, `SEED_OUTLETS`, `SEED_RANDOM_STATE`, `SEED_END_DATE` | true, 730, 5, 42, yesterday | Demo data generation (at least 90 days, 1-7 outlets) |
+| `DEMO_SHIFT_DATES` | true | Move an old, untouched demo forward to yesterday on start (off on the hosted demo: it is slow on a tiny CPU) |
 | `INITIAL_ADMIN_EMAIL`, `INITIAL_ADMIN_PASSWORD` | not set | With `SEED_DEMO_DATA=false`: the first admin created on an empty database |
 | `LLM_ENABLED`, `OLLAMA_URL`, `OLLAMA_MODEL` | true, `http://localhost:11434`, `llama3.2:3b` | Optional local LLM |
 

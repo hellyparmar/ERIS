@@ -22,9 +22,9 @@ import logging
 import time
 from datetime import timedelta
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 
-from app.db import SessionLocal, engine, migrate
+from app.db import SessionLocal, engine, migrate, write_session
 
 log = logging.getLogger("eris.bake")
 HORIZON = 30  # the longest horizon offered in the app; shorter ones are served from the same result
@@ -217,6 +217,28 @@ def warm_cache() -> None:
     _say(f"stored {stored} page answers for {len(DEMO_LOGINS)} demo users in {time.time() - t0:.0f}s")
 
 
+def warm_assistant() -> None:
+    """Store every demo user's answers to the suggested questions, so the first click is instant. The questions
+    asked here are removed from their chat history again."""
+    from app.models import ChatMessage
+    from app.seed.generator import DEMO_LOGINS
+    from app.services.assistant.engine import SUGGESTED_QUESTIONS
+
+    t0 = time.time()
+    with SessionLocal() as db:
+        before = db.scalar(select(func.max(ChatMessage.id))) or 0
+    with _client() as c:
+        for _, email, _, _ in DEMO_LOGINS:
+            headers = _login(c, email)
+            for q in SUGGESTED_QUESTIONS:
+                c.post("/api/assistant/chat", json={"message": q}, headers=headers)
+    with write_session() as db:
+        db.execute(delete(ChatMessage).where(ChatMessage.id > before))
+        db.commit()
+    _say(f"stored assistant answers for {len(SUGGESTED_QUESTIONS)} questions x {len(DEMO_LOGINS)} users "
+         f"in {time.time() - t0:.0f}s")
+
+
 def compact() -> None:
     if engine.dialect.name != "sqlite":
         return
@@ -245,6 +267,7 @@ def main() -> None:
     if not a.no_evaluation:
         store_evaluation()
     warm_cache()
+    warm_assistant()
     compact()
     _say(f"demo database ready in {time.time() - t0:.0f}s")
 

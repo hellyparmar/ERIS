@@ -251,6 +251,47 @@ def test_assistant_answers_core_questions(client, admin):
     assert len(history) >= 2
 
 
+def test_assistant_reuses_an_answer_until_the_data_changes(client, admin):
+    """The same question (however worded) is answered from storage, and a new sale makes it recompute."""
+    ask = lambda q: client.post("/api/assistant/chat", headers=admin, json={"message": q}).json()  # noqa: E731
+    first = ask("Top 3 products this week")
+    assert first["provenance"].get("cached") is not True
+    second = ask("top 3 products this week?")  # different wording, same meaning
+    assert second["provenance"]["cached"] is True
+    assert second["answer"] == first["answer"] and second["blocks"] == first["blocks"]
+    assert any(m["role"] == "assistant" for m in client.get("/api/assistant/history", headers=admin).json())
+    client.post("/api/inventory/adjust", headers=admin,
+                json={"outlet_id": 1, "product_id": 14, "mode": "set", "quantity": 50})
+    r = client.post("/api/sales", headers=admin, json={"outlet_id": 1, "payment_method": "cash",
+                                                        "items": [{"product_id": 14, "quantity": 1}]})
+    assert r.status_code == 201, r.text
+    assert ask("Top 3 products this week")["provenance"].get("cached") is not True
+    # documentation and small talk read the wording itself: never reused
+    assert ask("hello")["provenance"].get("cached") is not True
+
+
+def test_demo_dates_are_only_shifted_when_enabled(client, monkeypatch):
+    """DEMO_SHIFT_DATES=false (the hosted demo) leaves the baked data, and its stored answers, as they are."""
+    from app import main
+
+    started = []
+
+    class FakeThread:
+        def __init__(self, target=None, **_):
+            started.append(target)
+
+        def start(self):
+            pass
+
+    monkeypatch.setattr(main.threading, "Thread", FakeThread)
+    monkeypatch.setattr(main.settings, "DEMO_SHIFT_DATES", False)
+    main._bootstrap()
+    assert started == []
+    monkeypatch.setattr(main.settings, "DEMO_SHIFT_DATES", True)
+    main._bootstrap()
+    assert started == [main._refresh_demo_dates]
+
+
 def test_assistant_uses_llm_when_rules_are_unsure(client, admin, monkeypatch):
     """With a local LLM available, low-confidence questions are routed through it (mocked here)."""
     from app.services.assistant import llm

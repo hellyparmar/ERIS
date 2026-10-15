@@ -151,7 +151,11 @@ Set `SEED_DEMO_DATA=false` with `INITIAL_ADMIN_EMAIL` and `INITIAL_ADMIN_PASSWOR
 empty organisation and its admin. Alternatively run `python -m app.manage create-admin --email ... --name ...
 --password ... --org ...`. Then add outlets, products and suppliers in Settings, or import CSVs. The demo
 generator needs at least 90 days of history; a demo created with `SEED_END_DATE` keeps its dates, while the
-default demo moves forward to yesterday on each start.
+default demo moves forward to yesterday on each start (unless `DEMO_SHIFT_DATES=false`, as on the hosted demo).
+
+The assistant stores each analytics answer by what the question *meant* (intent, period, outlets, products), the
+asker and the data version, so a repeated or reworded question is served from the database. The suggested
+questions are stored for every demo user when the image is built.
 
 ## Roles and access control
 

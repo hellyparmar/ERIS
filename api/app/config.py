@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     SEED_OUTLETS: int = 5  # 1-7 outlets in the demo company
     SEED_RANDOM_STATE: int = 42
     SEED_END_DATE: str | None = None  # YYYY-MM-DD; default = yesterday (business time zone)
+    # Move an old, untouched demo forward to yesterday at start-up. It rewrites every dated row, which takes
+    # minutes (and drops the pre-computed answers) on a small hosted server: render.yaml turns it off there.
+    DEMO_SHIFT_DATES: bool = True
     # Start without demo data: the first admin is created from these on an empty database
     INITIAL_ADMIN_EMAIL: str | None = None
     INITIAL_ADMIN_PASSWORD: str | None = None
