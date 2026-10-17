@@ -38,7 +38,8 @@ const resolve = (color, c) => {
 }
 
 export function fmtAxis(format) {
-  if (format === 'currency') return (v) => money(v, { compact: true })
+  // axis ticks drop trailing zeros (₹26 L, ₹19.5 L) so they fit the axis without wrapping
+  if (format === 'currency') return (v) => money(v, { compact: true }).replace(/\.0+(?=\D*$)|(\.\d*?)0+(?=\D*$)/, '$1')
   if (format === 'percent' || format === 'percent_plain') return (v) => `${v}%`
   return (v) => (Math.abs(v) >= 1000 ? `${(v / 1000).toFixed(v >= 10000 ? 0 : 1)}k` : num(v))
 }

@@ -97,8 +97,14 @@ await p.waitForTimeout(800)
 await shot(p, 'reports')
 
 await p.goto(BASE + '/analytics')
-await p.waitForTimeout(4000)
+await p.waitForSelector('text=When do guests come in?', { timeout: 60_000 })
+await p.waitForTimeout(3000)
 await shot(p, 'analytics')
+
+await p.goto(BASE + '/sales')
+await p.waitForSelector('main table tbody tr', { timeout: 60_000 })
+await p.waitForTimeout(1000)
+await shot(p, 'sales')
 
 await p.goto(BASE + '/products')
 await p.waitForSelector('main table tbody tr', { timeout: 60_000 })

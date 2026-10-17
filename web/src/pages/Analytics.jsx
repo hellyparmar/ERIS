@@ -62,7 +62,7 @@ function SalesTab({ period }) {
           <TrendChart data={d.series} gran={d.granularity} series={[{ key: 'revenue', label: 'Revenue' }, { key: 'profit', label: 'Gross profit' }]} height={300} />
         </Card>
         <div className="grid grid-3">
-          <Card title="When do customers shop?" subtitle="Average revenue by weekday and hour" className="span-2">
+          <Card title="When do guests come in?" subtitle="Average revenue by weekday and hour" className="span-2">
             <Heatmap cells={d.heatmap.cells} />
           </Card>
           <div className="stack" style={{ gap: 16 }}>
