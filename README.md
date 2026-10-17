@@ -44,6 +44,8 @@ Every number traces back to the data.
 | ![Anomalies](docs/images/anomalies.png) | ![Import](docs/images/import.png) |
 | **Demo GST invoice** | **Reports & export** |
 | ![Invoice](docs/images/invoice.png) | ![Reports](docs/images/reports.png) |
+| **Sales: dine-in, takeaway and delivery bills** | **Analytics: sales patterns, dishes, outlets, guests** |
+| ![Sales](docs/images/sales.png) | ![Analytics](docs/images/analytics.png) |
 
 <img src="docs/images/mobile-dark.png" alt="Mobile, dark mode" width="260">
 
