@@ -71,6 +71,8 @@ Values are deliberately not written here. Commits and file types are enough to f
 - **2026-10-24 (owner report):** Render `DEMO_SHIFT_DATES=false` added and redeployed (owner report; not verified from this environment, which could not reach the hosted API).
 - **2026-10-24 (owner screenshot):** the Supabase project shown is a different project from the exposed one. Its address starts with `bsunxz`, it is in Mumbai, and it is still starting up. The exposed project (reference starting `rmqawn`) was **not** in that view. **Pending:** find `rmqawn` in the project list and delete, pause, or rotate it.
 
+- **2026-10-24 (history check):** the project reference `rmqawn` appears only in commits from the earlier product (`b86cc36`, `18e7012`, `1c513fb`, February–June 2026). No commit of the rebuilt ERIS (from 2026-10-01) adds or removes it, and the current tree does not contain it. The project is therefore not used by the current code. Whether anything else outside this repository uses it can only be checked in Supabase (the project's logs and any connected apps).
+
 ## What was done in the repository
 
 - Confirmed the current tree is clean (above).
