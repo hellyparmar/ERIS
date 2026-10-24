@@ -52,8 +52,13 @@ Values are deliberately not written here. Commits and file types are enough to f
 1. **Rotate the database password** of the hosted project behind commit `18e7012`, or delete the project if nothing uses it. Check the project's activity logs for any access from unknown sources.
 2. **Rotate the Supabase keys** from commit `b86cc36` if that project is still used. Otherwise delete it.
 3. **Check Render.** In the `eris` service, confirm `JWT_SECRET_KEY` is the generated value and not the development default. Confirm `DEMO_SHIFT_DATES=false` (see `11`, O4).
-4. **Turn on secret scanning and push protection** in the repository settings, so a secret cannot be pushed again.
+4. **Turn on secret scanning and push protection** in the repository settings, so a secret cannot be pushed again. *(Verified 2026-10-24 through the GitHub API: secret scanning enabled, push protection enabled. Still unknown: whether any alerts are open. The alerts endpoint is blocked through this environment's proxy, so the owner should check the Security tab.)*
 5. **Decide on history removal.** Rewriting history (for example with `git filter-repo`, followed by a force-push of every branch) removes the values from the repository, but not from forks, caches or copies already taken. It also breaks the shared branch history. Do it only after rotation, and only with the owner's explicit approval. Rotation is the fix that matters; a rewrite on its own does not make a leaked password safe.
+
+## Progress log
+
+- **2026-10-24:** Repo settings checked through the GitHub API: secret scanning and push protection are enabled.
+- **2026-10-24:** Browser-based checks of GitHub, Render and Supabase were requested. The browser tools were not available in this session, so they were not done. Render's `JWT_SECRET_KEY` and `DEMO_SHIFT_DATES`, and the Supabase project's status and keys, are still unverified.
 
 ## What was done in the repository
 

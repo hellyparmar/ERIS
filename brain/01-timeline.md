@@ -103,6 +103,7 @@ Three eras are visible in the history:
 - **Screenshots:** regenerated on the scratch demo so the sidebar shows the new name.
 - **Credentials:** full scan of the tree and all history. Current tree clean. Two real exposures in history (commits `18e7012` and `b86cc36`), recorded in `12-security-incident.md`. Rotation is open and needs the owner.
 - **Brain:** new file 12; open item S1 added.
+- **2026-10-24 (later):** GitHub settings confirmed through the API: secret scanning and push protection enabled. Browser checks of Render and Supabase were not possible in this session, so S1 stays open for those.
 
 ### Brain and repository rules
 
