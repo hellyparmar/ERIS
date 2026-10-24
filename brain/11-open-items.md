@@ -4,19 +4,16 @@ Things that are known, unresolved, or waiting on the owner. Each has a reason an
 
 ## Waiting on the owner
 
-### O1. Commit attribution lines
-- **Issue:** Earlier commits carry a `Co-Authored-By` line that names an AI model. A separate instruction in this
-  session says model identifiers must not appear in commit messages, PR text or any repo artifact. The two conflict.
-- **Status:** Not resolved. Nothing in this `brain` folder names a model, and nothing has been committed yet.
-- **Next step:** The owner decides: keep the model-named trailer, drop it, or use a neutral trailer. Then apply it to future commits.
+### O1. Commit attribution lines (decided)
+- **Decision (D19):** Future commits use the neutral trailer `Co-Authored-By: Claude <noreply@anthropic.com>` and the `Claude-Session:` line. No model names in commits, PR text or repo files. Earlier commits keep their existing trailers; history is not rewritten.
+- **Status:** Applied from commit `9118970` onward and written into `CLAUDE.md`.
+- **Open:** The owner may still choose a different trailer; if so, change `CLAUDE.md` and D19 together.
 
-### O2. Standing rule in every session
-- **Issue:** The "every change goes in the brain" rule is recorded in `brain/README.md`. A future session will only follow it if it reads that file.
-- **Next step:** The owner decides whether to also add a pointer in a `CLAUDE.md` at the repository root, so every session sees it first.
+### O2. Standing rule in every session (resolved)
+- **Decision:** A `CLAUDE.md` at the repository root points to `brain/README.md` and states the rule, so each session reads it first.
 
-### O3. Commit the brain folder
-- **Issue:** `brain/` exists in the working tree only. It is not committed.
-- **Next step:** Confirm the content, then commit it on `claude/loving-wright-326xam` and open a PR (only when asked).
+### O3. Commit the brain folder (resolved)
+- **Done:** Committed and pushed to `claude/loving-wright-326xam` as `9118970`. No pull request opened.
 
 ### O4. Set `DEMO_SHIFT_DATES=false` on the hosted API
 - **Issue:** `render.yaml` sets it, but if the Render service was not created from the blueprint, the variable must be set by hand. Without it, the hosted assistant is slow again (D10, 06).

@@ -109,3 +109,12 @@ Each decision gives: **what** was chosen, **why**, **alternatives**, **consequen
 - **What:** `FORECAST_EVALUATION.md`, `ASSISTANT_EVALUATION.md`, screenshots and the dataset figures are produced by scripts and committed with the change that made them.
 - **Why:** Hand-typed numbers drift from the code. Generated ones can be checked.
 - **Source:** recorded (commits 8be81c2, 884fec9).
+
+---
+
+## D19. Commit trailers name no model
+- **What:** Commits end with `Co-Authored-By: Claude <noreply@anthropic.com>` and `Claude-Session: <session URL>`. No model name appears in commit messages, PR text or repository files.
+- **Why:** A session rule forbids model names in repository artifacts. Earlier commits named a model in their trailer, which conflicted with that rule.
+- **Alternatives:** Keep the model trailer (conflicts with the rule). Rewrite earlier history (rejected: it would break the shared branch and the merged PRs).
+- **Consequence:** Earlier commits keep their trailers. Only new commits follow this convention. `CLAUDE.md` states it.
+- **Source:** recorded (`CLAUDE.md`, commit `9118970`).

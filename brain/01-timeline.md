@@ -96,7 +96,10 @@ Three eras are visible in the history:
 
 #13, #22, #23, #24, #25, #27, #28, #29, #30, #31, #32 (see `git log --merges` for the full list).
 
+### Brain and repository rules
+
+- **2026-10-24:** `brain/` committed as `9118970`. Trailer convention decided (D19). `CLAUDE.md` added at the repository root to point future sessions to `brain/README.md`.
+
 ### Work outside commits
 
-- **2026-10-23/24:** this `brain` folder created. Not yet committed.
 - A model-comparison evaluation was stored in the local demo database used for screenshots. That database is not part of the repository.
