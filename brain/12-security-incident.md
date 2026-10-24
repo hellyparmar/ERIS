@@ -60,6 +60,10 @@ Values are deliberately not written here. Commits and file types are enough to f
 - **2026-10-24:** Repo settings checked through the GitHub API: secret scanning and push protection are enabled.
 - **2026-10-24:** Browser-based checks of GitHub, Render and Supabase were requested. The browser tools were not available in this session, so they were not done. Render's `JWT_SECRET_KEY` and `DEMO_SHIFT_DATES`, and the Supabase project's status and keys, are still unverified.
 
+- **2026-10-24 (Render, checked by the owner):** `JWT_SECRET_KEY` is the generated value, not the development default. Good.
+- **2026-10-24 (Render, open):** `DEMO_SHIFT_DATES` is not listed in the dashboard. The code default is `True`, so the service shifts the demo data on each start. Set it to `false` in the `eris` service's Environment tab. `render.yaml` says `false`, so the dashboard should match.
+- **2026-10-24 (Render, mismatch):** the dashboard has `SEED_DEMO_DATA=false`, but `render.yaml` has `"true"`. Harmless while the baked database has users. Either change the dashboard to match the file, or update the file, so they agree.
+
 ## What was done in the repository
 
 - Confirmed the current tree is clean (above).
