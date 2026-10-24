@@ -68,6 +68,9 @@ Values are deliberately not written here. Commits and file types are enough to f
 - **2026-10-24 (owner report):** GitHub secret scanning shows **no open alerts**. This does not make the exposed password safe. The alert may never have fired, or may have been closed, and the password is still readable in public history until it is rotated.
 - **2026-10-24:** The exposed Supabase project is the one whose reference starts with `rmqawn` (from the URL in `b86cc36:.env.supabase`). The current app has no Supabase references, so the project can be deleted or rotated without changing the app. **Pending:** the owner has not yet confirmed whether the project is in use, or whether its database password was reset or the project deleted.
 
+- **2026-10-24 (owner report):** Render `DEMO_SHIFT_DATES=false` added and redeployed (owner report; not verified from this environment, which could not reach the hosted API).
+- **2026-10-24 (owner screenshot):** the Supabase project shown is a different project from the exposed one. Its address starts with `bsunxz`, it is in Mumbai, and it is still starting up. The exposed project (reference starting `rmqawn`) was **not** in that view. **Pending:** find `rmqawn` in the project list and delete, pause, or rotate it.
+
 ## What was done in the repository
 
 - Confirmed the current tree is clean (above).
