@@ -46,6 +46,12 @@
 - **Live demo:** eris-retail.vercel.app, with the API on eris-tvro.onrender.com.
 - The free API server sleeps when idle, so the first visit can take up to a minute.
 
+## Deploy history on Render (observed 2026-10-24)
+
+- The last live deploy before this check was `788bf2b` (PR #25, UI redesign), dated 2026-10-06. Commits from 2026-10-07 onward, including the restaurant dataset and the speed fixes, had not reached the hosted API.
+- A manual deploy of `8615f2e` (merge of PR #32) was started on 2026-10-24 after the `DEMO_SHIFT_DATES=false` change. Until it shows as live, the hosted demo is still on the older code.
+- The API could not be reached from the sandbox, so the hosted demo was not checked after the deploy.
+
 ## Things to check after a deploy
 - `DEMO_SHIFT_DATES=false` is set in the Render service. If the service was not created from `render.yaml`, it must be set by hand (`11`).
 - `JWT_SECRET_KEY` is set to a real secret for any shared deployment.
