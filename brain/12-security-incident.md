@@ -75,6 +75,8 @@ Values are deliberately not written here. Commits and file types are enough to f
 
 - **2026-10-24 (owner screenshot 2):** the project shown is `bsunxz…` and reports Healthy, with no GitHub repository connected, no branches, no migrations and no backups. The repo has no reference to it, apart from the note in the brain. It is **not** the exposed project and is not part of this incident. Deleting it is the owner's call and is not required for the incident.
 
+- **2026-10-24 (owner screenshot 3):** the `bsunxz…` project's Table Editor shows no tables or views and no recent items. It holds no data. Recommendation given: delete it, since nothing uses it. This does not affect the incident, which is still open for the `rmqawn` project.
+
 ## What was done in the repository
 
 - Confirmed the current tree is clean (above).
