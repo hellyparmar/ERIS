@@ -182,7 +182,7 @@ export default function Layout() {
       <nav className={`sidebar ${open ? 'open' : ''}`} aria-label="Main">
         <div className="brand">
           <div className="brand-mark">E</div>
-          <div className="brand-text"><b>ERIS</b><small>Restaurant Intelligence</small></div>
+          <div className="brand-text"><b>ERIS</b><small>Enterprise Retail Intelligence System</small></div>
           <button className="btn ghost sm icon collapse-btn" onClick={toggle} aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>{collapsed ? <PanelLeftOpen /> : <PanelLeftClose />}</button>
         </div>

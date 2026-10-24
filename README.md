@@ -1,4 +1,4 @@
-# ERIS: Enterprise Restaurant Intelligence System
+# ERIS: Enterprise Retail Intelligence System
 
 ERIS is an open-source **intelligence and decision-support platform for a restaurant chain** running several
 outlets (five by default, up to seven). It brings together:
