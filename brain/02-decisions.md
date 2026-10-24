@@ -92,6 +92,7 @@ Each decision gives: **what** was chosen, **why**, **alternatives**, **consequen
 ## D15. Typography: serif tried, then removed
 - **What:** On 10-06 page titles were set in Fraunces (4b2ad6f). On 10-07 the serif was removed and headings returned to Geist with tighter sizes (8be81c2).
 - **Why (recorded in 8be81c2):** the decluttering pass wanted one consistent typeface. The reason for the reversal is only partly recorded.
+- **Final:** Geist is the typeface shipped. Fraunces is not in the code. Confirmed by the owner (`11`, O5).
 - **Consequence:** Do not reintroduce Fraunces without reading this entry.
 - **Source:** recorded for the change; the reason for reversing it is *reconstructed*.
 

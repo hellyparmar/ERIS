@@ -15,13 +15,13 @@ Things that are known, unresolved, or waiting on the owner. Each has a reason an
 ### O3. Commit the brain folder (resolved)
 - **Done:** Committed and pushed to `claude/loving-wright-326xam` as `9118970`. No pull request opened.
 
-### O4. Set `DEMO_SHIFT_DATES=false` on the hosted API
-- **Issue:** `render.yaml` sets it, but if the Render service was not created from the blueprint, the variable must be set by hand. Without it, the hosted assistant is slow again (D10, 06).
-- **Next step:** Check the Render environment variables.
+### O4. Set `DEMO_SHIFT_DATES=false` on the hosted API (resolved)
+- **Done:** The owner confirmed it is set on the hosted API. `render.yaml` also sets it, so a fresh blueprint deploy keeps it. Without it the hosted assistant becomes slow again (D10, 06).
+- **Keep in mind:** Re-check this after any change to the Render service, or if the service is recreated by hand.
 
-### O5. Fraunces was added and then removed
-- **Issue:** The serif title font was added (4b2ad6f) and removed (8be81c2). Reason for the reversal is only partly recorded (D15).
-- **Next step:** The owner confirms Geist is the intended final choice, or asks for the serif again.
+### O5. Fraunces was added and then removed (resolved: Geist)
+- **Decision:** Geist is the final typeface. Fraunces is no longer in the code: no import, no font package, no CSS reference. The styles define one family, Geist, with Geist Mono for figures (`web/src/styles.css`, `main.jsx`).
+- **Why this is recorded:** The screenshots, the README and the shipped app all use Geist. Reintroducing a serif would be a new decision, not a restoration.
 
 ## Discrepancies to fix
 

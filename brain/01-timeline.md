@@ -98,6 +98,7 @@ Three eras are visible in the history:
 
 ### Brain and repository rules
 
+- **2026-10-24:** Open items closed: `DEMO_SHIFT_DATES=false` confirmed on the hosted API (O4); Geist confirmed as the final typeface and Fraunces confirmed absent from the code (O5, D15).
 - **2026-10-24:** `brain/` committed as `9118970`. Trailer convention decided (D19). `CLAUDE.md` added at the repository root to point future sessions to `brain/README.md`.
 
 ### Work outside commits
