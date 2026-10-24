@@ -73,6 +73,8 @@ Values are deliberately not written here. Commits and file types are enough to f
 
 - **2026-10-24 (history check):** the project reference `rmqawn` appears only in commits from the earlier product (`b86cc36`, `18e7012`, `1c513fb`, February–June 2026). No commit of the rebuilt ERIS (from 2026-10-01) adds or removes it, and the current tree does not contain it. The project is therefore not used by the current code. Whether anything else outside this repository uses it can only be checked in Supabase (the project's logs and any connected apps).
 
+- **2026-10-24 (owner screenshot 2):** the project shown is `bsunxz…` and reports Healthy, with no GitHub repository connected, no branches, no migrations and no backups. The repo has no reference to it, apart from the note in the brain. It is **not** the exposed project and is not part of this incident. Deleting it is the owner's call and is not required for the incident.
+
 ## What was done in the repository
 
 - Confirmed the current tree is clean (above).
