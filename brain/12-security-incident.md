@@ -1,7 +1,7 @@
 # Credential exposure in repository history
 
 **Found:** 2026-10-24, by a full scan of the working tree and of every commit on every branch.
-**Status:** Open. The exposed database credential has not been rotated yet. Rotation needs the owner, because it happens in the hosting provider's dashboard.
+**Status:** Open. The exposed database credential has not been rotated yet (pending the owner's Supabase check). Rotation needs the owner, because it happens in the hosting provider's dashboard.
 **Severity:** High. The repository is public (`hellyparmar/ERIS`, checked through the GitHub API), so anything committed is readable by anyone.
 
 Values are deliberately not written here. Commits and file types are enough to find them.
@@ -63,6 +63,10 @@ Values are deliberately not written here. Commits and file types are enough to f
 - **2026-10-24 (Render, checked by the owner):** `JWT_SECRET_KEY` is the generated value, not the development default. Good.
 - **2026-10-24 (Render, open):** `DEMO_SHIFT_DATES` is not listed in the dashboard. The code default is `True`, so the service shifts the demo data on each start. Set it to `false` in the `eris` service's Environment tab. `render.yaml` says `false`, so the dashboard should match.
 - **2026-10-24 (Render, mismatch):** the dashboard has `SEED_DEMO_DATA=false`, but `render.yaml` has `"true"`. Harmless while the baked database has users. Either change the dashboard to match the file, or update the file, so they agree.
+
+- **2026-10-24 (owner report):** Render's `JWT_SECRET_KEY` is the generated value, not the development default. `DEMO_SHIFT_DATES` is **not visible** in the Render service even though `render.yaml` sets it to `false`. The app's own default is `true`, so the hosted demo will shift dates on each start until the variable is added. Action: add `DEMO_SHIFT_DATES=false` to the `eris` service and redeploy.
+- **2026-10-24 (owner report):** GitHub secret scanning shows **no open alerts**. This does not make the exposed password safe. The alert may never have fired, or may have been closed, and the password is still readable in public history until it is rotated.
+- **2026-10-24:** The exposed Supabase project is the one whose reference starts with `rmqawn` (from the URL in `b86cc36:.env.supabase`). The current app has no Supabase references, so the project can be deleted or rotated without changing the app. **Pending:** the owner has not yet confirmed whether the project is in use, or whether its database password was reset or the project deleted.
 
 ## What was done in the repository
 
