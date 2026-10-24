@@ -27,6 +27,7 @@ future contributors, and for any future work session on this repository.
 | [09-security-ci-deploy.md](09-security-ci-deploy.md) | Access control, CI hardening, Docker, hosting |
 | [10-testing.md](10-testing.md) | Test suites, what each proves, and how to run them |
 | [11-open-items.md](11-open-items.md) | Known gaps, doc discrepancies, and decisions waiting on the owner |
+| [12-security-incident.md](12-security-incident.md) | Credentials found in repository history, their severity, and the owner actions still open |
 | [TEMPLATE.md](TEMPLATE.md) | The entry format for future changes |
 
 ## Standing rule for all future work

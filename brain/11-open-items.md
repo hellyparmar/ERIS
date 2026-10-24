@@ -4,6 +4,10 @@ Things that are known, unresolved, or waiting on the owner. Each has a reason an
 
 ## Waiting on the owner
 
+### S1. Rotate the credentials exposed in public history (open, high)
+- **Issue:** A real database password (commit `18e7012`) and a Supabase project's keys (commit `b86cc36`) are in a public repository's history. Full detail and the owner actions are in `12-security-incident.md`.
+- **Next step:** The owner rotates or deletes the hosted project, checks Render's `JWT_SECRET_KEY`, and enables secret scanning. History is not to be rewritten without the owner's approval.
+
 ### O1. Commit attribution lines (decided)
 - **Decision (D19):** Future commits use the neutral trailer `Co-Authored-By: Claude <noreply@anthropic.com>` and the `Claude-Session:` line. No model names in commits, PR text or repo files. Earlier commits keep their existing trailers; history is not rewritten.
 - **Status:** Applied from commit `9118970` onward and written into `CLAUDE.md`.

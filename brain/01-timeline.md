@@ -8,7 +8,7 @@ Three eras are visible in the history:
 - **Era 0 (Feb–Mar 2026): an earlier product.** Phased POS, billing and compliance work. Removed in full on
   2026-10-01. Its history is kept, its code is not in the working tree.
 - **Era 1 (June 2026): a UI pass on that earlier product.** Superseded by the rebuild.
-- **Era 2 (2026-10-01 onward): ERIS.** The current product, a restaurant intelligence system.
+- **Era 2 (2026-10-01 onward): ERIS.** The current product, the Enterprise Retail Intelligence System, demonstrated on a restaurant chain.
 
 ---
 
@@ -95,6 +95,14 @@ Three eras are visible in the history:
 ### Pull-request merges in Era 2
 
 #13, #22, #23, #24, #25, #27, #28, #29, #30, #31, #32 (see `git log --merges` for the full list).
+
+### 2026-10-24 entry: name, verification, security review
+
+- **Name:** the product is now called **Enterprise Retail Intelligence System** everywhere it appears: the README title, the sidebar brand, the page title, and the brain. The dataset stays one restaurant chain (Saffron Table) with five outlets by default.
+- **Causal analysis and RAG:** kept. Checked in the code (`services/drivers.py`, `services/assistant/knowledge.py`, `docs/knowledge/`). Full API suite re-run: 120 passed; Ruff clean. Relevant tests: `test_revenue_drivers_add_up`, `test_how_to_questions_are_answered_from_the_docs`, `test_how_it_works_questions_use_documentation`.
+- **Screenshots:** regenerated on the scratch demo so the sidebar shows the new name.
+- **Credentials:** full scan of the tree and all history. Current tree clean. Two real exposures in history (commits `18e7012` and `b86cc36`), recorded in `12-security-incident.md`. Rotation is open and needs the owner.
+- **Brain:** new file 12; open item S1 added.
 
 ### Brain and repository rules
 
