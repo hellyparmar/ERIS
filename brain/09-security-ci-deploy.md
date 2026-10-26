@@ -52,6 +52,14 @@
 - A manual deploy of `8615f2e` (merge of PR #32) was started on 2026-10-24 after the `DEMO_SHIFT_DATES=false` change. Until it shows as live, the hosted demo is still on the older code.
 - The API could not be reached from the sandbox, so the hosted demo was not checked after the deploy.
 
+## Weekly refresh workflow (`refresh-demo.yml`) failing
+
+- The workflow runs on Sundays and calls a Render deploy hook, which rebuilds the hosted demo so its data stays current.
+- Every scheduled run since at least 2026-10-12 has failed in about 45 seconds with exit code 22. That is `curl -f` receiving an HTTP error from the deploy hook.
+- The workflow exits successfully only when the `RENDER_DEPLOY_HOOK_URL` secret is empty. Since the job fails, the secret is set but the hook URL is stale or no longer valid, for example after the Render service or its hook was recreated or regenerated.
+- The hook URL is not in the repository, in any commit, or in the workflow file. It exists only as a GitHub secret.
+- **Fix (owner):** in Render, open service `eris` → Settings → Deploy Hook and copy the current URL. In GitHub, update `RENDER_DEPLOY_HOOK_URL`. Alternatively, delete the secret, which turns the workflow into a no-op. Then run the workflow manually to confirm.
+
 ## Things to check after a deploy
 - `DEMO_SHIFT_DATES=false` is set in the Render service. If the service was not created from `render.yaml`, it must be set by hand (`11`).
 - `JWT_SECRET_KEY` is set to a real secret for any shared deployment.
