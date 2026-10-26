@@ -105,6 +105,7 @@ Three eras are visible in the history:
 - **Brain:** new file 12; open item S1 added.
 - **2026-10-24 (Render, owner check):** `JWT_SECRET_KEY` is the generated value. `DEMO_SHIFT_DATES` is missing from the dashboard (open: set it to false). `SEED_DEMO_DATA` is false in the dashboard but true in `render.yaml` (mismatch recorded in `12`).
 - **2026-10-24:** Render's last live deploy before this check was `788bf2b` (2026-10-06). A deploy of `8615f2e` (PR #32) was started by the owner after the `DEMO_SHIFT_DATES` change. Recorded in `09`.
+- **2026-10-26:** `.gitignore` extended to cover credential files, SSH and cloud CLI state folders, and Terraform state. Tested with `git check-ignore`; `api/.env.example` stays tracked. Recorded in `09`.
 - **2026-10-26:** The weekly `refresh-demo.yml` workflow has failed on every scheduled run since 2026-10-12 (exit code 22: the Render deploy hook is rejected). Cause and owner fix recorded in `09`. Not fixed from this repository, because the hook URL is a GitHub secret.
 - **2026-10-24 (later):** GitHub settings confirmed through the API: secret scanning and push protection enabled. Browser checks of Render and Supabase were not possible in this session, so S1 stays open for those.
 

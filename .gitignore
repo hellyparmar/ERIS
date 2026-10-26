@@ -157,3 +157,25 @@ Thumbs.db
 web/node_modules/
 web/dist/
 api/data/
+
+# Credentials and deployment state (never commit these)
+secrets.json
+credentials.json
+*credentials*.json
+*secret*.json
+id_rsa
+id_rsa.pub
+id_ed25519
+id_ed25519.pub
+*.p12
+*.pfx
+.npmrc
+.pypirc
+.netrc
+.pgpass
+.vercel/
+.render/
+.supabase/
+*.tfstate
+*.tfstate.backup
+*.tfvars

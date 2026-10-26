@@ -65,5 +65,12 @@
 - `JWT_SECRET_KEY` is set to a real secret for any shared deployment.
 - The demo is on the expected data version (check the Settings page dataset info).
 
+## Keeping secrets out of git
+
+- `.gitignore` ignores env files (`.env`, `.env.local`, `.env.production`), the local database (`api/data/`), private keys (`*.pem`, `*.key`, `*.p12`, `*.pfx`, SSH keys), and credential files (`credentials*.json`, `secret*.json`, `.npmrc`, `.pypirc`, `.netrc`, `.pgpass`).
+- It also ignores the local state folders of the deployment CLIs (`.vercel/`, `.render/`, `.supabase/`) and Terraform state and variables (`*.tfstate`, `*.tfvars`).
+- `api/.env.example` is the only env file tracked, and it is kept on purpose with placeholder values only (`!.env.example`).
+- Ignore rules stop new files from being added. They do not remove anything already committed. Values in history are removed only by rotation, see `12`.
+
 ## Earlier security work (Era 0, for context)
 - 2026-03-25 and 03-26: post-audit cleanup and JWT secret rotation in the earlier product (3e614eb, 6b0dbc8). That code was removed in the rebuild.
