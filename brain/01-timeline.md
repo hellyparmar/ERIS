@@ -96,6 +96,12 @@ Three eras are visible in the history:
 
 #13, #22, #23, #24, #25, #27, #28, #29, #30, #31, #32 (see `git log --merges` for the full list).
 
+### 2026-10-27: PR #33 merged; CI on main failed; start command fixed
+
+- PR #33 merged to `main` (357279e) at the owner's request. Vercel production now serves the hardened web build (CSP present).
+- CI on the merge failed in two jobs. `web`: an empty `catch` in `web/public/theme-init.js`. `docker`: the container start command left `*` unquoted in `--forwarded-allow-ips ${FORWARDED_ALLOW_IPS:-*}`; the shell expanded it into the file names of the working directory, so uvicorn received wrong arguments and the container exited. The same build on Render failed, so Render kept the previous version.
+- Fixed on the working branch: the wildcard is quoted, and the start command was tested to pass exactly the intended arguments; the empty `catch` now carries a comment. Lint and the web build pass locally. Not yet merged to `main` (a new merge deploys to production; awaiting the owner's approval).
+
 ### 2026-10-27: live check (partial)
 
 - `eris-retail.vercel.app` reachable; serves an older build from `main` (no `vercel.json` security headers, inline script present). Hardening is not in production until PR #33 is merged.
