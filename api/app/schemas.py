@@ -19,7 +19,7 @@ class ProfileIn(BaseModel):
 
 
 class RefreshIn(BaseModel):
-    refresh_token: str
+    refresh_token: str | None = None  # API clients; browsers send the HTTP-only cookie instead
 
 
 class UserIn(BaseModel):

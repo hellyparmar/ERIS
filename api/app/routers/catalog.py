@@ -10,6 +10,7 @@ from app.routers.common import csv_response, get_or_404, page_response, paginate
 from app.schemas import CategoryIn, ProductIn
 from app.security import get_current_user, require_manager, scoped_outlet_ids
 from app.services import analytics as A
+from app.services.capacity import EXPORTS
 from app.services.inventory import stock_status
 
 router = APIRouter(prefix="/api", tags=["products"])
@@ -135,13 +136,14 @@ def list_products(search: str | None = None, category_id: int | None = None, sup
 
 @router.get("/products/export")
 def export_products(_: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    rows = [[p.kind, p.sku, p.name, p.category.name, p.unit, p.cost_price, p.selling_price, p.tax_rate,
-             p.reorder_level, p.supplier.name if p.supplier else "",
-             "; ".join(f"{r.ingredient.sku}={r.quantity:g}" for r in p.recipe)]
-            for p in db.scalars(select(Product).order_by(Product.kind.desc(), Product.sku)).all()]
-    return csv_response("menu_and_ingredients.csv", ["kind", "sku", "name", "category", "unit", "cost_price",
-                                                     "selling_price", "tax_rate", "reorder_level", "supplier",
-                                                     "recipe"], rows)
+    with EXPORTS():
+        rows = [[p.kind, p.sku, p.name, p.category.name, p.unit, p.cost_price, p.selling_price, p.tax_rate,
+                 p.reorder_level, p.supplier.name if p.supplier else "",
+                 "; ".join(f"{r.ingredient.sku}={r.quantity:g}" for r in p.recipe)]
+                for p in db.scalars(select(Product).order_by(Product.kind.desc(), Product.sku)).all()]
+        return csv_response("menu_and_ingredients.csv", ["kind", "sku", "name", "category", "unit", "cost_price",
+                                                         "selling_price", "tax_rate", "reorder_level", "supplier",
+                                                         "recipe"], rows)
 
 
 def _portions(db: Session, recipe: list[Recipe], outlet_ids: list[int] | None) -> list[dict]:

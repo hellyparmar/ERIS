@@ -29,6 +29,7 @@ from app.schemas import PurchaseOrderIn, ReceiveIn, ReorderCreateIn, ReorderLeve
 from app.security import ensure_outlet_access, get_current_user, require_manager, scoped_outlet_ids
 from app.services import analytics as A
 from app.services import forecasting as F
+from app.services.capacity import EXPORTS
 from app.services.inventory import change_stock, set_stock, stock_status
 
 router = APIRouter(prefix="/api", tags=["inventory & purchasing"])
@@ -98,14 +99,15 @@ def list_inventory(outlet_id: int | None = None, category_id: int | None = None,
 
 @router.get("/inventory/export")
 def export_inventory(outlet_id: int | None = None, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    outlet_ids = scoped_outlet_ids(user, outlet_id)
-    q = select(Outlet.code, Product.sku, Product.name, InventoryItem.quantity, InventoryItem.reorder_level).join(
-        Product, Product.id == InventoryItem.product_id).join(Outlet, Outlet.id == InventoryItem.outlet_id).order_by(
-        Outlet.code, Product.sku)
-    if outlet_ids:
-        q = q.where(InventoryItem.outlet_id.in_(outlet_ids))
-    return csv_response("inventory.csv", ["outlet_code", "sku", "product", "quantity", "reorder_level"],
-                        [list(r) for r in db.execute(q).all()])
+    with EXPORTS():
+        outlet_ids = scoped_outlet_ids(user, outlet_id)
+        q = select(Outlet.code, Product.sku, Product.name, InventoryItem.quantity, InventoryItem.reorder_level).join(
+            Product, Product.id == InventoryItem.product_id).join(Outlet, Outlet.id == InventoryItem.outlet_id).order_by(
+            Outlet.code, Product.sku)
+        if outlet_ids:
+            q = q.where(InventoryItem.outlet_id.in_(outlet_ids))
+        return csv_response("inventory.csv", ["outlet_code", "sku", "product", "quantity", "reorder_level"],
+                            [list(r) for r in db.execute(q).all()])
 
 
 @router.post("/inventory/adjust")

@@ -13,6 +13,14 @@ log = logging.getLogger(__name__)
 _status: dict = {"checked": 0.0, "available": False, "model": None, "error": None}
 
 
+def _transport_allowed(url: str) -> bool:
+    """In production every connection to the model server must be encrypted (https). Plain HTTP is refused even on
+    this machine: production then has no unencrypted model traffic at all, and the assistant uses its built-in engine."""
+    from urllib.parse import urlsplit
+
+    return settings.ENVIRONMENT != "production" or urlsplit(url).scheme == "https"
+
+
 def status(force: bool = False) -> dict:
     """Is Ollama reachable and is the configured model pulled? (cached for 60 s)"""
     if not settings.LLM_ENABLED:
@@ -20,6 +28,10 @@ def status(force: bool = False) -> dict:
     if not force and time.time() - _status["checked"] < 60:
         return {**{k: v for k, v in _status.items() if k != "checked"}, "provider": "ollama"}
     _status["checked"] = time.time()
+    if not _transport_allowed(settings.OLLAMA_URL):
+        _status.update(available=False, model=None, error="plain-HTTP Ollama address refused in production: "
+                                                          "use https:// or a localhost address")
+        return {**{k: v for k, v in _status.items() if k != "checked"}, "provider": "ollama"}
     try:
         r = httpx.get(f"{settings.OLLAMA_URL}/api/tags", timeout=1.5)
         r.raise_for_status()

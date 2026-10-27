@@ -1,37 +1,43 @@
-// Thin fetch wrapper: adds the JWT, renews it with the refresh token when it expires, parses JSON and turns
-// API errors into readable messages.
-const TOKEN_KEY = 'eris-token'
+// Thin fetch wrapper: sends the browser's session cookies, renews the access cookie from the refresh cookie when it
+// expires, parses JSON and turns API errors into readable messages.
+//
+// The browser holds no token the page can read. The server keeps the access and refresh tokens in HTTP-only cookies;
+// this module only remembers whether a session exists, and a page reload checks that again through the cookies.
 // Where the API lives. Empty (default): the same server that serves this app, or the Vite dev proxy.
 // Set VITE_API_URL at build time when the web app is hosted separately (e.g. Vercel + API on Render).
 export const API_BASE = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '')
 const apiUrl = (path) => new URL(path.startsWith('/api') ? path : `/api${path}`, API_BASE || window.location.origin)
-const REFRESH_KEY = 'eris-refresh'
+// Sent with every request. A page on another site cannot add it without a CORS preflight the API refuses, which
+// protects the session cookies from forged changes.
+const CLIENT_HEADER = 'X-ERIS-Client'
 
-const read = (k) => { try { return localStorage.getItem(k) } catch { return null } }
-const write = (k, v) => { try { v ? localStorage.setItem(k, v) : localStorage.removeItem(k) } catch { /* private mode */ } }
+// Versions before this one kept tokens in localStorage. Remove them so no old token lingers.
+try { ['eris-token', 'eris-refresh'].forEach((k) => localStorage.removeItem(k)) } catch { /* private mode */ }
 
-export const getToken = () => read(TOKEN_KEY)
-export const setToken = (t) => write(TOKEN_KEY, t)
-export const setSession = (access, refresh) => { write(TOKEN_KEY, access); write(REFRESH_KEY, refresh) }
-export const clearSession = () => setSession(null, null)
+let signedIn = false
+export const isSignedIn = () => signedIn
+export const setSignedIn = (value) => { signedIn = !!value }
+export const clearSession = () => setSignedIn(false)
 
-// One refresh at a time: parallel requests that hit an expired token all wait for the same renewal.
+// One renewal at a time: parallel requests that hit an expired access cookie all wait for the same renewal.
 let refreshing = null
 async function renewSession() {
-  const refresh = read(REFRESH_KEY)
-  if (!refresh) return false
   if (!refreshing) {
     refreshing = fetch(apiUrl('/auth/refresh'), {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: refresh }),
-    }).then(async (res) => {
-      if (!res.ok) return false
-      const data = await res.json()
-      setSession(data.access_token, data.refresh_token)
-      return true
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', [CLIENT_HEADER]: 'web' },
+      body: '{}',
+    }).then((res) => {
+      setSignedIn(res.ok)
+      return res.ok
     }).catch(() => false).finally(() => { setTimeout(() => { refreshing = null }, 0) })
   }
   return refreshing
 }
+
+/** On start-up: is there a session cookie that still gives a valid session? */
+export const restoreSession = () => renewSession()
 
 export class ApiError extends Error {
   constructor(message, status, data) {
@@ -58,9 +64,7 @@ export async function api(path, { method = 'GET', body, params, raw = false, for
   Object.entries(params || {}).forEach(([k, v]) => {
     if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, v)
   })
-  const headers = {}
-  const token = getToken()
-  if (token) headers.Authorization = `Bearer ${token}`
+  const headers = { [CLIENT_HEADER]: 'web' }
   let payload
   if (form) payload = form
   else if (body !== undefined) {
@@ -69,11 +73,11 @@ export async function api(path, { method = 'GET', body, params, raw = false, for
   }
   let res
   try {
-    res = await fetch(url, { method, headers, body: payload })
+    res = await fetch(url, { method, headers, body: payload, credentials: 'include' })
   } catch {
     throw new ApiError('Cannot reach the ERIS server. Is the API running?', 0)
   }
-  if (res.status === 401 && token && !path.includes('/auth/login')) {
+  if (res.status === 401 && signedIn && !path.includes('/auth/login')) {
     if (!retried && await renewSession()) return api(path, { method, body, params, raw, form, retried: true })
     onUnauthorized()
   }

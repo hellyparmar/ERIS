@@ -2,7 +2,7 @@ import { Fragment, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Bot, Building2, Database, KeyRound, LogOut, Pencil, Plus, RefreshCw, Trash2, UserCog, Users } from 'lucide-react'
-import { api, setSession } from '../lib/api'
+import { api } from '../lib/api'
 import { useApp, useToast } from '../lib/app'
 import { date, dateTime, num } from '../lib/format'
 import { Badge, Card, DataTable, Field, Modal, PageHead, Spinner, StatusBadge, Tabs } from '../components/ui'
@@ -78,8 +78,8 @@ function ProfileTab() {
   const saveName = useMutation({ mutationFn: () => api('/auth/me', { method: 'PATCH', body: { full_name: name } }), onSuccess: () => { toast('Profile saved', 'success'); qc.invalidateQueries({ queryKey: ['me'] }) }, onError: (e) => toast(e.message, 'error') })
   const savePw = useMutation({
     mutationFn: () => api('/auth/change-password', { method: 'POST', body: { current_password: pw.current_password, new_password: pw.new_password } }),
-    onSuccess: (r) => {
-      setSession(r.access_token, r.refresh_token)  // other devices are signed out; this one stays signed in
+    onSuccess: () => {
+      // other devices are signed out; this one stays signed in (its session cookies are renewed by the server)
       toast('Password changed - other devices have been signed out', 'success')
       setPw({ current_password: '', new_password: '', confirm: '' })
     },

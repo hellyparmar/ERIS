@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { api, clearSession, getToken, setSession, setUnauthorizedHandler } from './api'
+import { api, clearSession, restoreSession, setSignedIn, setUnauthorizedHandler } from './api'
 import { setCurrencySymbol } from './format'
 
 const AppCtx = createContext(null)
@@ -15,7 +15,8 @@ function writePref(key, value) {
 
 export function AppProvider({ children }) {
   const qc = useQueryClient()
-  const [token, setTok] = useState(getToken())
+  const [session, setTok] = useState(false)  // a session exists (its tokens are HTTP-only cookies the page cannot read)
+  const [restoring, setRestoring] = useState(true)  // true until the start-up check for a session cookie is done
   const [outletId, setOutletIdState] = useState(() => {
     const v = readPref('eris-outlet', '')
     return v ? Number(v) : null
@@ -23,6 +24,7 @@ export function AppProvider({ children }) {
   const [theme, setThemeState] = useState(() => readPref('eris-theme', 'system'))
 
   const logout = useCallback(() => {
+    api('/auth/logout', { method: 'POST' }).catch(() => {})  // removes the refresh cookie for this browser
     clearSession()
     setTok(null)
     qc.clear()
@@ -30,17 +32,26 @@ export function AppProvider({ children }) {
 
   useEffect(() => setUnauthorizedHandler(logout), [logout])
 
-  const me = useQuery({ queryKey: ['me', token], queryFn: () => api('/auth/me'), enabled: !!token, retry: false, staleTime: 300_000 })
-  const org = useQuery({ queryKey: ['org'], queryFn: () => api('/settings/organization'), enabled: !!token && me.isSuccess, staleTime: 600_000 })
-  const outlets = useQuery({ queryKey: ['outlets'], queryFn: () => api('/outlets'), enabled: !!token && me.isSuccess, staleTime: 300_000 })
+  // A page reload keeps the session: the refresh cookie renews the access cookie without signing in again.
+  useEffect(() => {
+    let alive = true
+    restoreSession()
+      .then((ok) => { if (alive && ok) setTok(true) })
+      .finally(() => { if (alive) setRestoring(false) })
+    return () => { alive = false }
+  }, [])
+
+  const me = useQuery({ queryKey: ['me', session], queryFn: () => api('/auth/me'), enabled: !!session, retry: false, staleTime: 300_000 })
+  const org = useQuery({ queryKey: ['org'], queryFn: () => api('/settings/organization'), enabled: !!session && me.isSuccess, staleTime: 600_000 })
+  const outlets = useQuery({ queryKey: ['outlets'], queryFn: () => api('/outlets'), enabled: !!session && me.isSuccess, staleTime: 300_000 })
 
   useEffect(() => { if (org.data) setCurrencySymbol(org.data.currency_symbol) }, [org.data])
 
   const login = async (email, password) => {
     const res = await api('/auth/login', { method: 'POST', body: { email, password } })
-    setSession(res.access_token, res.refresh_token)
+    setSignedIn(true)
     qc.clear()
-    setTok(res.access_token)
+    setTok(true)
     return res.user
   }
 
@@ -67,13 +78,13 @@ export function AppProvider({ children }) {
   const effectiveOutlet = !user || user.role === 'admin' ? outletId
     : assigned.length === 1 ? assigned[0] : (assigned.includes(outletId) ? outletId : null)
   const value = useMemo(() => ({
-    token, user, loadingUser: !!token && me.isLoading, login, logout,
+    session, user, loadingUser: !!session && me.isLoading, restoring, login, logout,
     org: org.data, outlets: outlets.data || [], outletId: effectiveOutlet, setOutletId,
     isAdmin: user?.role === 'admin', isManager: user?.role === 'admin' || user?.role === 'manager',
     canWrite: !!user && user.role !== 'viewer', isViewer: user?.role === 'viewer',
     theme, setTheme,
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [token, user, me.isLoading, org.data, outlets.data, effectiveOutlet, theme])
+  }), [session, user, me.isLoading, restoring, org.data, outlets.data, effectiveOutlet, theme])
 
   return <AppCtx.Provider value={value}>{children}</AppCtx.Provider>
 }

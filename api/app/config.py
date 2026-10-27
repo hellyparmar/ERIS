@@ -22,6 +22,12 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_DAYS: int = 14
 
+    # Browser sessions: the refresh token travels only in an HTTP-only cookie (never readable by page scripts).
+    # SameSite=none is needed when the web app is on another site than the API (e.g. Vercel + Render); it requires Secure.
+    REFRESH_COOKIE_NAME: str = "eris_refresh"
+    REFRESH_COOKIE_SAMESITE: str = "lax"   # set "none" for a cross-site web app (render.yaml does)
+    REFRESH_COOKIE_SECURE: bool | None = None  # None: Secure in production, not in development
+
     CORS_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173"
     # optional pattern for extra web origins, e.g. Vercel previews: https://my-project-[a-z0-9-]+\.vercel\.app
     CORS_ORIGIN_REGEX: str | None = None
@@ -39,11 +45,21 @@ class Settings(BaseSettings):
     INITIAL_ADMIN_EMAIL: str | None = None
     INITIAL_ADMIN_PASSWORD: str | None = None
 
+    # Transport and abuse protection (app/hardening.py). Limits are per client address and per process.
+    RATE_LIMIT_ENABLED: bool = True
+    RATE_LIMIT_API_PER_MINUTE: int = 1200      # every /api request
+    RATE_LIMIT_LOGIN_PER_MINUTE: int = 60      # sign-in attempts per address (an office may share one address)
+    RATE_LIMIT_HEAVY_PER_MINUTE: int = 120     # forecasts, assistant questions, imports, exports
+    MAX_BODY_MB: int = 20                      # imports are capped at 15 MB; this is the request ceiling
+
     # Model fitting is the heaviest work the API does. At most this many fits run at once, so a burst of forecast
     # requests cannot take every worker thread (or the whole CPU of a small server) from the other pages; a
     # request that cannot start a fit within FORECAST_WAIT_SECONDS gets a quick "busy, try again" (HTTP 503).
     FORECAST_WORKERS: int = 1
     FORECAST_WAIT_SECONDS: float = 20.0
+    # Exports (CSV and Excel) build whole files in memory. At most EXPORT_WORKERS run at once.
+    EXPORT_WORKERS: int = 2
+    EXPORT_WAIT_SECONDS: float = 10.0
 
     # Optional local LLM (free, open source) via Ollama: https://ollama.com
     # The assistant works fully without it (built-in analytics engine);
@@ -59,6 +75,10 @@ class Settings(BaseSettings):
     @property
     def cors_origins(self) -> list[str]:
         return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
+
+    @property
+    def cookie_secure(self) -> bool:
+        return self.ENVIRONMENT == "production" if self.REFRESH_COOKIE_SECURE is None else self.REFRESH_COOKIE_SECURE
 
     @property
     def is_sqlite(self) -> bool:

@@ -35,6 +35,7 @@ export default defineConfig({
       SEED_DEMO_DATA: 'true',
       SEED_DAYS: '240',
       LLM_ENABLED: 'false',
+      RATE_LIMIT_LOGIN_PER_MINUTE: '1000', // the suite signs in many times from one address (lockout still applies)
       JWT_SECRET_KEY: 'e2e-only-secret-key-0123456789abcdef-0123456789',
     },
   },

@@ -40,8 +40,10 @@ test('bill a dine-in table, issue a demo GST invoice', async ({ page }) => {
   await expect(page.getByText('Tax summary')).toBeVisible()
   await expect(page.locator('.drawer').getByText(/DEMO - NOT FOR TAX FILING/)).toBeVisible()
   await expect(page.locator('.drawer').getByText('Intra-state - CGST + SGST')).toBeVisible()
+  const signedIn = await page.request.post('/api/auth/login', { data: { email: 'admin@eris.demo', password: 'Admin@123' } })
+  const { access_token } = await signedIn.json()
   const pdf = await page.request.get(`/api/invoices/${new URL(page.url()).searchParams.get('id')}/pdf`, {
-    headers: { Authorization: `Bearer ${await page.evaluate(() => localStorage.getItem('eris-token'))}` },
+    headers: { Authorization: `Bearer ${access_token}` },
   })
   expect(pdf.ok()).toBeTruthy()
   expect((await pdf.body()).subarray(0, 4).toString()).toBe('%PDF')

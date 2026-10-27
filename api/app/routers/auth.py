@@ -2,17 +2,18 @@ import logging
 import threading
 import time
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy import func, select
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from app import clock
+from app.config import settings
 from app.db import get_db
 from app.models import Outlet, User
 from app.routers.common import get_or_404
 from app.schemas import ChangePasswordIn, LoginIn, ProfileIn, RefreshIn, UserIn, UserUpdate
-from app.security import decode_token, get_current_user, hash_password, require_admin, token_pair, verify_password
+from app.security import ACCESS_COOKIE, decode_token, get_current_user, hash_password, require_admin, token_pair, verify_password
 from app.services.audit import audit
 
 log = logging.getLogger(__name__)
@@ -68,8 +69,41 @@ def demo_accounts(db: Session = Depends(get_db)):
     return out
 
 
+WEB_CLIENT_HEADER = "x-eris-client"
+
+
+def _is_web(request: Request) -> bool:
+    """The web app sends this custom header. A cross-site page cannot add it without a CORS preflight the API
+    refuses for other origins, so it doubles as protection against forged cookie requests (CSRF)."""
+    return request.headers.get(WEB_CLIENT_HEADER) == "web"
+
+
+def _set_refresh_cookie(response: Response, token: str) -> None:
+    response.set_cookie(settings.REFRESH_COOKIE_NAME, token, max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400,
+                        httponly=True, secure=settings.cookie_secure, samesite=settings.REFRESH_COOKIE_SAMESITE,
+                        path="/api/auth")
+
+
+def _set_access_cookie(response: Response, token: str) -> None:
+    response.set_cookie(ACCESS_COOKIE, token, max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+                        httponly=True, secure=settings.cookie_secure, samesite=settings.REFRESH_COOKIE_SAMESITE,
+                        path="/api")
+
+
+def _browser_session(pair: dict, request: Request, response: Response) -> dict:
+    """Browsers get both tokens as HTTP-only cookies and see neither in the body; API clients keep them in the body."""
+    if _is_web(request):
+        _set_refresh_cookie(response, pair.pop("refresh_token"))
+        _set_access_cookie(response, pair.pop("access_token"))
+    return pair
+
+
+def _session_response(pair: dict, user: User, request: Request, response: Response) -> dict:
+    return {**_browser_session(pair, request, response), "user": user_dict(user)}
+
+
 @router.post("/auth/login")
-def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
+def login(body: LoginIn, request: Request, response: Response, db: Session = Depends(get_db)):
     email = body.email.strip().lower()
     key = (email, request.client.host if request.client else "?")
     hits = _recent_failures(key)
@@ -91,17 +125,37 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
     except OperationalError:  # e.g. SQLite busy while demo data is being generated - not a reason to refuse sign-in
         db.rollback()
         log.warning("could not record last login for %s", user.email)
-    return {**token_pair(user), "user": user_dict(user)}
+    return _session_response(token_pair(user), user, request, response)
 
 
 @router.post("/auth/refresh")
-def refresh(body: RefreshIn, db: Session = Depends(get_db)):
-    """Exchange a refresh token for a new access + refresh token pair (rotation)."""
-    payload = decode_token(body.refresh_token, "refresh")
+def refresh(request: Request, response: Response, body: RefreshIn | None = None, db: Session = Depends(get_db)):
+    """Exchange a refresh token for a new access + refresh token pair (rotation).
+
+    The token comes from the HTTP-only cookie (browsers) or from the body (API clients)."""
+    cookie = request.cookies.get(settings.REFRESH_COOKIE_NAME)
+    if cookie and not _is_web(request):
+        raise HTTPException(403, f"Missing {WEB_CLIENT_HEADER} header")
+    token = cookie or (body.refresh_token if body else None)
+    if not token:
+        raise HTTPException(401, "Sign in again")
+    payload = decode_token(token, "refresh")
     user = db.get(User, int(payload.get("sub", 0)))
     if user is None or not user.is_active or payload.get("ver") != (user.token_version or 0):
         raise HTTPException(401, "Session is no longer valid - please sign in again")
-    return {**token_pair(user), "user": user_dict(user)}
+    return _session_response(token_pair(user), user, request, response)
+
+
+@router.post("/auth/logout")
+def logout(request: Request, response: Response):
+    """End this browser's session: both session cookies are removed. (Other devices: /auth/logout-all.)"""
+    if not _is_web(request):
+        raise HTTPException(403, f"Missing {WEB_CLIENT_HEADER} header")
+    response.delete_cookie(settings.REFRESH_COOKIE_NAME, path="/api/auth", secure=settings.cookie_secure,
+                           samesite=settings.REFRESH_COOKIE_SAMESITE, httponly=True)
+    response.delete_cookie(ACCESS_COOKIE, path="/api", secure=settings.cookie_secure,
+                           samesite=settings.REFRESH_COOKIE_SAMESITE, httponly=True)
+    return {"ok": True}
 
 
 @router.post("/auth/logout-all")
@@ -125,14 +179,15 @@ def update_me(body: ProfileIn, user: User = Depends(get_current_user), db: Sessi
 
 
 @router.post("/auth/change-password")
-def change_password(body: ChangePasswordIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def change_password(body: ChangePasswordIn, request: Request, response: Response,
+                    user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     if not verify_password(body.current_password, user.password_hash):
         raise HTTPException(400, "Current password is incorrect")
     user.password_hash = hash_password(body.new_password)
     user.token_version = (user.token_version or 0) + 1  # sign out other sessions
     audit(db, user, "user.password", "user", user.id, "Changed own password")
     db.commit()
-    return {**token_pair(user), "ok": True}
+    return {**_browser_session(token_pair(user), request, response), "ok": True}
 
 
 # ------------------------------------------------------------------------------------------ users (admin)

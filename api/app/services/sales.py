@@ -7,7 +7,7 @@ imported history never blocks).
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from fastapi import HTTPException
@@ -42,7 +42,6 @@ class SaleInput:
     bill_discount: float = 0.0  # absolute amount, spread across lines proportionally
     invoice_no: str | None = None
     notes: str | None = None
-    extra: dict = field(default_factory=dict)
 
 
 def normalize_phone(phone: str | None) -> str | None:

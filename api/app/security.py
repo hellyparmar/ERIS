@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 
 import bcrypt
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
@@ -64,16 +64,30 @@ def decode_token(token: str, expected_type: str) -> dict:
     return payload
 
 
+ACCESS_COOKIE = "eris_access"  # browsers: the access token in an HTTP-only cookie (page scripts cannot read it)
+WEB_HEADER = "x-eris-client"
+SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+
 def get_current_user(
+    request: Request,
     creds: HTTPAuthorizationCredentials | None = Depends(bearer),
     db: Session = Depends(get_db),
 ) -> User:
     unauthorized = HTTPException(
         status.HTTP_401_UNAUTHORIZED, "Not authenticated", headers={"WWW-Authenticate": "Bearer"}
     )
-    if creds is None:
-        raise unauthorized
-    payload = decode_token(creds.credentials, "access")
+    if creds is not None:
+        token = creds.credentials  # API clients: Authorization header
+    else:
+        token = request.cookies.get(ACCESS_COOKIE)  # browsers: HTTP-only cookie
+        if token is None:
+            raise unauthorized
+        # A cookie is sent by the browser on any request, including one a third-party page forged. Changing requests
+        # therefore need the custom header, which such a page cannot add without a preflight the API refuses.
+        if request.method not in SAFE_METHODS and request.headers.get(WEB_HEADER) != "web":
+            raise HTTPException(status.HTTP_403_FORBIDDEN, f"Missing {WEB_HEADER} header")
+    payload = decode_token(token, "access")
     try:
         user_id = int(payload["sub"])
     except (KeyError, ValueError):

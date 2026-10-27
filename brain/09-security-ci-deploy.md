@@ -1,0 +1,80 @@
+# Security, CI, Docker and hosting
+
+## Access control (D3, D4, D5)
+- Roles: admin, manager, viewer, staff. Staff can only bill.
+- Outlet scope on every outlet-scoped endpoint, including the assistant and reports.
+- Access tokens are short-lived. Refresh tokens rotate, and the tests `test_refresh_rotates…` and the revocation tests check it. `token_version` on the user revokes every session. (The exact replay handling for a reused refresh token was not re-read for this note.)
+- Five failed logins lock the account.
+- Dev JWT secret: the API logs a warning if the development secret is in use. Set `JWT_SECRET_KEY` for any shared deployment.
+
+## Import and input safety
+- CSV only (or TXT, TSV). Excel files and binary content rejected with guidance.
+- 15 MB and 50,000 rows maximum.
+- **CSV injection:** cells beginning with `=`, `+`, `-` or `@` are neutralised on export (ebc267a).
+- **UTF-16** files are accepted (ebc267a), so Windows exports work.
+- **NaN and huge quantities** are rejected per row (ebc267a).
+- **Dates before an outlet opened** are rejected per row (ebc267a).
+- Imports are atomic.
+
+## Concurrency (f534063, e258523)
+- Numbering (invoices, POs) is unique under concurrent writes.
+- PostgreSQL imports take an advisory lock, so two uploads of the same file do not clash.
+- Route guards in the web app stop a viewer from reaching write screens.
+
+## Audit trail
+- Automatic before-flush hook on every business record.
+- One summary entry per import and per bulk reset.
+- Audit log page is read-only.
+
+## CI (514787f, edfd346)
+- **Read-only** workflow token.
+- Checkout without persisted credentials.
+- Third-party actions **pinned to commit hashes**, not version tags.
+- The refresh workflow gets **no token** at all.
+- The image used in CI signs in with the demo login it publishes, not a password stored in the workflow.
+- Jobs: `api` (SQLite), `api-postgres`, `web`, `e2e`, `docker`. GitGuardian scans for secrets.
+
+## Docker (514787f)
+- Demo data is prepared in its **own build stage with no network access**.
+- The final image receives only the data directory, owned by a non-root user.
+- At run time: 512 MB memory limit, no Linux capabilities, `no-new-privileges`, and the code directory is not writable by the process.
+- `BAKE_DEMO=1` triggers the bake (`Dockerfile`, line 29).
+
+## Hosting
+- **API:** Render, service `eris` (ceec816). `render.yaml` sets `DEMO_SHIFT_DATES=false` (D10).
+- **Web:** Vercel (`vercel.json`). Preview deployments on each PR branch.
+- **Live demo:** eris-retail.vercel.app, with the API on eris-tvro.onrender.com.
+- The free API server sleeps when idle, so the first visit can take up to a minute.
+
+## Deploy history on Render (observed 2026-10-24)
+
+- The last live deploy before this check was `788bf2b` (PR #25, UI redesign), dated 2026-10-06. Commits from 2026-10-07 onward, including the restaurant dataset and the speed fixes, had not reached the hosted API.
+- A manual deploy of `8615f2e` (merge of PR #32) was started on 2026-10-24 after the `DEMO_SHIFT_DATES=false` change. Until it shows as live, the hosted demo is still on the older code.
+- The API could not be reached from the sandbox, so the hosted demo was not checked after the deploy.
+
+## Weekly refresh workflow (`refresh-demo.yml`) failing
+
+- The workflow runs on Sundays and calls a Render deploy hook, which rebuilds the hosted demo so its data stays current.
+- Every scheduled run since at least 2026-10-12 has failed in about 45 seconds with exit code 22. That is `curl -f` receiving an HTTP error from the deploy hook.
+- The workflow exits successfully only when the `RENDER_DEPLOY_HOOK_URL` secret is empty. Since the job fails, the secret is set but the hook URL is stale or no longer valid, for example after the Render service or its hook was recreated or regenerated.
+- The hook URL is not in the repository, in any commit, or in the workflow file. It exists only as a GitHub secret.
+- **Fix (owner):** in Render, open service `eris` → Settings → Deploy Hook and copy the current URL. In GitHub, update `RENDER_DEPLOY_HOOK_URL`. Alternatively, delete the secret, which turns the workflow into a no-op. Then run the workflow manually to confirm.
+
+## Things to check after a deploy
+- `DEMO_SHIFT_DATES=false` is set in the Render service. If the service was not created from `render.yaml`, it must be set by hand (`11`).
+- `JWT_SECRET_KEY` is set to a real secret for any shared deployment.
+- The demo is on the expected data version (check the Settings page dataset info).
+
+## Transport and request protection
+
+Security headers, the HTTPS redirect, rate limits and the export and forecast gates are described in `13-hardening-and-pipelines.md`. In short: production redirects plain HTTP to HTTPS and sends HSTS; the API sends a restrictive CSP; the database connection requires TLS in production; the container trusts forwarded headers from the platform proxy.
+
+## Keeping secrets out of git
+
+- `.gitignore` ignores env files (`.env`, `.env.local`, `.env.production`), the local database (`api/data/`), private keys (`*.pem`, `*.key`, `*.p12`, `*.pfx`, SSH keys), and credential files (`credentials*.json`, `secret*.json`, `.npmrc`, `.pypirc`, `.netrc`, `.pgpass`).
+- It also ignores the local state folders of the deployment CLIs (`.vercel/`, `.render/`, `.supabase/`) and Terraform state and variables (`*.tfstate`, `*.tfvars`).
+- `api/.env.example` is the only env file tracked, and it is kept on purpose with placeholder values only (`!.env.example`).
+- Ignore rules stop new files from being added. They do not remove anything already committed. Values in history are removed only by rotation, see `12`.
+
+## Earlier security work (Era 0, for context)
+- 2026-03-25 and 03-26: post-audit cleanup and JWT secret rotation in the earlier product (3e614eb, 6b0dbc8). That code was removed in the rebuild.
