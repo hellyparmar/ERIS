@@ -96,6 +96,12 @@ Three eras are visible in the history:
 
 #13, #22, #23, #24, #25, #27, #28, #29, #30, #31, #32 (see `git log --merges` for the full list).
 
+### 2026-10-27: live check (partial)
+
+- `eris-retail.vercel.app` reachable; serves an older build from `main` (no `vercel.json` security headers, inline script present). Hardening is not in production until PR #33 is merged.
+- `eris-tvro.onrender.com` unreachable (HTTP 000). Branch preview returned 403.
+- No merge made: merging deploys to production and needs the owner's approval.
+
 ### 2026-10-27: no session token readable by the page; deployment check script
 
 - **Access token out of the page too:** `eris_access` (HTTP-only, path `/api`) joins the refresh cookie; the browser body carries no token. Changing cookie-authenticated requests need `X-ERIS-Client: web` (403 without it). Decision D21 updated.
