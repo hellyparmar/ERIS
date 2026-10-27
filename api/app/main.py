@@ -9,15 +9,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import func, select
+from sqlalchemy.exc import TimeoutError as PoolTimeout
 
 from app import clock
 from app.config import settings
 from app.db import SessionLocal, migrate, write_engine
+from app.hardening import HardeningMiddleware
 from app.routers import auth, catalog, imports, insights, inventory, outlets, partners, records, sales
 from app.routers import settings as settings_router
 from app.services import audit as _audit  # noqa: F401  (registers the audit hook)
 from app.services import forecasting as F
 from app.services import response_cache
+from app.services.capacity import Busy
 from app.state import seeding_state, set_seeding
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -100,6 +103,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 app.middleware("http")(response_cache.middleware)  # analytics answers reused while the data is unchanged
+app.add_middleware(HardeningMiddleware)  # security headers, HTTPS redirect, body limit, rate limits
 
 # CORS matters only when the web app is hosted on another origin (e.g. Vercel with VITE_API_URL pointing here)
 app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins, allow_origin_regex=settings.CORS_ORIGIN_REGEX,
@@ -114,6 +118,22 @@ for r in (auth, settings_router, outlets, catalog, partners, inventory, sales, i
 async def forecast_busy(_: Request, exc: F.ForecastBusy):
     return JSONResponse(status_code=503, content={"detail": str(exc)},
                         headers={"Retry-After": "5", "Cache-Control": "no-store"})
+
+
+BUSY_HEADERS = {"Retry-After": "2", "Cache-Control": "no-store"}
+
+
+@app.exception_handler(Busy)
+async def export_busy(_: Request, exc: Busy):
+    return JSONResponse(status_code=503, content={"detail": str(exc)}, headers=BUSY_HEADERS)
+
+
+@app.exception_handler(PoolTimeout)
+async def database_saturated(_: Request, exc: PoolTimeout):
+    # Under a burst every connection can be busy for a moment: say "busy, try again" rather than failing.
+    log.warning("Database connection pool saturated: %s", exc)
+    return JSONResponse(status_code=503, content={"detail": "The server is busy right now. Please try again in a moment."},
+                        headers=BUSY_HEADERS)
 
 
 @app.exception_handler(Exception)

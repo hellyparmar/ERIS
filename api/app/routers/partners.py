@@ -11,6 +11,7 @@ from app.routers.common import csv_response, get_or_404, page_response, paginate
 from app.schemas import CustomerIn, SupplierIn
 from app.security import get_current_user, require_manager, require_writer, scoped_outlet_ids
 from app.services import analytics as A
+from app.services.capacity import EXPORTS
 from app.services.sales import normalize_phone
 
 router = APIRouter(prefix="/api", tags=["suppliers & customers"])
@@ -137,9 +138,10 @@ def list_customers(search: str | None = None, customer_type: str | None = None, 
 
 @router.get("/customers/export")
 def export_customers(_: User = Depends(require_manager), db: Session = Depends(get_db)):
-    rows = [[c.name, c.phone or "", c.email or "", c.city or "", c.customer_type]
-            for c in db.scalars(select(Customer).order_by(Customer.name)).all()]
-    return csv_response("customers.csv", ["name", "phone", "email", "city", "customer_type"], rows)
+    with EXPORTS():
+        rows = [[c.name, c.phone or "", c.email or "", c.city or "", c.customer_type]
+                for c in db.scalars(select(Customer).order_by(Customer.name)).all()]
+        return csv_response("customers.csv", ["name", "phone", "email", "city", "customer_type"], rows)
 
 
 @router.get("/customers/{customer_id}")

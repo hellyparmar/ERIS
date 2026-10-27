@@ -1,3 +1,4 @@
+
 """Response cache for the heavy, read-only analytics endpoints.
 
 A dashboard or analytics page runs a dozen aggregations over two years of sales: about three seconds of work on a
@@ -15,6 +16,7 @@ An answer is reused only when all of these are identical to when it was stored:
 """
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import logging
@@ -137,6 +139,9 @@ def _store(key: str, version: str, body: str) -> None:
         log.warning("could not store a cached response", exc_info=True)
 
 
+_inflight: dict[str, asyncio.Lock] = {}
+
+
 async def middleware(request: Request, call_next):
     if not is_cacheable(request):
         return await call_next(request)
@@ -153,6 +158,21 @@ async def middleware(request: Request, call_next):
         return await call_next(request)
     if body is not None:
         return Response(body, media_type="application/json", headers={"X-Cache": "hit"})
+    # Single flight: when many requests miss at once (a burst on the dashboard, say), one computes the answer and the
+    # others wait for it and read the cache, instead of all recomputing the same numbers.
+    lock = _inflight.setdefault(key, asyncio.Lock())
+    try:
+        async with lock:
+            version, body = await run_in_threadpool(_lookup, key, user_id)
+            if body is not None:
+                return Response(body, media_type="application/json", headers={"X-Cache": "hit"})
+            return await _compute_and_store(request, call_next, key, version)
+    finally:
+        if not lock.locked():
+            _inflight.pop(key, None)
+
+
+async def _compute_and_store(request: Request, call_next, key: str, version: str):
     response = await call_next(request)
     if response.status_code != 200 or not response.headers.get("content-type", "").startswith("application/json") \
             or "no-store" in response.headers.get("cache-control", ""):

@@ -96,6 +96,16 @@ Three eras are visible in the history:
 
 #13, #22, #23, #24, #25, #27, #28, #29, #30, #31, #32 (see `git log --merges` for the full list).
 
+### 2026-10-27: goal review (dead code, ports, security, pipelines)
+
+- **Dead code removed:** `STATE_CODE_BY_NAME`, `create_tables()`, six unused constants in `models.py`, and the unused `extra` field of `SaleInput`. Other `vulture` hits reviewed as false positives (see `13`).
+- **Links:** no broken relative links; no old host references in code or docs.
+- **Ports and exposure:** compose publishes the API on `127.0.0.1` only; required secrets for the JWT and the database password; Postgres and Ollama stay unpublished.
+- **Security:** headers on every response; CSP and HSTS; HTTPS redirect in production; TLS to PostgreSQL in production; inline theme script moved to a file; uvicorn trusts forwarded headers so limits see real addresses.
+- **Pipelines:** database pool sized to the thread pool, with 503 when saturated (was 500 after 30 s); export gate; single flight for cached answers; per-address rate limits; body size ceiling. Load test (25 users): no 5xx except deliberate 503s, dashboard p50 13 s → 0.07 s. Recorded in `13`, decision D20.
+- **Tests:** API 120 → 137 (new: hardening, capacity, transport); e2e 14 passed under the new policy; lint and build clean.
+- **Found and fixed in the process:** the export wrap first removed the code after each handler (caught by the test suite; restored and redone).
+
 ### 2026-10-24 entry: name, verification, security review
 
 - **Name:** the product is now called **Enterprise Retail Intelligence System** everywhere it appears: the README title, the sidebar brand, the page title, and the brain. The dataset stays one restaurant chain (Saffron Table) with five outlets by default.

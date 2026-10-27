@@ -11,6 +11,7 @@ from app.routers.common import csv_response, get_or_404, page_response, paginate
 from app.schemas import SaleIn, VoidIn
 from app.security import ensure_outlet_access, get_current_user, require_manager, require_writer, scoped_outlet_ids
 from app.services import forecasting as F
+from app.services.capacity import EXPORTS
 from app.services.sales import LineInput, SaleInput, create_sale, void_sale
 
 router = APIRouter(prefix="/api/sales", tags=["sales"])
@@ -71,25 +72,26 @@ def list_sales(outlet_id: int | None = None, start: date | None = None, end: dat
 def export_sales(outlet_id: int | None = None, start: date | None = None, end: date | None = None,
                  user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Line-level export in the same format as the sales import template."""
-    if not start or not end:
-        end = end or clock.today()
-        start = start or end - timedelta(days=30)
-    if (end - start).days > 400:
-        raise HTTPException(400, "Export at most ~13 months at a time")
-    outlet_ids = scoped_outlet_ids(user, outlet_id)
-    q = select(Sale.invoice_no, Sale.sold_at, Outlet.code, Product.sku, SaleItem.quantity, SaleItem.unit_price,
-               SaleItem.discount, Sale.payment_method, Sale.channel, Sale.covers, Customer.phone, Customer.name,
-               SaleItem.line_total).join(
-        SaleItem, SaleItem.sale_id == Sale.id).join(Outlet, Outlet.id == Sale.outlet_id).join(
-        Product, Product.id == SaleItem.product_id).outerjoin(Customer, Customer.id == Sale.customer_id).where(
-        Sale.status == "completed", Sale.sale_date >= start, Sale.sale_date <= end).order_by(Sale.sold_at)
-    if outlet_ids:
-        q = q.where(Sale.outlet_id.in_(outlet_ids))
-    rows = ([inv, ts.date().isoformat(), ts.strftime("%H:%M"), oc, sku, qty, price, disc, pm, ch, cov or "", ph or "",
-             cn or "", lt] for inv, ts, oc, sku, qty, price, disc, pm, ch, cov, ph, cn, lt in db.execute(q))
-    return csv_response(f"sales_{start}_{end}.csv",
-                        ["invoice_no", "date", "time", "outlet_code", "sku", "quantity", "unit_price", "discount",
-                         "payment_method", "channel", "covers", "customer_phone", "customer_name", "line_total"], rows)
+    with EXPORTS():
+        if not start or not end:
+            end = end or clock.today()
+            start = start or end - timedelta(days=30)
+        if (end - start).days > 400:
+            raise HTTPException(400, "Export at most ~13 months at a time")
+        outlet_ids = scoped_outlet_ids(user, outlet_id)
+        q = select(Sale.invoice_no, Sale.sold_at, Outlet.code, Product.sku, SaleItem.quantity, SaleItem.unit_price,
+                   SaleItem.discount, Sale.payment_method, Sale.channel, Sale.covers, Customer.phone, Customer.name,
+                   SaleItem.line_total).join(
+            SaleItem, SaleItem.sale_id == Sale.id).join(Outlet, Outlet.id == Sale.outlet_id).join(
+            Product, Product.id == SaleItem.product_id).outerjoin(Customer, Customer.id == Sale.customer_id).where(
+            Sale.status == "completed", Sale.sale_date >= start, Sale.sale_date <= end).order_by(Sale.sold_at)
+        if outlet_ids:
+            q = q.where(Sale.outlet_id.in_(outlet_ids))
+        rows = ([inv, ts.date().isoformat(), ts.strftime("%H:%M"), oc, sku, qty, price, disc, pm, ch, cov or "", ph or "",
+                 cn or "", lt] for inv, ts, oc, sku, qty, price, disc, pm, ch, cov, ph, cn, lt in db.execute(q))
+        return csv_response(f"sales_{start}_{end}.csv",
+                            ["invoice_no", "date", "time", "outlet_code", "sku", "quantity", "unit_price", "discount",
+                             "payment_method", "channel", "covers", "customer_phone", "customer_name", "line_total"], rows)
 
 
 @router.get("/{sale_id}")

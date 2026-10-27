@@ -18,7 +18,6 @@ STATES = {
     "30": "Goa", "31": "Lakshadweep", "32": "Kerala", "33": "Tamil Nadu", "34": "Puducherry",
     "35": "Andaman and Nicobar Islands", "36": "Telangana", "37": "Andhra Pradesh", "38": "Ladakh",
 }
-STATE_CODE_BY_NAME = {v.lower(): k for k, v in STATES.items()}
 _CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 GSTIN_RE = re.compile(r"^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$")
 

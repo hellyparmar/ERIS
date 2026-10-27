@@ -32,26 +32,10 @@ from app.db import Base
 
 # admin: everything · manager: operations for assigned outlets · staff: billing & stock lookup ·
 # viewer: read-only dashboards, forecasts, analytics and AI questions
-ROLES = ("admin", "manager", "staff", "viewer")
 MAX_OUTLETS = 7
 OPEN_PO_STATUSES = ("ordered", "partial")  # partial = some goods received, the rest still expected
-SALE_SOURCES = ("synthetic", "manual", "import")
 PAYMENT_METHODS = ("cash", "upi", "card", "credit")
 CHANNELS = ("dine_in", "takeaway", "delivery")
-ITEM_KINDS = ("menu", "ingredient")
-SALE_STATUSES = ("completed", "void")
-PO_STATUSES = ("ordered", "received", "cancelled")
-MOVEMENT_REASONS = (
-    "sale",
-    "sale_void",
-    "purchase",
-    "adjustment",
-    "damage",
-    "wastage",
-    "transfer_in",
-    "transfer_out",
-    "import",
-)
 
 
 class TimestampMixin:

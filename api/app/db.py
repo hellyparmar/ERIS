@@ -13,13 +13,24 @@ class Base(DeclarativeBase):
     pass
 
 
+def require_tls(url: str, environment: str) -> str:
+    """In production, a PostgreSQL connection must be encrypted: add sslmode=require unless the URL states a mode."""
+    if environment != "production" or url.startswith("sqlite") or "sslmode=" in url:
+        return url
+    return url + ("&" if "?" in url else "?") + "sslmode=require"
+
+
 def _make_engine(url: str):
+    url = require_tls(url, settings.ENVIRONMENT)
     if url.startswith("sqlite"):
         db_path = url.split("///", 1)[-1]
         if db_path and db_path != ":memory:":
             Path(db_path).parent.mkdir(parents=True, exist_ok=True)
         # timeout: how long a writer waits for SQLite's single write lock before giving up
-        engine = create_engine(url, connect_args={"check_same_thread": False, "timeout": 30})
+        # The pool matches the request thread pool (FastAPI runs up to 40 sync requests at once), so a request is
+        # not left waiting for a connection that is free. pool_timeout turns a saturated pool into a fast 503.
+        pool = {"pool_size": 20, "max_overflow": 20, "pool_timeout": 10} if db_path and db_path != ":memory:" else {}
+        engine = create_engine(url, connect_args={"check_same_thread": False, "timeout": 30}, **pool)
 
         @event.listens_for(engine, "connect")
         def _sqlite_pragmas(dbapi_conn, _):
@@ -41,7 +52,8 @@ def _make_engine(url: str):
 
         return engine
     _register_numpy_adapters()
-    return create_engine(url, pool_pre_ping=True, pool_size=10, max_overflow=20, insertmanyvalues_page_size=5000)
+    return create_engine(url, pool_pre_ping=True, pool_size=20, max_overflow=20, pool_timeout=10,
+                         insertmanyvalues_page_size=5000)
 
 
 def _register_numpy_adapters() -> None:
@@ -89,13 +101,6 @@ def get_db(request: Request) -> Iterator[Session]:
         yield db
     finally:
         db.close()
-
-
-def create_tables() -> None:
-    """Create all tables directly (tests / throwaway databases). Normal startup uses `migrate()`."""
-    from app import models  # noqa: F401  (register models)
-
-    Base.metadata.create_all(engine)
 
 
 def migrate() -> None:

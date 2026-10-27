@@ -9,6 +9,7 @@ _tmp = tempfile.mkdtemp(prefix="eris-test-")
 os.environ["DATABASE_URL"] = os.environ.get("TEST_DATABASE_URL") or f"sqlite:///{_tmp}/test.db"  # empty = unset
 os.environ["SEED_DEMO_DATA"] = "false"
 os.environ["LLM_ENABLED"] = "false"
+os.environ["RATE_LIMIT_ENABLED"] = "false"  # the suite makes many requests from one address; hardening tests switch limits on
 
 from fastapi.testclient import TestClient  # noqa: E402
 

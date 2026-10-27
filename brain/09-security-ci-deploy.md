@@ -65,6 +65,10 @@
 - `JWT_SECRET_KEY` is set to a real secret for any shared deployment.
 - The demo is on the expected data version (check the Settings page dataset info).
 
+## Transport and request protection
+
+Security headers, the HTTPS redirect, rate limits and the export and forecast gates are described in `13-hardening-and-pipelines.md`. In short: production redirects plain HTTP to HTTPS and sends HSTS; the API sends a restrictive CSP; the database connection requires TLS in production; the container trusts forwarded headers from the platform proxy.
+
 ## Keeping secrets out of git
 
 - `.gitignore` ignores env files (`.env`, `.env.local`, `.env.production`), the local database (`api/data/`), private keys (`*.pem`, `*.key`, `*.p12`, `*.pfx`, SSH keys), and credential files (`credentials*.json`, `secret*.json`, `.npmrc`, `.pypirc`, `.netrc`, `.pgpass`).

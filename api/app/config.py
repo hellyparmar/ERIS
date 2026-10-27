@@ -39,11 +39,21 @@ class Settings(BaseSettings):
     INITIAL_ADMIN_EMAIL: str | None = None
     INITIAL_ADMIN_PASSWORD: str | None = None
 
+    # Transport and abuse protection (app/hardening.py). Limits are per client address and per process.
+    RATE_LIMIT_ENABLED: bool = True
+    RATE_LIMIT_API_PER_MINUTE: int = 1200      # every /api request
+    RATE_LIMIT_LOGIN_PER_MINUTE: int = 60      # sign-in attempts per address (an office may share one address)
+    RATE_LIMIT_HEAVY_PER_MINUTE: int = 120     # forecasts, assistant questions, imports, exports
+    MAX_BODY_MB: int = 20                      # imports are capped at 15 MB; this is the request ceiling
+
     # Model fitting is the heaviest work the API does. At most this many fits run at once, so a burst of forecast
     # requests cannot take every worker thread (or the whole CPU of a small server) from the other pages; a
     # request that cannot start a fit within FORECAST_WAIT_SECONDS gets a quick "busy, try again" (HTTP 503).
     FORECAST_WORKERS: int = 1
     FORECAST_WAIT_SECONDS: float = 20.0
+    # Exports (CSV and Excel) build whole files in memory. At most EXPORT_WORKERS run at once.
+    EXPORT_WORKERS: int = 2
+    EXPORT_WAIT_SECONDS: float = 10.0
 
     # Optional local LLM (free, open source) via Ollama: https://ollama.com
     # The assistant works fully without it (built-in analytics engine);

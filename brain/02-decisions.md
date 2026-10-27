@@ -119,3 +119,13 @@ Each decision gives: **what** was chosen, **why**, **alternatives**, **consequen
 - **Alternatives:** Keep the model trailer (conflicts with the rule). Rewrite earlier history (rejected: it would break the shared branch and the merged PRs).
 - **Consequence:** Earlier commits keep their trailers. Only new commits follow this convention. `CLAUDE.md` states it.
 - **Source:** recorded (`CLAUDE.md`, commit `9118970`).
+
+---
+
+## D20. Protect the request pipelines before they fail, and answer "busy" rather than error
+- **What:** A pool sized to the thread pool, with a 10-second wait and a 503 when it is saturated. Export and forecast gates answer 503 when full. Identical cache misses share one computation. Per-address rate limits on the API, sign-in and heavy endpoints. Security headers, HTTPS redirect in production, request size ceiling, and TLS to PostgreSQL in production.
+- **Why:** Under 25 concurrent users, the database pool timed out (15 connections against 40 threads) and exports returned 500 after 30 s. A 503 with `Retry-After` is recoverable; a 500 after a long wait is not. Single flight stops a burst from doing the same work many times.
+- **Alternatives:** Stream the export files (rejected for now: the database session has to outlive the response, which needs care). Shared rate-limit store (deferred: one worker).
+- **Consequence:** Heavy endpoints answer 429 after their budget per address. Shared networks need the limits raised; the settings are in `brain/13`.
+- **Source:** recorded (`brain/13-hardening-and-pipelines.md`; load test figures above).
+

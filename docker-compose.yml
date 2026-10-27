@@ -1,7 +1,7 @@
 # ERIS with Docker Compose.
 #
 #   docker compose up --build                      # app on http://localhost:8000 (SQLite, demo data auto-generated)
-#   DATABASE_URL=postgresql+psycopg2://eris:eris@postgres:5432/eris \
+#   DATABASE_URL=postgresql+psycopg2://eris:${POSTGRES_PASSWORD}@postgres:5432/eris \
 #     docker compose --profile postgres up --build # same, but on PostgreSQL
 #   docker compose --profile ai up --build         # adds a local LLM (Ollama) for the assistant;
 #                                                  # then: docker compose exec ollama ollama pull llama3.2:3b
@@ -9,9 +9,9 @@ services:
   eris:
     build: .
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"   # this machine only; put a TLS proxy in front to expose it
     environment:
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-me-please-use-a-long-random-string}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?set JWT_SECRET_KEY (32+ random characters) in .env or the shell}
       DATABASE_URL: ${DATABASE_URL:-sqlite:////app/api/data/eris.db}
       OLLAMA_URL: http://ollama:11434
       OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2:3b}
@@ -31,7 +31,7 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: eris
-      POSTGRES_PASSWORD: eris
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env or the shell}
       POSTGRES_DB: eris
     volumes:
       - pg-data:/var/lib/postgresql/data

@@ -4,6 +4,11 @@ Things that are known, unresolved, or waiting on the owner. Each has a reason an
 
 ## Waiting on the owner
 
+### H1. Verify the hosts (opened 2026-10-27)
+- **Render:** `ENVIRONMENT=production` is set by `render.yaml`; confirm it on the service. Set `CORS_ORIGINS` to the Vercel address only.
+- **Vercel:** confirm `VITE_API_URL` is an `https://` address, and that the new headers are served (`curl -I` on the site).
+- **Residual risk:** tokens are kept in `localStorage`. Moving the refresh token to an HTTP-only secure cookie is the next step (see `13`).
+
 ### S1. Rotate the credentials exposed in public history (open, high)
 - **Issue:** A real database password (commit `18e7012`) and a Supabase project's keys (commit `b86cc36`) are in a public repository's history. Full detail and the owner actions are in `12-security-incident.md`.
 - **Next step:** The owner rotates or deletes the hosted project, checks Render's `JWT_SECRET_KEY`, and enables secret scanning. History is not to be rewritten without the owner's approval.
