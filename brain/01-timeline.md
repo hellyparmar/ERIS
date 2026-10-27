@@ -96,6 +96,13 @@ Three eras are visible in the history:
 
 #13, #22, #23, #24, #25, #27, #28, #29, #30, #31, #32 (see `git log --merges` for the full list).
 
+### 2026-10-27: PR #34 merged; CI green on main; Render still on the previous build
+
+- Owner approved. PR #34 (fix to the container start command and the web lint error) merged to `main` as `8213593`.
+- CI on `main` for `8213593`: all jobs passed (including `docker`, which had failed before).
+- Vercel production serves the new build (CSP present).
+- Render's `/api/health` still returns the previous build's response (no `x-content-type-options`, no HSTS from the app). No deployment status is reported to GitHub for Render, so the Render deploy state could not be read from here. The live check (`scripts/verify_deployment.py`) is still to run against Render. Owner action: check the `eris` service's Events in Render and trigger a manual deploy of the latest commit if none is running.
+
 ### 2026-10-27: PR #33 merged; CI on main failed; start command fixed
 
 - PR #33 merged to `main` (357279e) at the owner's request. Vercel production now serves the hardened web build (CSP present).
