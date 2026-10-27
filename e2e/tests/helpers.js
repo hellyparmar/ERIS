@@ -21,6 +21,11 @@ export async function login(page, who = 'admin') {
 export function watchErrors(page) {
   const errors = []
   page.on('pageerror', (e) => errors.push(e.message))
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()) })
+  page.on('console', (m) => {
+    if (m.type() !== 'error') return
+    // Visitors without a session get one expected 401 when the app checks for a session cookie at start-up.
+    const expected = m.text().includes('status of 401') && m.location().url.endsWith('/api/auth/refresh')
+    if (!expected) errors.push(m.text())
+  })
   return errors
 }

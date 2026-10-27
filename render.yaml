@@ -25,6 +25,8 @@ services:
         value: "false"
       - key: DEMO_SHIFT_DATES  # moving old demo data forward takes minutes on 0.1 CPU; each deploy refreshes it
         value: "false"
+      - key: REFRESH_COOKIE_SAMESITE  # the web app is on Vercel (another site): the session cookie must allow cross-site use (it is Secure)
+        value: "none"
       - key: MALLOC_ARENA_MAX  # keeps memory well inside the free plan's 512 MB
         value: "2"
       # If the web app is also hosted on Vercel (VITE_API_URL pointing here), allow its address:

@@ -13,6 +13,20 @@ log = logging.getLogger(__name__)
 _status: dict = {"checked": 0.0, "available": False, "model": None, "error": None}
 
 
+_LOOPBACK = ("localhost", "127.0.0.1", "::1")
+
+
+def _transport_allowed(url: str) -> bool:
+    """In production the model server must be reached over HTTPS, or be on this machine (no plain-HTTP hop
+    across a network)."""
+    from urllib.parse import urlsplit
+
+    parts = urlsplit(url)
+    if settings.ENVIRONMENT != "production" or parts.scheme == "https":
+        return True
+    return parts.hostname in _LOOPBACK
+
+
 def status(force: bool = False) -> dict:
     """Is Ollama reachable and is the configured model pulled? (cached for 60 s)"""
     if not settings.LLM_ENABLED:
@@ -20,6 +34,10 @@ def status(force: bool = False) -> dict:
     if not force and time.time() - _status["checked"] < 60:
         return {**{k: v for k, v in _status.items() if k != "checked"}, "provider": "ollama"}
     _status["checked"] = time.time()
+    if not _transport_allowed(settings.OLLAMA_URL):
+        _status.update(available=False, model=None, error="plain-HTTP Ollama address refused in production: "
+                                                          "use https:// or a localhost address")
+        return {**{k: v for k, v in _status.items() if k != "checked"}, "provider": "ollama"}
     try:
         r = httpx.get(f"{settings.OLLAMA_URL}/api/tags", timeout=1.5)
         r.raise_for_status()

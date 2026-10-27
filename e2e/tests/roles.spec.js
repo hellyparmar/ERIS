@@ -23,12 +23,29 @@ test('area manager can switch between their two outlets only', async ({ page }) 
   await expect(page.getByRole('heading', { name: 'Andheri West' })).toHaveCount(0)
 })
 
-test('expired access token is renewed with the refresh token', async ({ page }) => {
+test('an expired access token is renewed from the HTTP-only refresh cookie', async ({ page }) => {
   await login(page, 'manager')
-  await page.evaluate(() => localStorage.setItem('eris-token', 'expired.invalid.token'))
+  let renewals = 0
+  page.on('request', (r) => { if (r.url().includes('/api/auth/refresh')) renewals++ })
+  let expired = false
+  await page.route('**/api/sales**', (route) => {
+    if (!expired) { expired = true; return route.fulfill({ status: 401, contentType: 'application/json', body: '{"detail":"expired"}' }) }
+    return route.continue()
+  })
   await page.goto('/sales')
   await expect(page.locator('table')).toBeVisible()
-  expect(await page.evaluate(() => localStorage.getItem('eris-token'))).not.toBe('expired.invalid.token')
+  expect(renewals).toBeGreaterThan(0)
+})
+
+test('a page reload keeps the session, and no token is kept in the browser storage', async ({ page }) => {
+  await login(page, 'manager')
+  await page.reload()
+  await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible()
+  const stored = await page.evaluate(() => Object.keys(localStorage).filter((k) => /token|refresh|auth/i.test(k)))
+  expect(stored).toEqual([])
+  const cookies = await page.context().cookies()
+  const refresh = cookies.find((c) => c.name === 'eris_refresh')
+  expect(refresh && refresh.httpOnly).toBe(true)
 })
 
 test('phone layout has no horizontal scrolling', async ({ browser }) => {

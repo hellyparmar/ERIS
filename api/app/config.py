@@ -22,6 +22,12 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_DAYS: int = 14
 
+    # Browser sessions: the refresh token travels only in an HTTP-only cookie (never readable by page scripts).
+    # SameSite=none is needed when the web app is on another site than the API (e.g. Vercel + Render); it requires Secure.
+    REFRESH_COOKIE_NAME: str = "eris_refresh"
+    REFRESH_COOKIE_SAMESITE: str = "lax"   # set "none" for a cross-site web app (render.yaml does)
+    REFRESH_COOKIE_SECURE: bool | None = None  # None: Secure in production, not in development
+
     CORS_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173"
     # optional pattern for extra web origins, e.g. Vercel previews: https://my-project-[a-z0-9-]+\.vercel\.app
     CORS_ORIGIN_REGEX: str | None = None
@@ -69,6 +75,10 @@ class Settings(BaseSettings):
     @property
     def cors_origins(self) -> list[str]:
         return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
+
+    @property
+    def cookie_secure(self) -> bool:
+        return self.ENVIRONMENT == "production" if self.REFRESH_COOKIE_SECURE is None else self.REFRESH_COOKIE_SECURE
 
     @property
     def is_sqlite(self) -> bool:

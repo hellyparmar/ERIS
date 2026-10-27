@@ -96,6 +96,14 @@ Three eras are visible in the history:
 
 #13, #22, #23, #24, #25, #27, #28, #29, #30, #31, #32 (see `git log --merges` for the full list).
 
+### 2026-10-27: browser sessions and model-server transport
+
+- **Refresh token out of the browser:** sign-in and refresh set it as an HTTP-only, Secure cookie (`SameSite=none` on Render). The access token is kept in memory. Old `localStorage` tokens are removed on start. Decision D21.
+- **Forged cookie requests:** refresh and logout require `X-ERIS-Client: web` when the cookie is present.
+- **Model server:** a plain-HTTP Ollama address outside this machine is refused in production.
+- **Tests:** API 145 (new: browser cookie flow, Ollama transport); e2e 15 (renewal from the cookie after a 401; reload keeps the session and stores no token).
+- **Not done:** host checks (H1), blocked from this environment.
+
 ### 2026-10-27: goal review (dead code, ports, security, pipelines)
 
 - **Dead code removed:** `STATE_CODE_BY_NAME`, `create_tables()`, six unused constants in `models.py`, and the unused `extra` field of `SaleInput`. Other `vulture` hits reviewed as false positives (see `13`).

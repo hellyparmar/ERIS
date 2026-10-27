@@ -76,14 +76,24 @@ Load test: a mixed script (dashboard, sales list, stock list, menu list, forecas
 | `EXPORT_WAIT_SECONDS` | 10 | How long an export waits for a slot |
 | `FORWARDED_ALLOW_IPS` | `*` | Proxy addresses whose forwarded headers are trusted (Dockerfile) |
 
+## Browser sessions and the model server (added 2026-10-27)
+
+- **Refresh token out of the browser.** Sign-in and refresh set the refresh token in an HTTP-only cookie (`eris_refresh`, path `/api/auth`, `Secure` in production, `SameSite=none` in `render.yaml` because the web app is on Vercel, another site). Page scripts cannot read it.
+- **Forged cookie requests refused.** The web app sends `X-ERIS-Client: web`. Refresh and logout refuse a cookie request without it (403). A cross-site page cannot add that header without a CORS preflight the API refuses for other origins.
+- **Access token in memory only.** `web/src/lib/api.js` keeps it in a variable. A reload restores the session through the cookie (`restoreSession`). Old `localStorage` tokens are removed on start.
+- **API clients unchanged.** Requests without the header still receive the refresh token in the body, so scripts and the CI smoke test work.
+- **Ollama.** In production, a plain-HTTP model address is refused unless it is on this machine (`localhost`). Use `https://` to reach a model server on another host. The assistant then uses its built-in engine.
+
 ## Limits of this design (residual risks)
 
 - **Per process:** the rate limits and the single-flight lock live in one process. The container runs one worker, so this holds. With several workers or several instances, move these counters to a shared store (for example Redis).
 - **Trusted forwarded headers:** `FORWARDED_ALLOW_IPS=*` trusts any sender. It is safe only behind the platform proxy. Set the proxy's range where the platform publishes one.
-- **Tokens in the browser:** access and refresh tokens are in `localStorage`. The Content-Security-Policy blocks inline and third-party scripts, which reduces the risk from cross-site scripting, but does not remove it. The next step is a refresh token in an HTTP-only, secure cookie.
+- **Access token in memory:** a script running on the page could still use it while the page is open. The refresh token is not reachable from script.
+- **Third-party cookies:** browsers that block cross-site cookies (some privacy settings, private windows) will not restore the session after a reload; the user signs in again. Serving the web app and the API from one site (a custom domain for both) removes this.
+- **Verify on the hosts:** not verifiable from the build environment. See `11`, H1.
 - **SQLite is one writer:** writes queue on a single lock. Under heavy writing, PostgreSQL is the right choice (see `render.yaml` comments).
 - **CORS defaults:** the default allowed origins include `localhost`. Production should set `CORS_ORIGINS` to the web app's address only.
-- **Verify on the hosts:** the Render service needs `ENVIRONMENT=production` (set in `render.yaml`), and the Vercel build needs `VITE_API_URL` to be an `https://` address. Neither can be checked from the repository.
+- **Verify on the hosts (H1):** the Render service needs `ENVIRONMENT=production` (set in `render.yaml`), and the Vercel build needs `VITE_API_URL` to be an `https://` address. Neither can be checked from the repository.
 
 ## How to verify
 

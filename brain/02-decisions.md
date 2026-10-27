@@ -129,3 +129,14 @@ Each decision gives: **what** was chosen, **why**, **alternatives**, **consequen
 - **Consequence:** Heavy endpoints answer 429 after their budget per address. Shared networks need the limits raised; the settings are in `brain/13`.
 - **Source:** recorded (`brain/13-hardening-and-pipelines.md`; load test figures above).
 
+
+
+---
+
+## D21. Refresh token only in an HTTP-only cookie; access token only in memory
+- **What:** Browsers receive the refresh token as an HTTP-only cookie scoped to `/api/auth`. They send `X-ERIS-Client: web`, which refresh and logout require when the cookie is present. The access token lives in a variable. A reload restores the session. API clients keep the refresh token in the body.
+- **Why:** The owner asked that tokens not be stored where page scripts can read them. `localStorage` is readable by any script that runs on the page.
+- **Alternatives:** Keep `localStorage` (rejected: readable by script). Put both tokens in cookies (rejected: the access token is then sent with every request, including to other sites).
+- **Consequence:** Cross-site cookies must be allowed (`SameSite=none`, Secure). Cookies blocked by the browser end the session on reload.
+- **Source:** recorded (`brain/13`; code in `api/app/routers/auth.py` and `web/src/lib/api.js`).
+

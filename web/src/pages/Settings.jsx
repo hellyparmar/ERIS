@@ -79,7 +79,7 @@ function ProfileTab() {
   const savePw = useMutation({
     mutationFn: () => api('/auth/change-password', { method: 'POST', body: { current_password: pw.current_password, new_password: pw.new_password } }),
     onSuccess: (r) => {
-      setSession(r.access_token, r.refresh_token)  // other devices are signed out; this one stays signed in
+      setSession(r.access_token)  // other devices are signed out; this one stays signed in (its cookie is renewed)
       toast('Password changed - other devices have been signed out', 'success')
       setPw({ current_password: '', new_password: '', confirm: '' })
     },

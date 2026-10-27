@@ -4,10 +4,14 @@ Things that are known, unresolved, or waiting on the owner. Each has a reason an
 
 ## Waiting on the owner
 
-### H1. Verify the hosts (opened 2026-10-27)
-- **Render:** `ENVIRONMENT=production` is set by `render.yaml`; confirm it on the service. Set `CORS_ORIGINS` to the Vercel address only.
-- **Vercel:** confirm `VITE_API_URL` is an `https://` address, and that the new headers are served (`curl -I` on the site).
-- **Residual risk:** tokens are kept in `localStorage`. Moving the refresh token to an HTTP-only secure cookie is the next step (see `13`).
+### H1. Verify the hosts (open, 2026-10-27)
+- **Not verified from this environment.** The sandbox proxy refuses the Render and Vercel hosts (HTTP 403: destination not allowed for the session). The checks below must be run by the owner.
+- **Render:** on the `eris` service, confirm `ENVIRONMENT=production` and `REFRESH_COOKIE_SAMESITE=none`. Set `CORS_ORIGINS` to the Vercel address only.
+- **Vercel:** confirm `VITE_API_URL` is an `https://` address.
+- **Commands to run (any computer):**
+  - `curl -I https://eris-tvro.onrender.com/api/health`: expect `strict-transport-security` and `content-security-policy` headers.
+  - `curl -I https://<your-vercel-site>/`: expect the same security headers.
+  - Sign in on the site, reload, and confirm you stay signed in. Then in the browser's developer tools confirm `eris_refresh` is listed under cookies with HttpOnly ticked, and that nothing named `eris-token` is in local storage.
 
 ### S1. Rotate the credentials exposed in public history (open, high)
 - **Issue:** A real database password (commit `18e7012`) and a Supabase project's keys (commit `b86cc36`) are in a public repository's history. Full detail and the owner actions are in `12-security-incident.md`.
