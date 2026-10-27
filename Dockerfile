@@ -4,7 +4,7 @@
 # Three isolated stages feed the final image: the web build, the Python runtime, and the demo data. Only their
 # outputs are copied forward (web/dist and the data directory), so build tools, caches and scratch files from
 # preparing the demo never reach the running image.
-FROM node:22-alpine AS web
+FROM node:26-alpine AS web
 WORKDIR /web
 COPY web/package.json web/package-lock.json ./
 RUN npm ci --no-audit --no-fund
