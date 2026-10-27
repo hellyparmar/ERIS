@@ -95,6 +95,10 @@ Load test: a mixed script (dashboard, sales list, stock list, menu list, forecas
 - **CORS defaults:** the default allowed origins include `localhost`. Production should set `CORS_ORIGINS` to the web app's address only.
 - **Verify on the hosts (H1):** the Render service needs `ENVIRONMENT=production` (set in `render.yaml`), and the Vercel build needs `VITE_API_URL` to be an `https://` address. Neither can be checked from the repository.
 
+## How to verify the deployed system
+
+`python3 scripts/verify_deployment.py https://<api host> --web https://<web host>` runs the connectivity and security checks against a live deployment (see `brain/11`, H1). Add `--local --ca <file>` for a test server.
+
 ## How to verify
 
 ```bash

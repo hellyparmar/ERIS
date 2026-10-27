@@ -102,7 +102,7 @@ Three eras are visible in the history:
 - **Forged cookie requests:** refresh and logout require `X-ERIS-Client: web` when the cookie is present.
 - **Model server:** a plain-HTTP Ollama address outside this machine is refused in production.
 - **Tests:** API 145 (new: browser cookie flow, Ollama transport); e2e 15 (renewal from the cookie after a 401; reload keeps the session and stores no token).
-- **Not done:** host checks (H1), blocked from this environment.
+- **Not done:** host checks (H1), blocked from this environment. A verification script (`scripts/verify_deployment.py`) is in the repository for a run on the live hosts; against a local HTTPS production-mode server it passed 22 of 23 checks (the 23rd is the platform redirect that needs the live host).
 
 ### 2026-10-27: goal review (dead code, ports, security, pipelines)
 
