@@ -42,4 +42,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=30s CMD python -c "import
 # X-Forwarded-* headers (rate limits and the HTTPS redirect depend on them). Set FORWARDED_ALLOW_IPS to the proxy's
 # address range when the platform publishes one; the default trusts any sender, which is safe only when the
 # container is reachable through the platform proxy alone.
-CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT} --proxy-headers --forwarded-allow-ips ${FORWARDED_ALLOW_IPS:-*}"]
+CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT} --proxy-headers --forwarded-allow-ips \"${FORWARDED_ALLOW_IPS:-*}\""]
