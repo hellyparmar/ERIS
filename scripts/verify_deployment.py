@@ -37,6 +37,17 @@ def _https_context():
     return ssl.create_default_context(cafile=CA_FILE) if CA_FILE else None
 
 
+def _headers(response) -> dict:
+    """Lower-cased headers; every Set-Cookie line is kept (joined by newlines under 'set-cookie-all')."""
+    out = {k.lower(): v for k, v in response.headers.items()}
+    out["set-cookie-all"] = "\n".join(response.headers.get_all("set-cookie") or [])
+    return out
+
+
+def cookie_line(headers: dict, name: str) -> str:
+    return next((c for c in headers.get("set-cookie-all", "").split("\n") if c.startswith(name + "=")), "")
+
+
 def request(url, method="GET", headers=None, body=None, opener=None, follow=True):
     req = urllib.request.Request(url, method=method, data=body, headers=headers or {})
     handlers = [urllib.request.HTTPSHandler(context=_https_context())]
@@ -45,9 +56,9 @@ def request(url, method="GET", headers=None, body=None, opener=None, follow=True
     op = opener or urllib.request.build_opener(*handlers)
     try:
         with op.open(req, timeout=60) as r:
-            return r.status, {k.lower(): v for k, v in r.headers.items()}, r.read()
+            return r.status, _headers(r), r.read()
     except urllib.error.HTTPError as e:
-        return e.code, {k.lower(): v for k, v in e.headers.items()}, e.read()
+        return e.code, _headers(e), e.read()
 
 
 def api_checks(api: str, local: bool, web_origin: str | None) -> None:
@@ -79,21 +90,28 @@ def api_checks(api: str, local: bool, web_origin: str | None) -> None:
     login = json.dumps(DEMO).encode()
     status, headers, body = request(f"{api}/api/auth/login", "POST", {"Content-Type": "application/json", "X-ERIS-Client": "web"}, login, opener)
     data = json.loads(body) if status == 200 else {}
-    check("browser sign-in works", status == 200 and "access_token" in data, f"HTTP {status}")
-    check("browser sign-in keeps the refresh token out of the body", status == 200 and "refresh_token" not in data)
-    cookie = headers.get("set-cookie", "")
-    check("refresh cookie is HttpOnly", "httponly" in cookie.lower())
-    check("refresh cookie is scoped to /api/auth", "path=/api/auth" in cookie.lower())
+    check("browser sign-in works", status == 200 and "user" in data, f"HTTP {status}")
+    check("browser sign-in puts no token in the page's reach", status == 200 and "access_token" not in data and "refresh_token" not in data)
+    refresh = cookie_line(headers, "eris_refresh")
+    access = cookie_line(headers, "eris_access")
+    check("refresh cookie is HttpOnly and scoped to /api/auth", "httponly" in refresh.lower() and "path=/api/auth" in refresh.lower())
+    check("access cookie is HttpOnly and scoped to /api", "httponly" in access.lower() and "path=/api" in access.lower())
     if not local:
-        check("refresh cookie is Secure", "secure" in cookie.lower())
-        check("refresh cookie allows cross-site use (SameSite=None)", "samesite=none" in cookie.lower(),
-              "needed when the web app is on another site" if "samesite=none" not in cookie.lower() else "")
+        check("session cookies are Secure", "secure" in refresh.lower() and "secure" in access.lower())
+        check("session cookies allow cross-site use (SameSite=None)",
+              "samesite=none" in refresh.lower() and "samesite=none" in access.lower(),
+              "needed when the web app is on another site" if "samesite=none" not in refresh.lower() else "")
 
     if not local:
+        status, _, _ = request(f"{api}/api/auth/me", "GET", {"X-ERIS-Client": "web"}, None, opener)
+        check("the session cookie is accepted by the API", status == 200, f"HTTP {status}")
+        status, _, _ = request(f"{api}/api/customers", "POST", {"Content-Type": "application/json"},
+                               b'{"name": "verify", "phone": "9800000001"}', opener)
+        check("a cookie-authenticated change without the web header is refused", status == 403, f"HTTP {status}")
         status, _, _ = request(f"{api}/api/auth/refresh", "POST", {"Content-Type": "application/json", "X-ERIS-Client": "web"}, b"{}", opener)
         check("refresh with the cookie renews the session", status == 200, f"HTTP {status}")
         status, _, _ = request(f"{api}/api/auth/refresh", "POST", {"Content-Type": "application/json"}, b"{}", opener)
-        check("a cookie request without the web header is refused", status == 403, f"HTTP {status}")
+        check("a refresh cookie request without the web header is refused", status == 403, f"HTTP {status}")
 
     evil = {"Origin": "https://evil.example", "Access-Control-Request-Method": "POST",
             "Access-Control-Request-Headers": "x-eris-client"}

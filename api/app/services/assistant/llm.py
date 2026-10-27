@@ -13,18 +13,12 @@ log = logging.getLogger(__name__)
 _status: dict = {"checked": 0.0, "available": False, "model": None, "error": None}
 
 
-_LOOPBACK = ("localhost", "127.0.0.1", "::1")
-
-
 def _transport_allowed(url: str) -> bool:
-    """In production the model server must be reached over HTTPS, or be on this machine (no plain-HTTP hop
-    across a network)."""
+    """In production every connection to the model server must be encrypted (https). Plain HTTP is refused even on
+    this machine: production then has no unencrypted model traffic at all, and the assistant uses its built-in engine."""
     from urllib.parse import urlsplit
 
-    parts = urlsplit(url)
-    if settings.ENVIRONMENT != "production" or parts.scheme == "https":
-        return True
-    return parts.hostname in _LOOPBACK
+    return settings.ENVIRONMENT != "production" or urlsplit(url).scheme == "https"
 
 
 def status(force: bool = False) -> dict:

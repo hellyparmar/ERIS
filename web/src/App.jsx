@@ -38,9 +38,9 @@ function Guard({ allow, children }) {
 const MANAGERS = ['admin', 'manager']
 
 export default function App() {
-  const { token, user, loadingUser, restoring } = useApp()
+  const { session, user, loadingUser, restoring } = useApp()
   if (restoring) return <Spinner label="Loading ERIS…" />
-  if (!token) return <Login />
+  if (!session) return <Login />
   if (loadingUser || !user) return <Spinner label="Loading ERIS…" />
   return (
     <Suspense fallback={<Spinner />}>

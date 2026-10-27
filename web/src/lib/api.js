@@ -1,25 +1,25 @@
-// Thin fetch wrapper: adds the access token, renews it from the HTTP-only refresh cookie when it expires, parses
-// JSON and turns API errors into readable messages.
+// Thin fetch wrapper: sends the browser's session cookies, renews the access cookie from the refresh cookie when it
+// expires, parses JSON and turns API errors into readable messages.
 //
-// The access token lives in memory only, so it is gone when the tab closes. The refresh token never reaches page
-// scripts: the server keeps it in an HTTP-only cookie, and a page reload restores the session through that cookie.
+// The browser holds no token the page can read. The server keeps the access and refresh tokens in HTTP-only cookies;
+// this module only remembers whether a session exists, and a page reload checks that again through the cookies.
 // Where the API lives. Empty (default): the same server that serves this app, or the Vite dev proxy.
 // Set VITE_API_URL at build time when the web app is hosted separately (e.g. Vercel + API on Render).
 export const API_BASE = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '')
 const apiUrl = (path) => new URL(path.startsWith('/api') ? path : `/api${path}`, API_BASE || window.location.origin)
 // Sent with every request. A page on another site cannot add it without a CORS preflight the API refuses, which
-// is what protects the refresh cookie from forged requests.
+// protects the session cookies from forged changes.
 const CLIENT_HEADER = 'X-ERIS-Client'
 
 // Versions before this one kept tokens in localStorage. Remove them so no old token lingers.
 try { ['eris-token', 'eris-refresh'].forEach((k) => localStorage.removeItem(k)) } catch { /* private mode */ }
 
-let accessToken = null
-export const getToken = () => accessToken
-export const setSession = (access) => { accessToken = access || null }
-export const clearSession = () => setSession(null)
+let signedIn = false
+export const isSignedIn = () => signedIn
+export const setSignedIn = (value) => { signedIn = !!value }
+export const clearSession = () => setSignedIn(false)
 
-// One renewal at a time: parallel requests that hit an expired token all wait for the same renewal.
+// One renewal at a time: parallel requests that hit an expired access cookie all wait for the same renewal.
 let refreshing = null
 async function renewSession() {
   if (!refreshing) {
@@ -28,17 +28,15 @@ async function renewSession() {
       credentials: 'include',
       headers: { 'Content-Type': 'application/json', [CLIENT_HEADER]: 'web' },
       body: '{}',
-    }).then(async (res) => {
-      if (!res.ok) return false
-      const data = await res.json()
-      setSession(data.access_token)
-      return true
+    }).then((res) => {
+      setSignedIn(res.ok)
+      return res.ok
     }).catch(() => false).finally(() => { setTimeout(() => { refreshing = null }, 0) })
   }
   return refreshing
 }
 
-/** On start-up: is there a session cookie that still gives a valid access token? */
+/** On start-up: is there a session cookie that still gives a valid session? */
 export const restoreSession = () => renewSession()
 
 export class ApiError extends Error {
@@ -67,8 +65,6 @@ export async function api(path, { method = 'GET', body, params, raw = false, for
     if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, v)
   })
   const headers = { [CLIENT_HEADER]: 'web' }
-  const token = getToken()
-  if (token) headers.Authorization = `Bearer ${token}`
   let payload
   if (form) payload = form
   else if (body !== undefined) {
@@ -81,7 +77,7 @@ export async function api(path, { method = 'GET', body, params, raw = false, for
   } catch {
     throw new ApiError('Cannot reach the ERIS server. Is the API running?', 0)
   }
-  if (res.status === 401 && token && !path.includes('/auth/login')) {
+  if (res.status === 401 && signedIn && !path.includes('/auth/login')) {
     if (!retried && await renewSession()) return api(path, { method, body, params, raw, form, retried: true })
     onUnauthorized()
   }

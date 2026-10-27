@@ -76,13 +76,13 @@ Load test: a mixed script (dashboard, sales list, stock list, menu list, forecas
 | `EXPORT_WAIT_SECONDS` | 10 | How long an export waits for a slot |
 | `FORWARDED_ALLOW_IPS` | `*` | Proxy addresses whose forwarded headers are trusted (Dockerfile) |
 
-## Browser sessions and the model server (added 2026-10-27)
+## Browser sessions and the model server (updated 2026-10-27)
 
-- **Refresh token out of the browser.** Sign-in and refresh set the refresh token in an HTTP-only cookie (`eris_refresh`, path `/api/auth`, `Secure` in production, `SameSite=none` in `render.yaml` because the web app is on Vercel, another site). Page scripts cannot read it.
-- **Forged cookie requests refused.** The web app sends `X-ERIS-Client: web`. Refresh and logout refuse a cookie request without it (403). A cross-site page cannot add that header without a CORS preflight the API refuses for other origins.
-- **Access token in memory only.** `web/src/lib/api.js` keeps it in a variable. A reload restores the session through the cookie (`restoreSession`). Old `localStorage` tokens are removed on start.
-- **API clients unchanged.** Requests without the header still receive the refresh token in the body, so scripts and the CI smoke test work.
-- **Ollama.** In production, a plain-HTTP model address is refused unless it is on this machine (`localhost`). Use `https://` to reach a model server on another host. The assistant then uses its built-in engine.
+- **No token the page can read.** Sign-in and refresh set two HTTP-only cookies: `eris_access` (path `/api`, lifetime of the access token) and `eris_refresh` (path `/api/auth`, lifetime of the refresh token). Both are `Secure` in production and `SameSite=none` on Render, where the web app is cross-site. The browser sends them; page scripts cannot read them. Neither token appears in any response body for a browser.
+- **Forged changes refused.** The web app sends `X-ERIS-Client: web`. A request authenticated by the access cookie that changes data (anything but GET, HEAD or OPTIONS) is refused with 403 without that header, and so is a refresh or logout that carries the refresh cookie without it. A third-party page cannot add the header without a CORS preflight the API refuses for other origins.
+- **Session restore.** `web/src/lib/api.js` remembers only whether a session exists. A reload checks it through the refresh cookie. Old `localStorage` tokens are removed on start.
+- **API clients unchanged.** A request with an `Authorization` header is authenticated by it, and its login response keeps both tokens in the body (scripts, the CI smoke test).
+- **Model server.** In production, every connection to the model server must be `https://`. Plain HTTP is refused even on the same machine, so production has no unencrypted model traffic. The assistant then uses its built-in engine. Development keeps plain `localhost` for a local model.
 
 ## Limits of this design (residual risks)
 

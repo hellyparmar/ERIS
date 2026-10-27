@@ -133,10 +133,10 @@ Each decision gives: **what** was chosen, **why**, **alternatives**, **consequen
 
 ---
 
-## D21. Refresh token only in an HTTP-only cookie; access token only in memory
-- **What:** Browsers receive the refresh token as an HTTP-only cookie scoped to `/api/auth`. They send `X-ERIS-Client: web`, which refresh and logout require when the cookie is present. The access token lives in a variable. A reload restores the session. API clients keep the refresh token in the body.
+## D21. Both session tokens in HTTP-only cookies; no token readable by the page
+- **What:** Browsers receive the access token (`eris_access`, path `/api`) and the refresh token (`eris_refresh`, path `/api/auth`) as HTTP-only cookies, and neither token appears in a response body. They send `X-ERIS-Client: web`; changing requests authenticated by cookie, and refresh or logout with the cookie, are refused without it. API clients use the `Authorization` header and keep both tokens in the body.
 - **Why:** The owner asked that tokens not be stored where page scripts can read them. `localStorage` is readable by any script that runs on the page.
 - **Alternatives:** Keep `localStorage` (rejected: readable by script). Put both tokens in cookies (rejected: the access token is then sent with every request, including to other sites).
 - **Consequence:** Cross-site cookies must be allowed (`SameSite=none`, Secure). Cookies blocked by the browser end the session on reload.
-- **Source:** recorded (`brain/13`; code in `api/app/routers/auth.py` and `web/src/lib/api.js`).
+- **Source:** recorded (`brain/13`; code in `api/app/security.py`, `api/app/routers/auth.py` and `web/src/lib/api.js`).
 

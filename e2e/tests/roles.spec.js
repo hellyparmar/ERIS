@@ -37,15 +37,17 @@ test('an expired access token is renewed from the HTTP-only refresh cookie', asy
   expect(renewals).toBeGreaterThan(0)
 })
 
-test('a page reload keeps the session, and no token is kept in the browser storage', async ({ page }) => {
+test('a page reload keeps the session; the tokens are HTTP-only cookies, not in the browser storage', async ({ page }) => {
   await login(page, 'manager')
   await page.reload()
   await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible()
   const stored = await page.evaluate(() => Object.keys(localStorage).filter((k) => /token|refresh|auth/i.test(k)))
   expect(stored).toEqual([])
   const cookies = await page.context().cookies()
-  const refresh = cookies.find((c) => c.name === 'eris_refresh')
-  expect(refresh && refresh.httpOnly).toBe(true)
+  for (const name of ['eris_refresh', 'eris_access']) {
+    const c = cookies.find((x) => x.name === name)
+    expect(c && c.httpOnly).toBe(true)
+  }
 })
 
 test('phone layout has no horizontal scrolling', async ({ browser }) => {

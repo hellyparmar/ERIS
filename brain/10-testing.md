@@ -4,7 +4,7 @@
 
 | Suite | Where | What it proves | Count (latest recorded) |
 |---|---|---|---|
-| API tests (SQLite) | `api/tests/` | Endpoints, roles, scope, imports, forecasting, assistant routing, caching, concurrency, isolation, security headers, rate limits, gates, TLS | 145 (confirmed by a full run on 2026-10-27) |
+| API tests (SQLite) | `api/tests/` | Endpoints, roles, scope, imports, forecasting, assistant routing, caching, concurrency, isolation, security headers, rate limits, gates, TLS | 148 (confirmed by a full run on 2026-10-27) |
 | API tests (PostgreSQL) | same, `api-postgres` CI job | Same, on PostgreSQL. Starts from an empty schema | 120 |
 | End-to-end (Playwright) | `e2e/tests/` | The UI as a user sees it, per role, against a running API, under the Content-Security-Policy; session restore and renewal from the cookie | 15 |
 | Assistant evaluation | `api/app/assistant_eval.py` | 31 intents routed correctly; 21 numbers match independent SQL | 31 + 21 |

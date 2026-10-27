@@ -4,13 +4,14 @@ Things that are known, unresolved, or waiting on the owner. Each has a reason an
 
 ## Waiting on the owner
 
-### H1. Verify the hosts (open: needs a run on the live hosts)
-- **Not verified from the build environment.** The sandbox proxy refuses the Render and Vercel hosts (HTTP 403: destination not allowed for the session). The proxy's rules say not to route around that.
-- **Run the check yourself, from any computer:**
-  `python3 scripts/verify_deployment.py https://eris-tvro.onrender.com --web https://<your-site>.vercel.app`
-  It signs in with the public demo account, checks the security headers, the HTTPS redirect, the refresh cookie flags (HttpOnly, Secure, SameSite=None, path), the cookie-renewal and forged-request refusals, and the CORS rules. It prints PASS/FAIL per check and exits non-zero on any failure.
-- **Also check by hand:** on Render, `ENVIRONMENT=production` and `REFRESH_COOKIE_SAMESITE=none`, and `CORS_ORIGINS` set to the Vercel address only. On Vercel, `VITE_API_URL` starts with `https://`. In the browser, sign in, reload, and confirm you stay signed in and that no token is in local storage.
-- **Evidence from this environment:** the script ran against a local production-mode server over HTTPS (self-signed certificate, trusted with `--ca`): 22 of 23 checks passed. The one failure was the platform's plain-HTTP redirect, which a local server without an HTTP listener cannot provide. Plain HTTP over the live hosts is the check that still needs running.
+### H1. Verify the hosts (open: needs the owner to allow the hosts, then a run)
+- **Blocked from the build environment.** The sandbox's network policy refuses `eris-tvro.onrender.com` and the Vercel site (HTTP 403). To allow them: in the session's cloud environment settings, Network access → Allowed domains, add both hosts (keep package managers ticked). Docs: https://code.claude.com/docs/en/cloud-environments#network-access
+- **Then the check runs from anywhere:** `python3 scripts/verify_deployment.py https://eris-tvro.onrender.com --web https://<your-site>.vercel.app` (signs in with the public demo account; prints PASS/FAIL per check).
+- **Also confirm on the hosts:** Render `ENVIRONMENT=production` and `REFRESH_COOKIE_SAMESITE=none`; `CORS_ORIGINS` set to the Vercel address only; Vercel `VITE_API_URL` starts with `https://`.
+- **Evidence from the build environment:** the same script passed 24 of 25 checks against a local HTTPS production-mode server (self-signed certificate trusted with `--ca`). The one failure, the platform's plain-HTTP redirect, needs the live host.
+
+### H2. Cross-site cookies (decision for the owner)
+- Browsers that block third-party cookies end the session on reload when the web app (Vercel) and the API (Render) are on different sites. Option: make them the same site (a custom domain for both, or Vercel rewrites `/api/*` to Render). That also lets `SameSite=lax` apply. Trade-off: behind a rewrite, every request reaches the API from Vercel's address, so per-address limits depend on forwarded headers being trusted; that needs checking on the live host. Not changed here.
 
 ### S1. Rotate the credentials exposed in public history (open, high)
 - **Issue:** A real database password (commit `18e7012`) and a Supabase project's keys (commit `b86cc36`) are in a public repository's history. Full detail and the owner actions are in `12-security-incident.md`.

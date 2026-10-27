@@ -13,7 +13,7 @@ from app.db import get_db
 from app.models import Outlet, User
 from app.routers.common import get_or_404
 from app.schemas import ChangePasswordIn, LoginIn, ProfileIn, RefreshIn, UserIn, UserUpdate
-from app.security import decode_token, get_current_user, hash_password, require_admin, token_pair, verify_password
+from app.security import ACCESS_COOKIE, decode_token, get_current_user, hash_password, require_admin, token_pair, verify_password
 from app.services.audit import audit
 
 log = logging.getLogger(__name__)
@@ -84,11 +84,22 @@ def _set_refresh_cookie(response: Response, token: str) -> None:
                         path="/api/auth")
 
 
-def _session_response(pair: dict, user: User, request: Request, response: Response) -> dict:
-    """Browsers get the refresh token as a cookie only; API clients keep it in the body."""
+def _set_access_cookie(response: Response, token: str) -> None:
+    response.set_cookie(ACCESS_COOKIE, token, max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+                        httponly=True, secure=settings.cookie_secure, samesite=settings.REFRESH_COOKIE_SAMESITE,
+                        path="/api")
+
+
+def _browser_session(pair: dict, request: Request, response: Response) -> dict:
+    """Browsers get both tokens as HTTP-only cookies and see neither in the body; API clients keep them in the body."""
     if _is_web(request):
         _set_refresh_cookie(response, pair.pop("refresh_token"))
-    return {**pair, "user": user_dict(user)}
+        _set_access_cookie(response, pair.pop("access_token"))
+    return pair
+
+
+def _session_response(pair: dict, user: User, request: Request, response: Response) -> dict:
+    return {**_browser_session(pair, request, response), "user": user_dict(user)}
 
 
 @router.post("/auth/login")
@@ -137,10 +148,12 @@ def refresh(request: Request, response: Response, body: RefreshIn | None = None,
 
 @router.post("/auth/logout")
 def logout(request: Request, response: Response):
-    """End this browser's session: the refresh cookie is removed. (Other devices: /auth/logout-all.)"""
+    """End this browser's session: both session cookies are removed. (Other devices: /auth/logout-all.)"""
     if not _is_web(request):
         raise HTTPException(403, f"Missing {WEB_CLIENT_HEADER} header")
     response.delete_cookie(settings.REFRESH_COOKIE_NAME, path="/api/auth", secure=settings.cookie_secure,
+                           samesite=settings.REFRESH_COOKIE_SAMESITE, httponly=True)
+    response.delete_cookie(ACCESS_COOKIE, path="/api", secure=settings.cookie_secure,
                            samesite=settings.REFRESH_COOKIE_SAMESITE, httponly=True)
     return {"ok": True}
 
@@ -174,10 +187,7 @@ def change_password(body: ChangePasswordIn, request: Request, response: Response
     user.token_version = (user.token_version or 0) + 1  # sign out other sessions
     audit(db, user, "user.password", "user", user.id, "Changed own password")
     db.commit()
-    pair = token_pair(user)
-    if _is_web(request):
-        _set_refresh_cookie(response, pair.pop("refresh_token"))
-    return {**pair, "ok": True}
+    return {**_browser_session(token_pair(user), request, response), "ok": True}
 
 
 # ------------------------------------------------------------------------------------------ users (admin)

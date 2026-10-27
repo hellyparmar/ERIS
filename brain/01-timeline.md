@@ -96,6 +96,13 @@ Three eras are visible in the history:
 
 #13, #22, #23, #24, #25, #27, #28, #29, #30, #31, #32 (see `git log --merges` for the full list).
 
+### 2026-10-27: no session token readable by the page; deployment check script
+
+- **Access token out of the page too:** `eris_access` (HTTP-only, path `/api`) joins the refresh cookie; the browser body carries no token. Changing cookie-authenticated requests need `X-ERIS-Client: web` (403 without it). Decision D21 updated.
+- **Model server in production:** only `https://` is accepted (loopback no longer exempt), so production has no unencrypted model traffic.
+- **Deployment check:** `scripts/verify_deployment.py` passed 24 of 25 against a local HTTPS production-mode server; the live hosts remain to be checked (H1, needs the owner to allow the hosts in the environment's network settings).
+- **Tests:** API 148; e2e 15 (renewal after a 401; reload keeps the session; tokens HTTP-only).
+
 ### 2026-10-27: browser sessions and model-server transport
 
 - **Refresh token out of the browser:** sign-in and refresh set it as an HTTP-only, Secure cookie (`SameSite=none` on Render). The access token is kept in memory. Old `localStorage` tokens are removed on start. Decision D21.
