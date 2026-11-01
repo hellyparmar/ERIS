@@ -1,6 +1,6 @@
 -r requirements.txt
-pytest>=8
-ruff>=0.5
+pytest>=9.2.0
+ruff>=0.17.3
 # forecast evaluation report & notebook
 matplotlib>=3.8
 tabulate>=0.9
