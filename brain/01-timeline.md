@@ -122,6 +122,7 @@ Three eras are visible in the history:
 - `yaml.safe_load` on `ci.yml`: parses; jobs `api`, `api-postgres`, `web`, `docker`, `e2e`.
 - Local e2e: `npm run build` in `web`, then `npx playwright test` in `e2e` with Playwright 1.56.1 and the pre-installed Chromium, against the API on SQLite: **15 passed** (2.1 min). Earlier notes said 14; the suite has 15 tests.
 - `ruff check app tests`: passed. `pytest -q` in `api`: **152 passed**.
+- CI on `0a73cf6` (run 41692003425, https://github.com/hellyparmar/ERIS/actions/runs/41692003425): **all five jobs passed** on `ubuntu-24.04` (api, api-postgres, web, docker, e2e).
 - Live: `python3 scripts/verify_deployment.py https://eris-tvro.onrender.com --web https://eris-retail.vercel.app`: **24 of 24 passed**, including `SameSite=None` on both session cookies, the HTTP-to-HTTPS 301 and the hardened Vercel build (CSP, no inline scripts).
 
 **Follow-ups**
