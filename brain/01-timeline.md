@@ -96,6 +96,40 @@ Three eras are visible in the history:
 
 #13, #22, #23, #24, #25, #27, #28, #29, #30, #31, #32 (see `git log --merges` for the full list).
 
+### 2026-11-03: CI e2e job fixed by pinning the runner; live check 24 of 24
+
+**Request (as given):** Stop-hook goal: check dead code, old redirects, open ports, pipelines under heavy traffic, optimise the pipelines, encrypt and secure the connectivity to the backend, and verify on the deployed system. The unresolved items named were the live SameSite check, the failing CI run on 6f17eac, the red Dependabot PRs and the failing Refresh hosted demo job.
+
+**What changed**
+- `.github/workflows/ci.yml`: every job `runs-on: ubuntu-latest` → `ubuntu-24.04` (five jobs).
+
+**Why this approach**
+- CI run 159 on 6f17eac failed in the `e2e` job only. `npx playwright install --with-deps chromium` stopped with "Playwright does not support chromium on ubuntu26.04-x64": `ubuntu-latest` now resolves to Ubuntu 26.04, and the pinned `@playwright/test` 1.56.1 does not support it. The api, api-postgres, web and docker jobs passed on the same commit, so the break is in the runner image, not the code.
+- Pinning to 24.04, which Playwright 1.56.1 supports, fixes it without a Playwright upgrade. A fixed image also stops a future runner change from breaking the pipeline without notice (D22).
+- The live SameSite item is closed: the owner set `REFRESH_COOKIE_SAMESITE=none` on Render, and the live check now passes.
+
+**Alternatives considered**
+- Upgrade Playwright to 1.64.1 (Dependabot #37): a version change with its own risk. Kept for its own PR.
+- Pin only the e2e job: leaves the jobs on different images. Rejected.
+
+**Trade-offs and risks**
+- The pin is a deliberate maintenance point: GitHub will retire 24.04, and the image must be moved on purpose, with the Playwright version checked. It would show as a red `e2e` job again.
+
+**Decision record**
+- New decision D22 in `02-decisions.md`. Source: recorded (CI log of run 41688702034).
+
+**Verification (as run)**
+- `yaml.safe_load` on `ci.yml`: parses; jobs `api`, `api-postgres`, `web`, `docker`, `e2e`.
+- Local e2e: `npm run build` in `web`, then `npx playwright test` in `e2e` with Playwright 1.56.1 and the pre-installed Chromium, against the API on SQLite: **15 passed** (2.1 min). Earlier notes said 14; the suite has 15 tests.
+- `ruff check app tests`: passed. `pytest -q` in `api`: **152 passed**.
+- Live: `python3 scripts/verify_deployment.py https://eris-tvro.onrender.com --web https://eris-retail.vercel.app`: **24 of 24 passed**, including `SameSite=None` on both session cookies, the HTTP-to-HTTPS 301 and the hardened Vercel build (CSP, no inline scripts).
+
+**Follow-ups**
+- Dependabot #42 (pip group) fails in the `api` job: it moves the constraint to `numpy==2.5.4`, which has no wheel for Python 3.11, the CI and Docker runtime. Needs a decision (stay on 2.4.6, or move the runtime). Open item I2.
+- Dependabot #35 moves the Docker base to Python 3.15; the tested runtime is 3.11. Open item I2.
+- Dependabot branches predate the fixes on `main`; rebase them before judging their results.
+- Refresh hosted demo still fails (exit 22): `RENDER_DEPLOY_HOOK_URL` is stale. Owner action; open item I3.
+
 ### 2026-11-03: PR #43 merged; live check 23 of 25
 
 - PR #43 merged to `main` (af1acc2). Render serves the new build (security headers present).

@@ -140,3 +140,10 @@ Each decision gives: **what** was chosen, **why**, **alternatives**, **consequen
 - **Consequence:** Cross-site cookies must be allowed (`SameSite=none`, Secure). Cookies blocked by the browser end the session on reload.
 - **Source:** recorded (`brain/13`; code in `api/app/security.py`, `api/app/routers/auth.py` and `web/src/lib/api.js`).
 
+## D22. CI runs on a fixed Ubuntu image
+- **What:** Every CI job runs on `ubuntu-24.04`, not `ubuntu-latest`.
+- **Why:** `ubuntu-latest` moved to Ubuntu 26.04. The pinned Playwright 1.56.1 cannot install Chromium there, so the `e2e` job failed on every run after the move (run 41688702034, commit 6f17eac). The other jobs passed on the same commit, so the break was in the runner image, not the code.
+- **Alternatives:** Upgrade Playwright to 1.64.1 (Dependabot #37): a version change with its own risk, kept for a separate change. Pin only `e2e`: leaves jobs on different images.
+- **Consequence:** The image must be moved on purpose before GitHub retires 24.04, with the Playwright version checked at the same time.
+- **Source:** recorded (CI log; `.github/workflows/ci.yml`).
+
