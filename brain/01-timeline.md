@@ -96,6 +96,32 @@ Three eras are visible in the history:
 
 #13, #22, #23, #24, #25, #27, #28, #29, #30, #31, #32 (see `git log --merges` for the full list).
 
+### 2026-11-03: CI failure in two import tests fixed (date of the sample row)
+
+**What changed**
+- `api/tests/test_isolation.py`, `_sample_row`: the sample sale is dated yesterday in the business time zone (`clock.today() - 1 day`), not the latest seeded sale date.
+
+**Why this approach**
+- CI runs 165 (`db77a14`) and 166 (`748e59c`) failed `api` and `api-postgres` in two tests of `test_isolation.py`. Run 164 (`efb828d`) had passed on the same code.
+- Reproduced locally in the full suite, not in the single file. The importer's error for the sample row: "Sale date/time cannot be in the future" (`created` = 0).
+- Cause: the sample date was the latest seeded sale date. The conftest seeds that data ending on `date.today()` in the runner's UTC clock, while the app's business clock is Asia/Kolkata. Near midnight in India the seeded data can reach the business "today", and the row is then refused as future.
+- Fix: yesterday on the business clock is always in the past and after the outlets opened, and the importer's own sample generator uses the same rule.
+
+**Alternatives considered**
+- Retry the tests: rejected; the failure is deterministic near midnight IST, not random.
+- Change the seed to use the business clock: a larger change to test setup; left for later.
+
+**Trade-offs and risks**
+- The test now depends on the business clock, as the importer does. If the organization's time zone changes, the test follows it.
+
+**Decision record**
+- No new decision. Topic file: `brain/10-testing.md`.
+
+**Verification (as run)**
+- Full API suite locally: `pytest -q` → 152 passed (before the fix: 150 passed, 2 failed in the same two tests).
+- `ruff check app tests`: passed.
+- CI on the fix: pending at the time of writing (see the next entry).
+
 ### 2026-11-03: Attribution removed from new commits and the rule; six branch commits rewritten
 
 **Request (as given):** "make sure nothing like co-authored with claude or claude's name in doing all these appear in github repo or anywhere where other ppl get to know this project". Choices given by the owner: rewrite only this branch's six unmerged commits; keep the mentions in the files.
