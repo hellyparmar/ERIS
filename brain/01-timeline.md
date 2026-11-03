@@ -96,6 +96,145 @@ Three eras are visible in the history:
 
 #13, #22, #23, #24, #25, #27, #28, #29, #30, #31, #32 (see `git log --merges` for the full list).
 
+### 2026-11-03: CI failure in two import tests fixed (date of the sample row)
+
+**What changed**
+- `api/tests/test_isolation.py`, `_sample_row`: the sample sale is dated yesterday in the business time zone (`clock.today() - 1 day`), not the latest seeded sale date.
+
+**Why this approach**
+- CI runs 165 (`db77a14`) and 166 (`748e59c`) failed `api` and `api-postgres` in two tests of `test_isolation.py`. Run 164 (`efb828d`) had passed on the same code.
+- Reproduced locally in the full suite, not in the single file. The importer's error for the sample row: "Sale date/time cannot be in the future" (`created` = 0).
+- Cause: the sample date was the latest seeded sale date. The conftest seeds that data ending on `date.today()` in the runner's UTC clock, while the app's business clock is Asia/Kolkata. Near midnight in India the seeded data can reach the business "today", and the row is then refused as future.
+- Fix: yesterday on the business clock is always in the past and after the outlets opened, and the importer's own sample generator uses the same rule.
+
+**Alternatives considered**
+- Retry the tests: rejected; the failure is deterministic near midnight IST, not random.
+- Change the seed to use the business clock: a larger change to test setup; left for later.
+
+**Trade-offs and risks**
+- The test now depends on the business clock, as the importer does. If the organization's time zone changes, the test follows it.
+
+**Decision record**
+- No new decision. Topic file: `brain/10-testing.md`.
+
+**Verification (as run)**
+- Full API suite locally: `pytest -q` → 152 passed (before the fix: 150 passed, 2 failed in the same two tests).
+- `ruff check app tests`: passed.
+- CI on the fix: pending at the time of writing (see the next entry).
+
+### 2026-11-03: Attribution removed from new commits and the rule; six branch commits rewritten
+
+**Request (as given):** "make sure nothing like co-authored with claude or claude's name in doing all these appear in github repo or anywhere where other ppl get to know this project". Choices given by the owner: rewrite only this branch's six unmerged commits; keep the mentions in the files.
+
+**What changed**
+- The six unmerged commits on this branch (`6f17eac` to `efb828d`, now `67a8328` to `db77a14`): the `Co-Authored-By: Claude` and `Claude-Session` lines were removed from their messages. No file content changed.
+- `CLAUDE.md`, "Commits": the trailer rule now says no attribution trailers or footers.
+- `brain/02-decisions.md`: D19 replaced with the new rule; the earlier version is noted as superseded.
+
+**Why this approach**
+- The six commits are not on `main`, so rewriting them changes nothing public that others have seen; the rewrite was done with `git filter-branch` on `origin/main..HEAD`, and the tree hash was checked before and after (identical: `62027ed`).
+- The older 79 commits on `main` were not rewritten: that changes every SHA on the public default branch and needs the owner's explicit choice.
+
+**Alternatives considered**
+- Rewrite all 85 commits and force-push `main`: not chosen by the owner; blocked in practice by the `main` protection and it breaks links to commits.
+- Keep the trailers and only stop adding them: rejected by the owner's request for the branch.
+
+**Trade-offs and risks**
+- `main` still shows the trailers on 79 older commits and in the four files that mention Claude (`CLAUDE.md`, brain notes). Anyone reading the history can still see them.
+- The force-push replaced `efb828d`. A local backup branch `backup/pre-attribution-rewrite` keeps the old tip; it is local only.
+
+**Decision record**
+- D19 in `02-decisions.md` (superseded wording kept in the entry). Source: recorded (owner's request).
+
+**Verification (as run)**
+- `git rev-parse HEAD^{tree}` before and after the rewrite: `62027ed` both; `git log origin/main..HEAD --grep Claude -i`: 0 matches after the rewrite.
+- Force-push with `--force-with-lease=claude/loving-wright-326xam:efb828d`: accepted.
+
+**Follow-ups**
+- Owner decision: whether to rewrite the 79 older commits on `main` (changes SHAs; needs a `main` branch change).
+- CLAUDE.md still names Claude in its title and in the brain-folder rule's text; left as the owner asked.
+
+### 2026-11-03: Refresh hosted demo verified; its runner pinned
+
+**What changed**
+- `.github/workflows/refresh-demo.yml`: `runs-on: ubuntu-latest` → `ubuntu-24.04`, as in D22.
+
+**Why this approach**
+- The open item "stale RENDER_DEPLOY_HOOK_URL" was wrong. The scheduled run of 2026-11-02 (run 4) logged "Rebuild requested.", so the secret works. Run 3 (2026-10-25) was the last failure.
+- The job still ran on `ubuntu-26.04`; pinning it matches the other workflows.
+
+**Verification (as run)**
+- GitHub API: runs 3 (failure, 2026-10-25) and 4 (success, 2026-11-02) of the workflow; job log of run 4 read.
+- `yaml.safe_load` on `refresh-demo.yml`: parses.
+
+### 2026-11-03: Dependabot held to Python 3.11 (D23)
+
+**Request (as given):** Stop-hook goal, pipeline items still open: the Dependabot PRs (#42, #35) blocked by the runtime decision.
+
+**What changed**
+- `.github/dependabot.yml`: pip ignores `numpy` `>=2.5`; docker ignores `python` `>=3.12`.
+
+**Why this approach**
+- The tested runtime is 3.11 (CI, Dockerfile). numpy 2.5 has no 3.11 wheel, so the pip group fails at install (PR #42, run log: "no matching distributions available").
+- A rule keeps the next monthly run from proposing the same breaking bump, without touching the open PRs.
+
+**Alternatives considered**
+- Move to 3.12+ now: a runtime change that needs the full suite and Render re-verified; not done without the owner.
+
+**Trade-offs and risks**
+- Two open PRs (#42, #35) remain until closed. The rule is not a substitute for closing them.
+- The owner has not answered the runtime question; D23 is the default and can be overruled.
+
+**Decision record**
+- D23 in `02-decisions.md`. Source: recorded as a default, pending owner confirmation.
+
+**Verification (as run)**
+- `yaml.safe_load` on `dependabot.yml`: parses; both ignore rules present.
+
+**Follow-ups**
+- Close #42 and #35 (owner or Claude on request) once the rule is confirmed.
+- Refresh hosted demo secret: owner action (I3).
+
+### 2026-11-03: CI e2e job fixed by pinning the runner; live check 24 of 24
+
+**Request (as given):** Stop-hook goal: check dead code, old redirects, open ports, pipelines under heavy traffic, optimise the pipelines, encrypt and secure the connectivity to the backend, and verify on the deployed system. The unresolved items named were the live SameSite check, the failing CI run on 6f17eac, the red Dependabot PRs and the failing Refresh hosted demo job.
+
+**What changed**
+- `.github/workflows/ci.yml`: every job `runs-on: ubuntu-latest` → `ubuntu-24.04` (five jobs).
+
+**Why this approach**
+- CI run 159 on 6f17eac failed in the `e2e` job only. `npx playwright install --with-deps chromium` stopped with "Playwright does not support chromium on ubuntu26.04-x64": `ubuntu-latest` now resolves to Ubuntu 26.04, and the pinned `@playwright/test` 1.56.1 does not support it. The api, api-postgres, web and docker jobs passed on the same commit, so the break is in the runner image, not the code.
+- Pinning to 24.04, which Playwright 1.56.1 supports, fixes it without a Playwright upgrade. A fixed image also stops a future runner change from breaking the pipeline without notice (D22).
+- The live SameSite item is closed: the owner set `REFRESH_COOKIE_SAMESITE=none` on Render, and the live check now passes.
+
+**Alternatives considered**
+- Upgrade Playwright to 1.64.1 (Dependabot #37): a version change with its own risk. Kept for its own PR.
+- Pin only the e2e job: leaves the jobs on different images. Rejected.
+
+**Trade-offs and risks**
+- The pin is a deliberate maintenance point: GitHub will retire 24.04, and the image must be moved on purpose, with the Playwright version checked. It would show as a red `e2e` job again.
+
+**Decision record**
+- New decision D22 in `02-decisions.md`. Source: recorded (CI log of run 41688702034).
+
+**Verification (as run)**
+- `yaml.safe_load` on `ci.yml`: parses; jobs `api`, `api-postgres`, `web`, `docker`, `e2e`.
+- Local e2e: `npm run build` in `web`, then `npx playwright test` in `e2e` with Playwright 1.56.1 and the pre-installed Chromium, against the API on SQLite: **15 passed** (2.1 min). Earlier notes said 14; the suite has 15 tests.
+- `ruff check app tests`: passed. `pytest -q` in `api`: **152 passed**.
+- CI on `0a73cf6` (run 41692003425, https://github.com/hellyparmar/ERIS/actions/runs/41692003425): **all five jobs passed** on `ubuntu-24.04` (api, api-postgres, web, docker, e2e).
+- Live: `python3 scripts/verify_deployment.py https://eris-tvro.onrender.com --web https://eris-retail.vercel.app`: **24 of 24 passed**, including `SameSite=None` on both session cookies, the HTTP-to-HTTPS 301 and the hardened Vercel build (CSP, no inline scripts).
+
+**Follow-ups**
+- Dependabot #42 (pip group) fails in the `api` job: it moves the constraint to `numpy==2.5.4`, which has no wheel for Python 3.11, the CI and Docker runtime. Needs a decision (stay on 2.4.6, or move the runtime). Open item I2.
+- Dependabot #35 moves the Docker base to Python 3.15; the tested runtime is 3.11. Open item I2.
+- Dependabot branches predate the fixes on `main`; rebase them before judging their results.
+- Refresh hosted demo still fails (exit 22): `RENDER_DEPLOY_HOOK_URL` is stale. Owner action; open item I3.
+
+### 2026-11-03: PR #43 merged; live check 23 of 25
+
+- PR #43 merged to `main` (af1acc2). Render serves the new build (security headers present).
+- Live check: 23 of 25 passed. The application-level redirect check is local-only (the platform proxy overrides the header). Open: the live cookies are `SameSite=lax`; `REFRESH_COOKIE_SAMESITE` must be set to `none` in Render's environment for the Vercel site's sign-in to work (owner action).
+
 ### 2026-11-03: cause of the failed Render deploy of 8213593, and the fix
 
 - Render's log for the failed deploy (owner-provided): the app started ("Started server process", "Waiting for application startup", migrations), but Render's port scan timed out before "Application startup complete" and "Uvicorn running" appeared. The app answered health checks with 200 only after that. Uvicorn runs the application's start-up code before it opens the port, so the start-up work exceeded Render's port-scan window.

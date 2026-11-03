@@ -13,8 +13,8 @@ history of every change.
 
 ## Commits
 
-- Trailers: `Co-Authored-By: Claude <noreply@anthropic.com>` and the `Claude-Session:` line. Do not name a model in
-  commit messages, PR titles or bodies, or any file in the repository.
+- No attribution trailers or footers: no `Co-Authored-By` or `Claude-Session` lines, and no "Generated with" footer, in
+  commits or pull requests. Do not name a model in commit messages, PR titles or bodies, or any file in the repository.
 - Push to the branch you were given. Open a pull request only when asked.
 
 ## Checks

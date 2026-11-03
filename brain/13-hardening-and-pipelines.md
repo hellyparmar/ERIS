@@ -95,6 +95,13 @@ Load test: a mixed script (dashboard, sales list, stock list, menu list, forecas
 - **CORS defaults:** the default allowed origins include `localhost`. Production should set `CORS_ORIGINS` to the web app's address only.
 - **Verify on the hosts (H1):** the Render service needs `ENVIRONMENT=production` (set in `render.yaml`), and the Vercel build needs `VITE_API_URL` to be an `https://` address. Neither can be checked from the repository.
 
+## Live check findings (2026-11-03)
+
+- Against the live Render API and Vercel site (after PR #43): 23 of 25 checks passed.
+- The application's own plain-HTTP redirect cannot be exercised from outside a hosted service: the platform's proxy sets `X-Forwarded-Proto` itself. The script now runs that check only against a local server. The platform's HTTP-to-HTTPS redirect (301) passes on the live host.
+- **Resolved 2026-11-03:** the session cookies were `SameSite=lax`, so the browser did not send them from the Vercel site to the Render API, and sign-in failed. The owner set `REFRESH_COOKIE_SAMESITE=none` on the `eris` service and redeployed. The live check now passes 24 of 24: both session cookies are `HttpOnly`, `Secure` and `SameSite=None`, sign-in and renewal work, and the Vercel site serves the hardened build (CSP, no inline scripts).
+- **CI, 2026-11-03:** the `e2e` job failed on every run after `ubuntu-latest` moved to Ubuntu 26.04, where Playwright 1.56.1 cannot install Chromium. All jobs are pinned to `ubuntu-24.04` (D22). The e2e suite passes locally: 15 tests.
+
 ## How to verify the deployed system
 
 `python3 scripts/verify_deployment.py https://<api host> --web https://<web host>` runs the connectivity and security checks against a live deployment (see `brain/11`, H1). Add `--local --ca <file>` for a test server.
@@ -102,7 +109,7 @@ Load test: a mixed script (dashboard, sales list, stock list, menu list, forecas
 ## How to verify
 
 ```bash
-cd api && ruff check app tests && pytest -q          # 137 tests, incl. tests/test_hardening.py, test_capacity.py, test_transport.py
+cd api && ruff check app tests && pytest -q          # 152 tests, incl. tests/test_hardening.py, test_capacity.py, test_transport.py
 cd web && npx eslint src && npm run build
-cd e2e && npx playwright test                          # 14 tests; the login limit is raised for this server only
+cd e2e && npx playwright test                          # 15 tests; the login limit is raised for this server only
 ```

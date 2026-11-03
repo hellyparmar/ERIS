@@ -113,12 +113,12 @@ Each decision gives: **what** was chosen, **why**, **alternatives**, **consequen
 
 ---
 
-## D19. Commit trailers name no model
-- **What:** Commits end with `Co-Authored-By: Claude <noreply@anthropic.com>` and `Claude-Session: <session URL>`. No model name appears in commit messages, PR text or repository files.
-- **Why:** A session rule forbids model names in repository artifacts. Earlier commits named a model in their trailer, which conflicted with that rule.
-- **Alternatives:** Keep the model trailer (conflicts with the rule). Rewrite earlier history (rejected: it would break the shared branch and the merged PRs).
-- **Consequence:** Earlier commits keep their trailers. Only new commits follow this convention. `CLAUDE.md` states it.
-- **Source:** recorded (`CLAUDE.md`, commit `9118970`).
+## D19. Commits and pull requests carry no attribution trailers
+- **What:** Commits and pull requests carry no `Co-Authored-By` or `Claude-Session` lines and no "Generated with" footer. No model name appears in commit messages, PR text or repository files.
+- **Why:** The owner asked that the project not show that Claude helped build it, in GitHub or anywhere else people see the project. A session rule also forbids model names in repository artifacts.
+- **Alternatives:** Keep the neutral trailer (rejected by the owner). Rewrite the older history on `main` to remove the trailers (not done: it would change every commit SHA on the public `main`, and the owner did not ask for it; 79 older commits still carry trailers).
+- **Consequence:** Only commits from 2026-11-03 onward are clean, plus the six commits rewritten on the branch that day. `CLAUDE.md` states the new rule.
+- **Source:** recorded (owner's request, 2026-11-03; `CLAUDE.md`). Supersedes the earlier version of this decision.
 
 ---
 
@@ -139,4 +139,18 @@ Each decision gives: **what** was chosen, **why**, **alternatives**, **consequen
 - **Alternatives:** Keep `localStorage` (rejected: readable by script). Put both tokens in cookies (rejected: the access token is then sent with every request, including to other sites).
 - **Consequence:** Cross-site cookies must be allowed (`SameSite=none`, Secure). Cookies blocked by the browser end the session on reload.
 - **Source:** recorded (`brain/13`; code in `api/app/security.py`, `api/app/routers/auth.py` and `web/src/lib/api.js`).
+
+## D22. CI runs on a fixed Ubuntu image
+- **What:** Every CI job runs on `ubuntu-24.04`, not `ubuntu-latest`.
+- **Why:** `ubuntu-latest` moved to Ubuntu 26.04. The pinned Playwright 1.56.1 cannot install Chromium there, so the `e2e` job failed on every run after the move (run 41688702034, commit 6f17eac). The other jobs passed on the same commit, so the break was in the runner image, not the code.
+- **Alternatives:** Upgrade Playwright to 1.64.1 (Dependabot #37): a version change with its own risk, kept for a separate change. Pin only `e2e`: leaves jobs on different images.
+- **Consequence:** The image must be moved on purpose before GitHub retires 24.04, with the Playwright version checked at the same time.
+- **Source:** recorded (CI log; `.github/workflows/ci.yml`).
+
+## D23. The runtime stays on Python 3.11; Dependabot holds the newer versions
+- **What:** The API runs and is tested on Python 3.11 (CI jobs, `Dockerfile` base `python:3.11-slim`). `.github/dependabot.yml` ignores `numpy` 2.5 and later, and Docker `python` 3.12 and later. Moving the runtime is a separate change, made on purpose, with the full suite re-run.
+- **Why:** numpy 2.5 publishes no wheel for Python 3.11, so Dependabot's pip group (#42) cannot install. The Docker base bump to 3.15 (#35) would move the runtime without the suite having run on it.
+- **Alternatives:** Move to Python 3.12+ now (a runtime change with its own risk; the suite and the Render image must be re-verified). Let Dependabot keep proposing the bumps (they fail CI each month).
+- **Consequence:** Existing PRs #42 and #35 stay open until closed; the rules stop new ones of the same kind. The owner can overrule this decision by removing the rules.
+- **Source:** recorded (owner has not answered the question; this is the default chosen in the session, to be confirmed).
 

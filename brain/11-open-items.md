@@ -4,13 +4,13 @@ Things that are known, unresolved, or waiting on the owner. Each has a reason an
 
 ## Waiting on the owner
 
-### H1. Verify the hosts (open: needs the owner to allow the hosts, then a run)
+### H1. Verify the hosts (resolved 2026-11-03)
 - **Blocked from the build environment.** The sandbox's network policy refuses `eris-tvro.onrender.com` and the Vercel site (HTTP 403). To allow them: in the session's cloud environment settings, Network access → Allowed domains, add both hosts (keep package managers ticked). Docs: https://code.claude.com/docs/en/cloud-environments#network-access
 - **Then the check runs from anywhere:** `python3 scripts/verify_deployment.py https://eris-tvro.onrender.com --web https://<your-site>.vercel.app` (signs in with the public demo account; prints PASS/FAIL per check).
 - **Also confirm on the hosts:** Render `ENVIRONMENT=production` and `REFRESH_COOKIE_SAMESITE=none`; `CORS_ORIGINS` set to the Vercel address only; Vercel `VITE_API_URL` starts with `https://`.
 - **Evidence from the build environment:** the same script passed 24 of 25 checks against a local HTTPS production-mode server (self-signed certificate trusted with `--ca`). The one failure, the platform's plain-HTTP redirect, needs the live host.
 - **Check made 2026-10-27 (live hosts):** `eris-retail.vercel.app` is reachable (HTTP 200) but serves an **older build**: the security headers from `vercel.json` are absent and an inline script is still in the page. Production is built from `main`, which does not yet contain the hardening (PR #33 is open). `eris-tvro.onrender.com` is still unreachable (HTTP 000). The branch's Vercel preview returned 403 from this environment, so it could not be checked either.
-- **To complete H1:** (1) allow `eris-tvro.onrender.com` in the environment's network settings; (2) decide whether to merge PR #33 to `main`. Merging deploys the hardened web app to Vercel and, because Render auto-deploys `main`, the API to Render too. That needs the owner's approval; it was not done.
+- **Resolved 2026-11-03:** both hosts are reachable from the build environment; PR #33 and PR #43 are merged to `main`; `REFRESH_COOKIE_SAMESITE=none` is live on Render. `verify_deployment.py` passes 24 of 24 against the live API and the Vercel site (`brain/13`, "Live check findings"). Cross-site cookies (H2) are the reason the `none` setting is needed.
 
 ### H2. Cross-site cookies (decision for the owner)
 - Browsers that block third-party cookies end the session on reload when the web app (Vercel) and the API (Render) are on different sites. Option: make them the same site (a custom domain for both, or Vercel rewrites `/api/*` to Render). That also lets `SameSite=lax` apply. Trade-off: behind a rewrite, every request reaches the API from Vercel's address, so per-address limits depend on forwarded headers being trusted; that needs checking on the live host. Not changed here.
@@ -50,7 +50,7 @@ Things that are known, unresolved, or waiting on the owner. Each has a reason an
 - **Next step:** When the count changes, update the README, AUDIT.md and `10-testing.md` in the same change.
 
 ### O8. The E2E count (resolved)
-- **Checked:** 14 end-to-end tests in `e2e/tests`, which matches the README. The commit fc09565 message quoted 13 at that time. Nothing to change.
+- **Checked 2026-11-03:** 15 end-to-end tests in `e2e/tests`; all pass locally with Playwright 1.56.1. Earlier notes said 14, and the commit fc09565 message said 13 at that time. The count is not quoted elsewhere in the brain.
 
 ### O9. Some reasons are reconstructed
 - **Issue:** Decisions D1, D4, D5, D15 and parts of D6 have reasons that were not written at the time. `02-decisions.md` marks them *reconstructed*.
@@ -69,3 +69,16 @@ Things that are known, unresolved, or waiting on the owner. Each has a reason an
 - `api/data/eris.db` (about 145 MB) is a local demo database. Check whether it is ignored by git before any commit (it is not in the commit list).
 - `.ruff_cache/` is local tooling output. Confirm it is ignored.
 - Era 0 and Era 1 code is only in git history. Nothing else refers to it.
+
+### I1. Obsolete planning issues (closed 2026-11-03)
+- Twelve open issues (#1–#12, "1 1 PostgreSQL Setup" to "5 2 Deployment Checklist") were the planning tasks of the earlier product, created 15 February 2026. That product was retired and removed from the repository in October 2026, so the issues were closed as not planned, each with a note saying so. No open issues remain.
+
+### I2. Dependabot PRs that need a decision (default chosen 2026-11-03, D23; owner to confirm)
+- **Issue:** Dependabot PRs [#42](https://github.com/hellyparmar/ERIS/pull/42) (pip group, 48 updates) and [#35](https://github.com/hellyparmar/ERIS/pull/35) (Docker base `python:3.11-slim` → `3.15-slim`) fail or change the runtime. #42 moves the constraint to `numpy==2.5.4`, which has no wheel for Python 3.11, so the `api` job cannot install. The CI and the Docker image run Python 3.11. The other Dependabot PRs ([#36](https://github.com/hellyparmar/ERIS/pull/36)–[#41](https://github.com/hellyparmar/ERIS/pull/41), [#37](https://github.com/hellyparmar/ERIS/pull/37) Playwright 1.64.1 and the GitHub Actions major bumps, [#17](https://github.com/hellyparmar/ERIS/pull/17) Node 26) run on bases from before the 2026-11-03 fixes and need a rebase before they are judged.
+- **Default applied (D23):** Python stays on 3.11; `dependabot.yml` ignores numpy 2.5+ and Python 3.12+. Open PRs #42 and #35 still need closing.
+- **Next step (owner):** Confirm D23, or choose a runtime: stay on Python 3.11 and pin numpy to 2.4.x (close #42's numpy bump), or move the runtime to 3.12+ with the full suite re-run. Then rebase the rest. Nothing was merged or pushed to these branches.
+
+### I3. Refresh hosted demo: resolved 2026-11-03 (the hook secret works)
+- **Issue:** The scheduled workflow `refresh-demo.yml` calls the Render deploy hook from the secret `RENDER_DEPLOY_HOOK_URL`. It has failed with exit code 22 since 12 October, which points to an old hook URL.
+- **Resolved:** the scheduled run of 2026-11-02 (run 4) logged "Rebuild requested." The secret was replaced after the failure of 2026-10-25 (run 3). The job runs on `ubuntu-24.04` since D22's follow-up.
+- **Earlier steps (kept for reference):** In Render, open the `eris` service and copy the current Deploy Hook URL into the GitHub secret `RENDER_DEPLOY_HOOK_URL` (or delete the secret if the demo is refreshed by the Render auto-deploy instead). Then run the workflow once from the Actions tab.

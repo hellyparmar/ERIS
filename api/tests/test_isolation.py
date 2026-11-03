@@ -84,11 +84,16 @@ def _sales_csv(rows):
 
 
 def _sample_row(db, invoice):
+    from datetime import timedelta
+
+    from app import clock
     from app.models import Outlet, Product
 
     o = db.scalar(select(Outlet).order_by(Outlet.id))
     p = db.scalar(select(Product).where(Product.kind == "menu").order_by(Product.id))
-    day = db.scalar(select(func.max(Sale.sale_date)))
+    # yesterday in the business time zone: the importer refuses future sales, and the seed's last day is taken from
+    # the runner's UTC date, which can be ahead of the business date near midnight in India
+    day = clock.today() - timedelta(days=1)
     return f"{invoice},{day.isoformat()},{o.code},{p.sku},1"
 
 
