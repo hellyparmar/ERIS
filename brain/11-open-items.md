@@ -40,7 +40,7 @@ Things that are known, unresolved, or waiting on the owner. Each has a reason an
 
 ### G7. Sales export is the slow path under concurrent load (measured 2026-11-03)
 - **Measured:** 40 concurrent workers: p50 11.4 s, p95 12.8 s, and 70 of 100 export requests answered 503 (`brain/13`, "Load check").
-- **Next step:** Stream the export in chunks from a query that reads only the needed columns, and cache the file for the same period; then re-run `scripts/load_check.py`. Not done.
+- **Investigated 2026-11-03 (`brain/13`):** one export is about 0.3 s of work; the wait is queueing for two export slots on a CPU-limited host. The leaner writer saves 15 to 25 %; not adopted (small gain, touches the escaping path). Owner decision needed: more CPU or export slots for the hosted instance, or an export that runs as a background job and is downloaded when ready.
 
 ## Discrepancies to fix
 

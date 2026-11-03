@@ -122,6 +122,17 @@ Three eras are visible in the history:
 - `ruff check app tests`: passed.
 - CI on the fix: pending at the time of writing (see the next entry).
 
+### 2026-11-03: Live light-load check, port reachability, and the export investigation
+
+**What changed:** `brain/13` (new section), `brain/11` (G7 updated). No application code changed.
+
+**Verification (as run)**
+- Live API, 5 workers, 70 requests: 68 × 200, 1 × 503, 1 client timeout at 60 s; no 5xx from the server. Warm requests 0.3 to 0.5 s.
+- TCP on the public hostname: 80 and 443 open; 22, 5432, 6379, 8000, 8080 closed or filtered.
+- Export profile in-process: about 0.3 s per 30-day export; leaner writer 15 to 25 % faster with byte-identical output; the join-free lookup variant no faster. Not adopted.
+
+**Outcome:** the export is not made materially faster by code on this host; the decision is capacity or a background export (open item G7).
+
 ### 2026-11-03: Load check of the request pipelines; live build status
 
 **Request (as given):** Stop-hook goal: "pipeline doesn't break during heavy traffic", and whether the merged build is live.

@@ -117,6 +117,13 @@ Reading: the pipelines degrade by refusing (503 with `Retry-After`, 429 past the
 
 This is one machine, one database, one load shape. It is not a test of the hosted free instance (0.1 CPU); the live host was not load-tested, on purpose.
 
+## Live check under light load and port reachability (2026-11-03)
+
+- **Live API, 5 workers, 70 requests** (`scripts/load_check.py` against `eris-tvro.onrender.com`): 68 × 200, 1 × 503 (export busy), **1 client timeout at 60 s**. Latency at 5 workers: dashboard p50 0.97 s, products 1.16 s, sales 1.47 s, assistant 1.5 s, export p50 15.3 s, forecast p50 3.0 s (p95 38 s). No 5xx from the server.
+- **The timeout:** a warm request answers in 0.3 to 0.5 s on the live host (checked directly after the test). The likely cause is a cold instance: the hosted free instance sleeps when idle, and the first uncached forecast fit on a 0.1-CPU host can take tens of seconds while other requests queue behind it. Not proven: the server log is not available from here.
+- **Reachability of the public hostname:** TCP 80 and 443 open (the platform's HTTP redirect and HTTPS); 22, 5432, 6379, 8000 and 8080 closed or filtered. Render routes only the web port, and the host is fronted by Cloudflare, so this check cannot see private ports on the origin; it confirms what the public address exposes.
+- **Sales export (G7), investigated and not changed:** one 30-day export is about 0.3 s of work in-process (SQL about 0.2 s, rows and CSV about 0.1 s). Two variants were measured: skipping `safe_cell` on numeric cells and writing rows directly saves 15 to 25 %; looking up outlet and product names in Python instead of joining saves nothing. Output was byte-identical. The 11 s median under 40 workers is queueing behind the two export slots on a CPU-limited host, not the export itself. Exports are not cached: the response cache holds JSON answers only, and a 3.5 MB file per user and parameter set would grow the cache without a bound.
+
 ## How to verify the deployed system
 
 `python3 scripts/verify_deployment.py https://<api host> --web https://<web host>` runs the connectivity and security checks against a live deployment (see `brain/11`, H1). Add `--local --ca <file>` for a test server.
