@@ -96,6 +96,19 @@ Three eras are visible in the history:
 
 #13, #22, #23, #24, #25, #27, #28, #29, #30, #31, #32 (see `git log --merges` for the full list).
 
+### 2026-11-03: Refresh hosted demo verified; its runner pinned
+
+**What changed**
+- `.github/workflows/refresh-demo.yml`: `runs-on: ubuntu-latest` → `ubuntu-24.04`, as in D22.
+
+**Why this approach**
+- The open item "stale RENDER_DEPLOY_HOOK_URL" was wrong. The scheduled run of 2026-11-02 (run 4) logged "Rebuild requested.", so the secret works. Run 3 (2026-10-25) was the last failure.
+- The job still ran on `ubuntu-26.04`; pinning it matches the other workflows.
+
+**Verification (as run)**
+- GitHub API: runs 3 (failure, 2026-10-25) and 4 (success, 2026-11-02) of the workflow; job log of run 4 read.
+- `yaml.safe_load` on `refresh-demo.yml`: parses.
+
 ### 2026-11-03: Dependabot held to Python 3.11 (D23)
 
 **Request (as given):** Stop-hook goal, pipeline items still open: the Dependabot PRs (#42, #35) blocked by the runtime decision.

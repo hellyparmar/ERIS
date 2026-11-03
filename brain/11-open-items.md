@@ -78,6 +78,7 @@ Things that are known, unresolved, or waiting on the owner. Each has a reason an
 - **Default applied (D23):** Python stays on 3.11; `dependabot.yml` ignores numpy 2.5+ and Python 3.12+. Open PRs #42 and #35 still need closing.
 - **Next step (owner):** Confirm D23, or choose a runtime: stay on Python 3.11 and pin numpy to 2.4.x (close #42's numpy bump), or move the runtime to 3.12+ with the full suite re-run. Then rebase the rest. Nothing was merged or pushed to these branches.
 
-### I3. Refresh hosted demo fails: stale deploy-hook secret (open, owner action)
+### I3. Refresh hosted demo: resolved 2026-11-03 (the hook secret works)
 - **Issue:** The scheduled workflow `refresh-demo.yml` calls the Render deploy hook from the secret `RENDER_DEPLOY_HOOK_URL`. It has failed with exit code 22 since 12 October, which points to an old hook URL.
-- **Next step:** In Render, open the `eris` service and copy the current Deploy Hook URL into the GitHub secret `RENDER_DEPLOY_HOOK_URL` (or delete the secret if the demo is refreshed by the Render auto-deploy instead). Then run the workflow once from the Actions tab.
+- **Resolved:** the scheduled run of 2026-11-02 (run 4) logged "Rebuild requested." The secret was replaced after the failure of 2026-10-25 (run 3). The job runs on `ubuntu-24.04` since D22's follow-up.
+- **Earlier steps (kept for reference):** In Render, open the `eris` service and copy the current Deploy Hook URL into the GitHub secret `RENDER_DEPLOY_HOOK_URL` (or delete the secret if the demo is refreshed by the Render auto-deploy instead). Then run the workflow once from the Actions tab.
