@@ -38,6 +38,10 @@ Things that are known, unresolved, or waiting on the owner. Each has a reason an
 - **Decision:** Geist is the final typeface. Fraunces is no longer in the code: no import, no font package, no CSS reference. The styles define one family, Geist, with Geist Mono for figures (`web/src/styles.css`, `main.jsx`).
 - **Why this is recorded:** The screenshots, the README and the shipped app all use Geist. Reintroducing a serif would be a new decision, not a restoration.
 
+### G7. Sales export is the slow path under concurrent load (measured 2026-11-03)
+- **Measured:** 40 concurrent workers: p50 11.4 s, p95 12.8 s, and 70 of 100 export requests answered 503 (`brain/13`, "Load check").
+- **Next step:** Stream the export in chunks from a query that reads only the needed columns, and cache the file for the same period; then re-run `scripts/load_check.py`. Not done.
+
 ## Discrepancies to fix
 
 ### O6. Forecast evaluation scope: 25 series vs 20

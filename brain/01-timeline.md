@@ -122,6 +122,39 @@ Three eras are visible in the history:
 - `ruff check app tests`: passed.
 - CI on the fix: pending at the time of writing (see the next entry).
 
+### 2026-11-03: Load check of the request pipelines; live build status
+
+**Request (as given):** Stop-hook goal: "pipeline doesn't break during heavy traffic", and whether the merged build is live.
+
+**What changed**
+- `scripts/load_check.py`: new, stdlib-only load check over the heavy endpoints; exits non-zero on a server error.
+- `brain/13-hardening-and-pipelines.md`: "Load check (2026-11-03)" with the measured results.
+- `brain/11-open-items.md`: G7, the sales export under concurrency.
+
+**Why this approach**
+- The goal asked for the pipelines to hold under heavy traffic; the earlier notes had no measurement of that. This run measures it on a local server with the demo data.
+- Live build status: `/api/health` reports only the app version, not the commit. Since `af1acc2` no application code changed (`git diff --stat af1acc2 f97b319 -- api/app web/src` is empty); PR #44 changed CI, tests, docs and the verification script. So the live check (24 of 24) still describes the running application code.
+
+**Alternatives considered**
+- Load-test the hosted free instance: not done; it is a shared resource, and a test there would be unannounced load on production.
+
+**Trade-offs and risks**
+- One machine, one shape of load. Not a capacity figure for the hosted host.
+
+**Decision record**
+- No new decision.
+
+**Verification (as run)**
+- Local server, 40 workers × 700 requests: 630 × 200, 70 × 503; zero 500s or exceptions; server log without errors.
+- Forecast cap: 429 from request 18 of 150, `Retry-After: 4`.
+- `ruff check scripts/load_check.py`: passed (the script is not in CI's lint scope).
+- Live check: `verify_deployment.py` 24 of 24 (run earlier on this tree; the application code is unchanged since).
+
+**Follow-ups**
+- G7: the export is the slow path under load.
+- Dependabot #42 and #35 still open (owner decision).
+- Older `main` commits still carry Claude trailers (owner chose not to rewrite them).
+
 ### 2026-11-03: Attribution removed from new commits and the rule; six branch commits rewritten
 
 **Request (as given):** "make sure nothing like co-authored with claude or claude's name in doing all these appear in github repo or anywhere where other ppl get to know this project". Choices given by the owner: rewrite only this branch's six unmerged commits; keep the mentions in the files.

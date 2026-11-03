@@ -102,6 +102,21 @@ Load test: a mixed script (dashboard, sales list, stock list, menu list, forecas
 - **Resolved 2026-11-03:** the session cookies were `SameSite=lax`, so the browser did not send them from the Vercel site to the Render API, and sign-in failed. The owner set `REFRESH_COOKIE_SAMESITE=none` on the `eris` service and redeployed. The live check now passes 24 of 24: both session cookies are `HttpOnly`, `Secure` and `SameSite=None`, sign-in and renewal work, and the Vercel site serves the hardened build (CSP, no inline scripts).
 - **CI, 2026-11-03:** the `e2e` job failed on every run after `ubuntu-latest` moved to Ubuntu 26.04, where Playwright 1.56.1 cannot install Chromium. All jobs are pinned to `ubuntu-24.04` (D22). The e2e suite passes locally: 15 tests.
 
+## Load check (2026-11-03)
+
+`scripts/load_check.py` drives N concurrent workers over the heavy endpoints of a running API (stdlib only; `ERIS_BASE` selects the server; exits non-zero on a server error). Run on this machine against a local server on SQLite with the demo data (240 days), rate limits at their defaults:
+
+| Run | Result |
+|---|---|
+| 4 workers, 40 requests | 40 × 200; no server errors |
+| 40 workers, 700 requests | 630 × 200, 70 × 503 (all export requests: the export gate's busy answer); **no 500s, no exceptions**; server log without errors |
+| Latency, 40 workers | dashboard, sales list, analytics, products and forecast (cached): p50 0.04 s, p95 ≤ 0.34 s. Assistant chat: p50 1.0 s, p95 4.6 s. **Sales export: p50 11.4 s, p95 12.8 s** (two export workers; the rest wait up to 10 s, then 503) |
+| Forecast rate limit (120 per minute) | 429 from request 18 of 150 in the same minute (the earlier run had used ~100 of the 120), `Retry-After: 4` |
+
+Reading: the pipelines degrade by refusing (503 with `Retry-After`, 429 past the minute cap) and do not fail with errors under this load. The weak point is the sales export under concurrency: its work is serial behind two workers. Not yet optimised (open item G7).
+
+This is one machine, one database, one load shape. It is not a test of the hosted free instance (0.1 CPU); the live host was not load-tested, on purpose.
+
 ## How to verify the deployed system
 
 `python3 scripts/verify_deployment.py https://<api host> --web https://<web host>` runs the connectivity and security checks against a live deployment (see `brain/11`, H1). Add `--local --ca <file>` for a test server.
