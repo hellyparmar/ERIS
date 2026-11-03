@@ -69,3 +69,7 @@ Things that are known, unresolved, or waiting on the owner. Each has a reason an
 - `api/data/eris.db` (about 145 MB) is a local demo database. Check whether it is ignored by git before any commit (it is not in the commit list).
 - `.ruff_cache/` is local tooling output. Confirm it is ignored.
 - Era 0 and Era 1 code is only in git history. Nothing else refers to it.
+
+### I1. Obsolete planning issues (closed 2026-11-03)
+- Twelve open issues (#1–#12, "1 1 PostgreSQL Setup" to "5 2 Deployment Checklist") were the planning tasks of the earlier product, created 15 February 2026. That product was retired and removed from the repository in October 2026, so the issues were closed as not planned, each with a note saying so. No open issues remain.
+
