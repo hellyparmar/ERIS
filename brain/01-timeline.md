@@ -96,6 +96,38 @@ Three eras are visible in the history:
 
 #13, #22, #23, #24, #25, #27, #28, #29, #30, #31, #32 (see `git log --merges` for the full list).
 
+### 2026-11-03: Attribution removed from new commits and the rule; six branch commits rewritten
+
+**Request (as given):** "make sure nothing like co-authored with claude or claude's name in doing all these appear in github repo or anywhere where other ppl get to know this project". Choices given by the owner: rewrite only this branch's six unmerged commits; keep the mentions in the files.
+
+**What changed**
+- The six unmerged commits on this branch (`6f17eac` to `efb828d`, now `67a8328` to `db77a14`): the `Co-Authored-By: Claude` and `Claude-Session` lines were removed from their messages. No file content changed.
+- `CLAUDE.md`, "Commits": the trailer rule now says no attribution trailers or footers.
+- `brain/02-decisions.md`: D19 replaced with the new rule; the earlier version is noted as superseded.
+
+**Why this approach**
+- The six commits are not on `main`, so rewriting them changes nothing public that others have seen; the rewrite was done with `git filter-branch` on `origin/main..HEAD`, and the tree hash was checked before and after (identical: `62027ed`).
+- The older 79 commits on `main` were not rewritten: that changes every SHA on the public default branch and needs the owner's explicit choice.
+
+**Alternatives considered**
+- Rewrite all 85 commits and force-push `main`: not chosen by the owner; blocked in practice by the `main` protection and it breaks links to commits.
+- Keep the trailers and only stop adding them: rejected by the owner's request for the branch.
+
+**Trade-offs and risks**
+- `main` still shows the trailers on 79 older commits and in the four files that mention Claude (`CLAUDE.md`, brain notes). Anyone reading the history can still see them.
+- The force-push replaced `efb828d`. A local backup branch `backup/pre-attribution-rewrite` keeps the old tip; it is local only.
+
+**Decision record**
+- D19 in `02-decisions.md` (superseded wording kept in the entry). Source: recorded (owner's request).
+
+**Verification (as run)**
+- `git rev-parse HEAD^{tree}` before and after the rewrite: `62027ed` both; `git log origin/main..HEAD --grep Claude -i`: 0 matches after the rewrite.
+- Force-push with `--force-with-lease=claude/loving-wright-326xam:efb828d`: accepted.
+
+**Follow-ups**
+- Owner decision: whether to rewrite the 79 older commits on `main` (changes SHAs; needs a `main` branch change).
+- CLAUDE.md still names Claude in its title and in the brain-folder rule's text; left as the owner asked.
+
 ### 2026-11-03: Refresh hosted demo verified; its runner pinned
 
 **What changed**
