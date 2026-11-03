@@ -96,6 +96,11 @@ Three eras are visible in the history:
 
 #13, #22, #23, #24, #25, #27, #28, #29, #30, #31, #32 (see `git log --merges` for the full list).
 
+### 2026-11-03: PR #43 merged; live check 23 of 25
+
+- PR #43 merged to `main` (af1acc2). Render serves the new build (security headers present).
+- Live check: 23 of 25 passed. The application-level redirect check is local-only (the platform proxy overrides the header). Open: the live cookies are `SameSite=lax`; `REFRESH_COOKIE_SAMESITE` must be set to `none` in Render's environment for the Vercel site's sign-in to work (owner action).
+
 ### 2026-11-03: cause of the failed Render deploy of 8213593, and the fix
 
 - Render's log for the failed deploy (owner-provided): the app started ("Started server process", "Waiting for application startup", migrations), but Render's port scan timed out before "Application startup complete" and "Uvicorn running" appeared. The app answered health checks with 200 only after that. Uvicorn runs the application's start-up code before it opens the port, so the start-up work exceeded Render's port-scan window.

@@ -77,10 +77,12 @@ def api_checks(api: str, local: bool, web_origin: str | None) -> None:
                       f"HTTP {status} {headers.get('location', '')}")
             except OSError as e:  # URLError, refused or closed connections
                 check("plain HTTP is redirected to HTTPS", False, f"no plain-HTTP answer: {getattr(e, 'reason', e)}")
-        # the application itself redirects a request that reached it as plain HTTP through a proxy
-        status, headers, _ = request(f"{api}/api/dashboard", headers={"X-Forwarded-Proto": "http"}, follow=False)
-        check("application redirects plain-HTTP requests to HTTPS", status in (307, 308) and headers.get("location", "").startswith("https://"),
-              f"HTTP {status}")
+        if local:
+            # the application's own redirect for a request that reached it as plain HTTP through a proxy; on a hosted
+            # service the platform's proxy sets X-Forwarded-Proto itself, so this cannot be exercised from outside
+            status, headers, _ = request(f"{api}/api/dashboard", headers={"X-Forwarded-Proto": "http"}, follow=False)
+            check("application redirects plain-HTTP requests to HTTPS", status in (307, 308) and headers.get("location", "").startswith("https://"),
+                  f"HTTP {status}")
 
     status, _, _ = request(f"{api}/api/dashboard")
     check("data needs a sign-in", status == 401, f"HTTP {status}")
