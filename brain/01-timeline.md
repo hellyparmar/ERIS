@@ -96,6 +96,27 @@ Three eras are visible in the history:
 
 #13, #22, #23, #24, #25, #27, #28, #29, #30, #31, #32 (see `git log --merges` for the full list).
 
+### 2026-11-03: cause of the failed Render deploy of 8213593, and the fix
+
+- Render's log for the failed deploy (owner-provided): the app started ("Started server process", "Waiting for application startup", migrations), but Render's port scan timed out before "Application startup complete" and "Uvicorn running" appeared. The app answered health checks with 200 only after that. Uvicorn runs the application's start-up code before it opens the port, so the start-up work exceeded Render's port-scan window.
+- Fix (branch, not yet on `main`): in production the start-up work (migrations and the demo-data check) runs in a background thread, so the port opens within about a second. Until it finishes, the health check returns 200 with status "starting" and API calls answer 503 with Retry-After. If start-up fails, the health check returns 503 so a broken deploy is not put into service. Development and tests keep the synchronous start.
+- Verified: 152 API tests pass (4 new in `tests/test_startup.py`); lint passes; the production start with the Dockerfile's exact command on port 10000 answers in about 1 s with "starting", then "ok" once start-up finishes.
+- Still to do: merge to `main` (deploys to production; needs the owner's approval), then a Render deploy and `scripts/verify_deployment.py`.
+
+### 2026-11-03: Render deploy of 8213593 failed its health check
+
+- The owner reports Render's deploy of `8213593` (PR #34) failed: "Timed out after waiting for internal health check ... eris-tvro.onrender.com:10000/api/health" (27 Oct, 11:58 PM). Earlier Render deploys (`8615f2e`) succeeded, and CI on `8213593` passed, including the Docker smoke test.
+- Startup code reviewed (`api/app/main.py` `_bootstrap`): migrations run, then the app returns at once when the database already has users, so the health check should not wait on seeding. The health path is exempt from the HTTPS redirect.
+- Root cause not yet identified: it needs Render's log for the failed deploy. The sandbox could not reproduce the container (its Python no longer has the app's packages).
+- Next: owner shares the Render log lines from the failed deploy; fix it on a branch and deploy it; then run `scripts/verify_deployment.py`.
+
+### 2026-10-27: PR #34 merged; CI green on main; Render still on the previous build
+
+- Owner approved. PR #34 (fix to the container start command and the web lint error) merged to `main` as `8213593`.
+- CI on `main` for `8213593`: all jobs passed (including `docker`, which had failed before).
+- Vercel production serves the new build (CSP present).
+- Render's `/api/health` still returns the previous build's response (no `x-content-type-options`, no HSTS from the app). No deployment status is reported to GitHub for Render, so the Render deploy state could not be read from here. The live check (`scripts/verify_deployment.py`) is still to run against Render. Owner action: check the `eris` service's Events in Render and trigger a manual deploy of the latest commit if none is running.
+
 ### 2026-10-27: PR #33 merged; CI on main failed; start command fixed
 
 - PR #33 merged to `main` (357279e) at the owner's request. Vercel production now serves the hardened web build (CSP present).
