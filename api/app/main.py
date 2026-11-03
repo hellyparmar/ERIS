@@ -46,10 +46,6 @@ def _bootstrap() -> None:
     """Create tables; generate demo data on an empty database; keep an untouched demo current."""
     from app.models import User
 
-    if settings.JWT_SECRET_KEY == DEFAULT_SECRET or len(settings.JWT_SECRET_KEY) < 32:
-        if settings.ENVIRONMENT == "production":
-            raise RuntimeError("Set a strong JWT_SECRET_KEY (32+ random characters) before running in production")
-        log.warning("Using a development JWT secret - set JWT_SECRET_KEY for any shared deployment")
     migrate()
     with SessionLocal() as db:
         clock.load_from_db(db)
@@ -89,9 +85,39 @@ def _bootstrap() -> None:
     threading.Thread(target=seed, daemon=True).start()
 
 
+_ready = threading.Event()  # set once start-up (migrations, demo data) has finished
+_startup_error: str | None = None
+
+
+def _check_jwt_secret() -> None:
+    if settings.JWT_SECRET_KEY == DEFAULT_SECRET or len(settings.JWT_SECRET_KEY) < 32:
+        if settings.ENVIRONMENT == "production":
+            raise RuntimeError("Set a strong JWT_SECRET_KEY (32+ random characters) before running in production")
+        log.warning("Using a development JWT secret - set JWT_SECRET_KEY for any shared deployment")
+
+
+def _bootstrap_in_background() -> None:
+    """Run start-up work and record the outcome; the server keeps running either way (see the health check)."""
+    global _startup_error
+    try:
+        _bootstrap()
+    except Exception as exc:
+        _startup_error = f"{type(exc).__name__}: {exc}"
+        log.exception("Start-up failed")
+    finally:
+        _ready.set()
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    _bootstrap()
+    _check_jwt_secret()
+    if settings.ENVIRONMENT == "production":
+        # The hosting platform expects the port to answer within a short window. Migrations and the demo check run in
+        # the background; until they finish, API calls answer 503 "starting up" and the health check reports it.
+        threading.Thread(target=_bootstrap_in_background, daemon=True, name="start-up").start()
+    else:
+        _bootstrap()
+        _ready.set()
     yield
 
 
@@ -144,7 +170,26 @@ async def unhandled(request: Request, exc: Exception):
 
 @app.get("/api/health", tags=["system"])
 def health():
-    return {"status": "ok", "app": settings.APP_NAME, "version": app.version, "seeding": seeding_state()}
+    """200 while starting (so the platform keeps the instance) and 200 when ready; 503 if start-up failed, so a
+    broken deploy is not put into service."""
+    if _startup_error:
+        status, state = 503, "error"
+    else:
+        status, state = 200, ("ok" if _ready.is_set() else "starting")
+    body = {"status": state, "app": settings.APP_NAME, "version": app.version, "seeding": seeding_state()}
+    if _startup_error:
+        body["detail"] = "The server could not start: " + _startup_error
+    return JSONResponse(body, status_code=status, headers={"Cache-Control": "no-store"})
+
+
+@app.middleware("http")
+async def wait_for_start_up(request: Request, call_next):
+    """While start-up runs in the background, API calls wait for it instead of reaching a half-prepared database."""
+    path = request.url.path
+    if path.startswith("/api") and path != "/api/health" and (not _ready.is_set() or _startup_error):
+        return JSONResponse({"detail": "The server is starting up. Please try again in a moment."}, status_code=503,
+                            headers={"Retry-After": "3", "Cache-Control": "no-store"})
+    return await call_next(request)
 
 
 # Serve the built web app (web/dist) from the same process when it exists.

@@ -96,6 +96,13 @@ Three eras are visible in the history:
 
 #13, #22, #23, #24, #25, #27, #28, #29, #30, #31, #32 (see `git log --merges` for the full list).
 
+### 2026-11-03: cause of the failed Render deploy of 8213593, and the fix
+
+- Render's log for the failed deploy (owner-provided): the app started ("Started server process", "Waiting for application startup", migrations), but Render's port scan timed out before "Application startup complete" and "Uvicorn running" appeared. The app answered health checks with 200 only after that. Uvicorn runs the application's start-up code before it opens the port, so the start-up work exceeded Render's port-scan window.
+- Fix (branch, not yet on `main`): in production the start-up work (migrations and the demo-data check) runs in a background thread, so the port opens within about a second. Until it finishes, the health check returns 200 with status "starting" and API calls answer 503 with Retry-After. If start-up fails, the health check returns 503 so a broken deploy is not put into service. Development and tests keep the synchronous start.
+- Verified: 152 API tests pass (4 new in `tests/test_startup.py`); lint passes; the production start with the Dockerfile's exact command on port 10000 answers in about 1 s with "starting", then "ok" once start-up finishes.
+- Still to do: merge to `main` (deploys to production; needs the owner's approval), then a Render deploy and `scripts/verify_deployment.py`.
+
 ### 2026-11-03: Render deploy of 8213593 failed its health check
 
 - The owner reports Render's deploy of `8213593` (PR #34) failed: "Timed out after waiting for internal health check ... eris-tvro.onrender.com:10000/api/health" (27 Oct, 11:58 PM). Earlier Render deploys (`8615f2e`) succeeded, and CI on `8213593` passed, including the Docker smoke test.
