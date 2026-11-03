@@ -73,9 +73,10 @@ Things that are known, unresolved, or waiting on the owner. Each has a reason an
 ### I1. Obsolete planning issues (closed 2026-11-03)
 - Twelve open issues (#1–#12, "1 1 PostgreSQL Setup" to "5 2 Deployment Checklist") were the planning tasks of the earlier product, created 15 February 2026. That product was retired and removed from the repository in October 2026, so the issues were closed as not planned, each with a note saying so. No open issues remain.
 
-### I2. Dependabot PRs that need a decision (open)
+### I2. Dependabot PRs that need a decision (default chosen 2026-11-03, D23; owner to confirm)
 - **Issue:** Dependabot PRs [#42](https://github.com/hellyparmar/ERIS/pull/42) (pip group, 48 updates) and [#35](https://github.com/hellyparmar/ERIS/pull/35) (Docker base `python:3.11-slim` → `3.15-slim`) fail or change the runtime. #42 moves the constraint to `numpy==2.5.4`, which has no wheel for Python 3.11, so the `api` job cannot install. The CI and the Docker image run Python 3.11. The other Dependabot PRs ([#36](https://github.com/hellyparmar/ERIS/pull/36)–[#41](https://github.com/hellyparmar/ERIS/pull/41), [#37](https://github.com/hellyparmar/ERIS/pull/37) Playwright 1.64.1 and the GitHub Actions major bumps, [#17](https://github.com/hellyparmar/ERIS/pull/17) Node 26) run on bases from before the 2026-11-03 fixes and need a rebase before they are judged.
-- **Next step:** The owner decides the runtime: stay on Python 3.11 and pin numpy to 2.4.x (close #42's numpy bump), or move the runtime to 3.12+ with the full suite re-run. Then rebase the rest. Nothing was merged or pushed to these branches.
+- **Default applied (D23):** Python stays on 3.11; `dependabot.yml` ignores numpy 2.5+ and Python 3.12+. Open PRs #42 and #35 still need closing.
+- **Next step (owner):** Confirm D23, or choose a runtime: stay on Python 3.11 and pin numpy to 2.4.x (close #42's numpy bump), or move the runtime to 3.12+ with the full suite re-run. Then rebase the rest. Nothing was merged or pushed to these branches.
 
 ### I3. Refresh hosted demo fails: stale deploy-hook secret (open, owner action)
 - **Issue:** The scheduled workflow `refresh-demo.yml` calls the Render deploy hook from the secret `RENDER_DEPLOY_HOOK_URL`. It has failed with exit code 22 since 12 October, which points to an old hook URL.

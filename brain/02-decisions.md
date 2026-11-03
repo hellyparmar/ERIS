@@ -147,3 +147,10 @@ Each decision gives: **what** was chosen, **why**, **alternatives**, **consequen
 - **Consequence:** The image must be moved on purpose before GitHub retires 24.04, with the Playwright version checked at the same time.
 - **Source:** recorded (CI log; `.github/workflows/ci.yml`).
 
+## D23. The runtime stays on Python 3.11; Dependabot holds the newer versions
+- **What:** The API runs and is tested on Python 3.11 (CI jobs, `Dockerfile` base `python:3.11-slim`). `.github/dependabot.yml` ignores `numpy` 2.5 and later, and Docker `python` 3.12 and later. Moving the runtime is a separate change, made on purpose, with the full suite re-run.
+- **Why:** numpy 2.5 publishes no wheel for Python 3.11, so Dependabot's pip group (#42) cannot install. The Docker base bump to 3.15 (#35) would move the runtime without the suite having run on it.
+- **Alternatives:** Move to Python 3.12+ now (a runtime change with its own risk; the suite and the Render image must be re-verified). Let Dependabot keep proposing the bumps (they fail CI each month).
+- **Consequence:** Existing PRs #42 and #35 stay open until closed; the rules stop new ones of the same kind. The owner can overrule this decision by removing the rules.
+- **Source:** recorded (owner has not answered the question; this is the default chosen in the session, to be confirmed).
+

@@ -6,6 +6,10 @@ updates:
     schedule: { interval: monthly }
     groups:
       python: { patterns: ["*"] }
+    # The tested runtime is Python 3.11 (CI, Dockerfile). numpy 2.5 has no 3.11 wheel, so it is held (D23).
+    ignore:
+      - dependency-name: numpy
+        versions: [">=2.5"]
   - package-ecosystem: npm
     directory: /web
     schedule: { interval: monthly }
@@ -20,3 +24,7 @@ updates:
   - package-ecosystem: docker
     directory: /
     schedule: { interval: monthly }
+    # Python stays on 3.11 until the runtime is moved on purpose, with the full suite run (D23).
+    ignore:
+      - dependency-name: python
+        versions: [">=3.12"]

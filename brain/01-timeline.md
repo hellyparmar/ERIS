@@ -96,6 +96,34 @@ Three eras are visible in the history:
 
 #13, #22, #23, #24, #25, #27, #28, #29, #30, #31, #32 (see `git log --merges` for the full list).
 
+### 2026-11-03: Dependabot held to Python 3.11 (D23)
+
+**Request (as given):** Stop-hook goal, pipeline items still open: the Dependabot PRs (#42, #35) blocked by the runtime decision.
+
+**What changed**
+- `.github/dependabot.yml`: pip ignores `numpy` `>=2.5`; docker ignores `python` `>=3.12`.
+
+**Why this approach**
+- The tested runtime is 3.11 (CI, Dockerfile). numpy 2.5 has no 3.11 wheel, so the pip group fails at install (PR #42, run log: "no matching distributions available").
+- A rule keeps the next monthly run from proposing the same breaking bump, without touching the open PRs.
+
+**Alternatives considered**
+- Move to 3.12+ now: a runtime change that needs the full suite and Render re-verified; not done without the owner.
+
+**Trade-offs and risks**
+- Two open PRs (#42, #35) remain until closed. The rule is not a substitute for closing them.
+- The owner has not answered the runtime question; D23 is the default and can be overruled.
+
+**Decision record**
+- D23 in `02-decisions.md`. Source: recorded as a default, pending owner confirmation.
+
+**Verification (as run)**
+- `yaml.safe_load` on `dependabot.yml`: parses; both ignore rules present.
+
+**Follow-ups**
+- Close #42 and #35 (owner or Claude on request) once the rule is confirmed.
+- Refresh hosted demo secret: owner action (I3).
+
 ### 2026-11-03: CI e2e job fixed by pinning the runner; live check 24 of 24
 
 **Request (as given):** Stop-hook goal: check dead code, old redirects, open ports, pipelines under heavy traffic, optimise the pipelines, encrypt and secure the connectivity to the backend, and verify on the deployed system. The unresolved items named were the live SameSite check, the failing CI run on 6f17eac, the red Dependabot PRs and the failing Refresh hosted demo job.
