@@ -96,6 +96,13 @@ Three eras are visible in the history:
 
 #13, #22, #23, #24, #25, #27, #28, #29, #30, #31, #32 (see `git log --merges` for the full list).
 
+### 2026-11-03: Render deploy of 8213593 failed its health check
+
+- The owner reports Render's deploy of `8213593` (PR #34) failed: "Timed out after waiting for internal health check ... eris-tvro.onrender.com:10000/api/health" (27 Oct, 11:58 PM). Earlier Render deploys (`8615f2e`) succeeded, and CI on `8213593` passed, including the Docker smoke test.
+- Startup code reviewed (`api/app/main.py` `_bootstrap`): migrations run, then the app returns at once when the database already has users, so the health check should not wait on seeding. The health path is exempt from the HTTPS redirect.
+- Root cause not yet identified: it needs Render's log for the failed deploy. The sandbox could not reproduce the container (its Python no longer has the app's packages).
+- Next: owner shares the Render log lines from the failed deploy; fix it on a branch and deploy it; then run `scripts/verify_deployment.py`.
+
 ### 2026-10-27: PR #34 merged; CI green on main; Render still on the previous build
 
 - Owner approved. PR #34 (fix to the container start command and the web lint error) merged to `main` as `8213593`.
