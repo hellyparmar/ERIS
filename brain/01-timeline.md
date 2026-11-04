@@ -122,6 +122,19 @@ Three eras are visible in the history:
 - `ruff check app tests`: passed.
 - CI on the fix: pending at the time of writing (see the next entry).
 
+### 2026-11-04: /api/health reports the serving commit (D27)
+
+**Request (as given):** owner: "I open a PR that adds the commit SHA to /api/health, so each deploy can be checked with one request".
+
+**What changed**
+- `api/app/main.py`: `/api/health` returns `build` (first 12 characters of `RENDER_GIT_COMMIT`, or `unknown`).
+- `api/tests/test_hardening.py`: a test for the value and the fallback.
+- `brain/02` (D27).
+
+**Verification (as run)**
+- `pytest -q` (API): 157 passed. `ruff check app tests`: passed.
+- After the deploy of `2b8594c`, the expected health value is `2b8594cb3c60`; to be checked live.
+
 ### 2026-11-04: Admission control for the hosted instance (D26); live heavy-load result
 
 **Request (as given):** the stop-hook goal: the pipelines must not break under heavy traffic on the deployed system; measure it.

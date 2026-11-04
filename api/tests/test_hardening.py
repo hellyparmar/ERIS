@@ -89,3 +89,11 @@ def test_sliding_window_counts_and_recovers():
 @pytest.mark.parametrize("path", ["/docs", "/openapi.json"])
 def test_api_docs_are_served(client, path):
     assert client.get(path).status_code == 200
+
+
+def test_health_reports_the_commit_that_is_serving(client, monkeypatch):
+    # Render sets RENDER_GIT_COMMIT for each deploy; the health answer shows it so a deploy can be checked in one request
+    monkeypatch.setenv("RENDER_GIT_COMMIT", "2b8594cb3c6098b7eacee0f5ca2c9ae645f792e0")
+    assert client.get("/api/health").json()["build"] == "2b8594cb3c60"
+    monkeypatch.delenv("RENDER_GIT_COMMIT")
+    assert client.get("/api/health").json()["build"] == "unknown"

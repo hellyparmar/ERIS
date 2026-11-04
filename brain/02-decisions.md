@@ -175,3 +175,10 @@ Each decision gives: **what** was chosen, **why**, **alternatives**, **consequen
 - **Consequence:** With more than 8 requests in progress, the excess wait up to 5 s and are then refused. The values 8 and 5 are a first estimate for a 0.1-CPU host: they are not measured on the hosted instance yet and must be re-measured after deploy (open item G8).
 - **Source:** recorded (live and local load tests, 2026-11-04; `brain/13`).
 
+## D27. /api/health reports the commit that is serving
+- **What:** `/api/health` returns `build`: the first 12 characters of `RENDER_GIT_COMMIT` (set by Render for each deploy), or `unknown` where it is not set.
+- **Why:** Earlier checks could not confirm which build served the hosted API (open items G8 and the deploy-status question). One request now shows the commit.
+- **Alternatives:** Put the SHA into the image at build time (needs a build argument and a Dockerfile change; the platform already provides the value). Expose nothing (rejected: the owner needs to verify deploys).
+- **Consequence:** The commit SHA is public. The repository is already public, so no secret is exposed. The value is read only; health remains unauthenticated and unchanged otherwise.
+- **Source:** recorded (owner's request, 2026-11-04; `api/app/main.py`).
+

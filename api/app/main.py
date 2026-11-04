@@ -1,5 +1,6 @@
 """ERIS - Enterprise Retail Intelligence System: FastAPI application."""
 import logging
+import os
 import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -176,7 +177,10 @@ def health():
         status, state = 503, "error"
     else:
         status, state = 200, ("ok" if _ready.is_set() else "starting")
-    body = {"status": state, "app": settings.APP_NAME, "version": app.version, "seeding": seeding_state()}
+    # RENDER_GIT_COMMIT is set by the Render platform for each deploy: it shows which commit is serving (unknown elsewhere)
+    commit = os.environ.get("RENDER_GIT_COMMIT", "")[:12] or "unknown"
+    body = {"status": state, "app": settings.APP_NAME, "version": app.version, "build": commit,
+            "seeding": seeding_state()}
     if _startup_error:
         body["detail"] = "The server could not start: " + _startup_error
     return JSONResponse(body, status_code=status, headers={"Cache-Control": "no-store"})
