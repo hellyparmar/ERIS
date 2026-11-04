@@ -161,10 +161,10 @@ Each decision gives: **what** was chosen, **why**, **alternatives**, **consequen
 - **Consequence:** One free instance running all month uses about 744 of the 750 free instance hours, so no second free service can run on the same account without exceeding them. Schedules can run late; the ping is a target, not a guarantee.
 - **Source:** recorded (owner's answer, 2026-11-04).
 
-## D25. Sales exports stay as they are under load
-- **What:** The export gate (two workers, 10 s wait, then 503 with Retry-After) stays. Exports are not cached and no background export job is added.
-- **Why:** A 30-day export is about 0.3 s of work. The 11 s median under 40 concurrent exports is queueing on a CPU-limited host. A leaner CSV writer saves 15 to 25 % but touches the escaping path shared by every export; caching would store multi-megabyte bodies in the database.
-- **Alternatives:** A background export job (a new endpoint and UI, moderate effort); more CPU and export slots (costs money).
-- **Consequence:** Under heavy export load, callers get a fast 503 and retry. Revisit if exports become a user-facing bottleneck.
-- **Source:** recorded (owner's answer, 2026-11-04).
+## D25. The sales export escapes its text cells explicitly; no caching, no background job
+- **What:** `csv_response` takes `escape=True` by default (every cell is checked, as before). The sales export escapes its text cells (invoice number, outlet, SKU, payment, channel, phone, customer name) itself and passes `escape=False`, so the numeric cells are not checked. Output is byte-identical. Exports are not cached, and no background export job is added. The export gate (two workers, 10 s wait, then 503 with Retry-After) stays.
+- **Why:** A two-month export is 76k lines and 7.4 MB, about 1.0 s of in-process work. The 11 s median under 40 concurrent exports is queueing for two export slots on a CPU-limited host. Skipping the check on the numeric cells gives about 7 to 8 %. The earlier estimate of 15 to 25 % came from a variant that also skipped escaping on most text cells, which is unsafe and was not used.
+- **Alternatives:** Cache the export (rejected: a 7 MB body per user and parameter set would grow the cache without a bound, and the cache stores JSON only). A background export job (a new endpoint and UI, moderate effort; not chosen). More CPU and export slots (costs money).
+- **Consequence:** Under heavy export load callers still get a fast 503 and retry. The escaping is now explicit in the sales export and tested (`test_sales_export_neutralises_formulas_in_text_cells_only`).
+- **Source:** recorded (owner's answers, 2026-11-04; measured in `brain/13`).
 

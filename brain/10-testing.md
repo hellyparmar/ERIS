@@ -58,3 +58,6 @@ On this host, Chromium is at `/opt/pw-browsers/chromium` and is used with `PW_CH
 ## Date-dependent tests (2026-11-03)
 - The seed for the API tests ends on the runner's UTC date; the importer and the sample rows use the business time zone (Asia/Kolkata). Tests that create sales must date them relative to the business clock (`clock.today()`), and not use the latest seeded date, because near midnight in India the two can disagree.
 - The importer refuses sales dated in the future; `test_isolation.py::_sample_row` uses yesterday on the business clock.
+
+## Export escaping (2026-11-04)
+- `test_sales_export_neutralises_formulas_in_text_cells_only` (`api/tests/test_api.py`): a customer name that starts with `=` is escaped in the sales export; the numeric quantity cell is not.

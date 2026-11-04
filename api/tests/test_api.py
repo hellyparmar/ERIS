@@ -445,3 +445,18 @@ def test_input_validation_rules(client, admin):
     body = {k: org[k] for k in ("name", "timezone", "tax_id", "state", "state_code")}
     assert client.put("/api/settings/organization", headers=admin, json={**body, "tax_id": "NOTAGSTIN"}).status_code == 422
     assert client.put("/api/settings/organization", headers=admin, json=body).status_code == 200
+
+
+def test_sales_export_neutralises_formulas_in_text_cells_only(client, admin):
+    # the export escapes text cells explicitly (customer, SKU, codes); a formula in the customer name must not run
+    dish = stock_up(client, admin, 1, "MNC-007")
+    r = client.post("/api/sales", headers=admin, json={
+        "outlet_id": 1, "payment_method": "upi", "channel": "dine_in", "covers": 1,
+        "customer_phone": "+91 98700 00001", "customer_name": "=HYPERLINK(\"http://x\")",
+        "items": [{"product_id": dish, "quantity": 1}]})
+    assert r.status_code == 201
+    text = client.get("/api/sales/export", headers=admin).text
+    assert "'=HYPERLINK" in text and "\n=HYPERLINK" not in text
+    # numbers stay numeric: the quantity cell of the new line is "1", not "'1"
+    line = next(x for x in text.splitlines() if "HYPERLINK" in x)
+    assert ",1," in line and ",'1," not in line

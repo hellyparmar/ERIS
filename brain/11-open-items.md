@@ -38,7 +38,7 @@ Things that are known, unresolved, or waiting on the owner. Each has a reason an
 - **Decision:** Geist is the final typeface. Fraunces is no longer in the code: no import, no font package, no CSS reference. The styles define one family, Geist, with Geist Mono for figures (`web/src/styles.css`, `main.jsx`).
 - **Why this is recorded:** The screenshots, the README and the shipped app all use Geist. Reintroducing a serif would be a new decision, not a restoration.
 
-### G7. Sales export is the slow path under concurrent load (decided 2026-11-04: D25)
+### G7. Sales export is the slow path under concurrent load (decided 2026-11-04: D25; adopted: explicit escaping, about 7 to 8 % faster)
 - **Measured:** 40 concurrent workers: p50 11.4 s, p95 12.8 s, and 70 of 100 export requests answered 503 (`brain/13`, "Load check").
 - **Investigated 2026-11-03 (`brain/13`):** one export is about 0.3 s of work; the wait is queueing for two export slots on a CPU-limited host. The leaner writer saves 15 to 25 %; not adopted (small gain, touches the escaping path). Owner decision needed: more CPU or export slots for the hosted instance, or an export that runs as a background job and is downloaded when ready.
 

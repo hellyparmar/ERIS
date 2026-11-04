@@ -42,11 +42,16 @@ def safe_cell(v):
     return v
 
 
-def csv_response(filename: str, header: list[str], rows: Iterable[list]) -> StreamingResponse:
+def csv_response(filename: str, header: list[str], rows: Iterable[list], escape: bool = True) -> StreamingResponse:
+    """A CSV download. `escape` neutralises formulas in every cell; a caller that already escapes its text cells
+    (and only those) passes escape=False to skip the per-cell check on the numbers."""
     buf = io.StringIO()
     w = csv.writer(buf)
     w.writerow(header)
-    w.writerows([safe_cell(v) for v in row] for row in rows)
+    if escape:
+        w.writerows([safe_cell(v) for v in row] for row in rows)
+    else:
+        w.writerows(rows)
     buf.seek(0)
     return StreamingResponse(iter([buf.getvalue()]), media_type="text/csv",
                              headers={"Content-Disposition": f'attachment; filename="{filename}"'})

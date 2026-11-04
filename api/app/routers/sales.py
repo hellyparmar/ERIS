@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app import clock
 from app.db import get_db
 from app.models import Customer, Outlet, Product, Sale, SaleItem, User
-from app.routers.common import csv_response, get_or_404, page_response, paginate
+from app.routers.common import csv_response, get_or_404, page_response, paginate, safe_cell
 from app.schemas import SaleIn, VoidIn
 from app.security import ensure_outlet_access, get_current_user, require_manager, require_writer, scoped_outlet_ids
 from app.services import forecasting as F
@@ -87,11 +87,14 @@ def export_sales(outlet_id: int | None = None, start: date | None = None, end: d
             Sale.status == "completed", Sale.sale_date >= start, Sale.sale_date <= end).order_by(Sale.sold_at)
         if outlet_ids:
             q = q.where(Sale.outlet_id.in_(outlet_ids))
-        rows = ([inv, ts.date().isoformat(), ts.strftime("%H:%M"), oc, sku, qty, price, disc, pm, ch, cov or "", ph or "",
-                 cn or "", lt] for inv, ts, oc, sku, qty, price, disc, pm, ch, cov, ph, cn, lt in db.execute(q))
+        # text cells are escaped here (customer or SKU text could start with a formula character); numbers are not
+        rows = ([safe_cell(inv), ts.date().isoformat(), ts.strftime("%H:%M"), safe_cell(oc), safe_cell(sku), qty, price,
+                 disc, safe_cell(pm), safe_cell(ch), cov or "", safe_cell(ph or ""), safe_cell(cn or ""), lt]
+                for inv, ts, oc, sku, qty, price, disc, pm, ch, cov, ph, cn, lt in db.execute(q))
         return csv_response(f"sales_{start}_{end}.csv",
                             ["invoice_no", "date", "time", "outlet_code", "sku", "quantity", "unit_price", "discount",
-                             "payment_method", "channel", "covers", "customer_phone", "customer_name", "line_total"], rows)
+                             "payment_method", "channel", "covers", "customer_phone", "customer_name", "line_total"],
+                            rows, escape=False)
 
 
 @router.get("/{sale_id}")

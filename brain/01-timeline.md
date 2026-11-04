@@ -122,6 +122,36 @@ Three eras are visible in the history:
 - `ruff check app tests`: passed.
 - CI on the fix: pending at the time of writing (see the next entry).
 
+### 2026-11-04: PR #46 merged; keep-warm verified; sales export adopted with explicit escaping
+
+**Request (as given):** "approve PR 46 and merge it"; "adopt the leaner export writer (15–25% faster, identical output)".
+
+**What changed**
+- `api/app/routers/common.py`: `csv_response(..., escape=True)`; `escape=False` skips the per-cell check.
+- `api/app/routers/sales.py`: the sales export escapes its text cells itself and passes `escape=False`.
+- `api/tests/test_api.py`: `test_sales_export_neutralises_formulas_in_text_cells_only`.
+- `brain/02` (D25 rewritten), `brain/10`, `brain/11` (G7), `brain/13`.
+
+**Why this approach**
+- The owner asked for the leaner writer. The version used for the earlier estimate skipped escaping on most text cells; the adopted version escapes every text cell, so the formula protection is unchanged.
+- Measured speed-up is about 7 to 8 %, not 15 to 25 %. Stated as measured.
+
+**Alternatives considered**
+- Keep the unsafe variant for the 15 to 25 %: rejected (formula injection through customer names).
+
+**Trade-offs and risks**
+- The escaping for the sales export is now in the endpoint, not in the shared helper. A future export that forgets to escape would be unprotected. The test covers the sales export only.
+
+**Decision record**
+- D25 rewritten in `02`. Source: recorded (owner's answer; measured).
+
+**Verification (as run)**
+- Baseline and after, same database, same endpoint and window: `cmp` identical (7,426,974 bytes, 76,369 lines).
+- Timing: before 1.031 s best / 1.064 s median; after 0.962 s / 0.981 s.
+- `pytest -q` (API): 153 passed (152 before, plus the new test). `ruff check app tests`: passed.
+- PR #46: approval refused by GitHub (the author cannot approve their own PR); the merge then succeeded (`55132f8`).
+- Keep-warm: manual run on `main` returned `200` in 34.4 s (cold instance).
+
 ### 2026-11-04: Keep-warm ping for the hosted API; Dependabot #42 and #35 closed; decisions on export and history
 
 **Request (as given):** The owner's answers to four open questions: export under load (keep as is), keep the hosted instance warm (scheduled ping), close Dependabot #42 and #35, leave the history on main as it is.
