@@ -1,0 +1,24 @@
+name: Keep the hosted API warm
+
+# The hosted free instance sleeps when idle; the first request after a pause can take tens of seconds (brain/13).
+# This pings the public health endpoint every 10 minutes. A failed ping fails the run, so a sleeping or broken
+# instance shows up in the Actions tab. Schedules can run late; the interval is a target, not a guarantee.
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+# Reads one public URL: no token, no code checkout, no secrets.
+permissions: {}
+
+concurrency:
+  group: keep-warm
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - name: Ping the health endpoint
+        run: curl -fsS -m 60 -o /dev/null -w "%{http_code} %{time_total}s\n" "https://eris-tvro.onrender.com/api/health"
