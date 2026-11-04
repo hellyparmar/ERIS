@@ -51,6 +51,8 @@ class Settings(BaseSettings):
     RATE_LIMIT_LOGIN_PER_MINUTE: int = 60      # sign-in attempts per address (an office may share one address)
     RATE_LIMIT_HEAVY_PER_MINUTE: int = 120     # forecasts, assistant questions, imports, exports
     MAX_BODY_MB: int = 20                      # imports are capped at 15 MB; this is the request ceiling
+    MAX_INFLIGHT_REQUESTS: int = 8             # requests answered at once (0 = no cap); the hosted host has 0.1 CPU
+    INFLIGHT_WAIT_SECONDS: float = 5.0         # a request waits this long for a free slot, then gets 503 with Retry-After
 
     # Model fitting is the heaviest work the API does. At most this many fits run at once, so a burst of forecast
     # requests cannot take every worker thread (or the whole CPU of a small server) from the other pages; a

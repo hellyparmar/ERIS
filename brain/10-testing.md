@@ -61,3 +61,6 @@ On this host, Chromium is at `/opt/pw-browsers/chromium` and is used with `PW_CH
 
 ## Export escaping (2026-11-04)
 - `test_sales_export_neutralises_formulas_in_text_cells_only` (`api/tests/test_api.py`): a customer name that starts with `=` is escaped in the sales export; the numeric quantity cell is not.
+
+## Admission control (2026-11-04)
+- `api/tests/test_admission.py`: 3 tests. A request beyond the in-flight cap is refused after its wait and capacity returns; health checks are not refused; a cap of 0 disables it. They use a stand-in ASGI app, not the database.

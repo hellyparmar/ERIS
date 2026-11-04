@@ -122,6 +122,32 @@ Three eras are visible in the history:
 - `ruff check app tests`: passed.
 - CI on the fix: pending at the time of writing (see the next entry).
 
+### 2026-11-04: Admission control for the hosted instance (D26); live heavy-load result
+
+**Request (as given):** the stop-hook goal: the pipelines must not break under heavy traffic on the deployed system; measure it.
+
+**What changed**
+- `api/app/hardening.py`: `HardeningMiddleware` admits at most `MAX_INFLIGHT_REQUESTS` requests at once; a request waiting more than `INFLIGHT_WAIT_SECONDS` gets 503 with `Retry-After: 2`. Health checks skip the queue.
+- `api/app/config.py`: `MAX_INFLIGHT_REQUESTS = 8`, `INFLIGHT_WAIT_SECONDS = 5.0`.
+- `api/tests/test_admission.py`: 3 tests.
+- `brain/02` (D26), `brain/10`, `brain/11` (G8), `brain/13`.
+
+**Why this approach**
+- The live heavy test (20 workers, 280 requests) gave 34 client timeouts with no server error: the server held requests past any client's patience. Bounding the total in progress and refusing with a retry hint is the D20 design.
+
+**Alternatives considered:** see D26.
+
+**Trade-offs and risks**
+- Under heavy load, some requests now get 503 instead of an answer. The values 8 and 5 are a first estimate and are not measured on the hosted host yet.
+
+**Decision record:** D26 in `02-decisions.md`. Source: recorded (live and local load tests).
+
+**Verification (as run)**
+- `pytest -q` (API): 156 passed, including the 3 new tests. `ruff check app tests`: passed.
+- Local server, defaults, 20 workers × 200 requests: 200 × 200.
+- Live, before the change, 20 workers × 280 requests: 219 × 200, 27 × 503, 34 timeouts, no 5xx.
+- Not yet run on the hosted instance (needs the merge).
+
 ### 2026-11-04: PR #46 merged; keep-warm verified; sales export adopted with explicit escaping
 
 **Request (as given):** "approve PR 46 and merge it"; "adopt the leaner export writer (15–25% faster, identical output)".

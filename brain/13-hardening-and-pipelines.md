@@ -129,6 +129,13 @@ This is one machine, one database, one load shape. It is not a test of the hoste
 - **Keep-warm verified on `main`:** the manual run returned `200` in **34.4 s**. The instance was cold, which supports the cold-start explanation of the earlier 60 s timeout. The scheduled runs (every 10 minutes) are the check that it stays warm; the result of the next scheduled runs is to be recorded here.
 - **Sales export, adopted:** explicit escaping of text cells and no per-cell check on numbers. Two-month export (76,369 lines, 7,426,974 bytes): before 1.031 s best / 1.064 s median; after 0.962 s best / 0.981 s median, in-process through the endpoint. **Byte-identical** (`cmp`). The earlier 15 to 25 % figure was for an unsafe variant and is withdrawn.
 
+## Live heavy test and admission control (2026-11-04)
+
+- **Live API, 20 workers, 280 requests** (`scripts/load_check.py`, bounded run on the owner's hosted free instance): 219 × 200, 27 × 503 (export busy), **34 client timeouts at 60 s**, zero 5xx from the server. Per endpoint: forecast 27 of 40 timed out; export p50 34 s; assistant p95 42 s; dashboard p95 4.8 s. The pipeline did not break as a server error; it broke as a hang, which the clients see as a failure.
+- **Cause:** nothing bounded the total number of requests in progress, so requests queued in the thread pool past every client timeout on a 0.1-CPU host. The per-endpoint gates (exports, forecasts) did not cover the rest.
+- **Change (D26):** a global admission limit in `HardeningMiddleware`: at most 8 requests answered at once; a request that cannot get a slot within 5 s gets 503 with `Retry-After`. Health checks skip the queue. Tested in `api/tests/test_admission.py` (3 tests) and locally: 20 workers × 200 requests at the defaults, 200 of 200 answered with no refusals and no timeouts (this machine does not saturate like the hosted one).
+- **Not yet done:** the change is not on the hosted instance. Its effect there (how many refusals, what latency) must be measured after deploy; the numbers 8 and 5 are not tuned for the host yet (G8).
+
 ## How to verify the deployed system
 
 `python3 scripts/verify_deployment.py https://<api host> --web https://<web host>` runs the connectivity and security checks against a live deployment (see `brain/11`, H1). Add `--local --ca <file>` for a test server.

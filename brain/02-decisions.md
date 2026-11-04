@@ -168,3 +168,10 @@ Each decision gives: **what** was chosen, **why**, **alternatives**, **consequen
 - **Consequence:** Under heavy export load callers still get a fast 503 and retry. The escaping is now explicit in the sales export and tested (`test_sales_export_neutralises_formulas_in_text_cells_only`).
 - **Source:** recorded (owner's answers, 2026-11-04; measured in `brain/13`).
 
+## D26. Admission control: at most 8 requests are answered at once; a wait of 5 s, then 503
+- **What:** `HardeningMiddleware` answers at most `MAX_INFLIGHT_REQUESTS` (8; 0 disables) requests at once. A request that cannot get a slot within `INFLIGHT_WAIT_SECONDS` (5) gets `503` with `Retry-After: 2`. Health checks skip the queue.
+- **Why:** The live heavy test (20 concurrent workers, 280 requests, 2026-11-04) answered 219 with 200 and 27 with 503, but **34 requests hit the 60 s client timeout**, including 27 of 40 forecasts. The server returned no 5xx: requests queued in silence past every client timeout. The per-endpoint gates do not bound the total queue. D20 already says to answer "busy" rather than wait.
+- **Alternatives:** Only lower the endpoint gates (rejected: the queue is shared by all endpoints). A cap of 24 with immediate refusal (rejected: 20 workers would still all be admitted and would still hang on this host). A paid always-on host (the owner chose the free option).
+- **Consequence:** With more than 8 requests in progress, the excess wait up to 5 s and are then refused. The values 8 and 5 are a first estimate for a 0.1-CPU host: they are not measured on the hosted instance yet and must be re-measured after deploy (open item G8).
+- **Source:** recorded (live and local load tests, 2026-11-04; `brain/13`).
+

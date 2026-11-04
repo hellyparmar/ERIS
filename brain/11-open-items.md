@@ -96,3 +96,9 @@ Things that are known, unresolved, or waiting on the owner. Each has a reason an
 
 ### I6. Hosted instance hours (watch)
 - The keep-warm ping (D24) runs one free instance all month. If another free service is added to the account, the total exceeds the free hours. Check the Render usage page after adding any service.
+
+### G8. Hosted instance under heavy load: admission control not yet deployed or measured (open)
+- **Measured before the change (2026-11-04, live):** 20 workers → 34 client timeouts at 60 s, no server 5xx (`brain/13`).
+- **Done:** D26 in `claude/loving-wright-326xam`; tests pass; local run clean.
+- **Next (needs the owner's merge decision):** merge the PR; then run `scripts/load_check.py` against the hosted API at 20 workers and record the refusals, timeouts and latency. If refusals are too many or waits too long, tune `MAX_INFLIGHT_REQUESTS` and `INFLIGHT_WAIT_SECONDS` on the host (environment variables, no code change).
+
