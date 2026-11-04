@@ -10,6 +10,7 @@
 
 It is a plain ASGI middleware, so it runs for every request, including the static web app.
 """
+import asyncio
 import math
 import threading
 import time
@@ -117,6 +118,8 @@ def _https_url(headers: Headers, scope) -> str:
 class HardeningMiddleware:
     def __init__(self, app) -> None:
         self.app = app
+        # slots for requests being answered now; None disables the cap
+        self.slots = asyncio.Semaphore(settings.MAX_INFLIGHT_REQUESTS) if settings.MAX_INFLIGHT_REQUESTS else None
 
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http":
@@ -154,4 +157,17 @@ class HardeningMiddleware:
                     out["strict-transport-security"] = HSTS
             await send(message)
 
-        return await self.app(scope, receive, send_with_security_headers)
+        # Admission control: at most MAX_INFLIGHT_REQUESTS are answered at once. A request waits a few seconds for a free
+        # slot, then gets 503 with Retry-After, instead of queueing until the client gives up (D20). Health checks skip
+        # the queue: the platform restarts an instance whose health check fails.
+        if self.slots is None or path == HEALTH_PATH:
+            return await self.app(scope, receive, send_with_security_headers)
+        try:
+            await asyncio.wait_for(self.slots.acquire(), settings.INFLIGHT_WAIT_SECONDS)
+        except TimeoutError:
+            return await JSONResponse({"detail": "The server is busy. Please try again in a moment."}, status_code=503,
+                                      headers={"Retry-After": "2"})(scope, receive, send)
+        try:
+            return await self.app(scope, receive, send_with_security_headers)
+        finally:
+            self.slots.release()
