@@ -124,6 +124,11 @@ This is one machine, one database, one load shape. It is not a test of the hoste
 - **Reachability of the public hostname:** TCP 80 and 443 open (the platform's HTTP redirect and HTTPS); 22, 5432, 6379, 8000 and 8080 closed or filtered. Render routes only the web port, and the host is fronted by Cloudflare, so this check cannot see private ports on the origin; it confirms what the public address exposes.
 - **Sales export (G7), investigated and not changed:** one 30-day export is about 0.3 s of work in-process (SQL about 0.2 s, rows and CSV about 0.1 s). Two variants were measured: skipping `safe_cell` on numeric cells and writing rows directly saves 15 to 25 %; looking up outlet and product names in Python instead of joining saves nothing. Output was byte-identical. The 11 s median under 40 workers is queueing behind the two export slots on a CPU-limited host, not the export itself. Exports are not cached: the response cache holds JSON answers only, and a 3.5 MB file per user and parameter set would grow the cache without a bound.
 
+## Keep-warm and the export change (2026-11-04)
+
+- **Keep-warm verified on `main`:** the manual run returned `200` in **34.4 s**. The instance was cold, which supports the cold-start explanation of the earlier 60 s timeout. The scheduled runs (every 10 minutes) are the check that it stays warm; the result of the next scheduled runs is to be recorded here.
+- **Sales export, adopted:** explicit escaping of text cells and no per-cell check on numbers. Two-month export (76,369 lines, 7,426,974 bytes): before 1.031 s best / 1.064 s median; after 0.962 s best / 0.981 s median, in-process through the endpoint. **Byte-identical** (`cmp`). The earlier 15 to 25 % figure was for an unsafe variant and is withdrawn.
+
 ## How to verify the deployed system
 
 `python3 scripts/verify_deployment.py https://<api host> --web https://<web host>` runs the connectivity and security checks against a live deployment (see `brain/11`, H1). Add `--local --ca <file>` for a test server.
