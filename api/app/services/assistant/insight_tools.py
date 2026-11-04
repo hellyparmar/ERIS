@@ -58,7 +58,7 @@ def growth_products(c: Ctx) -> dict:
     blocks = [chart("bar", f"Fastest-{word} dishes (revenue change %)", rows, "name", [("change_pct", "Change %")],
                     "percent"),
               table("Dishes", [("name", "Dish", "text"), ("category", "Category", "text"),
-                                 ("revenue", "Revenue", "currency"), ("previous", "Previous", "currency"),
+                                 ("revenue", "Sales incl. GST", "currency"), ("previous", "Previous", "currency"),
                                  ("change_pct", "Change", "percent")], rows)]
     return result(ans, blocks, [f"Forecast demand for {rows[0]['name']}", "Show the slowest dishes",
                                 "Which categories are growing?"], {"notes": notes})
@@ -103,7 +103,7 @@ def why_change(c: Ctx) -> dict:
     if r.get("scaled"):
         notes.append("The comparison period has a different length, so it was scaled to the same number of days.")
     drivers = [{"driver": x["label"], "effect": x["effect"], "detail": x["detail"]} for x in r["drivers"]]
-    blocks = [{"type": "kpis", "items": [kpi("Revenue", r["revenue"][0], "currency", r["change_pct"]),
+    blocks = [{"type": "kpis", "items": [kpi("Sales incl. GST", r["revenue"][0], "currency", r["change_pct"]),
                                          kpi("Bills", r["bills"][0], "number", A.pct_change(r["bills"][0], r["bills"][1])),
                                          kpi("Avg bill", r["avg_bill"][0], "currency",
                                              A.pct_change(r["avg_bill"][0], r["avg_bill"][1]))]},

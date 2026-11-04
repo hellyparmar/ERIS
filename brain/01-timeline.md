@@ -122,6 +122,31 @@ Three eras are visible in the history:
 - `ruff check app tests`: passed.
 - CI on the fix: pending at the time of writing (see the next entry).
 
+### 2026-11-04: Labels and units on the numbers fixed (D28)
+
+**Request (as given):** "are we sure the numbers ... are legit, valid and believable? ... in some places the units of numbers are not used correctly" (e.g. "Average bill ₹1,261, 7,497 bills"); then: "stay as it is but be relabelled 'Sales incl. GST', fix all the labels".
+
+**What changed**
+- Web: `web/src/lib/format.js` (lakh, crore written out); labels in `Dashboard.jsx`, `Analytics.jsx`, `Outlets.jsx`, `Products.jsx`, `Insights.jsx`.
+- API: `api/app/services/reports.py` (report headers), `assistant/tools.py` and `assistant/insight_tools.py` (table, chart and KPI labels).
+- `brain/02` (D28), `brain/03`, `brain/06`, `brain/11` (G9, G10).
+
+**Why this approach**
+- Checked on the live payload: revenue / bills = average bill (exact); outlets, categories, payments and trend each sum to the headline (100.00%). The headline includes GST (₹4.50 L); gross profit, margin and food cost are on sales excl. GST. One name fixes the mismatch without changing the numbers.
+
+**Alternatives considered:** make revenue exclude GST (owner chose not to); footnote only.
+
+**Trade-offs and risks**
+- Longer column headers ("Sales incl. GST"). Checked in screenshots of the Dashboard, Analytics and Outlets pages: nothing wraps or overflows.
+- Narrated sentences and the example questions still say "revenue".
+
+**Decision record:** D28 in `02-decisions.md`. Source: recorded (owner's decision).
+
+**Verification (as run)**
+- `pytest -q` (API): 157 passed; `ruff check app tests`: passed.
+- `eslint src` and `npm run build`: passed. Playwright e2e: 15 passed.
+- Screenshots of Dashboard, Analytics and Outlets on a local server: labels fit.
+
 ### 2026-11-04: /api/health reports the serving commit (D27)
 
 **Request (as given):** owner: "I open a PR that adds the commit SHA to /api/health, so each deploy can be checked with one request".

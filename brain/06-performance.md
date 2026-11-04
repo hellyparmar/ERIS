@@ -34,3 +34,8 @@ Measurements are from the commit messages. They were not re-run for this note.
 - Filtered lists still take about a second on the smallest host.
 - The first assistant answer for a new question takes a few seconds, because it is not cached yet.
 - Forecasts for a new scope are computed on demand and can wait for a slot.
+
+## Slow first load on the hosted instance (2026-11-04)
+- A warm dashboard answers in 0.6 to 1.6 s (cached). The long skeleton the owner saw is the free instance waking from sleep: about 30 to 60 s for the first request after idle (the first keep-warm ping took 34 s).
+- The GitHub keep-warm schedule is best-effort: one scheduled run in about ten hours, and that run waited about 15 minutes in GitHub's queue. It does not keep the instance awake reliably.
+- Options (owner's decision): a free external pinger every 5 minutes (UptimeRobot or cron-job.org), a paid always-on plan, or a "waking up the server" message in the app. See open item G9.

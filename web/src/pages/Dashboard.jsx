@@ -47,14 +47,14 @@ function Body({ d }) {
   return (
     <>
       <div className="grid grid-4">
-        <Kpi label="Revenue" value={money(k.revenue, { compact: true })} change={ch.revenue} hint="vs the previous period" />
-        <Kpi label="Gross profit" value={money(k.gross_profit, { compact: true })} change={ch.gross_profit} hint={`food cost ${k.food_cost_pct}% of sales`} />
-        <Kpi label="Guests (dine-in)" value={num(k.covers)} change={ch.covers} hint={`${money(k.spend_per_cover)} spent per guest`} />
-        <Kpi label="Average bill" value={money(k.avg_basket)} change={ch.avg_basket} hint={`${num(k.orders)} bills`} />
+        <Kpi label="Sales incl. GST" value={money(k.revenue, { compact: true })} change={ch.revenue} hint="vs the previous period" />
+        <Kpi label="Gross profit" value={money(k.gross_profit, { compact: true })} change={ch.gross_profit} hint={`food cost ${k.food_cost_pct}% of sales excl. GST`} />
+        <Kpi label="Guests (dine-in)" value={num(k.covers)} change={ch.covers} hint={`${money(k.spend_per_cover)} per guest (dine-in)`} />
+        <Kpi label="Average bill" value={money(k.avg_basket)} change={ch.avg_basket} hint={`across ${num(k.orders)} bills`} />
       </div>
 
       <div className="grid grid-3">
-        <Card className="span-2" title="Revenue"
+        <Card className="span-2" title="Sales incl. GST"
           actions={<div className="legend">
             <span><i className="swatch" style={{ background: c.s1 }} />This period</span>
             <span><i className="swatch" style={{ background: c.muted }} />Previous period</span>
@@ -69,7 +69,7 @@ function Body({ d }) {
                 <span className="big-number">{money(fc.summary.horizon_total, { compact: true })}</span>
                 <Delta value={fc.summary.change_vs_last_7_pct} />
               </div>
-              <span className="small muted">Expected revenue · next 7 days vs last 7</span>
+              <span className="small muted">Expected sales incl. GST over 14 days · the % compares the next 7 days with the last 7</span>
               <ForecastChart history={d.trend.slice(-21).map((t) => ({ date: t.date, actual: t.revenue }))} forecast={fc.forecast} height={190} />
             </div>
           ) : <Empty title="Not enough history yet" icon={TrendingUp}>Forecasts start after three weeks of sales.</Empty>}

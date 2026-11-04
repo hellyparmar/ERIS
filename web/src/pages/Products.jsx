@@ -60,7 +60,7 @@ function ItemList({ kind, onOpen, onEdit }) {
     { key: 'selling_price', label: 'Price', format: 'currency' },
     { key: 'cost_price', label: 'Food cost', render: (r) => <>{money(r.cost_price)} <span className="muted small">· {r.food_cost_pct}%</span></>, align: 'right' },
     { key: 'units_30d', label: 'Ordered (30d)', format: 'number' },
-    { key: 'revenue_30d', label: 'Revenue (30d)', format: 'currency' },
+    { key: 'revenue_30d', label: 'Sales incl. GST (30d)', format: 'currency' },
     ...edit,
   ] : [
     { key: 'name', label: 'Ingredient', render: (r) => <><b>{r.name}</b><div className="small muted">{r.sku} · {r.category}</div></> },
@@ -79,7 +79,7 @@ function ItemList({ kind, onOpen, onEdit }) {
         </select>
         <select className="select" value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort">
           {dish ? <>
-            <option value="revenue">Sort: revenue (30d)</option><option value="units">Most ordered</option>
+            <option value="revenue">Sort: sales (30d)</option><option value="units">Most ordered</option>
             <option value="food_cost">Highest food cost %</option><option value="price">Price</option><option value="name">Name</option>
           </> : <>
             <option value="name">Sort: name</option><option value="units">Most used</option><option value="stock">Lowest stock</option>
@@ -238,7 +238,7 @@ function DishDetail({ p }) {
       <div className="grid grid-2">
         <Card><div className="small muted">Ordered in the last 30 days</div><div className="kpi-value">{num(p.last_30_days.units)}</div>
           <div className="kpi-foot"><Delta value={prev ? ((p.last_30_days.units - prev) / prev) * 100 : null} /> vs previous 30 days</div></Card>
-        <Card><div className="small muted">Revenue (30d)</div><div className="kpi-value">{money(p.last_30_days.revenue, { compact: true })}</div>
+        <Card><div className="small muted">Sales incl. GST (30d)</div><div className="kpi-value">{money(p.last_30_days.revenue, { compact: true })}</div>
           <div className="kpi-foot">{money(p.selling_price)} · food cost {p.food_cost_pct}%</div></Card>
       </div>
       <Card title="Orders per week" actions={<Link className="small" to={`/forecasts?scope=product&id=${p.id}`}><TrendingUp size={13} /> Forecast</Link>}>

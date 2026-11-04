@@ -102,3 +102,9 @@ Things that are known, unresolved, or waiting on the owner. Each has a reason an
 - **Done:** D26 in `claude/loving-wright-326xam`; tests pass; local run clean.
 - **Next (needs the owner's merge decision):** merge the PR; then run `scripts/load_check.py` against the hosted API at 20 workers and record the refusals, timeouts and latency. If refusals are too many or waits too long, tune `MAX_INFLIGHT_REQUESTS` and `INFLIGHT_WAIT_SECONDS` on the host (environment variables, no code change).
 
+### G9. Cold start on the hosted instance (open, owner decision)
+- **Observed:** first request after idle takes 30 to 60 s (`brain/06`). The GitHub keep-warm schedule fires too rarely to prevent it.
+- **Options:** free external pinger every 5 minutes; paid always-on plan; a "waking up the server" message in the web app (code change, small).
+
+### G10. Cost model looks optimistic (note)
+- Food cost is 21% of sales excl. GST and gross margin 79% on the demo. Real restaurants usually run 28 to 35% food cost. The data is synthetic (`brain/05`): prices and costs are plausible for India, not sourced. Present it as demo data.

@@ -36,10 +36,10 @@ export default function Outlets() {
             <div className="card-head"><div><h2>Sales by outlet</h2><p>Last 30 days</p></div><span className="small muted">Compared to previous 30 days</span></div>
             <div style={{ padding: '4px 18px 18px' }}>
               <div className="row" style={{ gap: 40, alignItems: 'flex-end', marginBottom: 16 }}>
-                <div><div className="small muted">Revenue, all outlets</div>
+                <div><div className="small muted">Sales incl. GST, all outlets</div>
                   <div className="row" style={{ gap: 10 }}><span className="big-number">{money(total, { compact: true })}</span><Delta value={before ? ((total - before) / before) * 100 : null} /></div></div>
                 {best && <div><div className="small muted">Best outlet · {best.name}</div>
-                  <div className="row" style={{ gap: 10 }}><span className="big-number" style={{ color: 'var(--text-2)' }}>{best.stats.share_pct}%</span><span className="small muted">of revenue</span></div></div>}
+                  <div className="row" style={{ gap: 10 }}><span className="big-number" style={{ color: 'var(--text-2)' }}>{best.stats.share_pct}%</span><span className="small muted">of sales</span></div></div>}
               </div>
               <SegmentBar thick legend={false} items={ranked.map((o) => ({ label: o.name, value: o.stats.revenue_30d, color: colorOf[o.id] }))} format={(v) => money(v, { compact: true })} />
             </div>
@@ -47,7 +47,7 @@ export default function Outlets() {
               { key: 'name', label: 'Outlet', render: (o) => <span className="row" style={{ gap: 8, flexWrap: 'nowrap' }}><i className="swatch" style={{ background: colorOf[o.id] }} /><b>{o.name}</b>{!o.is_active && <StatusBadge status="inactive" />}</span> },
               { key: 'city', label: 'City', render: (o) => <span className="muted">{o.city}</span> },
               { key: 'share', label: 'Share', align: 'right', render: (o) => `${o.stats.share_pct}%` },
-              { key: 'rev', label: 'Revenue', align: 'right', render: (o) => <span className="row" style={{ gap: 6, justifyContent: 'flex-end', flexWrap: 'nowrap' }}>{money(o.stats.revenue_30d)}<Delta value={o.stats.change_pct} /></span> },
+              { key: 'rev', label: 'Sales incl. GST', align: 'right', render: (o) => <span className="row" style={{ gap: 6, justifyContent: 'flex-end', flexWrap: 'nowrap' }}>{money(o.stats.revenue_30d)}<Delta value={o.stats.change_pct} /></span> },
               { key: 'orders', label: 'Bills', align: 'right', render: (o) => num(o.stats.orders_30d) },
               { key: 'basket', label: 'Avg bill', align: 'right', render: (o) => money(o.stats.avg_basket) },
               { key: 'margin', label: 'Margin', align: 'right', render: (o) => `${o.stats.margin_pct}%` },
@@ -96,16 +96,16 @@ function OutletDetail({ id, outlet, onOpen }) {
         <button className="btn sm" onClick={onOpen}>Dishes & categories</button>
       </div>
       <div className="grid grid-4">
-        <Kpi label="Revenue" value={money(k.revenue, { compact: true })} change={ch.revenue} hint={`${outlet?.stats.share_pct ?? 0}% of all outlets`} />
-        <Kpi label="Gross profit" value={money(k.gross_profit, { compact: true })} change={ch.gross_profit} hint={`${k.margin_pct}% margin`} />
+        <Kpi label="Sales incl. GST" value={money(k.revenue, { compact: true })} change={ch.revenue} hint={`${outlet?.stats.share_pct ?? 0}% of all outlets`} />
+        <Kpi label="Gross profit" value={money(k.gross_profit, { compact: true })} change={ch.gross_profit} hint={`${k.margin_pct}% margin on sales excl. GST`} />
         <Kpi label="Bills" value={num(k.orders)} change={ch.orders} hint={`${num(k.items_per_basket, 1)} items per bill`} />
         <Kpi label="Average bill" value={money(k.avg_basket)} change={ch.avg_basket} hint={`${outlet?.stats.low_stock_items ?? 0} ingredients low on stock`} />
       </div>
       <div className="grid grid-2">
-        <Card title="Weekly revenue"
+        <Card title="Weekly sales incl. GST"
           actions={last && <div style={{ textAlign: 'right' }}><div className="small muted">Latest week</div>
             <div className="row" style={{ gap: 8 }}><span className="big-number" style={{ fontSize: 26 }}>{money(last.revenue, { compact: true })}</span>{prev?.revenue > 0 && <Delta value={((last.revenue - prev.revenue) / prev.revenue) * 100} />}</div></div>}>
-          <BarsChart data={trend} x="week" series={[{ key: 'revenue', label: 'Revenue' }]} height={230} highlight={(_, i) => i === trend.length - 1} />
+          <BarsChart data={trend} x="week" series={[{ key: 'revenue', label: 'Sales incl. GST' }]} height={230} highlight={(_, i) => i === trend.length - 1} />
         </Card>
         <Card title="Average bill by week"
           actions={last?.basket && <div style={{ textAlign: 'right' }}><div className="small muted">Latest week</div>
@@ -126,13 +126,13 @@ function OutletDrawer({ id, onClose }) {
         <>
           <Card><dl className="dl">
             <dt>Address</dt><dd>{o.address || '-'}</dd><dt>Phone</dt><dd>{o.phone || '-'}</dd><dt>Manager</dt><dd>{o.manager_name || '-'}</dd>
-            <dt>Revenue (30d)</dt><dd>{money(o.kpis.current.revenue)} <Delta value={o.kpis.change_pct.revenue} /></dd>
+            <dt>Sales incl. GST (30d)</dt><dd>{money(o.kpis.current.revenue)} <Delta value={o.kpis.change_pct.revenue} /></dd>
             <dt>Gross profit</dt><dd>{money(o.kpis.current.gross_profit)} ({o.kpis.current.margin_pct}%)</dd>
           </dl></Card>
-          <Card title="Weekly revenue (90 days)"><TrendChart data={o.trend} series={[{ key: 'revenue', label: 'Revenue' }]} height={180} /></Card>
+          <Card title="Weekly sales incl. GST (90 days)"><TrendChart data={o.trend} series={[{ key: 'revenue', label: 'Sales incl. GST' }]} height={180} /></Card>
           <Card title="Category mix (30 days)"><ShareList rows={o.categories} labelKey="category" valueKey="revenue" /></Card>
           <Card title="Top dishes (30 days)" flush>
-            <DataTable rows={o.top_products} sortable={false} columns={[{ key: 'name', label: 'Dish' }, { key: 'units', label: 'Orders', format: 'number' }, { key: 'revenue', label: 'Revenue', format: 'currency' }]} />
+            <DataTable rows={o.top_products} sortable={false} columns={[{ key: 'name', label: 'Dish' }, { key: 'units', label: 'Orders', format: 'number' }, { key: 'revenue', label: 'Sales incl. GST', format: 'currency' }]} />
           </Card>
         </>
       )}
