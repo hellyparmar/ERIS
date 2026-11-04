@@ -154,3 +154,17 @@ Each decision gives: **what** was chosen, **why**, **alternatives**, **consequen
 - **Consequence:** Existing PRs #42 and #35 stay open until closed; the rules stop new ones of the same kind. The owner can overrule this decision by removing the rules.
 - **Source:** recorded (owner has not answered the question; this is the default chosen in the session, to be confirmed).
 
+## D24. The hosted API is kept warm by a scheduled ping
+- **What:** `.github/workflows/keep-warm.yml` requests the public health endpoint every 10 minutes. A failed ping fails the run.
+- **Why:** The hosted free instance sleeps when idle. In the live light-load test one request hit a 60 s timeout; a warm request takes 0.3 to 0.5 s. The cold start is the likely cause (not proven: the server log is not available).
+- **Alternatives:** A paid always-on plan (costs money; owner chose the free option). Leaving it (accepts slow first requests after idle periods).
+- **Consequence:** One free instance running all month uses about 744 of the 750 free instance hours, so no second free service can run on the same account without exceeding them. Schedules can run late; the ping is a target, not a guarantee.
+- **Source:** recorded (owner's answer, 2026-11-04).
+
+## D25. Sales exports stay as they are under load
+- **What:** The export gate (two workers, 10 s wait, then 503 with Retry-After) stays. Exports are not cached and no background export job is added.
+- **Why:** A 30-day export is about 0.3 s of work. The 11 s median under 40 concurrent exports is queueing on a CPU-limited host. A leaner CSV writer saves 15 to 25 % but touches the escaping path shared by every export; caching would store multi-megabyte bodies in the database.
+- **Alternatives:** A background export job (a new endpoint and UI, moderate effort); more CPU and export slots (costs money).
+- **Consequence:** Under heavy export load, callers get a fast 503 and retry. Revisit if exports become a user-facing bottleneck.
+- **Source:** recorded (owner's answer, 2026-11-04).
+

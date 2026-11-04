@@ -102,6 +102,28 @@ Load test: a mixed script (dashboard, sales list, stock list, menu list, forecas
 - **Resolved 2026-11-03:** the session cookies were `SameSite=lax`, so the browser did not send them from the Vercel site to the Render API, and sign-in failed. The owner set `REFRESH_COOKIE_SAMESITE=none` on the `eris` service and redeployed. The live check now passes 24 of 24: both session cookies are `HttpOnly`, `Secure` and `SameSite=None`, sign-in and renewal work, and the Vercel site serves the hardened build (CSP, no inline scripts).
 - **CI, 2026-11-03:** the `e2e` job failed on every run after `ubuntu-latest` moved to Ubuntu 26.04, where Playwright 1.56.1 cannot install Chromium. All jobs are pinned to `ubuntu-24.04` (D22). The e2e suite passes locally: 15 tests.
 
+## Load check (2026-11-03)
+
+`scripts/load_check.py` drives N concurrent workers over the heavy endpoints of a running API (stdlib only; `ERIS_BASE` selects the server; exits non-zero on a server error). Run on this machine against a local server on SQLite with the demo data (240 days), rate limits at their defaults:
+
+| Run | Result |
+|---|---|
+| 4 workers, 40 requests | 40 × 200; no server errors |
+| 40 workers, 700 requests | 630 × 200, 70 × 503 (all export requests: the export gate's busy answer); **no 500s, no exceptions**; server log without errors |
+| Latency, 40 workers | dashboard, sales list, analytics, products and forecast (cached): p50 0.04 s, p95 ≤ 0.34 s. Assistant chat: p50 1.0 s, p95 4.6 s. **Sales export: p50 11.4 s, p95 12.8 s** (two export workers; the rest wait up to 10 s, then 503) |
+| Forecast rate limit (120 per minute) | 429 from request 18 of 150 in the same minute (the earlier run had used ~100 of the 120), `Retry-After: 4` |
+
+Reading: the pipelines degrade by refusing (503 with `Retry-After`, 429 past the minute cap) and do not fail with errors under this load. The weak point is the sales export under concurrency: its work is serial behind two workers. Not yet optimised (open item G7).
+
+This is one machine, one database, one load shape. It is not a test of the hosted free instance (0.1 CPU); the live host was not load-tested, on purpose.
+
+## Live check under light load and port reachability (2026-11-03)
+
+- **Live API, 5 workers, 70 requests** (`scripts/load_check.py` against `eris-tvro.onrender.com`): 68 × 200, 1 × 503 (export busy), **1 client timeout at 60 s**. Latency at 5 workers: dashboard p50 0.97 s, products 1.16 s, sales 1.47 s, assistant 1.5 s, export p50 15.3 s, forecast p50 3.0 s (p95 38 s). No 5xx from the server.
+- **The timeout:** a warm request answers in 0.3 to 0.5 s on the live host (checked directly after the test). The likely cause is a cold instance: the hosted free instance sleeps when idle, and the first uncached forecast fit on a 0.1-CPU host can take tens of seconds while other requests queue behind it. Not proven: the server log is not available from here.
+- **Reachability of the public hostname:** TCP 80 and 443 open (the platform's HTTP redirect and HTTPS); 22, 5432, 6379, 8000 and 8080 closed or filtered. Render routes only the web port, and the host is fronted by Cloudflare, so this check cannot see private ports on the origin; it confirms what the public address exposes.
+- **Sales export (G7), investigated and not changed:** one 30-day export is about 0.3 s of work in-process (SQL about 0.2 s, rows and CSV about 0.1 s). Two variants were measured: skipping `safe_cell` on numeric cells and writing rows directly saves 15 to 25 %; looking up outlet and product names in Python instead of joining saves nothing. Output was byte-identical. The 11 s median under 40 workers is queueing behind the two export slots on a CPU-limited host, not the export itself. Exports are not cached: the response cache holds JSON answers only, and a 3.5 MB file per user and parameter set would grow the cache without a bound.
+
 ## How to verify the deployed system
 
 `python3 scripts/verify_deployment.py https://<api host> --web https://<web host>` runs the connectivity and security checks against a live deployment (see `brain/11`, H1). Add `--local --ca <file>` for a test server.

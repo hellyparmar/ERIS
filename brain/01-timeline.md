@@ -122,6 +122,80 @@ Three eras are visible in the history:
 - `ruff check app tests`: passed.
 - CI on the fix: pending at the time of writing (see the next entry).
 
+### 2026-11-04: Keep-warm ping for the hosted API; Dependabot #42 and #35 closed; decisions on export and history
+
+**Request (as given):** The owner's answers to four open questions: export under load (keep as is), keep the hosted instance warm (scheduled ping), close Dependabot #42 and #35, leave the history on main as it is.
+
+**What changed**
+- `.github/workflows/keep-warm.yml`: new; pings `https://eris-tvro.onrender.com/api/health` every 10 minutes; `permissions: {}`.
+- Dependabot PRs #42 and #35: closed (no comment).
+- `brain/02-decisions.md`: D24 (keep-warm), D25 (export stays).
+- `brain/11-open-items.md`: G7 decided; I4 (PRs closed), I5 (history left), I6 (free hours to watch).
+
+**Why this approach**
+- The one slow live request (60 s) was most likely a cold start, so a ping is the cheapest fix that keeps the free plan.
+- Export: the measured work is 0.3 s; the wait is queueing. Adding code would not change the picture (D25).
+
+**Alternatives considered**
+- Paid always-on plan: costs money; not chosen.
+- Closing Dependabot PRs with a comment: a comment would carry the attribution footer the environment adds, which conflicts with the owner's request; closed without comment.
+
+**Trade-offs and risks**
+- One free instance running all month uses about 744 of 750 free hours (D24).
+- Scheduled runs can be late; the ping is best-effort.
+
+**Decision record**
+- D24 and D25 in `02-decisions.md`. Source: recorded (owner's answers).
+
+**Verification (as run)**
+- `yaml.safe_load` on `keep-warm.yml`: parses; one job (`ping`), schedule `*/10 * * * *`.
+- Dependabot #42 and #35: state `closed` returned by the GitHub API.
+- Keep-warm workflow run: see the follow-up entry once it has run.
+
+### 2026-11-03: Live light-load check, port reachability, and the export investigation
+
+**What changed:** `brain/13` (new section), `brain/11` (G7 updated). No application code changed.
+
+**Verification (as run)**
+- Live API, 5 workers, 70 requests: 68 × 200, 1 × 503, 1 client timeout at 60 s; no 5xx from the server. Warm requests 0.3 to 0.5 s.
+- TCP on the public hostname: 80 and 443 open; 22, 5432, 6379, 8000, 8080 closed or filtered.
+- Export profile in-process: about 0.3 s per 30-day export; leaner writer 15 to 25 % faster with byte-identical output; the join-free lookup variant no faster. Not adopted.
+
+**Outcome:** the export is not made materially faster by code on this host; the decision is capacity or a background export (open item G7).
+
+### 2026-11-03: Load check of the request pipelines; live build status
+
+**Request (as given):** Stop-hook goal: "pipeline doesn't break during heavy traffic", and whether the merged build is live.
+
+**What changed**
+- `scripts/load_check.py`: new, stdlib-only load check over the heavy endpoints; exits non-zero on a server error.
+- `brain/13-hardening-and-pipelines.md`: "Load check (2026-11-03)" with the measured results.
+- `brain/11-open-items.md`: G7, the sales export under concurrency.
+
+**Why this approach**
+- The goal asked for the pipelines to hold under heavy traffic; the earlier notes had no measurement of that. This run measures it on a local server with the demo data.
+- Live build status: `/api/health` reports only the app version, not the commit. Since `af1acc2` no application code changed (`git diff --stat af1acc2 f97b319 -- api/app web/src` is empty); PR #44 changed CI, tests, docs and the verification script. So the live check (24 of 24) still describes the running application code.
+
+**Alternatives considered**
+- Load-test the hosted free instance: not done; it is a shared resource, and a test there would be unannounced load on production.
+
+**Trade-offs and risks**
+- One machine, one shape of load. Not a capacity figure for the hosted host.
+
+**Decision record**
+- No new decision.
+
+**Verification (as run)**
+- Local server, 40 workers × 700 requests: 630 × 200, 70 × 503; zero 500s or exceptions; server log without errors.
+- Forecast cap: 429 from request 18 of 150, `Retry-After: 4`.
+- `ruff check scripts/load_check.py`: passed (the script is not in CI's lint scope).
+- Live check: `verify_deployment.py` 24 of 24 (run earlier on this tree; the application code is unchanged since).
+
+**Follow-ups**
+- G7: the export is the slow path under load.
+- Dependabot #42 and #35 still open (owner decision).
+- Older `main` commits still carry Claude trailers (owner chose not to rewrite them).
+
 ### 2026-11-03: Attribution removed from new commits and the rule; six branch commits rewritten
 
 **Request (as given):** "make sure nothing like co-authored with claude or claude's name in doing all these appear in github repo or anywhere where other ppl get to know this project". Choices given by the owner: rewrite only this branch's six unmerged commits; keep the mentions in the files.

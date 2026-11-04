@@ -38,6 +38,10 @@ Things that are known, unresolved, or waiting on the owner. Each has a reason an
 - **Decision:** Geist is the final typeface. Fraunces is no longer in the code: no import, no font package, no CSS reference. The styles define one family, Geist, with Geist Mono for figures (`web/src/styles.css`, `main.jsx`).
 - **Why this is recorded:** The screenshots, the README and the shipped app all use Geist. Reintroducing a serif would be a new decision, not a restoration.
 
+### G7. Sales export is the slow path under concurrent load (decided 2026-11-04: D25)
+- **Measured:** 40 concurrent workers: p50 11.4 s, p95 12.8 s, and 70 of 100 export requests answered 503 (`brain/13`, "Load check").
+- **Investigated 2026-11-03 (`brain/13`):** one export is about 0.3 s of work; the wait is queueing for two export slots on a CPU-limited host. The leaner writer saves 15 to 25 %; not adopted (small gain, touches the escaping path). Owner decision needed: more CPU or export slots for the hosted instance, or an export that runs as a background job and is downloaded when ready.
+
 ## Discrepancies to fix
 
 ### O6. Forecast evaluation scope: 25 series vs 20
@@ -82,3 +86,13 @@ Things that are known, unresolved, or waiting on the owner. Each has a reason an
 - **Issue:** The scheduled workflow `refresh-demo.yml` calls the Render deploy hook from the secret `RENDER_DEPLOY_HOOK_URL`. It has failed with exit code 22 since 12 October, which points to an old hook URL.
 - **Resolved:** the scheduled run of 2026-11-02 (run 4) logged "Rebuild requested." The secret was replaced after the failure of 2026-10-25 (run 3). The job runs on `ubuntu-24.04` since D22's follow-up.
 - **Earlier steps (kept for reference):** In Render, open the `eris` service and copy the current Deploy Hook URL into the GitHub secret `RENDER_DEPLOY_HOOK_URL` (or delete the secret if the demo is refreshed by the Render auto-deploy instead). Then run the workflow once from the Actions tab.
+
+### I4. Dependabot PRs #42 and #35 closed (2026-11-04)
+- Closed without a comment: a closing comment would need the attribution footer the environment adds, which conflicts with the owner's request. The reason is in D23 and this entry.
+- Reopen only if the runtime moves (D23 holds the rules in `.github/dependabot.yml`).
+
+### I5. Claude trailers on 79 older commits of main (decided 2026-11-04: leave history)
+- New commits and PRs are clean from now on (CLAUDE.md, D19). Older history is not rewritten, since that changes every commit SHA on the public default branch and needs a force-push.
+
+### I6. Hosted instance hours (watch)
+- The keep-warm ping (D24) runs one free instance all month. If another free service is added to the account, the total exceeds the free hours. Check the Render usage page after adding any service.
