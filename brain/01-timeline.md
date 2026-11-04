@@ -122,6 +122,17 @@ Three eras are visible in the history:
 - `ruff check app tests`: passed.
 - CI on the fix: pending at the time of writing (see the next entry).
 
+### 2026-11-04: Admission control verified on the hosted API
+
+**What changed:** `brain/13`, `brain/11` (G8). No code.
+
+**Verification (as run, live)**
+- `/api/health` reports `build: 94fd71f52fe0`: the hosted API runs the merged code, including D26.
+- 20 workers × 280 requests: 176 × 200, 104 × 503, 0 timeouts or exceptions (before D26: 34 timeouts).
+- 16 uncached forecasts: 8 refused at about 6 s with the admission message; admitted ones still took up to about 63 s.
+
+**Follow-ups:** tune the cap (G8).
+
 ### 2026-11-04: Labels and units on the numbers fixed (D28)
 
 **Request (as given):** "are we sure the numbers ... are legit, valid and believable? ... in some places the units of numbers are not used correctly" (e.g. "Average bill ₹1,261, 7,497 bills"); then: "stay as it is but be relabelled 'Sales incl. GST', fix all the labels".
