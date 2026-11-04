@@ -122,6 +122,36 @@ Three eras are visible in the history:
 - `ruff check app tests`: passed.
 - CI on the fix: pending at the time of writing (see the next entry).
 
+### 2026-11-04: Keep-warm ping for the hosted API; Dependabot #42 and #35 closed; decisions on export and history
+
+**Request (as given):** The owner's answers to four open questions: export under load (keep as is), keep the hosted instance warm (scheduled ping), close Dependabot #42 and #35, leave the history on main as it is.
+
+**What changed**
+- `.github/workflows/keep-warm.yml`: new; pings `https://eris-tvro.onrender.com/api/health` every 10 minutes; `permissions: {}`.
+- Dependabot PRs #42 and #35: closed (no comment).
+- `brain/02-decisions.md`: D24 (keep-warm), D25 (export stays).
+- `brain/11-open-items.md`: G7 decided; I4 (PRs closed), I5 (history left), I6 (free hours to watch).
+
+**Why this approach**
+- The one slow live request (60 s) was most likely a cold start, so a ping is the cheapest fix that keeps the free plan.
+- Export: the measured work is 0.3 s; the wait is queueing. Adding code would not change the picture (D25).
+
+**Alternatives considered**
+- Paid always-on plan: costs money; not chosen.
+- Closing Dependabot PRs with a comment: a comment would carry the attribution footer the environment adds, which conflicts with the owner's request; closed without comment.
+
+**Trade-offs and risks**
+- One free instance running all month uses about 744 of 750 free hours (D24).
+- Scheduled runs can be late; the ping is best-effort.
+
+**Decision record**
+- D24 and D25 in `02-decisions.md`. Source: recorded (owner's answers).
+
+**Verification (as run)**
+- `yaml.safe_load` on `keep-warm.yml`: parses; one job (`ping`), schedule `*/10 * * * *`.
+- Dependabot #42 and #35: state `closed` returned by the GitHub API.
+- Keep-warm workflow run: see the follow-up entry once it has run.
+
 ### 2026-11-03: Live light-load check, port reachability, and the export investigation
 
 **What changed:** `brain/13` (new section), `brain/11` (G7 updated). No application code changed.
