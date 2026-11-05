@@ -171,3 +171,21 @@ def test_a_failing_import_keeps_live_data_and_records_the_failure(client, admin,
         assert db.scalar(select(func.count(Sale.id))) == before
         job = db.scalar(select(ImportJob).order_by(ImportJob.id.desc()))
         assert job.filename == "fail.csv" and job.status == "failed"
+
+
+def test_uncached_forecasts_are_admitted_in_small_numbers_but_cached_ones_always_answer(client, admin, monkeypatch):
+    url = "/api/forecast?scope=category&target_id=2&horizon={h}&model=seasonal_naive"
+    F.clear_cache()
+    assert client.get(url.format(h=21), headers=admin).status_code == 200  # now in the memory cache
+    monkeypatch.setattr(settings, "FORECAST_ADMIT_WAIT_SECONDS", 0.1)
+    held = 0
+    while F._admit_slots.acquire(blocking=False):  # every admission slot is taken
+        held += 1
+    try:
+        assert client.get(url.format(h=21), headers=admin).status_code == 200  # cached: no gate, answers at once
+        r = client.get(url.format(h=22), headers=admin)  # uncached: refused quickly with a retry hint
+        assert r.status_code == 503 and r.headers["retry-after"] == "5" and "try again" in r.json()["detail"]
+    finally:
+        for _ in range(held):
+            F._admit_slots.release()
+    assert client.get(url.format(h=22), headers=admin).status_code == 200  # slots free again

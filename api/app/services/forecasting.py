@@ -250,6 +250,20 @@ class ForecastBusy(RuntimeError):
 
 
 _fit_slots = threading.BoundedSemaphore(max(1, settings.FORECAST_WORKERS))
+# Admission for uncached forecasts: loading the series and preparing the features is CPU work that happens before the fit
+# slot. On a small host several of them slow each other down (the slot wait then starts late), so only one fit plus
+# FORECAST_QUEUE others may be in progress; the rest are refused quickly. A cached answer never passes through here.
+_admit_slots = threading.BoundedSemaphore(max(1, settings.FORECAST_WORKERS) + max(0, settings.FORECAST_QUEUE))
+
+
+@contextmanager
+def admit_slot():
+    if not _admit_slots.acquire(timeout=settings.FORECAST_ADMIT_WAIT_SECONDS):
+        raise ForecastBusy("Forecasts are busy right now - please try again in a few seconds.")
+    try:
+        yield
+    finally:
+        _admit_slots.release()
 
 
 @contextmanager
@@ -496,7 +510,12 @@ def forecast_series(db: Session, spec: SeriesSpec, horizon: int = 30, model: str
     hit = _cached(key)
     if hit is not None:
         return hit
+    with admit_slot():
+        return _forecast_uncached(db, spec, horizon, model, history_days, user_id, persist, key, end)
 
+
+def _forecast_uncached(db: Session, spec: SeriesSpec, horizon: int, model: str, history_days: int,
+                       user_id: int | None, persist: bool, key: tuple, end: date) -> dict:
     t0 = time.time()
     series = None
     try:

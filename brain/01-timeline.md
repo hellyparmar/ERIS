@@ -122,6 +122,35 @@ Three eras are visible in the history:
 - `ruff check app tests`: passed.
 - CI on the fix: pending at the time of writing (see the next entry).
 
+### 2026-11-05: Forecast admission gate (D29)
+
+**Request (as given):** the stop-hook goal: pipelines must not break under heavy traffic; the measured weak point was a forecast held for about a minute before being refused.
+
+**What changed**
+- `api/app/services/forecasting.py`: `forecast_series` is split: the cache check, then `admit_slot()`, then `_forecast_uncached` (the unchanged remainder). `admit_slot` allows `FORECAST_WORKERS + FORECAST_QUEUE` uncached forecasts in progress.
+- `api/app/config.py`: `FORECAST_QUEUE = 3`, `FORECAST_ADMIT_WAIT_SECONDS = 5.0`.
+- `api/tests/test_isolation.py`: one test. `brain/02` (D29), `brain/10`, `brain/11`.
+
+**Why this approach:** see D29. The pre-slot work (series load, features) is what slows down under contention, so the gate goes before it, and cached answers skip it.
+
+**Alternatives considered:** take the fit slot first (serialises the cheap reuse path); lower global cap (4 was worse than 8).
+
+**Trade-offs and risks:** more refusals (503 with a retry hint) for uncached forecasts under load; cached forecasts and the dashboard's usual forecast are not affected. 3 and 5 s are a first estimate.
+
+**Verification (as run)**
+- `pytest -q` (API): 158 passed; `ruff check app tests`: passed.
+- Hosted API: not yet run; needs the deploy.
+
+### 2026-11-05: Cap of 4 tried on the hosted API; rejected
+
+**What changed:** `brain/13`, `brain/11` (G8). No code.
+
+**Verification (as run, live, build `bfb2e957cadb`)**
+- 20 workers × 280 requests with `MAX_INFLIGHT_REQUESTS=4`: 58 × 200, 221 × 503, 1 timeout. With the default of 8: 176 × 200, 104 × 503, 0 timeouts. Latency of served requests about the same.
+- Report headers read "Sales incl. GST" and the previous/actual/expected variants on the live API.
+
+**Outcome:** keep 8. The owner should remove or reset the variable on Render.
+
 ### 2026-11-05: Label deploy verified live; remaining report labels fixed; application listening ports recorded
 
 **What changed**
