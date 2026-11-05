@@ -29,6 +29,10 @@ services:
         value: "none"
       - key: MALLOC_ARENA_MAX  # keeps memory well inside the free plan's 512 MB
         value: "2"
+      - key: FORECAST_QUEUE  # one forecast fitting plus this many preparing; the rest are refused quickly (D29, D30)
+        value: "1"
+      - key: FORECAST_WAIT_SECONDS  # an admitted forecast waits at most this long for the single fit slot (D30)
+        value: "10"
       # If the web app is also hosted on Vercel (VITE_API_URL pointing here), allow its address:
       # - key: CORS_ORIGINS
       #   value: https://your-project.vercel.app

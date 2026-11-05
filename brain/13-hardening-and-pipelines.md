@@ -166,6 +166,29 @@ Same test (`scripts/load_check.py 20 280`, 20 workers, 280 requests), same hoste
 - **Not tried:** 6, a separate smaller cap for forecasts, or gating forecast work before the series is loaded. These are the next options if the forecast path still holds admitted requests for about a minute (G8).
 - **Live labels confirmed at build `bfb2e957cadb`:** report headers read "Sales incl. GST", "Previous period sales incl. GST", "Actual sales incl. GST" and "Expected sales incl. GST".
 
+## Forecast admission gate measured on the hosted API (2026-11-05)
+
+Build `eaa95ab7c9c8` (D29). The hosted instance has 0.1 CPU. The in-flight cap was back at the default of 8 (inferred from the result: 8 of 16 requests refused by the global limit after about 6 s).
+
+- **16 concurrent uncached forecasts:** 1 × 200, 15 × 503; wall 49 s (before the gate: wall 63 s, with a connection cut at 60 s). 8 refused at about 6 s by the global limit ("The server is busy"); of the 8 admitted, 4 were refused by the forecast gate at about 13 s, and 3 were refused by the fit-slot wait at about 43 to 49 s; 1 answered. No connection was cut. Before the gate, 6 of the 8 admitted were refused only at about 61 s.
+- **20 workers, 280 requests:** 178 × 200, 102 × 503, 0 timeouts or exceptions (cap 8 without the gate: 176 / 104 / 0; no cap at all: 219 / 27 / 34 timeouts; cap 4: 58 / 221 / 1). Fast pages p50 about 5 to 6 s, p95 7 to 10 s.
+- **Reading:** under heavy load the hosted API now answers or refuses every request; nothing hangs. A forecast still takes up to about 45 s to be refused when it is admitted but cannot get the fit slot, because preparing four forecasts at once is slow on this host. Setting `FORECAST_QUEUE=1` and `FORECAST_WAIT_SECONDS=10` as environment variables (no code change) would shorten that; not tried.
+
+## Forecast settings tuned on Render: FORECAST_QUEUE=1, FORECAST_WAIT_SECONDS=10 (2026-11-05)
+
+Set as environment variables by the owner on the hosted service; the code (build `eaa95ab7c9c8`) is unchanged. In-flight cap at the default of 8.
+
+| Run | Before (QUEUE 3, WAIT 20) | After (QUEUE 1, WAIT 10) |
+|---|---|---|
+| 16 concurrent uncached forecasts: wall time | 49 s | **40 s** |
+| of the 16, settled in about 13 s or less | 12 | **14** |
+| of the 16, taking 26 s or longer | 4 (43 to 49 s) | **2** (26 s and 40 s) |
+| 20 workers, 280 requests: answered / refused / timeouts | 178 / 102 / 0 | **187 / 93 / 0** |
+| fast pages p50 / p95 | about 5.3 s / 7 to 10 s | about 5.3 to 5.9 s / 7 s |
+
+- **Decision (D30):** keep `FORECAST_QUEUE=1` and `FORECAST_WAIT_SECONDS=10` on the hosted service. They shorten how long a forecast is held before a refusal, and answer slightly more requests. The values are set in Render's dashboard and in `render.yaml`, so a service rebuilt from the blueprint keeps them.
+- **Not tried:** a lower or separate cap for forecasts, and a paid instance. Fewer refusals need more CPU.
+
 ## How to verify the deployed system
 
 `python3 scripts/verify_deployment.py https://<api host> --web https://<web host>` runs the connectivity and security checks against a live deployment (see `brain/11`, H1). Add `--local --ca <file>` for a test server.
