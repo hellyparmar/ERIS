@@ -189,3 +189,10 @@ Each decision gives: **what** was chosen, **why**, **alternatives**, **consequen
 - **Consequence:** Sentences the assistant narrates ("Revenue is down ...") and the example questions users can type keep the word "revenue" and still parse. A future page that shows a GST-exclusive figure must label it so.
 - **Source:** recorded (owner's decision, 2026-11-04; code in `api/app/services/analytics.py`, web pages).
 
+## D29. Uncached forecasts pass an admission gate before any data is loaded
+- **What:** `forecast_series` now answers a cached result first, with no gate. An uncached request takes an admission slot (`FORECAST_WORKERS` + `FORECAST_QUEUE` = 1 fitting + 3 preparing) within `FORECAST_ADMIT_WAIT_SECONDS` (5 s); otherwise it is refused with the existing "Forecasts are busy" 503 and `Retry-After: 5`. The fit slot and its 20 s wait are unchanged.
+- **Why:** On the hosted instance (0.1 CPU), 16 concurrent uncached forecasts gave 8 refused by the global limit after about 6 s, but of the 8 admitted, 6 were refused only after about 61 s and one connection was cut at 60 s. The series load and feature preparation run before the fit slot, so several of them slow each other down and the slot wait starts late (`brain/13`).
+- **Alternatives:** Take the fit slot before loading (rejected: it would also serialise the cheap reuse path and make warm-cache requests wait behind a 30 s fit). A lower global cap (tried: 4 is worse than 8). Only shorten `FORECAST_WAIT_SECONDS` (rejected: the delay is mostly before the slot).
+- **Consequence:** At most 4 uncached forecasts are in progress. Cached and reused answers are unaffected. The numbers 3 and 5 s are a first estimate: to be measured on the hosted instance after deploy (G8).
+- **Source:** recorded (live measurements 2026-11-04; `api/app/services/forecasting.py`, `api/tests/test_isolation.py`).
+

@@ -64,3 +64,4 @@ On this host, Chromium is at `/opt/pw-browsers/chromium` and is used with `PW_CH
 
 ## Admission control (2026-11-04)
 - `api/tests/test_admission.py`: 3 tests. A request beyond the in-flight cap is refused after its wait and capacity returns; health checks are not refused; a cap of 0 disables it. They use a stand-in ASGI app, not the database.
+- `test_isolation.py::test_uncached_forecasts_are_admitted_in_small_numbers_but_cached_ones_always_answer`: with every admission slot taken, a cached forecast still answers and an uncached one is refused with 503 and `Retry-After: 5`; answers again once the slots are free. API suite: 158 tests.

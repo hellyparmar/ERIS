@@ -59,6 +59,8 @@ class Settings(BaseSettings):
     # request that cannot start a fit within FORECAST_WAIT_SECONDS gets a quick "busy, try again" (HTTP 503).
     FORECAST_WORKERS: int = 1
     FORECAST_WAIT_SECONDS: float = 20.0
+    FORECAST_QUEUE: int = 3                   # uncached forecasts allowed to prepare while one fits; the rest are refused
+    FORECAST_ADMIT_WAIT_SECONDS: float = 5.0  # an uncached forecast waits this long to be admitted, then gets 503
     # Exports (CSV and Excel) build whole files in memory. At most EXPORT_WORKERS run at once.
     EXPORT_WORKERS: int = 2
     EXPORT_WAIT_SECONDS: float = 10.0
