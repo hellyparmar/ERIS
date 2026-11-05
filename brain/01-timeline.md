@@ -122,6 +122,20 @@ Three eras are visible in the history:
 - `ruff check app tests`: passed.
 - CI on the fix: pending at the time of writing (see the next entry).
 
+### 2026-11-05: The forecast settings added to render.yaml
+
+**Request (as given):** "add them to render.yaml"
+
+**What changed**
+- `render.yaml`: `FORECAST_QUEUE=1` and `FORECAST_WAIT_SECONDS=10`, the same values the owner set in Render's dashboard (D30).
+- `brain/02` (D30), `brain/11`, `brain/13`: the notes that said the values were missing from the file.
+
+**Why this approach:** a service created or rebuilt from the blueprint would otherwise fall back to the code defaults (3 and 20) and lose the measured improvement.
+
+**Trade-offs and risks:** none beyond a normal deploy; the values equal the ones already live.
+
+**Verification (as run):** `yaml.safe_load` on `render.yaml` parses and lists the two variables. No application code changed.
+
 ### 2026-11-05: Forecast settings tuned on Render (D30)
 
 **What changed:** `brain/13`, `brain/02` (D30), `brain/11`. No code; the owner set two environment variables on Render.

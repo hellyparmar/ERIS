@@ -186,7 +186,7 @@ Set as environment variables by the owner on the hosted service; the code (build
 | 20 workers, 280 requests: answered / refused / timeouts | 178 / 102 / 0 | **187 / 93 / 0** |
 | fast pages p50 / p95 | about 5.3 s / 7 to 10 s | about 5.3 to 5.9 s / 7 s |
 
-- **Decision (D30):** keep `FORECAST_QUEUE=1` and `FORECAST_WAIT_SECONDS=10` on the hosted service. They shorten how long a forecast is held before a refusal, and answer slightly more requests. The values live in Render's dashboard; `render.yaml` does not set them, so a service rebuilt from the blueprint would use the defaults (3 and 20).
+- **Decision (D30):** keep `FORECAST_QUEUE=1` and `FORECAST_WAIT_SECONDS=10` on the hosted service. They shorten how long a forecast is held before a refusal, and answer slightly more requests. The values are set in Render's dashboard and in `render.yaml`, so a service rebuilt from the blueprint keeps them.
 - **Not tried:** a lower or separate cap for forecasts, and a paid instance. Fewer refusals need more CPU.
 
 ## How to verify the deployed system

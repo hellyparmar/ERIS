@@ -200,6 +200,6 @@ Each decision gives: **what** was chosen, **why**, **alternatives**, **consequen
 - **What:** On the Render service, as environment variables: `FORECAST_QUEUE=1` (one fitting plus one preparing) and `FORECAST_WAIT_SECONDS=10` (down from 3 and 20). The code defaults are unchanged.
 - **Why:** Measured live (`brain/13`): the 16-forecast burst takes 40 s instead of 49 s, 14 of 16 settle within about 13 s, and the 20-worker test answers 187 of 280 instead of 178, still with no timeouts.
 - **Alternatives:** The code defaults (3 and 20). A lower global cap (4 was worse than 8, D26).
-- **Consequence:** More uncached forecasts are refused early under load (with a retry hint); cached ones are never affected. If the service is rebuilt from `render.yaml`, these two variables must be set again (or added to `render.yaml`).
+- **Consequence:** More uncached forecasts are refused early under load (with a retry hint); cached ones are never affected. The two variables are also in `render.yaml`, so a service rebuilt from the blueprint keeps them.
 - **Source:** recorded (owner set the variables; measured 2026-11-05).
 
