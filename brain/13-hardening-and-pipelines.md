@@ -151,6 +151,21 @@ This is one machine, one database, one load shape. It is not a test of the hoste
 - **Limit of this check:** Render's own infrastructure behind its proxy is not visible from the build environment and is not under this code's control.
 - **Label deploy:** `/api/health` reports `build: 644f8621bfb8`. The served web files contain "Sales incl. GST" 21 times (Dashboard, Analytics, Outlets, Products, Insights), no old "Revenue" KPI label, and "lakh" and "crore" written out. Report headers say "Sales incl. GST". Three report columns and three report descriptions still said "revenue"; fixed in the same change as this note.
 
+## Cap tuning on the hosted API: 4 against 8 (2026-11-05)
+
+Same test (`scripts/load_check.py 20 280`, 20 workers, 280 requests), same hosted free instance (0.1 CPU), build `bfb2e957cadb`. `INFLIGHT_WAIT_SECONDS` unchanged (5 s).
+
+| `MAX_INFLIGHT_REQUESTS` | 200 | 503 (refused) | Timeouts | Fast pages p50 / p95 |
+|---|---|---|---|---|
+| none (before D26) | 219 | 27 (exports) | **34** | 2 to 3 s / up to 60 s |
+| 8 | 176 | 104 | 0 | about 5 s / 7 s |
+| 4 | **58** | **221** | 1 | about 5.5 to 6 s / 6 to 12 s |
+
+- **Reading:** the cap of 4 refuses 79 % of requests and does not make the served ones faster: they still take about 5 to 6 s, because the instance itself is slow, not because of queueing. A cap of 8 serves three times as many requests with the same latency and no timeouts.
+- **Decision:** keep the default of 8 (D26). A cap of 4 is rejected. The lever for faster pages on this host is capacity (CPU) or keeping it warm, not a lower cap.
+- **Not tried:** 6, a separate smaller cap for forecasts, or gating forecast work before the series is loaded. These are the next options if the forecast path still holds admitted requests for about a minute (G8).
+- **Live labels confirmed at build `bfb2e957cadb`:** report headers read "Sales incl. GST", "Previous period sales incl. GST", "Actual sales incl. GST" and "Expected sales incl. GST".
+
 ## How to verify the deployed system
 
 `python3 scripts/verify_deployment.py https://<api host> --web https://<web host>` runs the connectivity and security checks against a live deployment (see `brain/11`, H1). Add `--local --ca <file>` for a test server.

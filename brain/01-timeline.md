@@ -122,6 +122,16 @@ Three eras are visible in the history:
 - `ruff check app tests`: passed.
 - CI on the fix: pending at the time of writing (see the next entry).
 
+### 2026-11-05: Cap of 4 tried on the hosted API; rejected
+
+**What changed:** `brain/13`, `brain/11` (G8). No code.
+
+**Verification (as run, live, build `bfb2e957cadb`)**
+- 20 workers × 280 requests with `MAX_INFLIGHT_REQUESTS=4`: 58 × 200, 221 × 503, 1 timeout. With the default of 8: 176 × 200, 104 × 503, 0 timeouts. Latency of served requests about the same.
+- Report headers read "Sales incl. GST" and the previous/actual/expected variants on the live API.
+
+**Outcome:** keep 8. The owner should remove or reset the variable on Render.
+
 ### 2026-11-05: Label deploy verified live; remaining report labels fixed; application listening ports recorded
 
 **What changed**
