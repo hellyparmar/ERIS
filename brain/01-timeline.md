@@ -122,6 +122,19 @@ Three eras are visible in the history:
 - `ruff check app tests`: passed.
 - CI on the fix: pending at the time of writing (see the next entry).
 
+### 2026-11-05: Label deploy verified live; remaining report labels fixed; application listening ports recorded
+
+**What changed**
+- `api/app/services/reports.py`: "Previous period revenue", "Actual revenue" and "Expected revenue" column headers, and three report descriptions, now say "sales incl. GST" (D28).
+- `brain/13`: what the application listens on, and the label deploy.
+
+**Verification (as run)**
+- Live: `/api/health` build `644f8621bfb8`; the served web files contain "Sales incl. GST" 21 times; report headers checked on the live API (outlets, categories).
+- Local: `ruff check app tests` passed; `pytest` on the reports, insights and API tests: 48 passed.
+- Application sockets read from `/proc/net`: one listening socket.
+
+**Follow-ups:** the new report labels go live with the next deploy; cap tuning (G8) is still open.
+
 ### 2026-11-04: Admission control verified on the hosted API
 
 **What changed:** `brain/13`, `brain/11` (G8). No code.
