@@ -12,8 +12,8 @@ export function money(v, { compact = false, decimals = false } = {}) {
   const sign = n < 0 ? '-' : ''
   const a = Math.abs(n)
   if (compact && SYMBOL === '₹') {
-    if (a >= 1e7) return `${sign}₹${(a / 1e7).toFixed(2)} Cr`
-    if (a >= 1e5) return `${sign}₹${(a / 1e5).toFixed(2)} L`
+    if (a >= 1e7) return `${sign}₹${(a / 1e7).toFixed(2)} crore`
+    if (a >= 1e5) return `${sign}₹${(a / 1e5).toFixed(2)} lakh`
     if (a >= 1e3) return `${sign}₹${(a / 1e3).toFixed(1)}k`
   } else if (compact) {
     if (a >= 1e6) return `${sign}${SYMBOL}${(a / 1e6).toFixed(2)}M`

@@ -115,3 +115,8 @@ Business (Outlets, Data import, Audit log) · Help and Settings.
 - `lib/format.js`: money, numbers, dates, and `qty()` for measured quantities (0.012 kg, 2.5 L, 40 pcs).
 - `lib/api.js`: API client with retry on 503 (`Retry-After`) and token refresh.
 - `lib/app.jsx`: session, outlet selection, roles.
+
+## Labels and units (2026-11-04, D28)
+- The headline sales figure is called "Sales incl. GST" on the Dashboard, Analytics, Outlets, Products and Insights pages, in report headers and in the assistant's tables and charts. Margin and food cost are on sales excl. GST and say so.
+- Compact amounts read "lakh" and "crore", not "L" and "Cr" (`web/src/lib/format.js`). "L" also means litres in stock quantities.
+- Dashboard captions: "across N bills" (average bill), "per guest (dine-in)", and the forecast card says its total covers 14 days while the % compares the next 7 days with the last 7.

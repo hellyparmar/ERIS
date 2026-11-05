@@ -13,7 +13,7 @@ const ANOMALY_PERIODS = [{ value: '30d', label: '30 days' }, { value: '90d', lab
 export default function Insights() {
   return (
     <>
-      <PageHead title="Anomalies & drivers" subtitle="Why revenue changed, and which days look unusual." />
+      <PageHead title="Anomalies & drivers" subtitle="Why sales incl. GST changed, and which days look unusual." />
       <Drivers />
       <Anomalies />
     </>
@@ -25,7 +25,7 @@ function Drivers() {
   const [period, setPeriod] = useState('7d')
   const q = useQuery({ queryKey: ['drivers', period, outletId], queryFn: () => api('/analytics/drivers', { params: { period, outlet_id: outletId } }) })
   return (
-    <Card title="Why did revenue change?" subtitle="Compared with the same weekdays before"
+    <Card title="Why did sales incl. GST change?" subtitle="Compared with the same weekdays before"
       actions={<Seg options={PERIODS} value={period} onChange={setPeriod} label="Period" />}>
       <Query q={q}>{(d) => (d.insufficient_data
         ? <Empty title="Not enough data">{d.summary.join(' ')}</Empty>
@@ -40,7 +40,7 @@ function DriverResult({ d }) {
   return (
     <div className="stack" style={{ gap: 16 }}>
       <div className="grid grid-4">
-        <Kpi label="Revenue" value={money(d.revenue[0], { compact: true })} change={d.change_pct} hint={`vs ${money(d.revenue[1], { compact: true })}`} />
+        <Kpi label="Sales incl. GST" value={money(d.revenue[0], { compact: true })} change={d.change_pct} hint={`vs ${money(d.revenue[1], { compact: true })}`} />
         <Kpi label="Bills" value={d.bills[0].toLocaleString('en-IN')} change={d.bills[1] ? ((d.bills[0] - d.bills[1]) / d.bills[1]) * 100 : null} />
         <Kpi label="Average bill" value={money(d.avg_bill[0])} change={d.avg_bill[1] ? ((d.avg_bill[0] - d.avg_bill[1]) / d.avg_bill[1]) * 100 : null} />
         <Kpi label="Change" value={money(d.change, { compact: true })} hint={`${date(d.period.start)} – ${date(d.period.end)} vs ${date(d.comparison.start)} – ${date(d.comparison.end)}`} />
@@ -61,7 +61,7 @@ function DriverResult({ d }) {
           <div>
             <h3 className="small muted" style={{ margin: '0 0 6px' }}>By outlet</h3>
             <DataTable rows={d.outlets} columns={[
-              { key: 'outlet', label: 'Outlet' }, { key: 'current', label: 'Revenue', format: 'currency' },
+              { key: 'outlet', label: 'Outlet' }, { key: 'current', label: 'Sales incl. GST', format: 'currency' },
               { key: 'change', label: 'Change', format: 'currency' },
               { key: 'change_pct', label: '%', align: 'right', render: (r) => <Delta value={r.change_pct} /> },
             ]} />
@@ -70,7 +70,7 @@ function DriverResult({ d }) {
         <div>
           <h3 className="small muted" style={{ margin: '0 0 6px' }}>Biggest category moves</h3>
           <DataTable rows={[...d.categories].sort((x, y) => Math.abs(y.change) - Math.abs(x.change)).slice(0, 5)} columns={[
-            { key: 'category', label: 'Category' }, { key: 'current', label: 'Revenue', format: 'currency' },
+            { key: 'category', label: 'Category' }, { key: 'current', label: 'Sales incl. GST', format: 'currency' },
             { key: 'change', label: 'Change', format: 'currency' },
             { key: 'change_pct', label: '%', align: 'right', render: (r) => <Delta value={r.change_pct} /> },
           ]} />

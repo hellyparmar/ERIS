@@ -158,7 +158,7 @@ def business_overview(c: Ctx) -> dict:
     cats = A.category_breakdown(c.db, rng, c.outlet_ids)
     alerts = compute_alerts(c.db, c.outlet_ids)
     lines = [f"**Business snapshot for {c.scope_label} - last 7 days (to {c.anchor:%d %b %Y})**", ""]
-    lines.append(f"- Revenue **{c.f.money(cur['revenue'])}** ({trend_word(ch['revenue'])} vs the previous week) "
+    lines.append(f"- Sales incl. GST **{c.f.money(cur['revenue'])}** ({trend_word(ch['revenue'])} vs the previous week) "
                  f"from **{c.f.num(cur['orders'])}** bills, average bill **{c.f.money(cur['avg_basket'])}**.")
     if cur["covers"]:
         lines.append(f"- **{c.f.num(cur['covers'])}** guests dined in ({trend_word(ch['covers'])}), spending "
@@ -187,13 +187,13 @@ def business_overview(c: Ctx) -> dict:
     if important:
         lines += ["", "**What to focus on:**"] + [f"- {a['title']} - {a['message']}" for a in important]
     blocks = [{"type": "kpis", "items": [
-        kpi("Revenue (7d)", cur["revenue"], "currency", ch["revenue"]),
+        kpi("Sales incl. GST (7d)", cur["revenue"], "currency", ch["revenue"]),
         kpi("Bills", cur["orders"], "number", ch["orders"]),
         kpi("Spend per guest", cur["spend_per_cover"], "currency", ch["spend_per_cover"]),
         kpi("Gross profit", cur["gross_profit"], "currency", ch["gross_profit"]),
     ]}]
     if len(outlets) > 1:
-        blocks.append(chart("bar", "Revenue by restaurant - last 7 days", outlets, "name", [("revenue", "Revenue")]))
+        blocks.append(chart("bar", "Sales incl. GST by restaurant - last 7 days", outlets, "name", [("revenue", "Sales incl. GST")]))
     return result("\n".join(lines), blocks, ["What should I reorder?", "Forecast sales for next week",
                                              "Which dishes are growing fastest this month?"])
 
@@ -221,13 +221,13 @@ def _sales_summary(c: Ctx, rng: A.DateRange, label: str) -> dict:
                f"({trend_word(ch)} vs {prev_label}), **{c.f.num(units)}** dishes ordered, "
                f"gross profit **{c.f.money(profit)}**.")
         tops = A.top_products(c.db, rng, c.outlet_ids, 5, category_id=p.category_id)
-        blocks = [{"type": "kpis", "items": [kpi("Revenue", rev, "currency", ch), kpi("Dishes ordered", units),
+        blocks = [{"type": "kpis", "items": [kpi("Sales incl. GST", rev, "currency", ch), kpi("Dishes ordered", units),
                                              kpi("Gross profit", profit, "currency")]},
-                  chart("area", f"{p.category_name} - daily revenue", series, "date", [("revenue", "Revenue")])]
+                  chart("area", f"{p.category_name} - daily sales incl. GST", series, "date", [("revenue", "Sales incl. GST")])]
         if tops:
             ans += f" Best seller: **{tops[0]['name']}** ({c.f.money(tops[0]['revenue'])})."
             blocks.append(table("Top dishes in category", [("name", "Dish", "text"), ("units", "Orders", "number"),
-                                                              ("revenue", "Revenue", "currency")], tops))
+                                                              ("revenue", "Sales incl. GST", "currency")], tops))
         return result(ans, blocks, [f"Forecast {p.category_name} for next month", f"Slowest {p.category_name} dishes"])
 
     cur, ch = k["current"], k["change_pct"]
@@ -246,7 +246,7 @@ def _sales_summary(c: Ctx, rng: A.DateRange, label: str) -> dict:
             f" to {prev.end:%d %b})." if not single_day else ").")
     ans += f" Gross profit was **{c.f.money(cur['gross_profit'])}** ({cur['margin_pct']:.1f}% margin)."
     blocks = [{"type": "kpis", "items": [
-        kpi("Revenue", cur["revenue"], "currency", ch["revenue"]),
+        kpi("Sales incl. GST", cur["revenue"], "currency", ch["revenue"]),
         kpi("Bills", cur["orders"], "number", ch["orders"]),
         kpi("Guests (dine-in)", cur["covers"], "number", ch["covers"]),
         kpi("Avg bill", cur["avg_basket"], "currency", ch["avg_basket"]),
@@ -254,10 +254,11 @@ def _sales_summary(c: Ctx, rng: A.DateRange, label: str) -> dict:
     if rng.days > 1:
         gran = "month" if rng.days > 120 else ("week" if rng.days > 45 else "day")
         series = A.revenue_series(c.db, rng, c.outlet_ids, gran)
-        blocks.append(chart("area", f"Revenue by {gran}", series, "date", [("revenue", "Revenue"), ("profit", "Gross profit")]))
+        blocks.append(chart("area", f"Sales incl. GST by {gran}", series, "date",
+                            [("revenue", "Sales incl. GST"), ("profit", "Gross profit")]))
     if not c.outlet_ids or len(c.outlet_ids) > 1:
         outlets = A.outlet_performance(c.db, rng, c.outlet_ids)
-        blocks.append(table("By outlet", [("name", "Outlet", "text"), ("revenue", "Revenue", "currency"),
+        blocks.append(table("By outlet", [("name", "Outlet", "text"), ("revenue", "Sales incl. GST", "currency"),
                                           ("orders", "Bills", "number"), ("change_pct", "Change", "percent")], outlets))
     return result(ans, blocks, ["Which dishes sold the most?", "Compare this month with last month",
                                 "Show the sales trend for the last 6 months"])
@@ -305,9 +306,9 @@ def compare_periods(c: Ctx) -> dict:
     c.use(r1, l1)
     c.use(r2, l2)
     k1, k2 = A.kpis(c.db, r1, c.outlet_ids), A.kpis(c.db, r2, c.outlet_ids)
-    metrics = [("revenue", "Revenue", "currency"), ("orders", "Bills", "number"), ("avg_basket", "Avg bill", "currency"),
+    metrics = [("revenue", "Sales incl. GST", "currency"), ("orders", "Bills", "number"), ("avg_basket", "Avg bill", "currency"),
                ("units", "Units", "number"), ("gross_profit", "Gross profit", "currency"), ("margin_pct", "Margin %", "percent_plain"),
-               ("avg_daily_revenue", "Avg daily revenue", "currency")]
+               ("avg_daily_revenue", "Avg daily sales incl. GST", "currency")]
     rows = [{"metric": label, l1: k1[key], l2: k2[key], "change": A.pct_change(k1[key], k2[key]), "_format": fmt}
             for key, label, fmt in metrics]
     ch = A.pct_change(k1["revenue"], k2["revenue"])
@@ -344,14 +345,14 @@ def sales_trend(c: Ctx) -> dict:
         return f"{dt:%b %Y}" if gran == "month" else (f"week of {dt:%d %b}" if gran == "week" else f"{dt:%d %b}")
 
     first, last = complete[0]["revenue"], complete[-1]["revenue"]
-    what = c.parsed.product_names[0] if c.parsed.product_ids else (c.parsed.category_name or "Revenue")
+    what = c.parsed.product_names[0] if c.parsed.product_ids else (c.parsed.category_name or "Sales incl. GST")
     change = trend_word(A.pct_change(last, first))
     ans = (f"**{what}** trend for {c.scope_label} over {label} (by {gran}): from {c.f.money(first)} to "
            f"{c.f.money(last)}{f' (**{change}**)' if change else ''}. Best {gran}: **{lbl(best['date'])}** "
            f"({c.f.money(best['revenue'])}); weakest: **{lbl(worst['date'])}** ({c.f.money(worst['revenue'])}).")
     if gran == "month" and len(series) > 1 and complete is not series:
         ans += " (The current month is still in progress, so it is excluded from the comparison.)"
-    return result(ans, [chart("line", f"{what} by {gran}", series, "date", [("revenue", "Revenue"), ("profit", "Gross profit")])],
+    return result(ans, [chart("line", f"{what} by {gran}", series, "date", [("revenue", "Sales incl. GST"), ("profit", "Gross profit")])],
                   ["Forecast the next 30 days", "Which categories are growing?"])
 
 
@@ -382,7 +383,7 @@ def top_products(c: Ctx, slow: bool = False) -> dict:
     blocks = [chart("bar", f"{'Slowest' if slow else 'Top'} dishes by {measure}", rows, "name", [(key, measure.title())],
                     "number" if sort == "units" else "currency"),
               table("Dishes", [("name", "Dish", "text"), ("category", "Category", "text"), ("units", "Orders", "number"),
-                                 ("revenue", "Revenue", "currency"), ("margin_pct", "Margin", "percent_plain")], rows)]
+                                 ("revenue", "Sales incl. GST", "currency"), ("margin_pct", "Margin", "percent_plain")], rows)]
     return result(ans, blocks, ["Forecast demand for " + rows[0]["name"], "Show category performance",
                                 "What should I reorder?"])
 
@@ -407,8 +408,9 @@ def outlet_ranking(c: Ctx) -> dict:
                     f"Biggest improvement: **{up['name']}** ({trend_word(up['change_pct'])}).")
             if down["change_pct"] < 0:
                 ans += f" Biggest decline: **{down['name']}** ({trend_word(down['change_pct'])})."
-    blocks = [chart("bar", "Revenue by outlet", rows, "name", [("revenue", "Revenue"), ("previous_revenue", "Previous period")]),
-              table("Outlets", [("name", "Outlet", "text"), ("revenue", "Revenue", "currency"), ("orders", "Bills", "number"),
+    blocks = [chart("bar", "Sales incl. GST by outlet", rows, "name",
+                    [("revenue", "Sales incl. GST"), ("previous_revenue", "Previous period")]),
+              table("Outlets", [("name", "Outlet", "text"), ("revenue", "Sales incl. GST", "currency"), ("orders", "Bills", "number"),
                                 ("avg_basket", "Avg bill", "currency"), ("margin_pct", "Margin", "percent_plain"),
                                 ("change_pct", "Change", "percent")], rows)]
     return result(ans, blocks, [f"Why is {worst['name']} lower?", f"Top dishes at {best['name']}",
@@ -429,8 +431,8 @@ def category_mix(c: Ctx) -> dict:
         d = min(growers, key=lambda r: r["change_pct"])
         ans += (f"\n\nGrowing fastest: **{g['category']}** ({trend_word(g['change_pct'])}). "
                 f"Weakest: **{d['category']}** ({trend_word(d['change_pct'])}).")
-    return result(ans, [chart("pie", "Sales mix by category", rows, "category", [("revenue", "Revenue")]),
-                        table("Categories", [("category", "Category", "text"), ("revenue", "Revenue", "currency"),
+    return result(ans, [chart("pie", "Sales mix by category", rows, "category", [("revenue", "Sales incl. GST")]),
+                        table("Categories", [("category", "Category", "text"), ("revenue", "Sales incl. GST", "currency"),
                                              ("share_pct", "Share", "percent_plain"), ("margin_pct", "Margin", "percent_plain"),
                                              ("change_pct", "Change", "percent")], rows)],
                   [f"Top dishes in {rows[0]['category']}", f"Forecast {rows[0]['category']} sales"])
@@ -718,8 +720,8 @@ def peak_hours(c: Ctx) -> dict:
            f"Roster more cooks and servers for the lunch and dinner peaks, finish prep before them, and use the quiet "
            f"afternoon for deliveries and stock counts.")
     hours = [{"hour": f"{h}:00", "revenue": round(v, 2)} for h, v in sorted(by_hour.items())]
-    return result(ans, [chart("bar", "Average weekly revenue by hour", hours, "hour", [("revenue", "Revenue")]),
-                        {"type": "heatmap", "title": "Revenue heatmap (weekday x hour)", "cells": hm["cells"]}],
+    return result(ans, [chart("bar", "Average weekly sales incl. GST by hour", hours, "hour", [("revenue", "Sales incl. GST")]),
+                        {"type": "heatmap", "title": "Sales incl. GST heatmap (weekday x hour)", "cells": hm["cells"]}],
                   ["Which day of the week sells the most?", "Forecast next week"])
 
 
@@ -734,7 +736,7 @@ def payment_mix(c: Ctx) -> dict:
         ans += "\n\nBy channel: " + "; ".join(
             f"**{names.get(x['channel'], x['channel'])}** {x['share_pct']:.0f}% of revenue (average bill "
             f"{c.f.money(x['avg_basket'])})" for x in ch) + "."
-    return result(ans, [chart("pie", "Revenue by payment method", rows, "method", [("revenue", "Revenue")])],
+    return result(ans, [chart("pie", "Sales incl. GST by payment method", rows, "method", [("revenue", "Sales incl. GST")])],
                   ["What is the average bill value?", "Show sales by outlet"])
 
 
@@ -755,7 +757,7 @@ def profitability(c: Ctx) -> dict:
            "\n\n**Lowest margins (review the recipe, portion size or menu price):**\n" + "\n".join(
                f"- {r['name']}: {r['margin_pct']:.1f}% margin" for r in low_margin))
     return result(ans, [chart("bar", "Gross profit by category", cats, "category", [("profit", "Gross profit")]),
-                        table("Category margins", [("category", "Category", "text"), ("revenue", "Revenue", "currency"),
+                        table("Category margins", [("category", "Category", "text"), ("revenue", "Sales incl. GST", "currency"),
                                                    ("profit", "Gross profit", "currency"),
                                                    ("margin_pct", "Margin", "percent_plain")], cats)],
                   ["Top dishes by profit", "Show category performance"])

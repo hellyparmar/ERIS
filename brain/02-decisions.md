@@ -182,3 +182,10 @@ Each decision gives: **what** was chosen, **why**, **alternatives**, **consequen
 - **Consequence:** The commit SHA is public. The repository is already public, so no secret is exposed. The value is read only; health remains unauthenticated and unchanged otherwise.
 - **Source:** recorded (owner's request, 2026-11-04; `api/app/main.py`).
 
+## D28. "Sales incl. GST" is the name of the headline sales figure; the basis does not change
+- **What:** Every visible label that said "Revenue" for the sum of bill totals now says "Sales incl. GST" (web pages, report headers, assistant tables, charts and KPIs). Margin and food cost stay on sales **excl. GST** and say so ("food cost 21.1% of sales excl. GST", "78.9% margin on sales excl. GST"). The compact money units are written out: "lakh" and "crore" (the single letter L is also litres elsewhere in the app). The forecast card says the total is for 14 days and that the % compares the next 7 days with the last 7. API field names (`revenue`) are unchanged.
+- **Why:** The dashboard headline summed `Sale.total`, which includes 5% GST (₹4.50 L of ₹94.56 L on the hosted demo), while gross profit, margin and food cost were computed on sales without GST. Both were labelled "revenue" or "sales", so the figures looked inconsistent. Checked on the live payload: outlets, categories, payments and the daily trend each sum to the headline exactly (100.00%), so one basis applies throughout and one label is accurate everywhere.
+- **Alternatives:** Make revenue exclude GST (every figure about 5% lower; the owner chose not to). Keep the labels and add a footnote (easy to miss).
+- **Consequence:** Sentences the assistant narrates ("Revenue is down ...") and the example questions users can type keep the word "revenue" and still parse. A future page that shows a GST-exclusive figure must label it so.
+- **Source:** recorded (owner's decision, 2026-11-04; code in `api/app/services/analytics.py`, web pages).
+

@@ -136,6 +136,14 @@ This is one machine, one database, one load shape. It is not a test of the hoste
 - **Change (D26):** a global admission limit in `HardeningMiddleware`: at most 8 requests answered at once; a request that cannot get a slot within 5 s gets 503 with `Retry-After`. Health checks skip the queue. Tested in `api/tests/test_admission.py` (3 tests) and locally: 20 workers × 200 requests at the defaults, 200 of 200 answered with no refusals and no timeouts (this machine does not saturate like the hosted one).
 - **Not yet done:** the change is not on the hosted instance. Its effect there (how many refusals, what latency) must be measured after deploy; the numbers 8 and 5 are not tuned for the host yet (G8).
 
+## Admission control verified on the hosted API (2026-11-04)
+
+- **Deploy confirmed:** `/api/health` reports `"build": "94fd71f52fe0"` (PR #49), which includes the admission fix (PR #48, `2b8594c`). The deploy took about 50 minutes to go live on the free instance.
+- **20 workers, 280 requests, same test as before the fix:** 176 × 200, 104 × 503, **0 client timeouts** (before: 219 × 200, 27 × 503, 34 timeouts). Fast pages answered in about 5 s (p50), p95 about 7 s; exports about 29 s. The server returned no error other than the 503 refusals.
+- **Uncached forecasts, 16 concurrent:** 8 refused after about 6 s with "The server is busy. Please try again in a moment." (`Retry-After: 2`); of the 8 admitted, 1 answered (32 s), 6 were refused by the forecast gate after about 61 s, and 1 connection was cut at about 60 s. Before the fix all 16 answered or hung up to 75 s.
+- **Reading:** the system now degrades by refusing, not by hanging. But 8 simultaneous requests is too many for heavy work on a 0.1-CPU host: the forecast path loads and prepares the series before it reaches the fit slot, so eight of them slow each other down, and an admitted forecast can still take about a minute to be refused. About 37 % of requests were refused at 20 workers.
+- **Next (open item G8):** try a lower cap (`MAX_INFLIGHT_REQUESTS` 4) or a separate small cap for forecasts, set as environment variables on Render, and re-run `scripts/load_check.py 20 280`. Not done.
+
 ## How to verify the deployed system
 
 `python3 scripts/verify_deployment.py https://<api host> --web https://<web host>` runs the connectivity and security checks against a live deployment (see `brain/11`, H1). Add `--local --ca <file>` for a test server.

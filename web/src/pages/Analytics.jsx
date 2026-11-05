@@ -52,17 +52,17 @@ function SalesTab({ period }) {
     return (
       <>
         <div className="grid grid-4">
-          <Kpi label="Revenue" value={money(k.revenue, { compact: true })} change={ch.revenue} hint={`${money(k.avg_daily_revenue, { compact: true })} per day`} />
+          <Kpi label="Sales incl. GST" value={money(k.revenue, { compact: true })} change={ch.revenue} hint={`${money(k.avg_daily_revenue, { compact: true })} per day`} />
           <Kpi label="Bills" value={num(k.orders)} change={ch.orders} />
           <Kpi label="Average bill" value={money(k.avg_basket)} change={ch.avg_basket} hint={`${k.items_per_basket} items`} />
-          <Kpi label="Gross margin" value={`${k.margin_pct}%`} hint={`${money(k.discount, { compact: true })} given as discounts`} />
+          <Kpi label="Gross margin" value={`${k.margin_pct}%`} hint={`on sales excl. GST · ${money(k.discount, { compact: true })} discounts`} />
         </div>
-        <Card title="Revenue and gross profit" subtitle={`${date(d.range.start)} – ${date(d.range.end)}, by ${d.granularity}`}
+        <Card title="Sales incl. GST and gross profit" subtitle={`${date(d.range.start)} – ${date(d.range.end)}, by ${d.granularity}`}
           actions={<Seg options={[{ value: 'auto', label: 'Auto' }, { value: 'day', label: 'Day' }, { value: 'week', label: 'Week' }, { value: 'month', label: 'Month' }]} value={gran} onChange={setGran} label="Granularity" />}>
-          <TrendChart data={d.series} gran={d.granularity} series={[{ key: 'revenue', label: 'Revenue' }, { key: 'profit', label: 'Gross profit' }]} height={300} />
+          <TrendChart data={d.series} gran={d.granularity} series={[{ key: 'revenue', label: 'Sales incl. GST' }, { key: 'profit', label: 'Gross profit' }]} height={300} />
         </Card>
         <div className="grid grid-3">
-          <Card title="When do guests come in?" subtitle="Average revenue by weekday and hour" className="span-2">
+          <Card title="When do guests come in?" subtitle="Average sales incl. GST by weekday and hour" className="span-2">
             <Heatmap cells={d.heatmap.cells} />
           </Card>
           <div className="stack" style={{ gap: 16 }}>
@@ -85,13 +85,13 @@ function ProductsTab({ period }) {
       <div className="grid grid-3">
         {['A', 'B', 'C'].map((cls) => (
           <Kpi key={cls} label={`Class ${cls} dishes`} value={`${d.summary[cls].products} dishes`}
-            hint={`${d.summary[cls].share_pct}% of revenue · ${{ A: 'protect stock, never run out', B: 'review regularly', C: 'candidates for promotion or delisting' }[cls]}`} />
+            hint={`${d.summary[cls].share_pct}% of sales incl. GST · ${{ A: 'protect stock, never run out', B: 'review regularly', C: 'candidates for promotion or delisting' }[cls]}`} />
         ))}
       </div>
       <div className="grid grid-2">
         <Card title="Category performance" flush>
           <DataTable rows={d.categories} columns={[
-            { key: 'category', label: 'Category' }, { key: 'revenue', label: 'Revenue', format: 'currency' },
+            { key: 'category', label: 'Category' }, { key: 'revenue', label: 'Sales incl. GST', format: 'currency' },
             { key: 'share_pct', label: 'Share', format: 'percent_plain' }, { key: 'margin_pct', label: 'Margin', format: 'percent_plain' },
             { key: 'change_pct', label: 'Change', align: 'right', render: (r) => <Delta value={r.change_pct} /> },
           ]} />
@@ -107,11 +107,11 @@ function ProductsTab({ period }) {
           { key: 'confidence_pct', label: 'Confidence', format: 'percent_plain' }, { key: 'lift', label: 'Lift', align: 'right', render: (r) => `${r.lift}×` },
         ]} />
       </Card>
-      <Card title="ABC analysis" subtitle="A = top 80% of revenue, B = next 15%, C = the rest" flush>
+      <Card title="ABC analysis" subtitle="A = top 80% of sales incl. GST, B = next 15%, C = the rest" flush>
         <DataTable maxHeight={520} rows={d.products} columns={[
           { key: 'class', label: 'Class', render: (r) => <Badge tone={r.class === 'A' ? 'good' : r.class === 'B' ? 'info' : 'warn'}>{r.class}</Badge> },
           { key: 'name', label: 'Dish', render: (r) => <><b>{r.name}</b><div className="small muted">{r.category}</div></> },
-          { key: 'units', label: 'Units', format: 'number' }, { key: 'revenue', label: 'Revenue', format: 'currency' },
+          { key: 'units', label: 'Units', format: 'number' }, { key: 'revenue', label: 'Sales incl. GST', format: 'currency' },
           { key: 'margin_pct', label: 'Margin', format: 'percent_plain' }, { key: 'share_pct', label: 'Share', format: 'percent_plain' },
           { key: 'cumulative_pct', label: 'Cumulative', format: 'percent_plain' },
           { key: 'change_pct', label: 'vs previous', align: 'right', render: (r) => <Delta value={r.change_pct} /> },
@@ -126,13 +126,13 @@ function OutletsTab({ period }) {
   const q = useAnalytics('outlets', period)
   return <Loader q={q}>{(d) => (
     <>
-      <Card title="Revenue by outlet over time" subtitle={`By ${d.granularity}`}>
+      <Card title="Sales incl. GST by outlet over time" subtitle={`By ${d.granularity}`}>
         <TrendChart data={d.series} gran={d.granularity} area={false} series={d.outlets.map((o) => ({ key: o.name, label: o.name }))} height={320} />
       </Card>
       <Card title="Outlet comparison" flush>
         <DataTable rows={d.outlets} columns={[
           { key: 'name', label: 'Outlet', render: (r) => <><b>{r.name}</b><div className="small muted">{r.city}</div></> },
-          { key: 'revenue', label: 'Revenue', format: 'currency' }, { key: 'share_pct', label: 'Share', format: 'percent_plain' },
+          { key: 'revenue', label: 'Sales incl. GST', format: 'currency' }, { key: 'share_pct', label: 'Share', format: 'percent_plain' },
           { key: 'orders', label: 'Bills', format: 'number' }, { key: 'avg_basket', label: 'Avg bill', format: 'currency' },
           { key: 'avg_daily_revenue', label: 'Per day', format: 'currency' }, { key: 'profit', label: 'Gross profit', format: 'currency' },
           { key: 'margin_pct', label: 'Margin', format: 'percent_plain' },
@@ -157,7 +157,7 @@ function CustomersTab({ period }) {
         <Card title="RFM segments" subtitle="Last 12 months" flush>
           <DataTable rows={d.segments} columns={[
             { key: 'segment', label: 'Segment', render: (r) => <><b>{r.segment}</b><div className="small muted">{r.description}</div></> },
-            { key: 'customers', label: 'Customers', format: 'number' }, { key: 'revenue_share_pct', label: 'Revenue share', format: 'percent_plain' },
+            { key: 'customers', label: 'Customers', format: 'number' }, { key: 'revenue_share_pct', label: 'Share of sales', format: 'percent_plain' },
             { key: 'avg_orders', label: 'Avg visits', format: 'number' }, { key: 'avg_recency_days', label: 'Days since visit', format: 'number' },
           ]} />
         </Card>
