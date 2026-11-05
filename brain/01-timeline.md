@@ -122,6 +122,16 @@ Three eras are visible in the history:
 - `ruff check app tests`: passed.
 - CI on the fix: pending at the time of writing (see the next entry).
 
+### 2026-11-05: Forecast gate and admission control verified on the hosted API
+
+**What changed:** `brain/13`, `brain/11`. No code.
+
+**Verification (as run, live, build `eaa95ab7c9c8`)**
+- 16 concurrent uncached forecasts: 1 × 200, 15 × 503, wall 49 s, no cut connection (before: 63 s and a cut at 60 s).
+- 20 workers × 280 requests: 178 × 200, 102 × 503, 0 timeouts (before D26: 219 / 27 / 34 timeouts).
+
+**Follow-ups:** optional `FORECAST_QUEUE=1`, `FORECAST_WAIT_SECONDS=10` on Render; cold start (G9); Render's own infrastructure is not visible from here.
+
 ### 2026-11-05: Forecast admission gate (D29)
 
 **Request (as given):** the stop-hook goal: pipelines must not break under heavy traffic; the measured weak point was a forecast held for about a minute before being refused.
