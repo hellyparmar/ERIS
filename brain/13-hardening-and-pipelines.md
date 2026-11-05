@@ -144,6 +144,13 @@ This is one machine, one database, one load shape. It is not a test of the hoste
 - **Reading:** the system now degrades by refusing, not by hanging. But 8 simultaneous requests is too many for heavy work on a 0.1-CPU host: the forecast path loads and prepares the series before it reaches the fit slot, so eight of them slow each other down, and an admitted forecast can still take about a minute to be refused. About 37 % of requests were refused at 20 workers.
 - **Next (open item G8):** try a lower cap (`MAX_INFLIGHT_REQUESTS` 4) or a separate small cap for forecasts, set as environment variables on Render, and re-run `scripts/load_check.py 20 280`. Not done.
 
+## What the application listens on, and the label deploy (2026-11-05)
+
+- **Listening sockets of the application:** started as in production (`--host 0.0.0.0`, production mode, proxy headers), the process tree held **one** listening socket: the HTTP port. No IPv6, UDP, admin, debug or metrics listener. Read from `/proc/net` for the process's sockets.
+- **Configuration:** `EXPOSE 8000` in the Dockerfile is metadata (the container listens on `$PORT`); `docker-compose.yml` binds to `127.0.0.1` only; the public hostname answers only on 80 and 443 (SSH, Postgres, Redis, 8000 and 8080 closed or filtered).
+- **Limit of this check:** Render's own infrastructure behind its proxy is not visible from the build environment and is not under this code's control.
+- **Label deploy:** `/api/health` reports `build: 644f8621bfb8`. The served web files contain "Sales incl. GST" 21 times (Dashboard, Analytics, Outlets, Products, Insights), no old "Revenue" KPI label, and "lakh" and "crore" written out. Report headers say "Sales incl. GST". Three report columns and three report descriptions still said "revenue"; fixed in the same change as this note.
+
 ## How to verify the deployed system
 
 `python3 scripts/verify_deployment.py https://<api host> --web https://<web host>` runs the connectivity and security checks against a live deployment (see `brain/11`, H1). Add `--local --ca <file>` for a test server.

@@ -106,16 +106,16 @@ def _anomalies(db: Session, rng: A.DateRange, outlet_ids: list[int] | None) -> l
 
 
 REPORTS: dict[str, Report] = {r.key: r for r in [
-    Report("sales-daily", "Daily sales by outlet", "Bills, revenue, average bill, dishes, discounts and tax per day.",
+    Report("sales-daily", "Daily sales by outlet", "Bills, sales incl. GST, average bill, dishes, discounts and tax per day.",
            [("date", "Date"), ("outlet", "Outlet"), ("bills", "Bills"), ("revenue", "Sales incl. GST"),
             ("avg_bill", "Average bill"), ("units", "Dishes"), ("discount", "Discount"), ("tax", "Tax"),
             ("net_sales", "Net sales (excl. tax)")], _sales_daily),
     Report("outlets", "Outlet performance", "Sales incl. GST, bills, profit and growth per outlet versus the previous period.",
            [("code", "Code"), ("name", "Outlet"), ("city", "City"), ("revenue", "Sales incl. GST"), ("orders", "Bills"),
             ("avg_basket", "Average bill"), ("units", "Dishes"), ("profit", "Gross profit"), ("margin_pct", "Margin %"),
-            ("share_pct", "Share %"), ("previous_revenue", "Previous period revenue"), ("change_pct", "Change %")],
+            ("share_pct", "Share %"), ("previous_revenue", "Previous period sales incl. GST"), ("change_pct", "Change %")],
            _outlets),
-    Report("products", "Menu performance (ABC)", "Orders, revenue and margin per dish with ABC class.",
+    Report("products", "Menu performance (ABC)", "Orders, sales incl. GST and margin per dish with ABC class.",
            [("sku", "Code"), ("name", "Dish"), ("category", "Category"), ("units", "Orders"), ("revenue", "Sales incl. GST"),
             ("profit", "Gross profit"), ("margin_pct", "Margin %"), ("share_pct", "Share %"),
             ("cumulative_pct", "Cumulative %"), ("class", "ABC class")], _products),
@@ -142,9 +142,9 @@ REPORTS: dict[str, Report] = {r.key: r for r in [
            [("segment", "Segment"), ("description", "Description"), ("customers", "Customers"),
             ("revenue", "Sales incl. GST"), ("revenue_share_pct", "Share of sales %"), ("avg_recency_days", "Avg days since visit"),
             ("avg_orders", "Avg bills"), ("avg_spend", "Avg spend")], _customers, uses_period=False),
-    Report("anomalies", "Unusual days", "Outlet-days with unusual revenue and the evidence found for each.",
-           [("day", "Date"), ("outlet", "Outlet"), ("direction", "Direction"), ("actual", "Actual revenue"),
-            ("expected", "Expected revenue"), ("change_pct", "Change %"), ("z_score", "Robust z"),
+    Report("anomalies", "Unusual days", "Outlet-days with unusual sales incl. GST and the evidence found for each.",
+           [("day", "Date"), ("outlet", "Outlet"), ("direction", "Direction"), ("actual", "Actual sales incl. GST"),
+            ("expected", "Expected sales incl. GST"), ("change_pct", "Change %"), ("z_score", "Robust z"),
             ("severity", "Severity"), ("explained_by", "Context"), ("explanation", "Evidence")], _anomalies),
 ]}
 
