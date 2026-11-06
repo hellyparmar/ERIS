@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Info, Inbox, X, XCircle } from 'lucide-react'
-import { formatValue, pct, titleCase } from '../lib/format'
+import { formatValue, pct, splitUnit, titleCase } from '../lib/format'
 
 export function Card({ title, subtitle, actions, children, className = '', flush = false }) {
   return (
@@ -32,35 +32,34 @@ export function PageHead({ title, subtitle, children, eyebrow }) {
   )
 }
 
+/** Change pill: an arrow for the direction and the percentage, coloured by whether the change is good. */
 export function Delta({ value, inverse = false, suffix = '' }) {
   if (value === null || value === undefined) return <span className="muted small">no comparison</span>
   const good = inverse ? value < 0 : value >= 0
-  return <span className={`delta ${good ? 'up' : 'down'}`}>{pct(value)}{suffix}</span>
-}
-
-/** Small round arrow next to a headline number: direction of change, coloured by whether it is good. */
-export function TrendDot({ value, inverse = false }) {
-  if (value === null || value === undefined) return null
-  const good = inverse ? value < 0 : value >= 0
   const Icon = value >= 0 ? ArrowUp : ArrowDown
-  return <span className={`trend-dot ${good ? 'up' : 'down'}`} aria-hidden="true"><Icon /></span>
+  return <span className={`delta ${good ? 'up' : 'down'}`} aria-label={`${pct(value)}${suffix}`}><Icon aria-hidden="true" />{pct(Math.abs(value), { signed: false })}{suffix}</span>
 }
 
-/** KPI tile: label with the change pill on the right, the headline number, one line of context. */
-export function Kpi({ label, value, change, hint, loading, spark, inverse = false }) {
+/** A headline figure; a "lakh" or "crore" unit is drawn smaller and quieter than the number. */
+export function Figure({ value, className = '' }) {
+  const { figure, unit } = splitUnit(value)
+  return <span className={className}>{figure}{unit && <small className="unit">{unit}</small>}</span>
+}
+
+/** KPI tile: label, the headline number with its change pill beside it, one line of context. */
+export function Kpi({ label, value, change, hint, loading, inverse = false }) {
   return (
     <div className="card kpi">
-      <div className="kpi-top">
-        <div className="kpi-label"><span>{label}</span></div>
-        {change !== undefined && change !== null && <Delta value={change} inverse={inverse} />}
-      </div>
+      <div className="kpi-label"><span>{label}</span></div>
       <div>
         {loading ? <div className="skeleton" style={{ height: 30, width: '70%' }} /> : (
-          <div className="kpi-main"><div className="kpi-value">{value}</div><TrendDot value={change} inverse={inverse} /></div>
+          <div className="kpi-main">
+            <Figure className="kpi-value" value={value} />
+            {change !== undefined && change !== null && <Delta value={change} inverse={inverse} />}
+          </div>
         )}
         {hint && <div className="kpi-foot" style={{ marginTop: 6 }}>{hint}</div>}
       </div>
-      {spark && <div className="kpi-spark">{spark}</div>}
     </div>
   )
 }
@@ -80,23 +79,6 @@ export function SegmentBar({ items, format = (v) => v, thick = false, legend = t
           ))}
         </div>
       )}
-    </div>
-  )
-}
-
-/** Half-circle gauge for a 0-100 share (e.g. margin, loyalty share). */
-export function Gauge({ value, max = 100, label, caption, color = 'var(--s1)', size = 210 }) {
-  const r = 80
-  const len = Math.PI * r
-  const frac = Math.max(0, Math.min(1, (value || 0) / max))
-  return (
-    <div className="gauge" style={{ width: size, maxWidth: '100%', margin: '0 auto' }}>
-      <svg viewBox="0 0 200 112" width="100%" role="img" aria-label={`${label}: ${caption}`}>
-        <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="var(--surface-3)" strokeWidth="14" strokeLinecap="round" />
-        <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke={color} strokeWidth="14" strokeLinecap="round"
-          strokeDasharray={`${len * frac} ${len}`} />
-      </svg>
-      <div className="label"><b>{label}</b><span>{caption}</span></div>
     </div>
   )
 }
@@ -316,9 +298,4 @@ export function useDebounced(value, ms = 300) {
     return () => clearTimeout(t)
   }, [value, ms])
   return v
-}
-
-export function Meter({ value, max, color = 'var(--s1)' }) {
-  const w = max ? Math.max(2, Math.min(100, (value / max) * 100)) : 0
-  return <div className="bar-meter" aria-hidden="true"><i style={{ width: `${w}%`, background: color }} /></div>
 }

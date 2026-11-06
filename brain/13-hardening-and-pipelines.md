@@ -43,7 +43,7 @@ The web app: no unused source files; `main.jsx` is the entry point.
 - **Inline script removed:** the theme script moved from `web/index.html` to `web/public/theme-init.js`, so the policy can block every inline script.
 - **HTTPS:** in production, a request that reached the server as plain HTTP through a proxy is redirected (308) to HTTPS. HSTS is sent in production. The health check is exempt, because it runs inside the container over HTTP.
 - **Real client addresses:** the container runs uvicorn with `--proxy-headers`. Without it, every request would look like it came from the platform proxy, and one rate-limit bucket would throttle all users together. `FORWARDED_ALLOW_IPS` defaults to `*`, which is safe only while the container is reachable through the platform proxy alone. Set it to the proxy's range where the platform publishes one.
-- **Database over TLS:** in production, a PostgreSQL URL without an explicit `sslmode` gets `sslmode=require`. An explicit mode is kept as written.
+- **Database over TLS:** in production, a PostgreSQL URL without an explicit `sslmode` gets `sslmode=require`. An explicit mode is kept as written. From 2026-11-06 an explicit `sslmode` of `disable`, `allow` or `prefer` (which can fall back to plain text) is raised to `require` in production; `verify-ca` and `verify-full` are kept.
 - **Production JWT secret:** the application refuses to start in production with the development or a short secret (this was already the case, confirmed by reading `main.py`).
 - **Login brute force:** the existing per-account lockout (5 failures in 15 minutes) stays. It is now backed by a per-address rate limit.
 - **Request size:** bodies over `MAX_BODY_MB` (20 MB) get 413 before they are read. Imports are capped at 15 MB inside the importer.
@@ -200,3 +200,4 @@ cd api && ruff check app tests && pytest -q          # 152 tests, incl. tests/te
 cd web && npx eslint src && npm run build
 cd e2e && npx playwright test                          # 15 tests; the login limit is raised for this server only
 ```
+- **Database encryption is measured, not assumed (2026-11-06):** `GET /api/settings/system` returns `database_encrypted`, read from PostgreSQL's `pg_stat_ssl`; `scripts/verify_deployment.py` checks it on the hosted API.

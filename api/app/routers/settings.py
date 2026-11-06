@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app import clock
 from app.config import settings
-from app.db import SessionLocal, get_db
+from app.db import SessionLocal, connection_encrypted, get_db
 from app.models import Customer, DatasetInfo, Organization, Outlet, Product, PurchaseOrder, Sale, SaleItem, Supplier, User
 from app.schemas import OrganizationIn
 from app.security import get_current_user, require_admin
@@ -81,6 +81,7 @@ def system_info(_: User = Depends(get_current_user), db: Session = Depends(get_d
     return {
         "app": settings.APP_NAME,
         "database": "SQLite" if settings.is_sqlite else "PostgreSQL",
+        "database_encrypted": connection_encrypted(db),
         "counts": counts,
         "sales_by_source": by_source,
         "dataset": dataset,

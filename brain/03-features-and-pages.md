@@ -111,7 +111,7 @@ Business (Outlets, Data import, Audit log) · Help and Settings.
 - `components/Layout.jsx`: framed workspace, collapsible sidebar, breadcrumbs, outlet picker, notifications, page-change scroll reset (4b2ad6f).
 - `components/charts.jsx`: the chart set. Axis labels use compact money. Trailing zeros are trimmed (₹26 L, not ₹26.00 L) so labels do not wrap (a595a26). Colours from `useChartColors`, which reads CSS variables so both themes work.
 - `components/pickers.jsx`: searchable product and customer pickers. The dish search keeps its dropdown open on quick refocus (fixed in 90c91d2).
-- `components/ui.jsx`: cards, KPI tiles, buttons, tables, drawers, modals, toasts.
+- `components/ui.jsx`: cards, KPI tiles, buttons, tables, drawers, modals, toasts. `Delta` is one pill (arrow + percentage) and `Figure` draws the "lakh"/"crore" unit smaller than the number (2026-11-06).
 - `lib/format.js`: money, numbers, dates, and `qty()` for measured quantities (0.012 kg, 2.5 L, 40 pcs).
 - `lib/api.js`: API client with retry on 503 (`Retry-After`) and token refresh.
 - `lib/app.jsx`: session, outlet selection, roles.
@@ -120,3 +120,9 @@ Business (Outlets, Data import, Audit log) · Help and Settings.
 - The headline sales figure is called "Sales incl. GST" on the Dashboard, Analytics, Outlets, Products and Insights pages, in report headers and in the assistant's tables and charts. Margin and food cost are on sales excl. GST and say so.
 - Compact amounts read "lakh" and "crore", not "L" and "Cr" (`web/src/lib/format.js`). "L" also means litres in stock quantities.
 - Dashboard captions: "across N bills" (average bill), "per guest (dine-in)", and the forecast card says its total covers 14 days while the % compares the next 7 days with the last 7.
+
+## Interface polish (2026-11-06)
+- KPI tiles: label, then the figure with one change pill beside it, then a line of context. On phones the pill sits under the figure, so nothing is truncated.
+- Currency y-axes are wide enough for "₹4.5 lakh" on one line; the Dashboard sales chart fills its card.
+- Sidebar: tracked brand name, two-line subtitle, accent edge on the active link. Login: the form sits in a raised card; the hero headline scales with the screen.
+- Unused `Gauge`, `Meter`, `Sparkline` and `isSignedIn` removed (2026-11-06).

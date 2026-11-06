@@ -15,7 +15,6 @@ const CLIENT_HEADER = 'X-ERIS-Client'
 try { ['eris-token', 'eris-refresh'].forEach((k) => localStorage.removeItem(k)) } catch { /* private mode */ }
 
 let signedIn = false
-export const isSignedIn = () => signedIn
 export const setSignedIn = (value) => { signedIn = !!value }
 export const clearSession = () => setSignedIn(false)
 

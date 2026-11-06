@@ -22,6 +22,12 @@ export function money(v, { compact = false, decimals = false } = {}) {
   return `${sign}${SYMBOL}${(decimals ? nf2 : nf0).format(a)}`
 }
 
+/** Splits a compact amount such as "₹82.10 lakh" into the figure and its unit, so the unit can be drawn smaller. */
+export function splitUnit(text) {
+  const m = typeof text === 'string' && text.match(/^(.*?)\s+(lakh|crore)$/)
+  return m ? { figure: m[1], unit: m[2] } : { figure: text, unit: null }
+}
+
 export const num = (v, digits = 0) =>
   v === null || v === undefined ? '-' : (digits ? nf1 : nf0).format(Number(v))
 

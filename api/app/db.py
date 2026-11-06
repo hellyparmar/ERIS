@@ -1,9 +1,10 @@
 """Database engine and session management (SQLAlchemy 2.0, synchronous)."""
+import re
 from collections.abc import Iterator
 from pathlib import Path
 
 from fastapi import Request
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.config import settings
@@ -13,11 +14,25 @@ class Base(DeclarativeBase):
     pass
 
 
+_WEAK_SSL_MODES = re.compile(r"sslmode=(disable|allow|prefer)(?=&|$)")
+
+
 def require_tls(url: str, environment: str) -> str:
-    """In production, a PostgreSQL connection must be encrypted: add sslmode=require unless the URL states a mode."""
-    if environment != "production" or url.startswith("sqlite") or "sslmode=" in url:
+    """In production, a PostgreSQL connection must be encrypted: add sslmode=require when the URL states no mode, and
+    raise a mode that can fall back to plain text (disable, allow, prefer) to require. verify-ca and verify-full are kept."""
+    if environment != "production" or url.startswith("sqlite"):
         return url
+    if "sslmode=" in url:
+        return _WEAK_SSL_MODES.sub("sslmode=require", url)
     return url + ("&" if "?" in url else "?") + "sslmode=require"
+
+
+def connection_encrypted(db: Session) -> bool | None:
+    """Whether this database session runs over TLS, as the server itself reports it (PostgreSQL's pg_stat_ssl).
+    None when the database is not PostgreSQL, so there is no network connection to encrypt."""
+    if db.get_bind().dialect.name != "postgresql":
+        return None
+    return bool(db.execute(text("SELECT ssl FROM pg_stat_ssl WHERE pid = pg_backend_pid()")).scalar())
 
 
 def _make_engine(url: str):

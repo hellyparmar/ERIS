@@ -96,6 +96,114 @@ Three eras are visible in the history:
 
 #13, #22, #23, #24, #25, #27, #28, #29, #30, #31, #32 (see `git log --merges` for the full list).
 
+### 2026-11-06: The API reports whether its own database connection is encrypted
+
+**Request (as given):** the standing goal; the review said the encryption of the connection to the database was not confirmed from the deployed system, only from code.
+
+**What changed**
+- `api/app/db.py`: `connection_encrypted(db)` asks PostgreSQL itself (`pg_stat_ssl` for this backend) whether the session uses TLS; `None` on SQLite, which has no network connection.
+- `api/app/routers/settings.py`: `GET /api/settings/system` (signed-in users only) returns `database_encrypted`.
+- `scripts/verify_deployment.py`: new check that the hosted API's database connection is encrypted as the database reports it.
+- `api/tests/test_transport.py`: the field is `None` exactly when the database is SQLite.
+
+**Why this approach:** until now the guarantee was "the code asks for TLS". The database is the authority on what it negotiated, so asking it turns the guarantee into a measurement on the deployed system, and the deployment check can fail loudly if the setting is ever weakened. Kept behind the sign-in (not on `/api/health`) so the public health check reveals nothing new.
+
+**Alternatives considered:** a field on the public health check (rejected: needless disclosure); inspecting `sslmode` in the URL (rejected: shows the request, not the result).
+
+**Trade-offs and risks:** one more small query on the system page; PostgreSQL 9.5 or newer (`pg_stat_ssl`). If a provider hides `pg_stat_ssl`, the field reads false and the check fails, which is the safe direction.
+
+**Verification (as run)**
+- `ruff check app tests` clean; full API suite 160 passed (SQLite). The PostgreSQL path runs in the `api-postgres` CI job; no PostgreSQL server is available in this session, so that query has not been run locally.
+- CI on `aadd491` (push run 221, 2026-11-06 09:59 to 10:08 UTC): all five jobs passed: `web` (lint, build), `api` (Ruff, 160 tests on SQLite), `api-postgres` (the same suite on a real PostgreSQL, which runs the `pg_stat_ssl` query), `docker` (image build and container smoke check) and `e2e` (15 Playwright tests). The PostgreSQL container in CI has no TLS, so this proves the query and the field work, not that Render's database is encrypted.
+- Hosted result: not yet run. It needs the merge and a Render deploy, then `scripts/verify_deployment.py` against the hosted API; record it here.
+
+**Follow-ups:** after the deploy, run `scripts/verify_deployment.py` against the hosted API and record the result.
+
+### 2026-11-06: Cold-start cause confirmed from the keep-warm history
+
+**What changed:** `brain/11` (G9) only. No code.
+
+**Evidence (as run):** `list_workflow_runs` for `keep-warm.yml`: 8 runs from 2026-11-04 09:31 to 2026-11-06 03:27 UTC, although the schedule is `*/10 * * * *`. The first load run of 2026-11-06 began about 09:40 UTC, six hours after the last ping, and was the only one with timeouts (4); four later runs on the warm instance had none. The test file for the TLS rule was also run by name: 2 passed (the full suite had passed 159 after the change).
+
+**Consequence:** the keep-warm workflow reduces but does not prevent cold starts. An external pinger or a paid plan is the fix (owner decision).
+
+### 2026-11-06: Database TLS cannot be weakened by the URL; three more live load runs
+
+**Request (as given):** the standing goal (see the entry below); the review asked for more than one clean load run, for the encryption of backend connections to be checked beyond the public endpoint, and for changes under "optimize".
+
+**What changed**
+- `api/app/db.py`: `require_tls` now also raises an explicit `sslmode=disable`, `allow` or `prefer` to `require` in production. Before, any explicit mode was kept as written, so a `DATABASE_URL` with `sslmode=prefer` could still run in plain text. `verify-ca` and `verify-full` are kept; development is untouched.
+- `api/tests/test_transport.py`: new test for the three weak modes, the kept strong mode, and development.
+- `brain/13`: the TLS line updated.
+
+**Why this approach:** the only encrypted-connection guarantee in code was "add `require` when no mode is stated"; the weak modes were the one way the URL could undo it. Raising them is safer than refusing to start: the previous deploy keeps serving if the database truly cannot do TLS, and the failure is visible in the deploy log.
+
+**Alternatives considered:** refuse to start on a weak mode (a bad value would fail a deploy that takes about an hour); leave as is (keeps the gap).
+
+**Backend connections, as far as the code and the host show**
+- Browser to API: TLS 1.3, HSTS, HTTP redirected (live check, earlier entry).
+- API to database: TLS forced in production by `require_tls`. Whether Render's database accepts the session is not visible from outside; the API answering `/api/health` with data endpoints working means the connection succeeded under `require`.
+- API to model server: none on the hosted API (`LLM_ENABLED` false in `render.yaml`); when enabled locally the URL is configurable and defaults to the loopback address.
+
+**Verification (as run)**
+- `ruff check` clean; full API suite 159 passed (the transport file run alone fails 9 tests that need the shared test database set up by earlier files, with or without this change; the full run is what CI runs).
+- Live load, 20 workers x 280, three runs in a row at 09:48, 09:50, 09:53 UTC: 230 / 219 / 221 answered, 50 / 61 / 59 refused with 503, 0 timeouts, 0 other 5xx, exit code 0 each time. With the earlier 220-answered run, four runs in a row were clean. The one earlier run with 4 timeouts was the first after an idle period (a cold instance).
+
+**Follow-ups:** the cold-start timeout remains an owner decision (pinger or paid plan, G9); credential rotation (S1) needs the owner.
+
+### 2026-11-06: Full goal re-check; dead web code removed
+
+**Request (as given):** the standing goal: dead code, old redirect links, code optimization, open ports, pipelines that hold under heavy traffic, pipeline optimization, security and encrypted connectivity, verified on the deployed system.
+
+**What changed**
+- `web/src/components/ui.jsx`: `Gauge`, `Meter` and the unused `spark` prop of `Kpi` removed. `web/src/components/charts.jsx`: `Sparkline` removed. `web/src/lib/api.js`: `isSignedIn` removed. `web/src/styles.css`: the `.gauge` and `.kpi-spark` rules removed. Nothing imported any of them (found by counting references to every exported name).
+
+**Checked and found clean**
+- Python: `ruff check` passed; `vulture --min-confidence 70` on `api/app` reported nothing.
+- Redirects and old hosts: the only redirects are the HTTPS redirect in `hardening.py` (308) and the catch-all route in `App.jsx`; every `localhost` hit is a development or CI address; no `onrender`, `vercel`, `herokuapp`, `ngrok` or `netlify` host is hard-coded.
+- Live (`eris-tvro.onrender.com`, build `eaa95ab7c9c8`): HTTP answers 301 to HTTPS; TLS 1.3 with AES-256-GCM; HSTS (one year, subdomains), CSP, `X-Frame-Options: DENY`, `nosniff`, referrer and permissions policies present; `/api/dashboard` without a token answers 401. Vercel answers 308 to HTTPS. `/docs` and `/openapi.json` are public by design (D-level decision in `13`: read-only schema, own CSP).
+- Local: API suite 158 passed; e2e 15 passed; web lint and build clean.
+
+**Load check on the hosted API (20 workers x 280 requests, as run)**
+- First run, right after other requests: 97 x 200, 179 x 503, 4 client timeouts (forecast). Run exit non-zero.
+- Second run, instance warm: 220 x 200, 60 x 503, 0 timeouts, no 5xx other than 503. Export is the slowest (p50 33 s, 28 of 40 refused), as designed by its two-worker gate.
+- Reading: refusals under load are the design on the free 0.1-CPU plan; the first run shows that a cold or busy instance can still exceed the client's timeout on a forecast. Fewer refusals or timeouts need a paid plan (owner decision, G9).
+
+**Still outside the code's reach:** Render's own infrastructure behind its proxy is not visible from here; credential rotation (S1) and the cold-start fix need the owner.
+
+### 2026-11-06: Interface polish: KPI tiles, change pills, charts, sidebar, login
+
+**Request (as given):** "make the UI overall more decent and nicely put together and amazingly designed"
+
+**What changed**
+- `web/src/lib/format.js`: new `splitUnit()` separates a compact amount ("₹82.10 lakh") into its figure and unit.
+- `web/src/components/ui.jsx`: new `Figure` draws the "lakh"/"crore" unit smaller and quieter than the number. `Delta` is now one pill with an arrow and the absolute percentage (the signed value is its `aria-label`). `TrendDot` removed. `Kpi` shows label, then the figure with its change pill beside it, then one line of context.
+- `web/src/pages/Dashboard.jsx`: figures use `Figure` (KPIs, forecast total, outlet and dish lists); the sales chart card is a `fill` card so the chart uses the whole card height beside the taller forecast card.
+- `web/src/components/charts.jsx`: `TrendChart` takes `fill`; currency y-axes are 76 px wide so "₹4.5 lakh" stays on one line (was 58 px, wrapped).
+- `web/src/styles.css`: card padding 20; KPI tiles top-aligned (no stretched gaps); pill-shaped deltas; quieter table headers; sidebar brand (wider tracking, balanced two-line subtitle) and an accent edge on the active link; login form in its own raised card on a soft gold wash, larger fluid headline, icon tiles on the feature list; on phones the KPI figure and its pill stack so nothing is cut off.
+
+**Why this approach**
+- Baseline screenshots (light, dark, phone) showed: the unit as heavy as the number and cut off on phones ("₹82.10 la…"), the change shown twice per tile (pill and circled arrow), wrapped axis labels, empty space under the sales chart, a three-line brand subtitle, and a login form floating on an empty panel.
+- Every fix is in shared parts or the one stylesheet, so all 19 pages inherit it. No labels, routes, data or typefaces changed (D28 labels and Geist kept, O5).
+
+**Alternatives considered**
+- Abbreviating to "₹82.1L": rejected, D28 settled on "lakh"/"crore" (and "L" means litres).
+- A second typeface for headings: rejected, O5 (no serif).
+- A new component library or CSS framework: rejected; the stylesheet already has the tokens needed, and a rewrite risks the 15 browser tests for no gain.
+
+**Trade-offs and risks**
+- `Delta` is shared, so every percentage pill in tables now carries an arrow; it reads the same everywhere, but the pills are about 12 px wider.
+- `splitUnit` matches only the words "lakh" and "crore"; any other text passes through unchanged.
+
+**Decision record:** no new decision (presentation only). Source: recorded (this entry).
+
+**Verification (as run)**
+- `npm run lint` clean; `npm run build` succeeded.
+- Screenshots of 13 pages in light and dark plus the phone dashboard, before and after, from a local server on the demo data: units smaller, one change indicator per tile, axis labels on one line, no gap under the chart, login card and sidebar as intended.
+- Playwright suite: 15 passed (includes "phone layout has no horizontal scrolling").
+
+**Follow-ups:** none. The hosted preview shows it after the pull request is previewed on Vercel.
+
 ### 2026-11-03: CI failure in two import tests fixed (date of the sample row)
 
 **What changed**
