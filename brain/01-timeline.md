@@ -96,6 +96,14 @@ Three eras are visible in the history:
 
 #13, #22, #23, #24, #25, #27, #28, #29, #30, #31, #32 (see `git log --merges` for the full list).
 
+### 2026-11-06: Cold-start cause confirmed from the keep-warm history
+
+**What changed:** `brain/11` (G9) only. No code.
+
+**Evidence (as run):** `list_workflow_runs` for `keep-warm.yml`: 8 runs from 2026-11-04 09:31 to 2026-11-06 03:27 UTC, although the schedule is `*/10 * * * *`. The first load run of 2026-11-06 began about 09:40 UTC, six hours after the last ping, and was the only one with timeouts (4); four later runs on the warm instance had none. The test file for the TLS rule was also run by name: 2 passed (the full suite had passed 159 after the change).
+
+**Consequence:** the keep-warm workflow reduces but does not prevent cold starts. An external pinger or a paid plan is the fix (owner decision).
+
 ### 2026-11-06: Database TLS cannot be weakened by the URL; three more live load runs
 
 **Request (as given):** the standing goal (see the entry below); the review asked for more than one clean load run, for the encryption of backend connections to be checked beyond the public endpoint, and for changes under "optimize".
