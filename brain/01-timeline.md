@@ -114,7 +114,8 @@ Three eras are visible in the history:
 
 **Verification (as run)**
 - `ruff check app tests` clean; full API suite 160 passed (SQLite). The PostgreSQL path runs in the `api-postgres` CI job; no PostgreSQL server is available in this session, so that query has not been run locally.
-- Hosted result: recorded after the deploy (see the next entry).
+- CI on `aadd491` (push run 221, 2026-11-06 09:59 to 10:08 UTC): all five jobs passed: `web` (lint, build), `api` (Ruff, 160 tests on SQLite), `api-postgres` (the same suite on a real PostgreSQL, which runs the `pg_stat_ssl` query), `docker` (image build and container smoke check) and `e2e` (15 Playwright tests). The PostgreSQL container in CI has no TLS, so this proves the query and the field work, not that Render's database is encrypted.
+- Hosted result: not yet run. It needs the merge and a Render deploy, then `scripts/verify_deployment.py` against the hosted API; record it here.
 
 **Follow-ups:** after the deploy, run `scripts/verify_deployment.py` against the hosted API and record the result.
 
