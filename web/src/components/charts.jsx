@@ -260,24 +260,3 @@ export function Heatmap({ cells, format = 'currency', valueKey = 'revenue' }) {
     </div>
   )
 }
-
-export function Sparkline({ data, k = 'revenue', color, height = 46 }) {
-  const c = useChartColors()
-  const gid = useId().replace(/:/g, '')
-  const stroke = resolve(color, c) || c.s1
-  return (
-    <div style={{ height }} aria-hidden="true">
-      <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
-          <defs>
-            <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={stroke} stopOpacity={0.25} />
-              <stop offset="100%" stopColor={stroke} stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          <Area type="monotone" dataKey={k} stroke={stroke} fill={`url(#${gid})`} strokeWidth={2} dot={false} isAnimationActive={false} />
-        </AreaChart>
-      </ResponsiveContainer>
-    </div>
-  )
-}

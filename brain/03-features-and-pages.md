@@ -125,3 +125,4 @@ Business (Outlets, Data import, Audit log) · Help and Settings.
 - KPI tiles: label, then the figure with one change pill beside it, then a line of context. On phones the pill sits under the figure, so nothing is truncated.
 - Currency y-axes are wide enough for "₹4.5 lakh" on one line; the Dashboard sales chart fills its card.
 - Sidebar: tracked brand name, two-line subtitle, accent edge on the active link. Login: the form sits in a raised card; the hero headline scales with the screen.
+- Unused `Gauge`, `Meter`, `Sparkline` and `isSignedIn` removed (2026-11-06).

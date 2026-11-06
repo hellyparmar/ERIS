@@ -96,6 +96,26 @@ Three eras are visible in the history:
 
 #13, #22, #23, #24, #25, #27, #28, #29, #30, #31, #32 (see `git log --merges` for the full list).
 
+### 2026-11-06: Full goal re-check; dead web code removed
+
+**Request (as given):** the standing goal: dead code, old redirect links, code optimization, open ports, pipelines that hold under heavy traffic, pipeline optimization, security and encrypted connectivity, verified on the deployed system.
+
+**What changed**
+- `web/src/components/ui.jsx`: `Gauge`, `Meter` and the unused `spark` prop of `Kpi` removed. `web/src/components/charts.jsx`: `Sparkline` removed. `web/src/lib/api.js`: `isSignedIn` removed. `web/src/styles.css`: the `.gauge` and `.kpi-spark` rules removed. Nothing imported any of them (found by counting references to every exported name).
+
+**Checked and found clean**
+- Python: `ruff check` passed; `vulture --min-confidence 70` on `api/app` reported nothing.
+- Redirects and old hosts: the only redirects are the HTTPS redirect in `hardening.py` (308) and the catch-all route in `App.jsx`; every `localhost` hit is a development or CI address; no `onrender`, `vercel`, `herokuapp`, `ngrok` or `netlify` host is hard-coded.
+- Live (`eris-tvro.onrender.com`, build `eaa95ab7c9c8`): HTTP answers 301 to HTTPS; TLS 1.3 with AES-256-GCM; HSTS (one year, subdomains), CSP, `X-Frame-Options: DENY`, `nosniff`, referrer and permissions policies present; `/api/dashboard` without a token answers 401. Vercel answers 308 to HTTPS. `/docs` and `/openapi.json` are public by design (D-level decision in `13`: read-only schema, own CSP).
+- Local: API suite 158 passed; e2e 15 passed; web lint and build clean.
+
+**Load check on the hosted API (20 workers x 280 requests, as run)**
+- First run, right after other requests: 97 x 200, 179 x 503, 4 client timeouts (forecast). Run exit non-zero.
+- Second run, instance warm: 220 x 200, 60 x 503, 0 timeouts, no 5xx other than 503. Export is the slowest (p50 33 s, 28 of 40 refused), as designed by its two-worker gate.
+- Reading: refusals under load are the design on the free 0.1-CPU plan; the first run shows that a cold or busy instance can still exceed the client's timeout on a forecast. Fewer refusals or timeouts need a paid plan (owner decision, G9).
+
+**Still outside the code's reach:** Render's own infrastructure behind its proxy is not visible from here; credential rotation (S1) and the cold-start fix need the owner.
+
 ### 2026-11-06: Interface polish: KPI tiles, change pills, charts, sidebar, login
 
 **Request (as given):** "make the UI overall more decent and nicely put together and amazingly designed"
