@@ -75,16 +75,16 @@ export function Legend({ items }) {
 }
 
 /** Time series as lines or areas. series: [{key, label, color?, dashed?, format?}] */
-export function TrendChart({ data, x = 'date', series, format = 'currency', height = 260, area = true, gran = 'day', compare, legend = true }) {
+export function TrendChart({ data, x = 'date', series, format = 'currency', height = 260, area = true, gran = 'day', compare, legend = true, fill = false }) {
   const ref = useRef(null)
   const c = useChartColors(ref)
   const gid = useId().replace(/:/g, '')
   const Chart = area ? AreaChart : LineChart
   const colorOf = (s, i) => resolve(s.color, c) || c.series[i % 8]
   return (
-    <div ref={ref}>
+    <div ref={ref} style={fill ? { flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 } : undefined}>
       {legend && series.length > 1 && <Legend items={series.map((s, i) => ({ label: s.label, color: colorOf(s, i), dashed: s.dashed }))} />}
-      <div style={{ height, marginTop: legend && series.length > 1 ? 8 : 0 }}>
+      <div style={fill ? { flex: 1, minHeight: height, position: 'relative', marginTop: legend && series.length > 1 ? 8 : 0 } : { height, marginTop: legend && series.length > 1 ? 8 : 0 }}>
         <ResponsiveContainer width="100%" height="100%">
           <Chart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
             <defs>
@@ -97,7 +97,7 @@ export function TrendChart({ data, x = 'date', series, format = 'currency', heig
             </defs>
             <CartesianGrid vertical={false} stroke={c.grid} />
             <XAxis dataKey={x} tickFormatter={dateTick(gran)} stroke={c.axis} tickLine={false} axisLine={false} minTickGap={24} dy={6} />
-            <YAxis tickFormatter={fmtAxis(format)} stroke={c.axis} tickLine={false} axisLine={false} width={58} />
+            <YAxis tickFormatter={fmtAxis(format)} stroke={c.axis} tickLine={false} axisLine={false} width={format === 'currency' ? 76 : 52} />
             <Tooltip content={<TipBox format={format} series={series} labelFormat={(l) => (typeof l === 'string' && l.length === 10 ? (gran === 'month' ? monthLabel(l) : shortDate(l)) : l)} />}
               cursor={{ stroke: c.axis, strokeWidth: 1, strokeDasharray: '3 3' }} />
             {series.map((s, i) => area && !s.dashed ? (
@@ -136,7 +136,7 @@ export function BarsChart({ data, x, series, format = 'currency', height = 260, 
             ) : (
               <>
                 <XAxis dataKey={x} stroke={c.axis} tickLine={false} axisLine={false} interval={data.length <= 10 ? 0 : 'preserveStartEnd'} minTickGap={4} tickFormatter={xTick} dy={4} />
-                <YAxis tickFormatter={fmtAxis(format)} stroke={c.axis} tickLine={false} axisLine={false} width={58} />
+                <YAxis tickFormatter={fmtAxis(format)} stroke={c.axis} tickLine={false} axisLine={false} width={format === 'currency' ? 76 : 52} />
               </>
             )}
             <Tooltip content={<TipBox format={format} series={series} labelFormat={xTick} />} cursor={{ fill: c.grid, opacity: 0.6 }} />

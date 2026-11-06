@@ -96,6 +96,39 @@ Three eras are visible in the history:
 
 #13, #22, #23, #24, #25, #27, #28, #29, #30, #31, #32 (see `git log --merges` for the full list).
 
+### 2026-11-06: Interface polish: KPI tiles, change pills, charts, sidebar, login
+
+**Request (as given):** "make the UI overall more decent and nicely put together and amazingly designed"
+
+**What changed**
+- `web/src/lib/format.js`: new `splitUnit()` separates a compact amount ("₹82.10 lakh") into its figure and unit.
+- `web/src/components/ui.jsx`: new `Figure` draws the "lakh"/"crore" unit smaller and quieter than the number. `Delta` is now one pill with an arrow and the absolute percentage (the signed value is its `aria-label`). `TrendDot` removed. `Kpi` shows label, then the figure with its change pill beside it, then one line of context.
+- `web/src/pages/Dashboard.jsx`: figures use `Figure` (KPIs, forecast total, outlet and dish lists); the sales chart card is a `fill` card so the chart uses the whole card height beside the taller forecast card.
+- `web/src/components/charts.jsx`: `TrendChart` takes `fill`; currency y-axes are 76 px wide so "₹4.5 lakh" stays on one line (was 58 px, wrapped).
+- `web/src/styles.css`: card padding 20; KPI tiles top-aligned (no stretched gaps); pill-shaped deltas; quieter table headers; sidebar brand (wider tracking, balanced two-line subtitle) and an accent edge on the active link; login form in its own raised card on a soft gold wash, larger fluid headline, icon tiles on the feature list; on phones the KPI figure and its pill stack so nothing is cut off.
+
+**Why this approach**
+- Baseline screenshots (light, dark, phone) showed: the unit as heavy as the number and cut off on phones ("₹82.10 la…"), the change shown twice per tile (pill and circled arrow), wrapped axis labels, empty space under the sales chart, a three-line brand subtitle, and a login form floating on an empty panel.
+- Every fix is in shared parts or the one stylesheet, so all 19 pages inherit it. No labels, routes, data or typefaces changed (D28 labels and Geist kept, O5).
+
+**Alternatives considered**
+- Abbreviating to "₹82.1L": rejected, D28 settled on "lakh"/"crore" (and "L" means litres).
+- A second typeface for headings: rejected, O5 (no serif).
+- A new component library or CSS framework: rejected; the stylesheet already has the tokens needed, and a rewrite risks the 15 browser tests for no gain.
+
+**Trade-offs and risks**
+- `Delta` is shared, so every percentage pill in tables now carries an arrow; it reads the same everywhere, but the pills are about 12 px wider.
+- `splitUnit` matches only the words "lakh" and "crore"; any other text passes through unchanged.
+
+**Decision record:** no new decision (presentation only). Source: recorded (this entry).
+
+**Verification (as run)**
+- `npm run lint` clean; `npm run build` succeeded.
+- Screenshots of 13 pages in light and dark plus the phone dashboard, before and after, from a local server on the demo data: units smaller, one change indicator per tile, axis labels on one line, no gap under the chart, login card and sidebar as intended.
+- Playwright suite: 15 passed (includes "phone layout has no horizontal scrolling").
+
+**Follow-ups:** none. The hosted preview shows it after the pull request is previewed on Vercel.
+
 ### 2026-11-03: CI failure in two import tests fixed (date of the sample row)
 
 **What changed**

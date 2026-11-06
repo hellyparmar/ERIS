@@ -5,7 +5,7 @@ import { ArrowDown, ArrowRight, ArrowUp, BellRing, Bot, Receipt, TrendingUp } fr
 import { api } from '../lib/api'
 import { useApp } from '../lib/app'
 import { date, money, num, pct } from '../lib/format'
-import { AlertItem, Card, Delta, Empty, ErrorState, Kpi, PageHead, SkeletonGrid } from '../components/ui'
+import { AlertItem, Card, Delta, Empty, ErrorState, Figure, Kpi, PageHead, SkeletonGrid } from '../components/ui'
 import { ForecastChart, TrendChart, useChartColors } from '../components/charts'
 
 const PERIODS = [
@@ -54,19 +54,19 @@ function Body({ d }) {
       </div>
 
       <div className="grid grid-3">
-        <Card className="span-2" title="Sales incl. GST"
+        <Card className="span-2 fill" title="Sales incl. GST"
           actions={<div className="legend">
             <span><i className="swatch" style={{ background: c.s1 }} />This period</span>
             <span><i className="swatch" style={{ background: c.muted }} />Previous period</span>
           </div>}>
-          <TrendChart data={trend} gran={gran} height={270} legend={false}
+          <TrendChart data={trend} gran={gran} height={270} fill legend={false}
             series={[{ key: 'revenue', label: 'This period' }, { key: 'previous', label: 'Previous period', color: 'var(--muted)' }]} />
         </Card>
         <Card className="dark" title="Next 14 days" actions={<Link to="/forecasts" className="small" style={{ color: 'var(--gold)' }}>Forecasts <ArrowRight size={13} style={{ verticalAlign: -2 }} /></Link>}>
           {fc ? (
             <div className="stack" style={{ gap: 10 }}>
               <div className="row" style={{ gap: 10 }}>
-                <span className="big-number">{money(fc.summary.horizon_total, { compact: true })}</span>
+                <Figure className="big-number" value={money(fc.summary.horizon_total, { compact: true })} />
                 <Delta value={fc.summary.change_vs_last_7_pct} />
               </div>
               <span className="small muted">Expected sales incl. GST over 14 days · the % compares the next 7 days with the last 7</span>
@@ -92,7 +92,7 @@ function Body({ d }) {
               <div key={p.product_id ?? p.name} className="list-row">
                 <span className={`rank ${i < 3 ? 'top' : ''}`}>{i + 1}</span>
                 <div style={{ minWidth: 0, flex: 1 }}><b className="small" style={{ fontWeight: 550 }}>{p.name}</b><div className="small muted">{num(p.units)} ordered</div></div>
-                <span className="mono small">{money(p.revenue, { compact: true })}</span>
+                <Figure className="mono small" value={money(p.revenue, { compact: true })} />
               </div>
             ))}
           </div>
@@ -120,7 +120,7 @@ function RankList({ rows }) {
         <div key={r.key} className="stack" style={{ gap: 5 }}>
           <div className="row between small" style={{ flexWrap: 'nowrap' }}>
             <span style={{ fontWeight: 550 }}>{r.name}</span>
-            <span className="row" style={{ gap: 8, flexWrap: 'nowrap' }}><span className="mono">{money(r.value, { compact: true })}</span><Arrow v={r.change} /></span>
+            <span className="row" style={{ gap: 8, flexWrap: 'nowrap' }}><Figure className="mono" value={money(r.value, { compact: true })} /><Arrow v={r.change} /></span>
           </div>
           <div className="bar-meter"><i style={{ width: `${(r.value / max) * 100}%` }} /></div>
         </div>
