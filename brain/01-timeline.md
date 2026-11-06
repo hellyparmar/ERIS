@@ -96,6 +96,28 @@ Three eras are visible in the history:
 
 #13, #22, #23, #24, #25, #27, #28, #29, #30, #31, #32 (see `git log --merges` for the full list).
 
+### 2026-11-06: The API reports whether its own database connection is encrypted
+
+**Request (as given):** the standing goal; the review said the encryption of the connection to the database was not confirmed from the deployed system, only from code.
+
+**What changed**
+- `api/app/db.py`: `connection_encrypted(db)` asks PostgreSQL itself (`pg_stat_ssl` for this backend) whether the session uses TLS; `None` on SQLite, which has no network connection.
+- `api/app/routers/settings.py`: `GET /api/settings/system` (signed-in users only) returns `database_encrypted`.
+- `scripts/verify_deployment.py`: new check that the hosted API's database connection is encrypted as the database reports it.
+- `api/tests/test_transport.py`: the field is `None` exactly when the database is SQLite.
+
+**Why this approach:** until now the guarantee was "the code asks for TLS". The database is the authority on what it negotiated, so asking it turns the guarantee into a measurement on the deployed system, and the deployment check can fail loudly if the setting is ever weakened. Kept behind the sign-in (not on `/api/health`) so the public health check reveals nothing new.
+
+**Alternatives considered:** a field on the public health check (rejected: needless disclosure); inspecting `sslmode` in the URL (rejected: shows the request, not the result).
+
+**Trade-offs and risks:** one more small query on the system page; PostgreSQL 9.5 or newer (`pg_stat_ssl`). If a provider hides `pg_stat_ssl`, the field reads false and the check fails, which is the safe direction.
+
+**Verification (as run)**
+- `ruff check app tests` clean; full API suite 160 passed (SQLite). The PostgreSQL path runs in the `api-postgres` CI job; no PostgreSQL server is available in this session, so that query has not been run locally.
+- Hosted result: recorded after the deploy (see the next entry).
+
+**Follow-ups:** after the deploy, run `scripts/verify_deployment.py` against the hosted API and record the result.
+
 ### 2026-11-06: Cold-start cause confirmed from the keep-warm history
 
 **What changed:** `brain/11` (G9) only. No code.

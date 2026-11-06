@@ -107,6 +107,11 @@ def api_checks(api: str, local: bool, web_origin: str | None) -> None:
     if not local:
         status, _, _ = request(f"{api}/api/auth/me", "GET", {"X-ERIS-Client": "web"}, None, opener)
         check("the session cookie is accepted by the API", status == 200, f"HTTP {status}")
+        status, _, body = request(f"{api}/api/settings/system", "GET", {"X-ERIS-Client": "web"}, None, opener)
+        info = json.loads(body) if status == 200 else {}
+        check("the API's database connection is encrypted (as the database reports it)",
+              info.get("database_encrypted") is True or info.get("database") == "SQLite",
+              f"HTTP {status}, database={info.get('database')}, encrypted={info.get('database_encrypted')}")
         status, _, _ = request(f"{api}/api/customers", "POST", {"Content-Type": "application/json"},
                                b'{"name": "verify", "phone": "9800000001"}', opener)
         check("a cookie-authenticated change without the web header is refused", status == 403, f"HTTP {status}")

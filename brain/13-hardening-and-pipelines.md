@@ -200,3 +200,4 @@ cd api && ruff check app tests && pytest -q          # 152 tests, incl. tests/te
 cd web && npx eslint src && npm run build
 cd e2e && npx playwright test                          # 15 tests; the login limit is raised for this server only
 ```
+- **Database encryption is measured, not assumed (2026-11-06):** `GET /api/settings/system` returns `database_encrypted`, read from PostgreSQL's `pg_stat_ssl`; `scripts/verify_deployment.py` checks it on the hosted API.
