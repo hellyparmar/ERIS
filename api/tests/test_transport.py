@@ -130,3 +130,11 @@ def test_only_https_ollama_is_allowed_in_production(monkeypatch):
     assert not llm._transport_allowed("http://ollama.internal:11434")
     monkeypatch.setattr(settings, "ENVIRONMENT", "development")
     assert llm._transport_allowed("http://localhost:11434")
+
+
+def test_a_mode_that_can_fall_back_to_plain_text_is_raised_in_production():
+    for weak in ("disable", "allow", "prefer"):
+        url = f"postgresql+psycopg2://u:p@db/eris?connect_timeout=5&sslmode={weak}"
+        assert require_tls(url, "production") == "postgresql+psycopg2://u:p@db/eris?connect_timeout=5&sslmode=require"
+    assert require_tls("postgresql+psycopg2://u:p@db/eris?sslmode=verify-ca", "production").endswith("sslmode=verify-ca")
+    assert require_tls("postgresql+psycopg2://u:p@db/eris?sslmode=disable", "development").endswith("sslmode=disable")

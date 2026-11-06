@@ -96,6 +96,30 @@ Three eras are visible in the history:
 
 #13, #22, #23, #24, #25, #27, #28, #29, #30, #31, #32 (see `git log --merges` for the full list).
 
+### 2026-11-06: Database TLS cannot be weakened by the URL; three more live load runs
+
+**Request (as given):** the standing goal (see the entry below); the review asked for more than one clean load run, for the encryption of backend connections to be checked beyond the public endpoint, and for changes under "optimize".
+
+**What changed**
+- `api/app/db.py`: `require_tls` now also raises an explicit `sslmode=disable`, `allow` or `prefer` to `require` in production. Before, any explicit mode was kept as written, so a `DATABASE_URL` with `sslmode=prefer` could still run in plain text. `verify-ca` and `verify-full` are kept; development is untouched.
+- `api/tests/test_transport.py`: new test for the three weak modes, the kept strong mode, and development.
+- `brain/13`: the TLS line updated.
+
+**Why this approach:** the only encrypted-connection guarantee in code was "add `require` when no mode is stated"; the weak modes were the one way the URL could undo it. Raising them is safer than refusing to start: the previous deploy keeps serving if the database truly cannot do TLS, and the failure is visible in the deploy log.
+
+**Alternatives considered:** refuse to start on a weak mode (a bad value would fail a deploy that takes about an hour); leave as is (keeps the gap).
+
+**Backend connections, as far as the code and the host show**
+- Browser to API: TLS 1.3, HSTS, HTTP redirected (live check, earlier entry).
+- API to database: TLS forced in production by `require_tls`. Whether Render's database accepts the session is not visible from outside; the API answering `/api/health` with data endpoints working means the connection succeeded under `require`.
+- API to model server: none on the hosted API (`LLM_ENABLED` false in `render.yaml`); when enabled locally the URL is configurable and defaults to the loopback address.
+
+**Verification (as run)**
+- `ruff check` clean; full API suite 159 passed (the transport file run alone fails 9 tests that need the shared test database set up by earlier files, with or without this change; the full run is what CI runs).
+- Live load, 20 workers x 280, three runs in a row at 09:48, 09:50, 09:53 UTC: 230 / 219 / 221 answered, 50 / 61 / 59 refused with 503, 0 timeouts, 0 other 5xx, exit code 0 each time. With the earlier 220-answered run, four runs in a row were clean. The one earlier run with 4 timeouts was the first after an idle period (a cold instance).
+
+**Follow-ups:** the cold-start timeout remains an owner decision (pinger or paid plan, G9); credential rotation (S1) needs the owner.
+
 ### 2026-11-06: Full goal re-check; dead web code removed
 
 **Request (as given):** the standing goal: dead code, old redirect links, code optimization, open ports, pipelines that hold under heavy traffic, pipeline optimization, security and encrypted connectivity, verified on the deployed system.
